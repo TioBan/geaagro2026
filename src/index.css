@@ -1,0 +1,191 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+/* iOS PWA Safe Area Utilities */
+.pt-safe {
+  padding-top: max(0.625rem, calc(env(safe-area-inset-top, 0px) + 0.375rem));
+}
+.pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+.safe-top {
+  top: env(safe-area-inset-top, 0px);
+}
+
+@layer base {
+  body {
+    background-color: #f3f6f2;
+    color: #1e293b;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .dark body,
+  html.dark body {
+    background-color: #0b110d;
+    color: #f1f5f9;
+  }
+}
+
+/* AMOLED Deep Dark Helpers */
+.dark {
+  color-scheme: dark;
+}
+
+/* Custom subtle scrollbar (light & dark AMOLED) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.dark ::-webkit-scrollbar-track {
+  background: #09090b;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #27272a;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* Print optimizations - Isolate reports, force exact A4 pagination, and hide web app chrome */
+@page {
+  size: A4 portrait;
+  margin: 0;
+}
+
+@media print {
+  html,
+  html.dark,
+  body,
+  .dark body {
+    width: 210mm !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide app navigation, headers, footers, sidebars and buttons when printing */
+  header,
+  nav,
+  aside,
+  footer,
+  .print\:hidden,
+  button,
+  .no-print,
+  #top-export-pdf-btn,
+  #export-pdf-btn {
+    display: none !important;
+  }
+
+  /* When printing recommendation report (#recommendation-report-content) */
+  #recommendation-report-content {
+    display: block !important;
+    position: static !important;
+    width: 210mm !important;
+    max-width: 210mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  #recommendation-report-content * {
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+  }
+
+  /* Ensure each A4 sheet is strictly bounded and paginated without spillover */
+  .report-pdf-page {
+    width: 210mm !important;
+    height: 297mm !important;
+    max-height: 297mm !important;
+    min-height: 297mm !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin: 0 auto !important;
+    padding: 10mm 12mm !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  .report-pdf-page:last-of-type,
+  .report-pdf-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  /* Preserve intentional background badges on printable report */
+  #recommendation-report-content .bg-emerald-50,
+  #recommendation-report-content .bg-amber-50,
+  #recommendation-report-content .bg-teal-50,
+  #recommendation-report-content .bg-blue-50,
+  #recommendation-report-content .bg-purple-50,
+  #recommendation-report-content .bg-slate-50 {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background-color: inherit !important;
+  }
+
+  /* When Perícia Report Modal is open or printing, hide the rest of the application */
+  body.pericia-modal-open > *:not(#pericia-report-portal),
+  body.pericia-printing-now > *:not(#pericia-report-portal),
+  body.pericia-modal-open #root,
+  body.pericia-printing-now #root {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #pericia-report-portal {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+}
