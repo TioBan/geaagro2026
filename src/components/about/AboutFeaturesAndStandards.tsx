@@ -122,7 +122,7 @@ export const AboutFeaturesAndStandards: React.FC<AboutFeaturesAndStandardsProps>
           <div>
             <h3 className="font-bold text-base text-slate-900 dark:text-zinc-100 flex items-center gap-2">
               <Layers className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              <span>Módulos Integrados na Suíte 4.2.2</span>
+              <span>Módulos Integrados na Suíte 4.2.3</span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
               Ecossistema modular unificado para agrônomos, consultores técnicos e produtores rurais.
@@ -197,10 +197,10 @@ export const AboutFeaturesAndStandards: React.FC<AboutFeaturesAndStandardsProps>
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <Code2 className="w-5 h-5 text-emerald-400" />
-            <span className="font-bold text-sm text-white">Especificações da Versão 4.2.2</span>
+            <span className="font-bold text-sm text-white">Especificações da Versão 4.2.3</span>
           </div>
           <span className="text-[11px] font-mono bg-emerald-950 text-emerald-400 px-2.5 py-0.5 rounded border border-emerald-800">
-            Build v4.2.2-prod
+            Build v4.2.3-prod
           </span>
         </div>
 
@@ -225,7 +225,7 @@ export const AboutFeaturesAndStandards: React.FC<AboutFeaturesAndStandardsProps>
 
         <div className="pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
           <p>
-            © {new Date().getFullYear()} <strong className="text-slate-200">GeaAgro CRM 4.2.2</strong> — Todos os direitos reservados.
+            © {new Date().getFullYear()} <strong className="text-slate-200">GeaAgro CRM 4.2.3</strong> — Todos os direitos reservados.
           </p>
           {setActiveTab && (
             <button

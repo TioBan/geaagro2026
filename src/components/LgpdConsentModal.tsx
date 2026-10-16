@@ -32,7 +32,7 @@ export function saveLgpdConsentStatus(): LgpdConsentData {
   const consent: LgpdConsentData = {
     accepted: true,
     timestamp: new Date().toISOString(),
-    version: '4.2.2',
+    version: '4.2.3',
   };
   try {
     localStorage.setItem(LGPD_STORAGE_KEY, JSON.stringify(consent));
@@ -264,7 +264,7 @@ export const LgpdConsentModal: React.FC<LgpdConsentModalProps> = ({
               <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-900/50 text-emerald-950 dark:text-emerald-200 space-y-1.5">
                 <div className="font-bold text-sm flex items-center gap-2 text-emerald-900 dark:text-emerald-300">
                   <UserCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span>Bem-vindo ao GeaAgro CRM 4.2.2</span>
+                  <span>Bem-vindo ao GeaAgro CRM 4.2.3</span>
                 </div>
                 <p className="text-xs leading-relaxed text-emerald-900/90 dark:text-emerald-200/90">
                   Para utilizar as ferramentas de análise de solo, recomendação de adubação, caderno de campo e laudos agronômicos, é necessário concordar com o tratamento de dados segundo a <strong>Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018)</strong> e os termos de responsabilidade técnica agronômica.

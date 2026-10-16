@@ -28,14 +28,14 @@ export const AboutHeroSection: React.FC = () => {
           </div>
           <div className="absolute -bottom-2 -right-2 bg-amber-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full shadow-xs border border-white dark:border-black flex items-center gap-1">
             <Sprout className="w-3 h-3" />
-            <span>v4.2.2</span>
+            <span>v4.2.3</span>
           </div>
         </div>
 
         {/* App Title & Subtitle */}
         <div className="space-y-1 pt-1">
           <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 dark:text-zinc-100 tracking-tight">
-            GeaAgro CRM 4.2.2
+            GeaAgro CRM 4.2.3
           </h1>
           <p className="text-xs sm:text-sm font-medium text-emerald-800 dark:text-emerald-400 max-w-lg mx-auto">
             Plataforma de Inteligência Agronômica, Agricultura de Precisão e Gestão Rural Integrada
