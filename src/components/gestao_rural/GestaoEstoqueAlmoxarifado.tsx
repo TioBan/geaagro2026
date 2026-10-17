@@ -40,14 +40,14 @@ export const GestaoEstoqueAlmoxarifado: React.FC<GestaoEstoqueAlmoxarifadoProps>
     codigo: `INS-0${estoque.length + 1}`,
     nome: '',
     categoria: 'Fertilizantes',
-    lote: 'LT-2026-01',
-    dataValidade: '2027-12-31',
-    fornecedorNome: fornecedores[0]?.nomeEmpresa || 'Fornecedor Padrão',
-    quantidadeAtual: 1000,
+    lote: '',
+    dataValidade: '',
+    fornecedorNome: fornecedores[0]?.nomeEmpresa || '',
+    quantidadeAtual: 0,
     unidadeMedida: 'kg',
-    precoUnitarioR$: 3.5,
-    estoqueMinimo: 200,
-    localArmazenamento: 'Galpão Principal A',
+    precoUnitarioR$: 0,
+    estoqueMinimo: 0,
+    localArmazenamento: '',
     statusAlerta: 'normal',
   });
 
@@ -280,6 +280,13 @@ export const GestaoEstoqueAlmoxarifado: React.FC<GestaoEstoqueAlmoxarifadoProps>
                   </tr>
                 );
               })}
+              {filteredEstoque.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-slate-400">
+                    Nenhum item cadastrado no estoque. Clique em &ldquo;Cadastrar Novo Produto&rdquo; para adicionar insumos.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

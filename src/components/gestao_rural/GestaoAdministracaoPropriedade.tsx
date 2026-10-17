@@ -559,6 +559,11 @@ export const GestaoAdministracaoPropriedade: React.FC<GestaoAdministracaoProprie
               )}
             </div>
           ))}
+          {talhoes.length === 0 && (
+            <div className="col-span-full p-8 text-center bg-slate-50 dark:bg-zinc-800/20 rounded-2xl border border-dashed border-slate-300 dark:border-zinc-700 text-slate-500 dark:text-zinc-400">
+              Nenhum talhão cadastrado. Clique no botão &ldquo;Novo Talhão&rdquo; acima para cadastrar os talhões da sua propriedade.
+            </div>
+          )}
         </div>
       </div>
 

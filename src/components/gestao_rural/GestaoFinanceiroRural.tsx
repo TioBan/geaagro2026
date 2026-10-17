@@ -280,6 +280,13 @@ export const GestaoFinanceiroRural: React.FC<GestaoFinanceiroRuralProps> = ({
                   </td>
                 </tr>
               ))}
+              {financeiro.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-slate-400">
+                    Nenhum lançamento financeiro registrado nesta categoria. Clique em &ldquo;Novo Lançamento&rdquo; para adicionar.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

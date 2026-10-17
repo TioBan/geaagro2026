@@ -34,18 +34,18 @@ export const GestaoComprasComercializacao: React.FC<GestaoComprasComercializacao
   const [showAddVendaModal, setShowAddVendaModal] = useState(false);
 
   const [newVenda, setNewVenda] = useState<Partial<VendaComercializacaoRecord>>({
-    compradorNome: 'Cargill Agrícola S.A.',
-    compradorDocumento: '60.498.706/0001-57',
+    compradorNome: '',
+    compradorDocumento: '',
     cultura: 'Soja',
     safraId: safras[0]?.id || '',
-    quantidadeSacasOuKg: 1000,
+    quantidadeSacasOuKg: 0,
     unidade: 'sc',
-    precoUnitarioR$: 140.0,
+    precoUnitarioR$: 0,
     umidadePct: 13.5,
     impurezaPct: 1.0,
-    classificacaoQualidade: 'Tipo 1 Exportação',
-    notaFiscalNumero: 'NF-e 002.100',
-    valorFreteR$: 2500,
+    classificacaoQualidade: 'Tipo 1 Padrão',
+    notaFiscalNumero: '',
+    valorFreteR$: 0,
     valorComissaoR$: 0,
     statusRecebimento: 'recebido',
   });
@@ -154,9 +154,11 @@ export const GestaoComprasComercializacao: React.FC<GestaoComprasComercializacao
             Preço Médio Praticado
           </span>
           <span className="text-lg font-black text-amber-600 dark:text-amber-400 block">
-            R$ 138,50 / sc
+            {vendas.reduce((acc, v) => acc + v.quantidadeSacasOuKg, 0) > 0 
+              ? `R$ ${(totalComercializadoBruto / vendas.reduce((acc, v) => acc + v.quantidadeSacasOuKg, 0)).toFixed(2)} / sc`
+              : 'R$ 0,00'}
           </span>
-          <span className="text-[10px] text-emerald-600 font-bold">+R$ 8,50 acima do custo</span>
+          <span className="text-[10px] text-slate-500">Média ponderada</span>
         </div>
       </div>
 
@@ -219,6 +221,13 @@ export const GestaoComprasComercializacao: React.FC<GestaoComprasComercializacao
                   </td>
                 </tr>
               ))}
+              {vendas.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-slate-400">
+                    Nenhum contrato de venda registrado. Clique em &ldquo;Nova Venda&rdquo; para registrar a comercialização.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

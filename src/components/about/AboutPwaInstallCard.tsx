@@ -36,7 +36,7 @@ export const AboutPwaInstallCard: React.FC = () => {
         <div className="space-y-3 text-center md:text-left max-w-xl">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold uppercase tracking-wider">
             <WifiOff className="w-3.5 h-3.5 text-emerald-400" />
-            <span>GeaAgro em seu celular</span>
+            <span>GeaAgro em seu dispositivo</span>
           </div>
 
           <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center justify-center md:justify-start gap-2.5">

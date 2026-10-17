@@ -42,23 +42,23 @@ export const GestaoMaquinasRH: React.FC<GestaoMaquinasRHProps> = ({
     codigo: `TR-0${maquinas.length + 1}`,
     nome: '',
     tipo: 'Trator',
-    marcaModelo: 'John Deere 6135M',
-    anoFabricacao: 2023,
-    horimetroOuKmAtual: 1200,
-    consumoMedioLitersHour: 18,
+    marcaModelo: '',
+    anoFabricacao: new Date().getFullYear(),
+    horimetroOuKmAtual: 0,
+    consumoMedioLitersHour: 0,
     status: 'ativo',
-    proximaManutencaoHorimetro: 1500,
-    custoManutencaoAcumuladoR$: 8500,
+    proximaManutencaoHorimetro: 0,
+    custoManutencaoAcumuladoR$: 0,
     observacoes: '',
   });
 
   const [newFunc, setNewFunc] = useState<Partial<FuncionarioRuralRecord>>({
     nome: '',
-    cpf: '123.456.789-00',
+    cpf: '',
     cargoFuncao: 'Operador de Máquinas',
-    salarioBaseR$: 4500,
+    salarioBaseR$: 0,
     dataAdmissao: new Date().toISOString().split('T')[0],
-    treinamentosEPIs: ['NR-31 Agrotóxicos', 'NR-12 Operação de Tratores'],
+    treinamentosEPIs: [],
     jornadaHorasDiarias: 8,
     horasExtrasMes: 0,
     status: 'ativo',
@@ -290,6 +290,11 @@ export const GestaoMaquinasRH: React.FC<GestaoMaquinasRHProps> = ({
               </div>
             </div>
           ))}
+          {maquinas.length === 0 && (
+            <div className="col-span-full p-8 text-center bg-slate-50 dark:bg-zinc-800/20 rounded-2xl border border-dashed border-slate-300 dark:border-zinc-700 text-slate-500 dark:text-zinc-400">
+              Nenhuma máquina ou implemento cadastrado. Clique em &ldquo;Cadastrar Máquina&rdquo; para adicionar.
+            </div>
+          )}
         </div>
       )}
 

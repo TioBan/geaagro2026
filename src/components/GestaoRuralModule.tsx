@@ -17,10 +17,12 @@ import {
   Download,
   Upload,
   MapPin,
+  Trash2,
 } from 'lucide-react';
 import {
   loadGestaoRuralStorage,
   saveGestaoRuralStorage,
+  clearGestaoRuralStorage,
 } from '../utils/gestaoRuralStorage';
 import {
   PropriedadeRural,
@@ -158,6 +160,13 @@ export const GestaoRuralModule: React.FC<GestaoRuralModuleProps> = ({
     setData(prev => ({ ...prev, manutencoes: [manut, ...prev.manutencoes] }));
   };
 
+  const handleResetData = () => {
+    if (window.confirm('Deseja realmente limpar todos os dados de Administração e Gestão Rural? Todos os lançamentos serão zerados.')) {
+      clearGestaoRuralStorage();
+      setData(loadGestaoRuralStorage());
+    }
+  };
+
   return (
     <div className="w-full space-y-6 animate-fade-in">
       {/* UNIFIED SINGLE HERO BANNER */}
@@ -168,15 +177,15 @@ export const GestaoRuralModule: React.FC<GestaoRuralModuleProps> = ({
               Administração & Gestão Rural
             </div>
             <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white">
-              {data.propriedade.nome}
+              {data.propriedade.nome || 'Minha Propriedade'}
             </h1>
           </div>
 
           <p className="text-xs md:text-sm text-emerald-100/80 max-w-3xl leading-relaxed">
-            {data.propriedade.municipio} - {data.propriedade.estado} • Área Agricolável:{' '}
-            <strong className="text-white">{data.propriedade.areaAgricolaHa} ha</strong> | Irrigada:{' '}
-            <strong className="text-emerald-300">{data.propriedade.areaIrrigadaHa} ha</strong> | RT:{' '}
-            {data.propriedade.responsavelTecnico}
+            {data.propriedade.municipio ? `${data.propriedade.municipio}${data.propriedade.estado ? ` - ${data.propriedade.estado}` : ''} • ` : ''}Área Agricolável:{' '}
+            <strong className="text-white">{data.propriedade.areaAgricolaHa || 0} ha</strong> | Irrigada:{' '}
+            <strong className="text-emerald-300">{data.propriedade.areaIrrigadaHa || 0} ha</strong>
+            {data.propriedade.responsavelTecnico ? ` | RT: ${data.propriedade.responsavelTecnico}` : ''}
           </p>
         </div>
 
@@ -203,6 +212,14 @@ export const GestaoRuralModule: React.FC<GestaoRuralModuleProps> = ({
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Recarregar</span>
+          </button>
+          <button
+            onClick={handleResetData}
+            className="px-3.5 py-2.5 bg-red-950/40 hover:bg-red-900/60 text-red-200 font-extrabold text-xs rounded-xl border border-red-800/40 transition-all cursor-pointer flex items-center gap-1.5 ml-auto"
+            title="Limpar todos os dados deste módulo"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-red-400" />
+            <span>Limpar Dados</span>
           </button>
         </div>
       </div>

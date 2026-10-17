@@ -72,9 +72,25 @@ const DEMO_STORAGE_KEYS = [
   'geaagro_nursery_greenhouses_v1',
   'geaagro_nursery_orders_v1',
   'geaagro_nursery_pest_records_v1',
+  // Administração & Gestão Rural
+  'geaagro_gestao_propriedade',
+  'geaagro_gestao_talhoes',
+  'geaagro_gestao_safras',
+  'geaagro_gestao_cronograma',
+  'geaagro_gestao_operacoes',
+  'geaagro_gestao_estoque',
+  'geaagro_gestao_fornecedores',
+  'geaagro_gestao_compras',
+  'geaagro_gestao_vendas',
+  'geaagro_gestao_financeiro',
+  'geaagro_gestao_maquinas',
+  'geaagro_gestao_manutencoes',
+  'geaagro_gestao_funcionarios',
+  'geaagro_gestao_irrigacao',
+  'geaagro_gestao_clima',
 ];
 
-const CLEAN_STATE_FLAG = 'geaagro_clean_state_v6';
+const CLEAN_STATE_FLAG = 'geaagro_clean_state_v7';
 
 export function clearAllDemoData(): void {
   if (typeof window === 'undefined') return;

@@ -35,17 +35,17 @@ export const GestaoPlanejamentoAgricola: React.FC<GestaoPlanejamentoAgricolaProp
 
   // New Safra Form State
   const [newSafra, setNewSafra] = useState<Partial<SafraAgragricola>>({
-    nomeSafra: 'Safra Verão 2026/2027',
-    anoAgricola: '2026/2027',
+    nomeSafra: '',
+    anoAgricola: `${new Date().getFullYear()}/${new Date().getFullYear() + 1}`,
     cultura: 'Soja',
-    cultivar: 'TMG 7063 IPRO',
+    cultivar: '',
     talhaoId: talhoes[0]?.id || '',
-    areaHa: 100,
+    areaHa: 0,
     sistemaCultivo: 'Plantio Direto',
     cicloDias: 115,
-    dataPrevistaPlantio: '2026-10-15',
-    dataPrevistaColheita: '2027-02-10',
-    metaProdutividadeSacasHa: 85,
+    dataPrevistaPlantio: new Date().toISOString().split('T')[0],
+    dataPrevistaColheita: '',
+    metaProdutividadeSacasHa: 0,
     status: 'planejada',
   });
 
@@ -56,7 +56,7 @@ export const GestaoPlanejamentoAgricola: React.FC<GestaoPlanejamentoAgricolaProp
     safraId: safras[0]?.id || '',
     talhaoId: talhoes[0]?.id || '',
     dataPrevista: new Date().toISOString().split('T')[0],
-    responsavel: 'Operador Tiago',
+    responsavel: '',
     prioridade: 'media',
     observacoes: '',
   });
@@ -218,6 +218,11 @@ export const GestaoPlanejamentoAgricola: React.FC<GestaoPlanejamentoAgricolaProp
               </div>
             </div>
           ))}
+          {safras.length === 0 && (
+            <div className="col-span-full p-8 text-center bg-slate-50 dark:bg-zinc-800/20 rounded-2xl border border-dashed border-slate-300 dark:border-zinc-700 text-slate-500 dark:text-zinc-400">
+              Nenhuma safra cadastrada. Clique no botão &ldquo;Nova Safra&rdquo; acima para iniciar o planejamento do ano agrícola.
+            </div>
+          )}
         </div>
       </div>
 
@@ -357,6 +362,11 @@ export const GestaoPlanejamentoAgricola: React.FC<GestaoPlanejamentoAgricolaProp
               </div>
             </div>
           ))}
+          {cronograma.length === 0 && (
+            <div className="p-8 text-center bg-slate-50 dark:bg-zinc-800/20 rounded-2xl border border-dashed border-slate-300 dark:border-zinc-700 text-slate-500 dark:text-zinc-400">
+              Nenhuma tarefa cadastrada no cronograma. Clique no botão &ldquo;Nova Tarefa&rdquo; para programar atividades operacionais.
+            </div>
+          )}
         </div>
       </div>
 
