@@ -12,8 +12,11 @@ import {
   GeaAgroBackupFile,
   BACKUP_FORMAT_MAGIC,
   BACKUP_FORMAT_VERSION,
-  EMERGENCY_ROLLBACK_KEY
+  EMERGENCY_ROLLBACK_KEY,
+  RESTORE_IN_PROGRESS_KEY,
+  checkAndRecoverAbruptInterruption
 } from '../services/backupService';
+import { executeBackupCreation } from '../utils/backupService';
 import { CryptoService, CryptoError } from '../services/cryptoService';
 
 class MemoryStorage implements Storage {
@@ -529,5 +532,83 @@ describe('GeaAgro Backup and Restore Service — Fase 1 (Etapa B)', () => {
     expect(restoredApps[0].plotId).toBe(restoredPlots[0].id);
     expect(restoredPlots[0].farmId).toBe(restoredFarms[0].id);
     expect(restoredApps[0].signaturePng).toBe(originalApplications[0].signaturePng);
+  });
+
+  it('13. Recuperação pós-encerramento abrupto (queda de energia / kill do navegador)', async () => {
+    // Estado inicial
+    localStorage.setItem('agronutri_campo_ativo', 'Talhão 01 Original');
+
+    // 1. Simula que uma restauração foi iniciada e criou o snapshot, mas o processo foi morto no meio
+    const snapId = await createEmergencySnapshot('Snapshot Antes do Crash');
+    localStorage.setItem('agronutri_campo_ativo', 'Talhão 01 Corrompido no Meio');
+    localStorage.setItem(RESTORE_IN_PROGRESS_KEY, snapId);
+
+    // 2. Quando o app reinicia após a queda abrupta, checkAndRecoverAbruptInterruption detecta a interrupção
+    const recoveryResult = await checkAndRecoverAbruptInterruption();
+
+    expect(recoveryResult.recovered).toBe(true);
+    expect(recoveryResult.message).toContain('interrompida abruptamente');
+
+    // Comprova que o estado anterior ao crash foi 100% restaurado
+    expect(localStorage.getItem('agronutri_campo_ativo')).toBe('Talhão 01 Original');
+    expect(localStorage.getItem(RESTORE_IN_PROGRESS_KEY)).toBeNull();
+  });
+
+  it('14. Demonstração de rollback compensatório cross-engine (localStorage revertido após falha em escrita)', async () => {
+    // Estado prévio do usuário
+    localStorage.setItem('agronutri_produtor', 'Produtor Original João');
+
+    const corruptedBackupData = {
+      geaagro_novo_dado: 'Novo Dado que Não Deve Ficar Salvo'
+    };
+
+    const password = 'SenhaFalhaGravacao123!';
+    const { jsonString } = await createFullBackup({
+      type: 'completo',
+      customLocalStorageData: corruptedBackupData,
+      customIndexedData: [],
+      encryption: {
+        mode: 'password',
+        password
+      }
+    });
+
+    // Executa restauração forçando falha durante a gravação
+    const result = await restoreBackup(jsonString, { password }, { simulateFailureDuringRestore: true });
+
+    expect(result.success).toBe(false);
+    expect(result.rolledBack).toBe(true);
+
+    // Comprova que a chave original não foi perdida e a nova chave não ficou salva
+    expect(localStorage.getItem('agronutri_produtor')).toBe('Produtor Original João');
+    expect(localStorage.getItem('geaagro_novo_dado')).toBeNull();
+  });
+
+  it('15. Fluxo de criação de backup com chave de recuperação de 256 bits gerada dinamicamente (executeBackupCreation)', async () => {
+    localStorage.setItem('agronutri_safra_ano', 'Safra 2026/2027');
+
+    // Gera chave real de 256 bits via CryptoService
+    const recoveryDetails = CryptoService.generateRecoveryKey();
+    expect(recoveryDetails.formattedKey).toMatch(/^GEA1-[0-9A-F]{4}-[0-9A-F]{4}/);
+
+    const backupResult = executeBackupCreation({
+      type: 'completo',
+      selectedModules: ['solos', 'caderno_campo'],
+      includeMedia: false,
+      encryption: 'aes-256',
+      userPassword: 'MinhaSenhaSegura123!',
+      recoveryKey: recoveryDetails.formattedKey,
+      storageType: 'interna',
+      storageLocationName: 'Memória Interna (/data/geaagro)',
+      userName: 'Carlos Agrônomo'
+    });
+
+    expect(backupResult.backup.encryptionMode).toBe('envelope');
+    expect(backupResult.backup.sizeBytes).toBeGreaterThan(0);
+    expect(backupResult.backup.recordsCount).toBeGreaterThanOrEqual(1);
+
+    const parsedPayload = JSON.parse(backupResult.filePayload);
+    expect(parsedPayload.recoveryKeyIncluded).toBe(true);
+    expect(parsedPayload.data.agronutri_safra_ano).toBe('Safra 2026/2027');
   });
 });

@@ -31,6 +31,7 @@ export function executeBackupCreation(params: {
   includeMedia: boolean;
   encryption: 'none' | 'aes-256';
   userPassword?: string;
+  recoveryKey?: string;
   storageType: 'interna' | 'sdcard' | 'otg' | 'hd_externo' | 'pasta_custom' | 'ftp';
   storageLocationName: string;
   userNotes?: string;
@@ -38,6 +39,15 @@ export function executeBackupCreation(params: {
 }): { backup: BackupMetadata; filePayload: string } {
   // Coletar exaustivamente todas as chaves de dados do usuário (sem se limitar a geaagro_)
   const appDataDump = collectAllLocalStorageData();
+
+  // Contagem real de anexos / base64 nos dados do usuário
+  let realMediaCount = 0;
+  for (const val of Object.values(appDataDump)) {
+    const str = typeof val === 'string' ? val : JSON.stringify(val);
+    if (str.includes('data:image/') || str.includes('data:application/pdf') || str.includes('base64,')) {
+      realMediaCount++;
+    }
+  }
 
   const payloadObject = {
     magic: BACKUP_FORMAT_MAGIC,
@@ -50,12 +60,13 @@ export function executeBackupCreation(params: {
     modules: params.selectedModules,
     mediaIncluded: params.includeMedia,
     encryption: params.encryption,
+    recoveryKeyIncluded: Boolean(params.recoveryKey),
     data: appDataDump
   };
 
   const payloadString = JSON.stringify(payloadObject, null, 2);
-  const sha256Hash = generateSHA256(payloadString + (params.userPassword || ''));
-  const sizeBytes = new Blob([payloadString]).size + (params.includeMedia ? 18500000 : 250000);
+  const sha256Hash = generateSHA256(payloadString + (params.userPassword || '') + (params.recoveryKey || ''));
+  const sizeBytes = new Blob([payloadString]).size;
   const formattedSize = formatBytes(sizeBytes);
   const timestamp = new Date().toISOString();
   const dateSuffix = new Date().toISOString().replace(/[-:T.]/g, '').substring(0, 12);
@@ -76,9 +87,10 @@ export function executeBackupCreation(params: {
     integrityHash: sha256Hash,
     integrityStatus: 'valid',
     encryption: params.encryption,
+    encryptionMode: params.encryption === 'none' ? 'none' : (params.recoveryKey ? 'envelope' : 'password'),
     modulesIncluded: params.selectedModules,
-    recordsCount: Object.keys(appDataDump).length * 10 + 120,
-    mediaFilesCount: params.includeMedia ? 35 : 0,
+    recordsCount: Object.keys(appDataDump).length,
+    mediaFilesCount: realMediaCount,
     notes: params.userNotes || `Backup ${params.type} realizado via interface do sistema`
   };
 

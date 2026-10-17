@@ -125,9 +125,10 @@ self.addEventListener('install', (event) => {
           })
         )
       );
+      // A nova versão não assume o controle silenciosamente; aguarda confirmação expressa do usuário
+      console.log('[Service Worker] Nova versão baixada no cache. Aguardando autorização do usuário para ativação.');
     })
   );
-  self.skipWaiting();
 });
 
 // Activate & Clean old caches
@@ -326,9 +327,16 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// Message listener from React Application (Direct SW notification dispatch)
+// Message listener from React Application (Controlled updates & direct notifications)
 self.addEventListener('message', (event) => {
   if (!event.data) return;
+
+  // Atualização explícita sob controle e consentimento do usuário (Princípio 4 da Fase 1)
+  if (event.data.type === 'SKIP_WAITING' || event.data.type === 'APPLY_UPDATE') {
+    console.log('[Service Worker] Atualização autorizada expressamente pelo usuário. Ativando nova versão...');
+    self.skipWaiting();
+    return;
+  }
 
   if (event.data.type === 'SHOW_NOTIFICATION') {
     const { title, options } = event.data;

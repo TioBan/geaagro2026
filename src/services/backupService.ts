@@ -32,6 +32,7 @@ export const CURRENT_APP_VERSION = 'v4.8.2-PRO';
 export const CURRENT_DATABASE_VERSION = 'v4.2.8 - SQLite / IndexedDB';
 
 export const EMERGENCY_ROLLBACK_KEY = 'geaagro_emergency_rollback_snapshot_v1';
+export const RESTORE_IN_PROGRESS_KEY = 'geaagro_restore_in_progress_v1';
 export const STORAGE_KEY_BACKUP_HISTORY = 'geaagro_backup_history_v1';
 export const STORAGE_KEY_SNAPSHOTS = 'geaagro_backup_snapshots_v1';
 export const STORAGE_KEY_AUTO_CONFIG = 'geaagro_backup_autoconfig_v1';
@@ -1117,8 +1118,12 @@ export async function restoreBackup(
     return result;
   }
 
-  // 3. Aplicação transacional dos dados
+  // 3. Aplicação com orquestração de rollback compensatório
   try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem(RESTORE_IN_PROGRESS_KEY, emergencySnapshotId);
+    }
+
     if (options.simulateFailureDuringRestore) {
       throw new Error('Falha intencional simulada para validação de reversão segura (rollback).');
     }
@@ -1146,6 +1151,10 @@ export async function restoreBackup(
       }
     }
 
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem(RESTORE_IN_PROGRESS_KEY);
+    }
+
     result.restoredAttachmentsCount = (payload.attachments || []).length;
     result.success = true;
     return result;
@@ -1154,9 +1163,13 @@ export async function restoreBackup(
     const errMessage = execErr instanceof Error ? execErr.message : String(execErr);
     result.errors.push(errMessage);
 
-    console.warn('[BackupService] Erro na restauração. Iniciando rollback atômico...');
+    console.warn('[BackupService] Erro na restauração. Iniciando rollback compensatório...');
     const rollbackSuccess = await rollbackEmergencySnapshot();
     result.rolledBack = rollbackSuccess;
+
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem(RESTORE_IN_PROGRESS_KEY);
+    }
 
     if (!rollbackSuccess) {
       result.errors.push('ATENÇÃO: O rollback automático falhou. O estado foi mantido no snapshot de emergência.');
@@ -1165,6 +1178,29 @@ export async function restoreBackup(
     result.success = false;
     return result;
   }
+}
+
+/**
+ * Recuperação de segurança contra encerramento abrupto (crash do navegador ou perda de energia)
+ * Verifica na inicialização se uma restauração anterior foi interrompida antes da conclusão.
+ */
+export async function checkAndRecoverAbruptInterruption(): Promise<{ recovered: boolean; message?: string }> {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return { recovered: false };
+  }
+  const pending = localStorage.getItem(RESTORE_IN_PROGRESS_KEY);
+  if (!pending) {
+    return { recovered: false };
+  }
+  console.warn('[BackupService] Interrupção abrupta detectada em restauração anterior. Executando rollback preventivo...');
+  const success = await rollbackEmergencySnapshot();
+  localStorage.removeItem(RESTORE_IN_PROGRESS_KEY);
+  return {
+    recovered: success,
+    message: success
+      ? 'Uma restauração anterior foi interrompida abruptamente pelo navegador. Seus dados foram recuperados com sucesso para o estado anterior ao evento.'
+      : 'Falha ao recuperar dados da restauração interrompida.'
+  };
 }
 
 /**
