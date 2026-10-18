@@ -25,6 +25,7 @@ import {
   ShieldCheck,
   Scale,
   RotateCcw,
+  RefreshCw,
   PanelLeftClose,
   PanelLeftOpen,
   Menu,
@@ -458,6 +459,8 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState<boolean>(false);
+  const [swWaiting, setSwWaiting] = useState<ServiceWorker | null>(null);
+  const [showSwUpdateBanner, setShowSwUpdateBanner] = useState<boolean>(false);
 
 
   // Sync HTML root element class with theme state
@@ -528,6 +531,33 @@ export default function App() {
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('message', handleSWMessage);
+
+      // Listener para atualizações não silenciosas do Service Worker (Princípio 4 da Fase 1)
+      navigator.serviceWorker.ready.then((reg) => {
+        if (reg.waiting) {
+          setSwWaiting(reg.waiting);
+          setShowSwUpdateBanner(true);
+        }
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                setSwWaiting(newWorker);
+                setShowSwUpdateBanner(true);
+              }
+            });
+          }
+        });
+      });
+
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
     }
 
     return () => {
@@ -537,6 +567,13 @@ export default function App() {
       }
     };
   }, []);
+
+  const handleApplySwUpdate = () => {
+    if (swWaiting) {
+      swWaiting.postMessage({ type: 'SKIP_WAITING' });
+    }
+    setShowSwUpdateBanner(false);
+  };
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
@@ -1091,6 +1128,36 @@ export default function App() {
                   className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs px-4 py-2.5 rounded-lg flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
                 >
                   Instalar App <ArrowUpRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Service Worker Explicit Update Banner */}
+          {showSwUpdateBanner && (
+            <div className="bg-gradient-to-r from-teal-900 to-emerald-950 text-white rounded-xl p-4 sm:p-5 shadow-md border border-teal-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in print:hidden">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-teal-500/20 text-teal-300 border border-teal-500/30 rounded-lg shrink-0">
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm tracking-tight text-white">Nova versão do GeaAgro disponível</h4>
+                  <p className="text-xs text-teal-200/80 mt-0.5">Uma atualização da aplicação foi baixada com melhorias de segurança. Deseja aplicar a atualização agora?</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                <button
+                  onClick={() => setShowSwUpdateBanner(false)}
+                  className="p-2 text-teal-300 hover:text-white hover:bg-teal-800/40 rounded-lg text-xs transition-colors cursor-pointer"
+                  aria-label="Atualizar mais tarde"
+                >
+                  Mais Tarde
+                </button>
+                <button
+                  onClick={handleApplySwUpdate}
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs px-4 py-2.5 rounded-lg flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                >
+                  Atualizar Agora <RefreshCw className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>

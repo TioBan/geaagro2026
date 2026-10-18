@@ -61,6 +61,9 @@ import {
   saveSnapshots,
   getAutoTriggerConfig,
   saveAutoTriggerConfig,
+  createFullBackup,
+  restoreBackup,
+  validateAndInspectBackup,
   executeBackupCreation,
   createInstantSnapshot,
   generateSHA256,
@@ -190,6 +193,16 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
 
   // Restore State
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoreFileContent, setRestoreFileContent] = useState<string>('');
+  const [restorePassword, setRestorePassword] = useState<string>('');
+  const [restoreRecoveryKey, setRestoreRecoveryKey] = useState<string>('');
+  const [isRestoreEncrypted, setIsRestoreEncrypted] = useState<boolean>(false);
+  const [restoreEncryptionMode, setRestoreEncryptionMode] = useState<string>('none');
+  const [restoreValidationStatus, setRestoreValidationStatus] = useState<{
+    tested: boolean;
+    valid: boolean;
+    message?: string;
+  }>({ tested: false, valid: false });
   const [restorePreview, setRestorePreview] = useState<any | null>(null);
   const [restoreMode, setRestoreMode] = useState<'total' | 'modulo' | 'fazenda' | 'midia' | 'relatorios'>('total');
   const [selectedModuleToRestore, setSelectedModuleToRestore] = useState<string>('solos');
@@ -262,7 +275,7 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
     }
 
     setIsExecutingBackup(true);
-    setExecutionProgress(10);
+    setExecutionProgress(15);
     setExecutionStep('Coletando tabelas e registros da suite GeaAgro...');
 
     const storageLocationNames: Record<string, string> = {
@@ -274,40 +287,50 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
       ftp: `Servidor FTP (${ftpConfig.protocol.toUpperCase()}://${ftpConfig.host}:${ftpConfig.port}${ftpConfig.remotePath})`
     };
 
-    setTimeout(() => {
-      setExecutionProgress(40);
-      setExecutionStep(includeMediaFiles ? 'Empacotando fotografias, vídeos e laudos PDFs...' : 'Empacotando estruturas relacionais...');
-    }, 900);
+    (async () => {
+      try {
+        setExecutionProgress(35);
+        setExecutionStep(includeMediaFiles ? 'Empacotando fotografias, vídeos e laudos PDFs...' : 'Empacotando estruturas relacionais...');
 
-    setTimeout(() => {
-      setExecutionProgress(75);
-      setExecutionStep(useEncryption ? 'Gerando chave de criptografia AES-256 e hash SHA-256...' : 'Gerando arquivo e checksum SHA-256...');
-    }, 1800);
+        const encMode: 'none' | 'password' | 'envelope' = !useEncryption
+          ? 'none'
+          : (recoveryKey ? 'envelope' : 'password');
 
-    setTimeout(() => {
-      const result = executeBackupCreation({
-        type: backupType,
-        selectedModules,
-        includeMedia: includeMediaFiles,
-        encryption: useEncryption ? 'aes-256' : 'none',
-        userPassword: useEncryption ? encryptionPassword : undefined,
-        recoveryKey: useEncryption && recoveryKey ? recoveryKey : undefined,
-        storageType: selectedStorage,
-        storageLocationName: storageLocationNames[selectedStorage] || selectedStorage,
-        userNotes: backupNotes,
-        userName: backupUser
-      });
+        setExecutionProgress(65);
+        setExecutionStep(useEncryption
+          ? (encMode === 'envelope' ? 'Cifrando com AES-256-GCM e Envelope duplo (Senha + Chave)...' : 'Cifrando com AES-256-GCM por senha...')
+          : 'Gerando arquivo e checksum SHA-256...');
 
-      setExecutionProgress(100);
-      setExecutionStep('Backup concluído com sucesso!');
-      setHistory(getBackupHistory());
-      setLastCreatedBackup(result.backup);
+        const result = await createFullBackup({
+          type: backupType,
+          modules: selectedModules,
+          userResponsible: backupUser,
+          storageLocationName: storageLocationNames[selectedStorage] || selectedStorage,
+          storageType: selectedStorage,
+          userNotes: backupNotes,
+          encryption: {
+            mode: encMode,
+            password: useEncryption ? encryptionPassword : undefined,
+            recoveryKey: useEncryption && recoveryKey ? recoveryKey : undefined
+          }
+        });
 
-      // Trigger automatic browser download if required
-      triggerFileDownload(result.backup.filename, result.filePayload, 'application/json');
+        setExecutionProgress(100);
+        setExecutionStep('Backup concluído com sucesso!');
+        setHistory(getBackupHistory());
+        setLastCreatedBackup(result.metadata);
 
-      showToast(`Backup "${result.backup.filename}" criado e salvo com sucesso!`, 'success');
-    }, 2700);
+        // Download real cifrado
+        triggerFileDownload(result.metadata.filename, result.jsonString, 'application/json');
+
+        showToast(`Backup "${result.metadata.filename}" gerado e cifrado com sucesso!`, 'success');
+      } catch (err: any) {
+        console.error('[BackupModule] Falha na criação do backup:', err);
+        showToast(`Falha na criação do backup: ${err?.message || String(err)}`, 'error');
+      } finally {
+        setIsExecutingBackup(false);
+      }
+    })();
   };
 
   // Create Snapshot
@@ -363,51 +386,137 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
     if (files && files[0]) {
       const file = files[0];
       setRestoreFile(file);
+      setRestoreValidationStatus({ tested: false, valid: false });
 
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         try {
           const content = event.target?.result as string;
+          setRestoreFileContent(content);
+
           const parsed = JSON.parse(content);
+          const isEnc = parsed.encryption && parsed.encryption.mode !== 'none';
+          setIsRestoreEncrypted(isEnc);
+          setRestoreEncryptionMode(parsed.encryption?.mode || 'none');
+
+          // Validação preliminar do cabeçalho sem credenciais
+          const initialInspection = await validateAndInspectBackup(content);
+
           setRestorePreview({
-            valid: true,
-            version: parsed.version || 'v4.8.2-PRO',
-            createdAt: parsed.createdAt || new Date().toISOString(),
-            type: parsed.backupType || 'completo',
-            modulesCount: parsed.modules ? parsed.modules.length : 12,
-            sha256: generateSHA256(content)
+            valid: initialInspection.isValid || Boolean(initialInspection.manifest),
+            version: initialInspection.manifest?.appVersion || parsed.appVersion || 'v4.8.2-PRO',
+            createdAt: initialInspection.manifest?.timestamp || parsed.createdAt || new Date().toISOString(),
+            type: initialInspection.manifest?.type || parsed.backupType || 'completo',
+            modulesCount: initialInspection.manifest?.modulesIncluded?.length || (parsed.modules ? parsed.modules.length : 12),
+            recordsCount: initialInspection.manifest?.recordsCount || initialInspection.details?.indexedDbRecordCount || 0,
+            sha256: initialInspection.manifest?.integrityHash || generateSHA256(content),
+            encryptionMode: parsed.encryption?.mode || 'none'
           });
+
+          if (isEnc) {
+            showToast('Arquivo criptografado carregado. Insira a senha ou chave de recuperação para restaurar.', 'info');
+          } else {
+            showToast('Arquivo de backup pronto para restauração.', 'success');
+          }
         } catch {
-          // Fallback preview se for arquivo proprietário .geabackup binário
           setRestorePreview({
-            valid: true,
-            version: 'v4.8.2-PRO',
+            valid: false,
+            version: 'Desconhecida',
             createdAt: new Date().toISOString(),
-            type: 'completo',
-            modulesCount: 14,
-            sha256: generateSHA256(file.name + file.size)
+            type: 'desconhecido',
+            modulesCount: 0,
+            recordsCount: 0,
+            sha256: generateSHA256(file.name + file.size),
+            encryptionMode: 'desconhecido'
           });
+          showToast('Não foi possível ler o arquivo. Certifique-se de que é um backup .geaagro válido.', 'error');
         }
       };
       reader.readAsText(file);
     }
   };
 
-  // Execute Restore
-  const handleExecuteRestore = () => {
-    if (!restoreFile) {
-      showToast('Por favor, selecione um arquivo .geabackup para restaurar.', 'error');
+  // Test / Validate credentials before restore
+  const handleValidateCredentials = async () => {
+    if (!restoreFileContent) {
+      showToast('Nenhum arquivo de backup selecionado.', 'error');
       return;
     }
+    const inspection = await validateAndInspectBackup(restoreFileContent, {
+      password: restorePassword || undefined,
+      recoveryKey: restoreRecoveryKey || undefined
+    });
+    setRestoreValidationStatus({
+      tested: true,
+      valid: inspection.isValid,
+      message: inspection.isValid
+        ? `Autenticação AES-256-GCM validada com sucesso! ${inspection.details?.indexedDbRecordCount || 0} registros encontrados.`
+        : (inspection.errorMessage || 'Falha na autenticação do arquivo.')
+    });
+    if (inspection.isValid) {
+      showToast('Credenciais e integridade validadas com sucesso!', 'success');
+    } else {
+      showToast(inspection.errorMessage || 'Credenciais inválidas.', 'error');
+    }
+  };
+
+  // Execute Restore
+  const handleExecuteRestore = async () => {
+    if (!restoreFile || !restoreFileContent) {
+      showToast('Por favor, selecione um arquivo de backup para restaurar.', 'error');
+      return;
+    }
+
+    // 1. Validação estrita AES-256-GCM e hash antes de tocar em qualquer dado persistido
     setIsExecutingRestore(true);
-    setRestoreProgress(15);
-    setTimeout(() => setRestoreProgress(45), 800);
-    setTimeout(() => setRestoreProgress(80), 1600);
-    setTimeout(() => {
-      setRestoreProgress(100);
+    setRestoreProgress(10);
+
+    const inspection = await validateAndInspectBackup(restoreFileContent, {
+      password: restorePassword || undefined,
+      recoveryKey: restoreRecoveryKey || undefined
+    });
+
+    if (!inspection.isValid || !inspection.payload) {
       setIsExecutingRestore(false);
-      showToast(`Restauração (${restoreMode.toUpperCase()}) concluída com sucesso! Todos os dados foram atualizados.`, 'success');
-    }, 2400);
+      setRestoreProgress(0);
+      showToast(`Restauração bloqueada: ${inspection.errorMessage || 'Credenciais inválidas ou integridade violada.'}`, 'error');
+      return;
+    }
+
+    setRestoreProgress(30);
+
+    try {
+      setRestoreProgress(55);
+
+      // 2. Executa restauração com criação do snapshot de emergência e rollback transacional
+      const result = await restoreBackup(restoreFileContent, {
+        password: restorePassword || undefined,
+        recoveryKey: restoreRecoveryKey || undefined
+      });
+
+      setRestoreProgress(90);
+
+      if (result.success) {
+        setRestoreProgress(100);
+        setHistory(getBackupHistory());
+        setSnapshots(getSnapshots());
+        showToast(
+          `Restauração concluída com sucesso! ${result.restoredRecordsCount} registros e ${result.restoredKeysCount} chaves restaurados.`,
+          'success'
+        );
+      } else {
+        const errorMsg = result.errors.join('; ') || 'Erro desconhecido durante a restauração.';
+        const rollbackMsg = result.rolledBack
+          ? ' Rollback preventivo executado com sucesso. Nenhum dado prévio foi corrompido.'
+          : '';
+        showToast(`Falha na restauração: ${errorMsg}.${rollbackMsg}`, 'error');
+      }
+    } catch (err: any) {
+      console.error('[BackupModule] Falha na restauração:', err);
+      showToast(`Falha inesperada durante a restauração: ${err?.message || String(err)}`, 'error');
+    } finally {
+      setIsExecutingRestore(false);
+    }
   };
 
   // Filtered History
@@ -1584,13 +1693,105 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
             {restorePreview && (
               <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl space-y-2 animate-fadeIn">
                 <div className="flex items-center justify-between text-xs font-bold text-emerald-900 dark:text-emerald-300">
-                  <span>Arquivo de Backup Válido</span>
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    Arquivo de Backup Reconhecido
+                  </span>
                   <span>SHA-256: {restorePreview.sha256.substring(0, 16)}...</span>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-xs text-slate-600 dark:text-zinc-400 pt-1">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-slate-600 dark:text-zinc-400 pt-1">
                   <div>Versão: <strong>{restorePreview.version}</strong></div>
                   <div>Tipo: <strong>{restorePreview.type}</strong></div>
-                  <div>Módulos: <strong>{restorePreview.modulesCount} cadastrados</strong></div>
+                  <div>Módulos: <strong>{restorePreview.modulesCount}</strong></div>
+                  <div>Cifragem: <strong className="uppercase">{restorePreview.encryptionMode}</strong></div>
+                </div>
+              </div>
+            )}
+
+            {/* Authentication Credentials for Encrypted Backups */}
+            {restoreFile && (isRestoreEncrypted || (restorePreview && restorePreview.encryptionMode !== 'none')) && (
+              <div className="p-4 bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 rounded-2xl space-y-3 animate-fadeIn">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-amber-500" />
+                    <span className="text-xs font-bold text-slate-800 dark:text-zinc-200">
+                      Autenticação de Segurança (AES-256-GCM)
+                    </span>
+                  </div>
+                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                    {restoreEncryptionMode === 'envelope' ? 'Envelope Duplo' : 'Senha'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                  Este backup está protegido por criptografia de alta segurança. Os dados persistidos no aplicativo só serão alterados após a validação criptográfica bem-sucedida.
+                </p>
+
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
+                      Senha do Backup
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="Digite a senha de proteção do backup"
+                      value={restorePassword}
+                      onChange={(e) => {
+                        setRestorePassword(e.target.value);
+                        setRestoreValidationStatus({ tested: false, valid: false });
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-hidden"
+                    />
+                  </div>
+
+                  {restoreEncryptionMode === 'envelope' && (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                          Chave de Recuperação de 256 bits (Opcional se usar a senha)
+                        </label>
+                        <span className="text-[10px] text-slate-400">Modo Envelope</span>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="GEA1-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
+                        value={restoreRecoveryKey}
+                        onChange={(e) => {
+                          setRestoreRecoveryKey(e.target.value);
+                          setRestoreValidationStatus({ tested: false, valid: false });
+                        }}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-mono uppercase focus:ring-2 focus:ring-emerald-500 outline-hidden"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      type="button"
+                      onClick={handleValidateCredentials}
+                      className="px-3 py-1.5 rounded-lg bg-slate-200 dark:bg-zinc-700 hover:bg-slate-300 text-slate-800 dark:text-zinc-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                      Testar Credenciais & Integridade
+                    </button>
+                    {restoreValidationStatus.tested && (
+                      <span className={`text-xs font-bold flex items-center gap-1 ${
+                        restoreValidationStatus.valid ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'
+                      }`}>
+                        {restoreValidationStatus.valid ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+                        {restoreValidationStatus.valid ? 'Credencial Válida' : 'Credencial Inválida'}
+                      </span>
+                    )}
+                  </div>
+
+                  {restoreValidationStatus.tested && restoreValidationStatus.message && (
+                    <div className={`p-2.5 rounded-lg text-[11px] ${
+                      restoreValidationStatus.valid
+                        ? 'bg-emerald-100/60 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300'
+                        : 'bg-red-100/60 dark:bg-red-950/40 text-red-800 dark:text-red-300 border border-red-300'
+                    }`}>
+                      {restoreValidationStatus.message}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

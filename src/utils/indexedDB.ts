@@ -98,6 +98,19 @@ class IndexedDBService {
     await this.getDB();
   }
 
+  // Safely close connection before restorations or upgrades
+  public async close(): Promise<void> {
+    if (this.dbPromise) {
+      try {
+        const db = await this.dbPromise;
+        db.close();
+      } catch {
+        // Ignora erro no fechamento
+      }
+      this.dbPromise = null;
+    }
+  }
+
   // Get All Records from a Store
   public async getAll<T>(storeName: OfflineStoreName): Promise<T[]> {
     try {

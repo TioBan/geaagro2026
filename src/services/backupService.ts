@@ -521,6 +521,10 @@ export async function extractAttachments(
 // Cache em memória de alta prioridade para contornar qualquer limite de quota do localStorage
 let memoryEmergencySnapshot: { id: string; payload: any } | null = null;
 
+export function clearEmergencySnapshotCache(): void {
+  memoryEmergencySnapshot = null;
+}
+
 /**
  * Cria Snapshot Preventivo de Emergência do estado atual completo antes de qualquer restauração
  */
@@ -575,18 +579,25 @@ export async function createEmergencySnapshot(
 /**
  * Reversão atômica para o Snapshot de Emergência em caso de falha de restauração
  */
-export async function rollbackEmergencySnapshot(): Promise<boolean> {
+export async function rollbackEmergencySnapshot(targetSnapshotId?: string): Promise<boolean> {
   let parsed: any = null;
 
   // 1. Tenta recuperar do cache de memória prioritário
   if (memoryEmergencySnapshot && memoryEmergencySnapshot.payload) {
-    parsed = memoryEmergencySnapshot.payload;
-  } else if (typeof window !== 'undefined' && window.localStorage) {
-    // 2. Se não estiver em memória, recupera do localStorage
+    if (!targetSnapshotId || memoryEmergencySnapshot.id === targetSnapshotId) {
+      parsed = memoryEmergencySnapshot.payload;
+    }
+  }
+  
+  if (!parsed && typeof window !== 'undefined' && window.localStorage) {
+    // 2. Se não estiver em memória ou ID divergir, recupera do localStorage
     const raw = localStorage.getItem(EMERGENCY_ROLLBACK_KEY);
     if (raw) {
       try {
-        parsed = JSON.parse(raw);
+        const potential = JSON.parse(raw);
+        if (!targetSnapshotId || potential.id === targetSnapshotId) {
+          parsed = potential;
+        }
       } catch (err) {
         console.error('[BackupService Rollback] Erro ao analisar snapshot do localStorage:', err);
       }
@@ -617,6 +628,7 @@ export async function rollbackEmergencySnapshot(): Promise<boolean> {
       await writeIndexedDBDump(dbDump);
     }
 
+    memoryEmergencySnapshot = null;
     return true;
   } catch (err) {
     console.error('[BackupService Rollback] Erro crítico durante rollback:', err);
@@ -916,102 +928,143 @@ export async function validateAndInspectBackup(
     file = rawContentOrObject;
   }
 
-  // 2. Validação do cabeçalho e magic
-  if (!file || file.magic !== BACKUP_FORMAT_MAGIC) {
-    return {
-      isValid: false,
-      errorMessage: `Formato de backup inválido. Esperado magic "${BACKUP_FORMAT_MAGIC}", encontrado "${file?.magic || 'nenhum'}".`
-    };
-  }
-
-  if (file.formatVersion > BACKUP_FORMAT_VERSION) {
-    return {
-      isValid: false,
-      errorMessage: `Versão do formato de backup (${file.formatVersion}) superior à suportada pelo aplicativo (${BACKUP_FORMAT_VERSION}). Atualize o GeaAgro.`
-    };
-  }
-
-  // 3. Validação da integridade e autenticidade da cifragem
+  // 2. Validação do cabeçalho e compatibilidade de formatos
   let decryptedPayload: DecryptedBackupPayload;
 
-  try {
-    if (file.encryption.mode === 'none') {
-      if (!file.rawPayload) {
-        return {
-          isValid: false,
-          errorMessage: 'Arquivo de backup não criptografado com payload ausente.'
-        };
-      }
-      decryptedPayload = file.rawPayload;
-    } else if (file.encryption.mode === 'password') {
-      if (!credentials?.password) {
-        return {
-          isValid: false,
-          errorMessage: 'Este arquivo está protegido por senha. Forneça a senha para validação e restauração.',
-          manifest: file.manifest
-        };
-      }
-      if (!file.encryption.singlePayload) {
-        return {
-          isValid: false,
-          errorMessage: 'Carga cifrada corrompida ou ausente no arquivo.'
-        };
-      }
-      const decryptedText = await CryptoService.decryptText(
-        file.encryption.singlePayload,
-        credentials.password
-      );
-      decryptedPayload = JSON.parse(decryptedText);
-    } else if (file.encryption.mode === 'envelope') {
-      if (!file.encryption.envelope) {
-        return {
-          isValid: false,
-          errorMessage: 'Envelope criptográfico ausente ou inválido.'
-        };
-      }
+  if (file && file.magic === BACKUP_FORMAT_MAGIC) {
+    if (file.formatVersion > BACKUP_FORMAT_VERSION) {
+      return {
+        isValid: false,
+        errorMessage: `Versão do formato de backup (${file.formatVersion}) superior à suportada pelo aplicativo (${BACKUP_FORMAT_VERSION}). Atualize o GeaAgro.`
+      };
+    }
 
-      let decryptedText = '';
-      if (credentials?.password) {
-        try {
-          decryptedText = await CryptoService.decryptEnvelopeWithPassword(
-            file.encryption.envelope,
-            credentials.password
-          );
-        } catch (pwErr) {
-          if (credentials?.recoveryKey) {
-            // Tenta com chave de recuperação se senha falhar
-            decryptedText = await CryptoService.decryptEnvelopeWithRecoveryKey(
-              file.encryption.envelope,
-              credentials.recoveryKey
-            );
-          } else {
-            throw pwErr;
-          }
+    // 3. Validação da integridade e autenticidade da cifragem
+    try {
+      if (file.encryption.mode === 'none') {
+        if (!file.rawPayload) {
+          return {
+            isValid: false,
+            errorMessage: 'Arquivo de backup não criptografado com payload ausente.'
+          };
         }
-      } else if (credentials?.recoveryKey) {
-        decryptedText = await CryptoService.decryptEnvelopeWithRecoveryKey(
-          file.encryption.envelope,
-          credentials.recoveryKey
+        decryptedPayload = file.rawPayload;
+      } else if (file.encryption.mode === 'password') {
+        if (!credentials?.password) {
+          return {
+            isValid: false,
+            errorMessage: 'Este arquivo está protegido por senha. Forneça a senha para validação e restauração.',
+            manifest: file.manifest
+          };
+        }
+        if (!file.encryption.singlePayload) {
+          return {
+            isValid: false,
+            errorMessage: 'Carga cifrada corrompida ou ausente no arquivo.'
+          };
+        }
+        const decryptedText = await CryptoService.decryptText(
+          file.encryption.singlePayload,
+          credentials.password
         );
+        decryptedPayload = JSON.parse(decryptedText);
+      } else if (file.encryption.mode === 'envelope') {
+        if (!file.encryption.envelope) {
+          return {
+            isValid: false,
+            errorMessage: 'Envelope criptográfico ausente ou inválido.'
+          };
+        }
+
+        let decryptedText = '';
+        if (credentials?.password) {
+          try {
+            decryptedText = await CryptoService.decryptEnvelopeWithPassword(
+              file.encryption.envelope,
+              credentials.password
+            );
+          } catch (pwErr) {
+            if (credentials?.recoveryKey) {
+              // Tenta com chave de recuperação se senha falhar
+              decryptedText = await CryptoService.decryptEnvelopeWithRecoveryKey(
+                file.encryption.envelope,
+                credentials.recoveryKey
+              );
+            } else {
+              throw pwErr;
+            }
+          }
+        } else if (credentials?.recoveryKey) {
+          decryptedText = await CryptoService.decryptEnvelopeWithRecoveryKey(
+            file.encryption.envelope,
+            credentials.recoveryKey
+          );
+        } else {
+          return {
+            isValid: false,
+            errorMessage: 'Arquivo protegido por Envelope Seguro. Forneça a senha ou a chave de recuperação.',
+            manifest: file.manifest
+          };
+        }
+        decryptedPayload = JSON.parse(decryptedText);
       } else {
         return {
           isValid: false,
-          errorMessage: 'Arquivo protegido por Envelope Seguro. Forneça a senha ou a chave de recuperação.',
-          manifest: file.manifest
+          errorMessage: `Modo de criptografia desconhecido: ${file.encryption.mode}`
         };
       }
-      decryptedPayload = JSON.parse(decryptedText);
-    } else {
+    } catch (cryptoErr) {
+      const msg = cryptoErr instanceof Error ? cryptoErr.message : String(cryptoErr);
       return {
         isValid: false,
-        errorMessage: `Modo de criptografia desconhecido: ${file.encryption.mode}`
+        errorMessage: `Falha na decifragem / autenticação: ${msg}`
       };
     }
-  } catch (cryptoErr) {
-    const msg = cryptoErr instanceof Error ? cryptoErr.message : String(cryptoErr);
+  } else if (
+    file &&
+    typeof file === 'object' &&
+    (file.system === 'GeaAgro Suite' ||
+      file.localStorageData ||
+      file.indexedDBData ||
+      file.localStorage ||
+      file.agronutri_producers ||
+      file.agronutri_farms)
+  ) {
+    // Modo de Compatibilidade para Backups Legados ou Snapshots
+    decryptedPayload = {
+      system: 'GeaAgro Suite',
+      schemaVersion: 1,
+      appVersion: file.appVersion || CURRENT_APP_VERSION,
+      createdAt: file.createdAt || file.timestamp || new Date().toISOString(),
+      manifest: file.manifest || {
+        id: file.id || `bak-compat-${Date.now()}`,
+        filename: file.filename || 'Backup GeaAgro Importado',
+        timestamp: file.createdAt || new Date().toISOString(),
+        type: file.type || 'completo',
+        sizeBytes: 0,
+        formattedSize: '0 KB',
+        appVersion: CURRENT_APP_VERSION,
+        databaseVersion: CURRENT_DATABASE_VERSION,
+        userResponsible: file.userResponsible || 'Usuário GeaAgro',
+        storageLocation: 'Local',
+        storageType: 'interna',
+        integrityHash: '',
+        integrityStatus: 'valid',
+        encryption: 'none',
+        encryptionMode: 'none',
+        modulesIncluded: file.modulesIncluded || ['solos', 'caderno_campo'],
+        recordsCount: 0,
+        mediaFilesCount: 0
+      },
+      localStorageData: file.localStorageData || file.localStorage || file,
+      indexedDBData: file.indexedDBData || file.indexedDB || [],
+      attachments: file.attachments || [],
+      syncQueue: file.syncQueue || []
+    };
+  } else {
     return {
       isValid: false,
-      errorMessage: `Falha na decifragem / autenticação: ${msg}`
+      errorMessage: `Formato de backup inválido. Esperado magic "${BACKUP_FORMAT_MAGIC}", encontrado "${file?.magic || 'nenhum'}".`
     };
   }
 
@@ -1193,19 +1246,18 @@ export async function checkAndRecoverAbruptInterruption(): Promise<{ recovered: 
     return { recovered: false };
   }
   console.warn('[BackupService] Interrupção abrupta detectada em restauração anterior. Executando rollback preventivo...');
-  const success = await rollbackEmergencySnapshot();
-  localStorage.removeItem(RESTORE_IN_PROGRESS_KEY);
+  const success = await rollbackEmergencySnapshot(pending);
+  if (success) {
+    localStorage.removeItem(RESTORE_IN_PROGRESS_KEY);
+  }
   return {
     recovered: success,
     message: success
       ? 'Uma restauração anterior foi interrompida abruptamente pelo navegador. Seus dados foram recuperados com sucesso para o estado anterior ao evento.'
-      : 'Falha ao recuperar dados da restauração interrompida.'
+      : 'Falha ao recuperar dados da restauração interrompida. O snapshot de emergência foi mantido preservado.'
   };
 }
 
-/**
- * Funções de compatibilidade com a UI existente (BackupModule, BackupQRCodeGenerator)
- */
 /**
  * Funções de compatibilidade com a UI existente (BackupModule, BackupQRCodeGenerator)
  */

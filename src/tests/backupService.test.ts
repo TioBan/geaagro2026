@@ -591,7 +591,7 @@ describe('GeaAgro Backup and Restore Service — Fase 1 (Etapa B)', () => {
     const recoveryDetails = CryptoService.generateRecoveryKey();
     expect(recoveryDetails.formattedKey).toMatch(/^GEA1-[0-9A-F]{4}-[0-9A-F]{4}/);
 
-    const backupResult = executeBackupCreation({
+    const backupResult = await executeBackupCreation({
       type: 'completo',
       selectedModules: ['solos', 'caderno_campo'],
       includeMedia: false,
@@ -604,11 +604,75 @@ describe('GeaAgro Backup and Restore Service — Fase 1 (Etapa B)', () => {
     });
 
     expect(backupResult.backup.encryptionMode).toBe('envelope');
+    expect(backupResult.backup.encryption).toBe('aes-256');
     expect(backupResult.backup.sizeBytes).toBeGreaterThan(0);
     expect(backupResult.backup.recordsCount).toBeGreaterThanOrEqual(1);
 
-    const parsedPayload = JSON.parse(backupResult.filePayload);
-    expect(parsedPayload.recoveryKeyIncluded).toBe(true);
-    expect(parsedPayload.data.agronutri_safra_ano).toBe('Safra 2026/2027');
+    const parsedFile = JSON.parse(backupResult.filePayload);
+    expect(parsedFile.magic).toBe('GEAAGRO_BACKUP');
+    expect(parsedFile.encryption.mode).toBe('envelope');
+    expect(parsedFile.encryption.envelope).toBeDefined();
+
+    // 1. Descriptografia e validação por senha
+    const inspPass = await validateAndInspectBackup(backupResult.filePayload, {
+      password: 'MinhaSenhaSegura123!'
+    });
+    expect(inspPass.isValid).toBe(true);
+    expect(inspPass.payload?.localStorageData.agronutri_safra_ano).toBe('Safra 2026/2027');
+
+    // 2. Descriptografia e validação por Chave de Recuperação
+    const inspRec = await validateAndInspectBackup(backupResult.filePayload, {
+      recoveryKey: recoveryDetails.formattedKey
+    });
+    expect(inspRec.isValid).toBe(true);
+    expect(inspRec.payload?.localStorageData.agronutri_safra_ano).toBe('Safra 2026/2027');
+
+    // 3. Rejeição com senha errada
+    const inspBad = await validateAndInspectBackup(backupResult.filePayload, {
+      password: 'SenhaIncorreta999!'
+    });
+    expect(inspBad.isValid).toBe(false);
+  });
+
+  it('16. Restauração rejeitada por senha incorreta ou hash adulterado sem tocar nos dados existentes', async () => {
+    localStorage.setItem('agronutri_original_safe', 'Dado Intacto Não Modificado');
+
+    const backupData = { agronutri_malicious: 'Injeção Não Autorizada' };
+    const { jsonString } = await createFullBackup({
+      type: 'completo',
+      customLocalStorageData: backupData,
+      customIndexedData: [],
+      encryption: {
+        mode: 'password',
+        password: 'SenhaVerdadeira123!'
+      }
+    });
+
+    // Tentativa de restaurar com senha errada
+    const restoreAttempt = await restoreBackup(jsonString, {
+      password: 'SenhaTotalmenteErrada!'
+    });
+
+    expect(restoreAttempt.success).toBe(false);
+    expect(restoreAttempt.errors.length).toBeGreaterThan(0);
+
+    // O dado persistido original NÃO pode ter sido alterado nem corrompido
+    expect(localStorage.getItem('agronutri_original_safe')).toBe('Dado Intacto Não Modificado');
+    expect(localStorage.getItem('agronutri_malicious')).toBeNull();
+  });
+
+  it('17. Recuperação pós-encerramento abrupto com snapshot ausente ou corrompido não apaga dados nem trava', async () => {
+    // Configura marcador de restauração pendente sem snapshot válido no storage
+    localStorage.setItem(RESTORE_IN_PROGRESS_KEY, 'snap-inexistente');
+    localStorage.setItem(EMERGENCY_ROLLBACK_KEY, 'JSON_CORROMPIDO_INVALIDO');
+
+    const result = await checkAndRecoverAbruptInterruption();
+
+    // Deve retornar false de forma segura sem lançar exceção não tratada
+    expect(result.recovered).toBe(false);
+    expect(result.message).toContain('Falha ao recuperar dados');
+
+    // O marcador RESTORE_IN_PROGRESS_KEY não deve ser apagado silenciosamente se o rollback não teve sucesso
+    expect(localStorage.getItem(RESTORE_IN_PROGRESS_KEY)).toBe('snap-inexistente');
   });
 });
