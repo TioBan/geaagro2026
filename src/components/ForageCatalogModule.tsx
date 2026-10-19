@@ -19,6 +19,10 @@ import {
   BookOpen,
   Filter,
   CheckCircle2,
+  RefreshCw,
+  Trash2,
+  MapPin,
+  Tractor,
 } from 'lucide-react';
 
 interface ForageCatalogModuleProps {

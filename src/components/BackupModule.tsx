@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BackupQRCodeGenerator } from './BackupQRCodeGenerator';
 import { useStorageEstimate } from '../hooks/useStorageEstimate';
 import {
@@ -49,7 +49,8 @@ import {
   Globe,
   FolderOpen,
   Network,
-  Wifi
+  Wifi,
+  RotateCcw
 } from 'lucide-react';
 import {
   BackupMetadata,
@@ -63,6 +64,7 @@ import {
   saveAutoTriggerConfig,
   createFullBackup,
   restoreBackup,
+  rollbackEmergencySnapshot,
   validateAndInspectBackup,
   executeBackupCreation,
   createInstantSnapshot,
@@ -192,6 +194,11 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
   const [lastCreatedBackup, setLastCreatedBackup] = useState<BackupMetadata | null>(null);
 
   // Restore State
+  const restoreFileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [restoreInlineError, setRestoreInlineError] = useState<string | null>(null);
+  const [restoreStepText, setRestoreStepText] = useState<string>('');
+  const [restoreSuccessModal, setRestoreSuccessModal] = useState<{ count: number; keys: number } | null>(null);
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [restoreFileContent, setRestoreFileContent] = useState<string>('');
   const [restorePassword, setRestorePassword] = useState<string>('');
@@ -348,9 +355,22 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
   };
 
   // Rollback to Snapshot
-  const handleRollbackSnapshot = (snap: SnapshotRecord) => {
+  const handleRollbackSnapshot = async (snap: SnapshotRecord) => {
     if (window.confirm(`Tem certeza que deseja reverter o sistema para o estado do snapshot "${snap.title}" (${snap.timestamp})?`)) {
-      showToast(`Sistema revertido com sucesso para o estado do Snapshot: ${snap.title}!`, 'success');
+      setIsExecutingRestore(true);
+      setRestoreStepText('Revertendo estado para o snapshot selecionado...');
+      const success = await rollbackEmergencySnapshot(snap.id);
+      setIsExecutingRestore(false);
+      setRestoreStepText('');
+      if (success) {
+        showToast(`Sistema revertido com sucesso para o estado do Snapshot: ${snap.title}! Recarregando...`, 'success');
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('storage'));
+        }
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        showToast('Não foi possível localizar os dados deste snapshot para restauração direta.', 'error');
+      }
     }
   };
 
@@ -380,65 +400,72 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
     showToast('Preferências de backup automático salvas.', 'success');
   };
 
+  // Process selected file for restore (used by both input change and drag & drop)
+  const processRestoreFile = (file: File) => {
+    setRestoreFile(file);
+    setRestoreValidationStatus({ tested: false, valid: false });
+    setRestoreInlineError(null);
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const content = event.target?.result as string;
+        setRestoreFileContent(content);
+
+        const parsed = JSON.parse(content);
+        const isEnc = parsed.encryption && parsed.encryption.mode && parsed.encryption.mode !== 'none';
+        setIsRestoreEncrypted(Boolean(isEnc));
+        setRestoreEncryptionMode(parsed.encryption?.mode || 'none');
+
+        // Validação preliminar do cabeçalho sem credenciais
+        const initialInspection = await validateAndInspectBackup(content);
+
+        setRestorePreview({
+          valid: initialInspection.isValid || Boolean(initialInspection.manifest),
+          version: initialInspection.manifest?.appVersion || parsed.appVersion || 'v4.8.2-PRO',
+          createdAt: initialInspection.manifest?.timestamp || parsed.createdAt || new Date().toISOString(),
+          type: initialInspection.manifest?.type || parsed.backupType || 'completo',
+          modulesCount: initialInspection.manifest?.modulesIncluded?.length || (parsed.modules ? parsed.modules.length : 12),
+          recordsCount: initialInspection.manifest?.recordsCount || initialInspection.details?.indexedDbRecordCount || 0,
+          sha256: initialInspection.manifest?.integrityHash || generateSHA256(content),
+          encryptionMode: parsed.encryption?.mode || 'none'
+        });
+
+        if (isEnc) {
+          showToast('Arquivo criptografado carregado. Insira a senha ou chave de recuperação para restaurar.', 'info');
+        } else {
+          showToast('Arquivo de backup pronto para restauração.', 'success');
+        }
+      } catch {
+        setRestorePreview({
+          valid: false,
+          version: 'Desconhecida',
+          createdAt: new Date().toISOString(),
+          type: 'desconhecido',
+          modulesCount: 0,
+          recordsCount: 0,
+          sha256: generateSHA256(file.name + file.size),
+          encryptionMode: 'desconhecido'
+        });
+        setRestoreInlineError('Não foi possível ler o arquivo. Certifique-se de que é um arquivo JSON ou .geabackup válido.');
+        showToast('Não foi possível ler o arquivo. Certifique-se de que é um backup .geaagro válido.', 'error');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   // Handle Restore File Select
   const handleFileSelectForRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files[0]) {
-      const file = files[0];
-      setRestoreFile(file);
-      setRestoreValidationStatus({ tested: false, valid: false });
-
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        try {
-          const content = event.target?.result as string;
-          setRestoreFileContent(content);
-
-          const parsed = JSON.parse(content);
-          const isEnc = parsed.encryption && parsed.encryption.mode !== 'none';
-          setIsRestoreEncrypted(isEnc);
-          setRestoreEncryptionMode(parsed.encryption?.mode || 'none');
-
-          // Validação preliminar do cabeçalho sem credenciais
-          const initialInspection = await validateAndInspectBackup(content);
-
-          setRestorePreview({
-            valid: initialInspection.isValid || Boolean(initialInspection.manifest),
-            version: initialInspection.manifest?.appVersion || parsed.appVersion || 'v4.8.2-PRO',
-            createdAt: initialInspection.manifest?.timestamp || parsed.createdAt || new Date().toISOString(),
-            type: initialInspection.manifest?.type || parsed.backupType || 'completo',
-            modulesCount: initialInspection.manifest?.modulesIncluded?.length || (parsed.modules ? parsed.modules.length : 12),
-            recordsCount: initialInspection.manifest?.recordsCount || initialInspection.details?.indexedDbRecordCount || 0,
-            sha256: initialInspection.manifest?.integrityHash || generateSHA256(content),
-            encryptionMode: parsed.encryption?.mode || 'none'
-          });
-
-          if (isEnc) {
-            showToast('Arquivo criptografado carregado. Insira a senha ou chave de recuperação para restaurar.', 'info');
-          } else {
-            showToast('Arquivo de backup pronto para restauração.', 'success');
-          }
-        } catch {
-          setRestorePreview({
-            valid: false,
-            version: 'Desconhecida',
-            createdAt: new Date().toISOString(),
-            type: 'desconhecido',
-            modulesCount: 0,
-            recordsCount: 0,
-            sha256: generateSHA256(file.name + file.size),
-            encryptionMode: 'desconhecido'
-          });
-          showToast('Não foi possível ler o arquivo. Certifique-se de que é um backup .geaagro válido.', 'error');
-        }
-      };
-      reader.readAsText(file);
+      processRestoreFile(files[0]);
     }
   };
 
   // Test / Validate credentials before restore
   const handleValidateCredentials = async () => {
     if (!restoreFileContent) {
+      setRestoreInlineError('Nenhum arquivo de backup selecionado para validação.');
       showToast('Nenhum arquivo de backup selecionado.', 'error');
       return;
     }
@@ -454,22 +481,37 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
         : (inspection.errorMessage || 'Falha na autenticação do arquivo.')
     });
     if (inspection.isValid) {
+      setRestoreInlineError(null);
       showToast('Credenciais e integridade validadas com sucesso!', 'success');
     } else {
+      setRestoreInlineError(inspection.errorMessage || 'Credenciais inválidas.');
       showToast(inspection.errorMessage || 'Credenciais inválidas.', 'error');
     }
   };
 
   // Execute Restore
   const handleExecuteRestore = async () => {
+    setRestoreInlineError(null);
+
+    // Se nenhum arquivo foi selecionado, avisa claramente e abre o seletor de arquivos
     if (!restoreFile || !restoreFileContent) {
-      showToast('Por favor, selecione um arquivo de backup para restaurar.', 'error');
+      setRestoreInlineError('Selecione ou arraste um arquivo de backup (.json ou .geabackup) antes de executar a restauração.');
+      showToast('Selecione um arquivo de backup para restaurar.', 'error');
+      restoreFileInputRef.current?.click();
+      return;
+    }
+
+    // Se o arquivo é criptografado e nenhuma credencial foi informada, avisa na tela
+    if ((isRestoreEncrypted || restoreEncryptionMode !== 'none') && !restorePassword && !restoreRecoveryKey) {
+      setRestoreInlineError('Este backup é protegido por criptografia AES-256-GCM. Digite a senha do backup ou chave de recuperação acima para continuar.');
+      showToast('Insira a senha do backup para restaurar.', 'error');
       return;
     }
 
     // 1. Validação estrita AES-256-GCM e hash antes de tocar em qualquer dado persistido
     setIsExecutingRestore(true);
-    setRestoreProgress(10);
+    setRestoreProgress(15);
+    setRestoreStepText('Validando integridade SHA-256 e autenticação do arquivo...');
 
     const inspection = await validateAndInspectBackup(restoreFileContent, {
       password: restorePassword || undefined,
@@ -479,14 +521,19 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
     if (!inspection.isValid || !inspection.payload) {
       setIsExecutingRestore(false);
       setRestoreProgress(0);
-      showToast(`Restauração bloqueada: ${inspection.errorMessage || 'Credenciais inválidas ou integridade violada.'}`, 'error');
+      setRestoreStepText('');
+      const errorMsg = inspection.errorMessage || 'Credenciais inválidas ou integridade violada.';
+      setRestoreInlineError(`Restauração bloqueada: ${errorMsg}`);
+      showToast(`Restauração bloqueada: ${errorMsg}`, 'error');
       return;
     }
 
-    setRestoreProgress(30);
+    setRestoreProgress(40);
+    setRestoreStepText('Criando snapshot preventivo de emergência...');
 
     try {
-      setRestoreProgress(55);
+      setRestoreProgress(65);
+      setRestoreStepText('Restaurando tabelas do IndexedDB e configurações...');
 
       // 2. Executa restauração com criação do snapshot de emergência e rollback transacional
       const result = await restoreBackup(restoreFileContent, {
@@ -495,11 +542,24 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
       });
 
       setRestoreProgress(90);
+      setRestoreStepText('Finalizando aplicação dos dados...');
 
       if (result.success) {
         setRestoreProgress(100);
+        setRestoreStepText('Restauração concluída com sucesso!');
         setHistory(getBackupHistory());
         setSnapshots(getSnapshots());
+
+        // Exibe modal informativo de conclusão
+        setRestoreSuccessModal({
+          count: result.restoredRecordsCount,
+          keys: result.restoredKeysCount
+        });
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('storage'));
+        }
+
         showToast(
           `Restauração concluída com sucesso! ${result.restoredRecordsCount} registros e ${result.restoredKeysCount} chaves restaurados.`,
           'success'
@@ -509,11 +569,14 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
         const rollbackMsg = result.rolledBack
           ? ' Rollback preventivo executado com sucesso. Nenhum dado prévio foi corrompido.'
           : '';
+        setRestoreInlineError(`Falha na restauração: ${errorMsg}.${rollbackMsg}`);
         showToast(`Falha na restauração: ${errorMsg}.${rollbackMsg}`, 'error');
       }
     } catch (err: any) {
       console.error('[BackupModule] Falha na restauração:', err);
-      showToast(`Falha inesperada durante a restauração: ${err?.message || String(err)}`, 'error');
+      const errorMsg = err?.message || String(err);
+      setRestoreInlineError(`Falha inesperada durante a restauração: ${errorMsg}`);
+      showToast(`Falha inesperada durante a restauração: ${errorMsg}`, 'error');
     } finally {
       setIsExecutingRestore(false);
     }

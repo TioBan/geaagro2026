@@ -497,8 +497,18 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
   const [drawArea, setDrawArea] = useState<number>(0);
   const [selectedPlotToDelimit, setSelectedPlotToDelimit] = useState<string>(() => {
     const saved = localStorage.getItem('geaagro_polygon_selected_plot_id');
-    return saved || (plots[0]?.id || '');
+    if (saved && plots.some(p => p.id === saved)) {
+      return saved;
+    }
+    return plots[0]?.id || '__new_plot__';
   });
+  const [newPlotCustomName, setNewPlotCustomName] = useState<string>('');
+  const [mapToast, setMapToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showMapToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setMapToast({ message, type });
+    setTimeout(() => setMapToast(null), 4000);
+  };
 
   // POI points of interest state
   const [pois, setPois] = useState<CustomPOI[]>(() => {
@@ -2322,15 +2332,68 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
   // Handle Save drawn delimitation to selected plot
   const handleSaveDelimitation = () => {
-    if (drawVertices.length < 3) return;
-    const targetPlotId = selectedPlotToDelimit;
-    if (!targetPlotId) return;
+    if (drawVertices.length < 3) {
+      showMapToast('Desenhe pelo menos 3 pontos no mapa para formar um polígono fechado.', 'error');
+      return;
+    }
 
+    let targetPlotId = selectedPlotToDelimit;
+
+    // Se nenhum talhão foi selecionado, mas existem talhões, assume o primeiro
+    if ((!targetPlotId || targetPlotId === '') && plots.length > 0) {
+      targetPlotId = plots[0].id;
+      setSelectedPlotToDelimit(targetPlotId);
+    }
+
+    // Se foi escolhido criar novo talhão OU se não há nenhum talhão cadastrado:
+    if (targetPlotId === '__new_plot__' || plots.length === 0 || !plots.some(p => p.id === targetPlotId)) {
+      const nextNum = plots.length + 1;
+      const plotName = newPlotCustomName.trim() || `Talhão 0${nextNum} (${drawArea > 0 ? `${drawArea} ha` : 'Novo'})`;
+      const plotCode = `TAL-0${nextNum}`;
+
+      const newPlot: TraceabilityPlot = {
+        id: `plot-${Date.now()}`,
+        code: plotCode,
+        name: plotName,
+        farmId: property?.id || (plots[0]?.farmId) || 'farm-1',
+        areaHa: drawArea > 0 ? drawArea : 1.0,
+        structureType: 'campo_aberto',
+        currentCrop: 'Hortifruti / Lavoura',
+        currentCultivar: 'Padrão',
+        irrigationSystem: 'sequeiro',
+        soilType: 'Latossolo Vermelho',
+        soilTexture: 'medio',
+        latitude: drawVertices[0].lat,
+        longitude: drawVertices[0].lng,
+        croquiData: JSON.stringify(drawVertices),
+        active: true
+      };
+
+      const updatedPlots = [...plots, newPlot];
+      setPlots(updatedPlots);
+      if (onSavePlots) {
+        onSavePlots(updatedPlots);
+      }
+
+      setSelectedPlot(newPlot);
+      setSelectedPlotToDelimit(newPlot.id);
+      setNewPlotCustomName('');
+      setIsDrawing(false);
+      setDrawVertices([]);
+      localStorage.removeItem('geaagro_polygon_draw_vertices');
+      localStorage.setItem('geaagro_polygon_is_drawing', 'false');
+
+      showMapToast(`Novo talhão "${newPlot.name}" criado com sucesso (${drawArea} ha)!`, 'success');
+      setActiveTab('list');
+      return;
+    }
+
+    // Atualiza o talhão selecionado existente
     const updatedPlots = plots.map(p => {
       if (p.id === targetPlotId) {
         return {
           ...p,
-          areaHa: drawArea,
+          areaHa: drawArea > 0 ? drawArea : p.areaHa,
           croquiData: JSON.stringify(drawVertices),
           latitude: drawVertices[0].lat,
           longitude: drawVertices[0].lng,
@@ -2349,6 +2412,11 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
     setIsDrawing(false);
     setDrawVertices([]);
+    localStorage.removeItem('geaagro_polygon_draw_vertices');
+    localStorage.setItem('geaagro_polygon_is_drawing', 'false');
+
+    const plotName = edited ? edited.name : 'Talhão';
+    showMapToast(`Polígono do talhão "${plotName}" salvo com sucesso (${drawArea} ha)!`, 'success');
     setActiveTab('list');
   };
 
@@ -2375,7 +2443,17 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
   const selectedPlotLots = lots.filter(l => l.plotId === selectedPlot?.id || l.plotCode === selectedPlot?.code);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Toast Notification */}
+      {mapToast && (
+        <div className={`fixed top-6 right-6 z-[9999] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs font-bold text-white transition-all animate-bounce ${
+          mapToast.type === 'error' ? 'bg-rose-600' : mapToast.type === 'info' ? 'bg-sky-600' : 'bg-emerald-600'
+        }`}>
+          {mapToast.type === 'error' ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+          <span>{mapToast.message}</span>
+        </div>
+      )}
+
       {/* Top Header Card */}
       <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm flex flex-col gap-4">
         <div>
@@ -3199,13 +3277,21 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
               </div>
 
               {/* Target Plot Selection */}
-              <div className="space-y-1 text-xs">
-                <label className="font-semibold text-slate-700 dark:text-zinc-400">Selecionar Talhão Alvo:</label>
+              <div className="space-y-1.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-slate-700 dark:text-zinc-300">Selecionar Talhão Alvo:</label>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                    {plots.length} talhão(ões) disponível(is)
+                  </span>
+                </div>
                 <select
                   value={selectedPlotToDelimit}
                   onChange={e => {
                     const id = e.target.value;
                     setSelectedPlotToDelimit(id);
+                    if (id === '__new_plot__') {
+                      return;
+                    }
                     const plot = plots.find(p => p.id === id);
                     if (plot && plot.croquiData) {
                       try { setDrawVertices(JSON.parse(plot.croquiData)); } catch { setDrawVertices([]); }
@@ -3213,12 +3299,33 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                       setDrawVertices([]);
                     }
                   }}
-                  className="w-full p-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl"
+                  className="w-full p-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl font-medium text-slate-800 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500"
                 >
-                  {plots.map(p => (
-                    <option key={p.id} value={p.id}>{p.code} - {p.name}</option>
-                  ))}
+                  {plots.length === 0 ? (
+                    <option value="__new_plot__">+ Criar Novo Talhão com este Polígono</option>
+                  ) : (
+                    <>
+                      {plots.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.code} - {p.name} {p.areaHa ? `(${p.areaHa} ha)` : ''}
+                        </option>
+                      ))}
+                      <option value="__new_plot__">+ Criar Novo Talhão com este Polígono</option>
+                    </>
+                  )}
                 </select>
+
+                {selectedPlotToDelimit === '__new_plot__' && (
+                  <div className="pt-1 animate-fadeIn">
+                    <input
+                      type="text"
+                      placeholder={`Nome do novo talhão (ex: Talhão 0${plots.length + 1})`}
+                      value={newPlotCustomName}
+                      onChange={e => setNewPlotCustomName(e.target.value)}
+                      className="w-full p-2.5 bg-white dark:bg-zinc-900 border border-emerald-400 dark:border-emerald-700 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 text-slate-800 dark:text-zinc-100 placeholder:text-slate-400"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Interactive Delimitation controls */}
@@ -3276,7 +3383,10 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                   disabled={drawVertices.length < 3}
                   className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                 >
-                  <Save className="w-4 h-4" /> Salvar Polígono no Talhão
+                  <Save className="w-4 h-4" />
+                  {selectedPlotToDelimit === '__new_plot__' || plots.length === 0
+                    ? (drawArea > 0 ? `Criar Novo Talhão (${drawArea} ha)` : 'Criar Novo Talhão')
+                    : (drawArea > 0 ? `Salvar Polígono no Talhão (${drawArea} ha)` : 'Salvar Polígono no Talhão')}
                 </button>
 
                 {/* Import paste coordination segment */}

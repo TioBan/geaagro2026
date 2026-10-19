@@ -46,7 +46,7 @@ export const KNOWN_INDEXED_DATABASES: { name: string; version: number; stores: s
   },
   {
     name: 'NemaAIChatsDB',
-    version: 1,
+    version: 2,
     stores: ['diagnoses']
   },
   {
@@ -1023,43 +1023,44 @@ export async function validateAndInspectBackup(
   } else if (
     file &&
     typeof file === 'object' &&
-    (file.system === 'GeaAgro Suite' ||
-      file.localStorageData ||
-      file.indexedDBData ||
-      file.localStorage ||
-      file.agronutri_producers ||
-      file.agronutri_farms)
+    ((file as Record<string, any>).system === 'GeaAgro Suite' ||
+      Boolean((file as Record<string, any>).localStorageData) ||
+      Boolean((file as Record<string, any>).indexedDBData) ||
+      Boolean((file as Record<string, any>).localStorage) ||
+      Boolean((file as Record<string, any>).agronutri_producers) ||
+      Boolean((file as Record<string, any>).agronutri_farms))
   ) {
-    // Modo de Compatibilidade para Backups Legados ou Snapshots
+    // Modo de Compatibilidade Seguro para Backups Legados ou Snapshots
+    const legacy = file as Record<string, any>;
     decryptedPayload = {
       system: 'GeaAgro Suite',
       schemaVersion: 1,
-      appVersion: file.appVersion || CURRENT_APP_VERSION,
-      createdAt: file.createdAt || file.timestamp || new Date().toISOString(),
-      manifest: file.manifest || {
-        id: file.id || `bak-compat-${Date.now()}`,
-        filename: file.filename || 'Backup GeaAgro Importado',
-        timestamp: file.createdAt || new Date().toISOString(),
-        type: file.type || 'completo',
+      appVersion: legacy.appVersion || CURRENT_APP_VERSION,
+      createdAt: legacy.createdAt || legacy.timestamp || new Date().toISOString(),
+      manifest: legacy.manifest || {
+        id: legacy.id || `bak-compat-${Date.now()}`,
+        filename: legacy.filename || 'Backup GeaAgro Importado',
+        timestamp: legacy.createdAt || new Date().toISOString(),
+        type: legacy.type || 'completo',
         sizeBytes: 0,
         formattedSize: '0 KB',
         appVersion: CURRENT_APP_VERSION,
         databaseVersion: CURRENT_DATABASE_VERSION,
-        userResponsible: file.userResponsible || 'Usuário GeaAgro',
+        userResponsible: legacy.userResponsible || 'Usuário GeaAgro',
         storageLocation: 'Local',
         storageType: 'interna',
         integrityHash: '',
         integrityStatus: 'valid',
         encryption: 'none',
         encryptionMode: 'none',
-        modulesIncluded: file.modulesIncluded || ['solos', 'caderno_campo'],
+        modulesIncluded: legacy.modulesIncluded || ['solos', 'caderno_campo'],
         recordsCount: 0,
         mediaFilesCount: 0
       },
-      localStorageData: file.localStorageData || file.localStorage || file,
-      indexedDBData: file.indexedDBData || file.indexedDB || [],
-      attachments: file.attachments || [],
-      syncQueue: file.syncQueue || []
+      localStorageData: legacy.localStorageData || legacy.localStorage || legacy,
+      indexedDBData: legacy.indexedDBData || legacy.indexedDB || [],
+      attachments: legacy.attachments || [],
+      syncQueue: legacy.syncQueue || []
     };
   } else {
     return {
@@ -1102,12 +1103,12 @@ export async function validateAndInspectBackup(
 
   return {
     isValid: true,
-    manifest: file.manifest,
+    manifest: file.manifest || decryptedPayload.manifest,
     payload: decryptedPayload,
     details: {
       appVersion: decryptedPayload.appVersion,
       createdAt: decryptedPayload.createdAt,
-      encryptionMode: file.encryption.mode,
+      encryptionMode: file.encryption?.mode || decryptedPayload.manifest?.encryptionMode || 'none',
       localStorageKeyCount: Object.keys(decryptedPayload.localStorageData || {}).length,
       indexedDbDatabaseCount: (decryptedPayload.indexedDBData || []).length,
       indexedDbRecordCount: dbRecordCount,

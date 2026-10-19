@@ -1,6 +1,6 @@
-const NEMA_DB_NAME = 'NemaAIChatsDB';
-const NEMA_DB_VERSION = 1;
-const STORE_NAME = 'diagnoses';
+export const NEMA_DB_NAME = 'NemaAIChatsDB';
+export const NEMA_DB_VERSION = 2;
+export const STORE_NAME = 'diagnoses';
 
 export interface NemaAIDiagnosisLog {
   id: string;
@@ -19,33 +19,79 @@ export interface NemaAIDiagnosisLog {
   messages?: any[];
 }
 
-class NemaAIDBService {
+export class NemaAIDBService {
   private dbPromise: Promise<IDBDatabase> | null = null;
+  private currentDb: IDBDatabase | null = null;
+
+  public close(): void {
+    if (this.currentDb) {
+      try {
+        this.currentDb.close();
+      } catch {}
+      this.currentDb = null;
+    }
+    this.dbPromise = null;
+  }
+
+  private openDatabase(version?: number): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+      const targetVersion = version || NEMA_DB_VERSION;
+      const request = indexedDB.open(NEMA_DB_NAME, targetVersion);
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        // Cria a store diagnoses de forma idempotente sem apagar stores existentes
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+          console.log(`[NemaAIDB] Object store '${STORE_NAME}' criada com sucesso na versão ${db.version}.`);
+        }
+      };
+
+      request.onsuccess = async (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        this.currentDb = db;
+
+        // Auto-recuperação (Self-healing): se o banco já existia de versões anteriores
+        // sem a store 'diagnoses', fechamos e executamos uma migração segura de versão
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          console.warn(
+            `[NemaAIDB] Store '${STORE_NAME}' ausente na versão atual (${db.version}). Iniciando migração segura de versão...`
+          );
+          const nextVersion = Math.max(db.version + 1, NEMA_DB_VERSION);
+          db.close();
+          this.currentDb = null;
+          try {
+            const upgradedDb = await this.openDatabase(nextVersion);
+            resolve(upgradedDb);
+          } catch (upgradeErr) {
+            console.error('[NemaAIDB] Falha na migração segura de versão do banco:', upgradeErr);
+            reject(upgradeErr);
+          }
+          return;
+        }
+
+        resolve(db);
+      };
+
+      request.onerror = (event) => {
+        console.error('[NemaAIDB] Falha ao abrir o banco de dados:', (event.target as IDBOpenDBRequest).error);
+        reject((event.target as IDBOpenDBRequest).error);
+      };
+
+      request.onblocked = () => {
+        console.warn('[NemaAIDB] Migração de banco bloqueada por outra conexão aberta nesta ou em outra aba.');
+      };
+    });
+  }
 
   private getDB(): Promise<IDBDatabase> {
     if (this.dbPromise) {
       return this.dbPromise;
     }
 
-    this.dbPromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open(NEMA_DB_NAME, NEMA_DB_VERSION);
-
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-        }
-      };
-
-      request.onsuccess = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        resolve(db);
-      };
-
-      request.onerror = (event) => {
-        console.error('[NemaAIDB] Failed to open database', event);
-        reject((event.target as IDBOpenDBRequest).error);
-      };
+    this.dbPromise = this.openDatabase().catch((err) => {
+      this.dbPromise = null;
+      throw err;
     });
 
     return this.dbPromise;
