@@ -24,26 +24,102 @@ if (typeof window !== 'undefined') {
 
 // Register Service Worker for offline support & automatic background sync
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
+  const registerSW = () => {
+    navigator.serviceWorker
+      .register('/sw.js')
       .then((registration) => {
-        console.log('[Service Worker] Registered successfully with scope:', registration.scope);
-        
+        console.log('[Service Worker] Registrado com sucesso:', registration.scope);
+
         // Setup background sync if supported
         if ('sync' in registration) {
-          // Listen to connection restoration
           window.addEventListener('online', () => {
-            console.log('[Network] Back online! Requesting background sync...');
+            console.log('[Network] Conexão restabelecida! Disparando sincronização...');
             (registration as any).sync.register('geaagro-sync').catch((err: any) => {
-              console.warn('[Sync] Failed to register background sync:', err);
+              console.warn('[Sync] Falha ao registrar background sync:', err);
             });
           });
         }
       })
       .catch((err) => {
-        console.warn('[Service Worker] Registration failed:', err);
+        console.warn('[Service Worker] Registro falhou:', err);
       });
-  });
+  };
+
+  if (document.readyState === 'complete') {
+    registerSW();
+  } else {
+    window.addEventListener('load', registerSW);
+  }
+}
+
+// Preload all dynamic modules into browser cache during idle time so every single module opens instantly offline
+function scheduleModulePreloading() {
+  const moduleLoaders = [
+    () => import('./components/DashboardModule'),
+    () => import('./components/RegistrationModule'),
+    () => import('./components/SoilAnalysisModule'),
+    () => import('./components/RecommendationModule'),
+    () => import('./components/LeafAnalysisModule'),
+    () => import('./components/HistoricalComparativeModule'),
+    () => import('./components/TechnicalReportModule'),
+    () => import('./components/NurseryModule'),
+    () => import('./components/HydroponicsModule'),
+    () => import('./components/WeatherModule'),
+    () => import('./components/RainGaugeModule'),
+    () => import('./components/PhenologyModule'),
+    () => import('./components/FertigationModule'),
+    () => import('./components/TankMixModule'),
+    () => import('./components/WaterAnalysisModule'),
+    () => import('./components/BrixModule'),
+    () => import('./components/AgronomicCalculationsModule'),
+    () => import('./components/SeedAnalysisModule'),
+    () => import('./components/PlantabilityModule'),
+    () => import('./components/NematologyModule'),
+    () => import('./components/SoilDiseasesModule'),
+    () => import('./components/PestMonitoringModule'),
+    () => import('./components/PesticideBularioModule'),
+    () => import('./components/VeterinaryBularioModule'),
+    () => import('./components/LivestockModule'),
+    () => import('./components/BuffaloModule'),
+    () => import('./components/CaprineModule'),
+    () => import('./components/EquineModule'),
+    () => import('./components/SwineModule'),
+    () => import('./components/PoultryModule'),
+    () => import('./components/nutrition/AnimalNutritionModule'),
+    () => import('./components/FieldBookModule'),
+    () => import('./components/NemaAIConsole'),
+    () => import('./components/AboutModule'),
+    () => import('./components/BackupModule'),
+    () => import('./components/costs/CostManagementModule'),
+    () => import('./components/irrigation/IrrigationModule'),
+    () => import('./components/TraceabilityModule'),
+    () => import('./components/pericia/PericiaModule'),
+    () => import('./components/GeoprocessamentoModule'),
+    () => import('./components/ZarcRiscoModule'),
+    () => import('./components/GestaoRuralModule'),
+    () => import('./components/ForageCatalogModule'),
+  ];
+
+  let index = 0;
+  const loadNext = () => {
+    if (index < moduleLoaders.length) {
+      moduleLoaders[index++]()
+        .catch(() => {})
+        .finally(() => {
+          if ('requestIdleCallback' in window) {
+            (window as any).requestIdleCallback(loadNext, { timeout: 1500 });
+          } else {
+            setTimeout(loadNext, 80);
+          }
+        });
+    }
+  };
+
+  if ('requestIdleCallback' in window) {
+    (window as any).requestIdleCallback(loadNext, { timeout: 2500 });
+  } else {
+    setTimeout(loadNext, 1200);
+  }
 }
 
 // Inicialização orquestrada da aplicação com recuperação de interrupções abruptas
@@ -78,6 +154,9 @@ async function startApplication() {
         <App />
       </StrictMode>,
     );
+
+    // 5. Pre-warm all application modules in background for instant offline navigation
+    scheduleModulePreloading();
   }
 }
 

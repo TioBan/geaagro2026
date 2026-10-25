@@ -42,10 +42,12 @@ import {
   Info,
   Calendar,
   Compass,
+  Settings,
 } from 'lucide-react';
 
 export const TAB_METADATA: Record<string, { title: string; category: string; icon: any }> = {
   dashboard: { title: 'Dashboard Geral', category: 'Visão Geral', icon: Warehouse },
+  configuracoes: { title: 'Configurações', category: 'Principal', icon: Settings },
   nema_ia: { title: 'Nema IA', category: 'Inteligência Artificial', icon: Sparkles },
   caderno_campo: { title: 'Caderno de Campo Digital', category: 'Operações de Campo', icon: Calendar },
   cadastros: { title: 'Gestão de Cadastros', category: 'Estrutura & Propriedades', icon: Building2 },
@@ -148,6 +150,7 @@ const GeoprocessamentoModule = lazyWithRetry(() => import('./components/Geoproce
 const ZarcRiscoModule = lazyWithRetry(() => import('./components/ZarcRiscoModule').then((m: any) => ({ default: m.ZarcRiscoModule || m.default })));
 const GestaoRuralModule = lazyWithRetry(() => import('./components/GestaoRuralModule').then((m: any) => ({ default: m.GestaoRuralModule || m.default })));
 const ForageCatalogModule = lazyWithRetry(() => import('./components/ForageCatalogModule').then((m: any) => ({ default: m.ForageCatalogModule || m.default })));
+const ConfiguracoesModule = lazyWithRetry(() => import('./components/ConfiguracoesModule').then((m: any) => ({ default: m.ConfiguracoesModule || m.default })));
 
 // Error boundary to catch any runtime exceptions during module hydration or rendering
 interface ErrorBoundaryProps {
@@ -344,6 +347,12 @@ export function parseRouteFromUrl(): { tab: string; subTab: string } {
         'zarc': 'zarc_risco',
         'zarc_risco': 'zarc_risco',
         'risco': 'zarc_risco',
+        'configuracoes': 'configuracoes',
+        'configuracao': 'configuracoes',
+        'settings': 'configuracoes',
+        'config': 'configuracoes',
+        'perfil': 'configuracoes',
+        'perfis': 'configuracoes',
         'backup': 'backup',
         'sobre': 'sobre',
       };
@@ -1586,6 +1595,13 @@ export default function App() {
                 onNavigateSubTab={setActiveSubTab}
               />
             )}
+
+            {activeTab === 'configuracoes' && (
+              <ConfiguracoesModule
+                activeSubTab={activeSubTab}
+                setActiveSubTab={setActiveSubTab}
+              />
+            )}
           </Suspense>
         </ModuleErrorBoundary>
         </main>
@@ -1597,7 +1613,7 @@ export default function App() {
             <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
               <span className="font-extrabold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
                 <Sprout className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                GeaAgro CRM <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 font-extrabold border border-emerald-300 dark:border-emerald-800/80">v4.2.3</span>
+                GeaAgro CRM <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 font-extrabold border border-emerald-300 dark:border-emerald-800/80">v4.2.3.2</span>
               </span>
               <span className="hidden sm:inline text-slate-300 dark:text-zinc-700">•</span>
               <span className="text-slate-600 dark:text-zinc-400 text-[11px] font-medium">Plataforma de Inteligência Agronômica</span>

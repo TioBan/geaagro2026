@@ -33,29 +33,46 @@ import {
 } from '../../data/tankMixData';
 
 interface Props {
+  allProducts?: TankMixProduct[];
   selectedProducts: TankSelectedProduct[];
   setSelectedProducts: React.Dispatch<React.SetStateAction<TankSelectedProduct[]>>;
-  waterQuality: WaterQualityParameters;
-  tankVolumeL: number;
-  setTankVolumeL: (vol: number) => void;
-  sprayVolumeLHa: number;
-  setSprayVolumeLHa: (vol: number) => void;
-  onSaveRecipe: (name: string, description: string) => void;
-  onOpenTraceabilityModal: () => void;
-  onNavigateToWaterQuality: () => void;
+  waterQuality?: WaterQualityParameters;
+  setWaterQuality?: React.Dispatch<React.SetStateAction<WaterQualityParameters>>;
+  tankVolumeL?: number;
+  setTankVolumeL?: (vol: number) => void;
+  sprayVolumeLHa?: number;
+  setSprayVolumeLHa?: (vol: number) => void;
+  onSaveRecipe?: (name: string, description: string) => void;
+  onOpenTraceabilityModal?: () => void;
+  onNavigateToWaterQuality?: () => void;
+  onRecordApplication?: (record: any) => void;
+  farmName?: string;
 }
 
 export const TankMixVirtualLabView: React.FC<Props> = ({
-  selectedProducts,
+  allProducts = [],
+  selectedProducts = [],
   setSelectedProducts,
-  waterQuality,
-  tankVolumeL,
-  setTankVolumeL,
-  sprayVolumeLHa,
-  setSprayVolumeLHa,
-  onSaveRecipe,
-  onOpenTraceabilityModal,
-  onNavigateToWaterQuality,
+  waterQuality = {
+    ph: 6.2,
+    electricalConductivityUsCm: 180,
+    hardnessMgL: 65,
+    alkalinityMgL: 45,
+    temperatureC: 24,
+    calciumMgL: 18,
+    magnesiumMgL: 5,
+    ironMgL: 0.1,
+    manganeseMgL: 0.05,
+    bicarbonatesMgL: 40,
+    classification: 'Mole',
+  },
+  tankVolumeL = 2000,
+  setTankVolumeL = () => {},
+  sprayVolumeLHa = 100,
+  setSprayVolumeLHa = () => {},
+  onSaveRecipe = () => {},
+  onOpenTraceabilityModal = () => {},
+  onNavigateToWaterQuality = () => {},
 }) => {
   const [showProductModal, setShowProductModal] = useState(false);
   const [productSearch, setProductSearch] = useState('');
@@ -73,25 +90,31 @@ export const TankMixVirtualLabView: React.FC<Props> = ({
   // Helper to add product
   const handleAddProduct = (product: TankMixProduct) => {
     if (!product || !product.id) return;
-    if ((selectedProducts || []).some(p => p?.productId === product.id)) return;
+    if ((selectedProducts || []).some(p => p?.productId === product.id || p?.product?.id === product.id)) return;
     setSelectedProducts(prev => [
-      ...prev,
+      ...(prev || []),
       {
         productId: product.id,
+        product,
         dose: product.defaultDose,
         doseUnit: product.doseUnit,
+        additionOrder: (prev || []).length + 1,
       },
     ]);
     setShowProductModal(false);
   };
 
   const handleRemoveProduct = (productId: string) => {
-    setSelectedProducts(prev => (prev || []).filter(p => p?.productId !== productId));
+    setSelectedProducts(prev => (prev || []).filter(p => (p?.productId || p?.product?.id) !== productId));
   };
 
   const handleUpdateDose = (productId: string, dose: number) => {
     setSelectedProducts(prev =>
-      (prev || []).map(p => (p?.productId === productId ? { ...p, dose: Math.max(0.01, dose) } : p))
+      (prev || []).map(p =>
+        (p?.productId === productId || p?.product?.id === productId)
+          ? { ...p, dose: Math.max(0.01, dose) }
+          : p
+      )
     );
   };
 
@@ -137,7 +160,7 @@ export const TankMixVirtualLabView: React.FC<Props> = ({
 
         {/* Global Action Buttons */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          {evaluation.jarTestRequired && (
+          {evaluation.jarTestRequired && (selectedProducts || []).length > 0 && (
             <button
               onClick={() => setShowJarTestModal(true)}
               className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold px-3.5 py-2 rounded-xl text-xs shadow-sm transition-colors"
@@ -335,7 +358,9 @@ export const TankMixVirtualLabView: React.FC<Props> = ({
                 <span className="text-xs font-bold text-gray-700">Índice de Compatibilidade (ICG)</span>
                 <span
                   className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full ${
-                    evaluation.icgScore >= 85
+                    (selectedProducts || []).length === 0
+                      ? 'bg-gray-100 text-gray-600'
+                      : evaluation.icgScore >= 85
                       ? 'bg-emerald-100 text-emerald-800'
                       : evaluation.icgScore >= 70
                       ? 'bg-amber-100 text-amber-800'
@@ -344,20 +369,25 @@ export const TankMixVirtualLabView: React.FC<Props> = ({
                       : 'bg-rose-100 text-rose-800'
                   }`}
                 >
-                  {evaluation.icgScore}% •{' '}
-                  {evaluation.worstRating === 'compativel'
-                    ? 'Elevada'
-                    : evaluation.worstRating === 'compativel_restricoes'
-                    ? 'Com Cuidados'
-                    : evaluation.worstRating === 'restricao_severa'
-                    ? 'Restrições'
-                    : 'Incompatível'}
+                  {(selectedProducts || []).length === 0
+                    ? 'Aguardando Insumos'
+                    : `${evaluation.icgScore}% • ${
+                        evaluation.worstRating === 'compativel'
+                          ? 'Elevada'
+                          : evaluation.worstRating === 'compativel_restricoes'
+                          ? 'Com Cuidados'
+                          : evaluation.worstRating === 'restricao_severa'
+                          ? 'Restrições'
+                          : 'Incompatível'
+                      }`}
                 </span>
               </div>
               <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden">
                 <div
                   className={`h-full transition-all duration-500 ${
-                    evaluation.icgScore >= 85
+                    (selectedProducts || []).length === 0
+                      ? 'bg-gray-300'
+                      : evaluation.icgScore >= 85
                       ? 'bg-emerald-500'
                       : evaluation.icgScore >= 70
                       ? 'bg-amber-500'
@@ -365,7 +395,7 @@ export const TankMixVirtualLabView: React.FC<Props> = ({
                       ? 'bg-orange-500'
                       : 'bg-rose-500'
                   }`}
-                  style={{ width: `${evaluation.icgScore}%` }}
+                  style={{ width: (selectedProducts || []).length === 0 ? '0%' : `${evaluation.icgScore}%` }}
                 />
               </div>
             </div>
@@ -445,7 +475,11 @@ export const TankMixVirtualLabView: React.FC<Props> = ({
             ) : (
               <div className="space-y-3">
                 {(selectedProducts || []).map((sp, index) => {
-                  const product = (TANKMIX_PRODUCTS_DATABASE || []).find(p => p?.id === sp?.productId);
+                  const prodId = sp?.productId || sp?.product?.id || '';
+                  const product =
+                    sp?.product ||
+                    (TANKMIX_PRODUCTS_DATABASE || []).find(p => p?.id === prodId) ||
+                    (allProducts || []).find(p => p?.id === prodId);
                   if (!product) return null;
 
                   // Total amount for the whole tank:
@@ -454,7 +488,7 @@ export const TankMixVirtualLabView: React.FC<Props> = ({
 
                   return (
                     <div
-                      key={sp.productId}
+                      key={prodId || `sp_${index}`}
                       className="p-4 rounded-xl border border-gray-200 bg-white hover:border-emerald-300 transition-all shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3"
                     >
                       <div className="flex-1">
@@ -481,7 +515,7 @@ export const TankMixVirtualLabView: React.FC<Props> = ({
                             step={0.05}
                             min={0.01}
                             value={sp.dose}
-                            onChange={e => handleUpdateDose(sp.productId, Number(e.target.value))}
+                            onChange={e => handleUpdateDose(prodId, Number(e.target.value))}
                             className="w-16 bg-white border border-gray-300 rounded px-1.5 py-0.5 text-xs font-bold text-gray-900 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-center"
                           />
                           <span className="text-xs font-semibold text-gray-700">{sp.doseUnit}</span>
@@ -498,8 +532,8 @@ export const TankMixVirtualLabView: React.FC<Props> = ({
                         </div>
 
                         <button
-                          onClick={() => handleRemoveProduct(sp.productId)}
-                          className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          onClick={() => handleRemoveProduct(prodId)}
+                          className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                           title="Remover produto"
                         >
                           <Trash2 className="w-4 h-4" />

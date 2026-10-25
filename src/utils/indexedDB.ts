@@ -1,16 +1,42 @@
-import { Animal, Paddock } from '../types/livestock';
-import { PoultryBatch, PoultryShed } from '../types/poultry';
-import { INITIAL_ANIMALS, INITIAL_PADDOCKS } from '../data/livestockData';
-import { INITIAL_POULTRY_BATCHES, INITIAL_POULTRY_SHEDS } from '../data/poultryData';
-
 export const DB_NAME = 'GeaAgroOfflineDB';
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 
 export const REQUIRED_OBJECT_STORES = [
+  // Pecuária & Produção Animal
   'animals',
   'paddocks',
   'poultry_batches',
   'poultry_sheds',
+  'buffalo_records',
+  'caprine_records',
+  'equine_records',
+  'swine_records',
+  // Cadastros Mestres & Estrutura
+  'companies',
+  'agronomists',
+  'producers',
+  'farms',
+  // Solos, Diagnose Foliar & Nutrição
+  'soil_samples',
+  'leaf_samples',
+  'recommendations',
+  'water_analysis',
+  // Operações de Campo & Rastreabilidade
+  'fieldbook_operations',
+  'traceability_lots',
+  'traceability_harvests',
+  'traceability_photos',
+  // Gestão Rural, Custos & Engenharia
+  'gestao_rural',
+  'costs_records',
+  'plantability_records',
+  'irrigation_records',
+  // Fitossanidade, Viveiro & Diagnósticos
+  'pests_records',
+  'nursery_records',
+  'offline_diagnostics',
+  // Configurações & Sincronização Offline-First
+  'app_settings',
   'sync_queue',
 ] as const;
 
@@ -18,7 +44,7 @@ export type OfflineStoreName = typeof REQUIRED_OBJECT_STORES[number];
 
 export interface SyncItem {
   id: string;
-  table: 'animals' | 'paddocks' | 'poultry_batches' | 'poultry_sheds';
+  table: OfflineStoreName;
   action: 'insert' | 'update' | 'delete';
   data: any;
   timestamp: number;
@@ -93,9 +119,67 @@ class IndexedDBService {
     return this.dbPromise;
   }
 
-  // Initialize Database
+  // Initialize Database and request persistent browser storage
   public async initializeDefaultData(): Promise<void> {
-    await this.getDB();
+    try {
+      await this.getDB();
+      await this.requestPersistentStorage();
+      await this.persistAllEntitiesToIndexedDB();
+    } catch (err) {
+      console.warn('[IndexedDB] initializeDefaultData warning:', err);
+    }
+  }
+
+  // Request Persistent Storage from the browser to prevent eviction
+  public async requestPersistentStorage(): Promise<boolean> {
+    if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
+      try {
+        const isPersisted = await navigator.storage.persisted();
+        if (isPersisted) {
+          return true;
+        }
+        const granted = await navigator.storage.persist();
+        console.log(`[IndexedDB] Persistent storage request: ${granted ? 'GRANTED' : 'DENIED'}`);
+        return granted;
+      } catch (err) {
+        console.warn('[IndexedDB] Could not request persistent storage:', err);
+        return false;
+      }
+    }
+    return false;
+  }
+
+  // Get storage usage estimate
+  public async getStorageEstimate(): Promise<{
+    quota: number;
+    usage: number;
+    percentage: number;
+    isPersistent: boolean;
+  }> {
+    let quota = 0;
+    let usage = 0;
+    let percentage = 0;
+    let isPersistent = false;
+
+    if (typeof navigator !== 'undefined' && navigator.storage) {
+      if (navigator.storage.estimate) {
+        try {
+          const estimate = await navigator.storage.estimate();
+          quota = estimate.quota || 0;
+          usage = estimate.usage || 0;
+          if (quota > 0) {
+            percentage = parseFloat(((usage / quota) * 100).toFixed(2));
+          }
+        } catch {}
+      }
+      if (navigator.storage.persisted) {
+        try {
+          isPersistent = await navigator.storage.persisted();
+        } catch {}
+      }
+    }
+
+    return { quota, usage, percentage, isPersistent };
   }
 
   // Safely close connection before restorations or upgrades
@@ -108,6 +192,28 @@ class IndexedDBService {
         // Ignora erro no fechamento
       }
       this.dbPromise = null;
+    }
+  }
+
+  // Get Single Record from a Store by ID
+  public async get<T>(storeName: OfflineStoreName, id: string): Promise<T | null> {
+    try {
+      const db = await this.getDB();
+      if (!db.objectStoreNames.contains(storeName)) {
+        return null;
+      }
+
+      const tx = db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName);
+
+      return new Promise((resolve, reject) => {
+        const request = store.get(id);
+        request.onsuccess = () => resolve((request.result as T) || null);
+        request.onerror = () => reject(request.error);
+      });
+    } catch (error) {
+      console.warn(`[IndexedDB] get error on store '${storeName}':`, error);
+      return null;
     }
   }
 
@@ -134,10 +240,30 @@ class IndexedDBService {
     }
   }
 
+  // Count records in a store
+  public async count(storeName: OfflineStoreName): Promise<number> {
+    try {
+      const db = await this.getDB();
+      if (!db.objectStoreNames.contains(storeName)) {
+        return 0;
+      }
+      const tx = db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName);
+
+      return new Promise((resolve, reject) => {
+        const request = store.count();
+        request.onsuccess = () => resolve(request.result || 0);
+        request.onerror = () => reject(request.error);
+      });
+    } catch {
+      return 0;
+    }
+  }
+
   // Save/Update a Record in a Store
-  public async put<T>(
-    storeName: 'animals' | 'paddocks' | 'poultry_batches' | 'poultry_sheds',
-    value: T & { id: string },
+  public async put<T extends { id: string }>(
+    storeName: OfflineStoreName,
+    value: T,
     skipSync = false
   ): Promise<void> {
     const db = await this.getDB();
@@ -154,15 +280,49 @@ class IndexedDBService {
       request.onerror = () => reject(request.error);
     });
 
-    if (!skipSync) {
+    if (!skipSync && storeName !== 'sync_queue' && storeName !== 'app_settings') {
       await this.addToSyncQueue(storeName, 'update', value);
     }
   }
 
+  // Bulk Put Many Records in a Single Transaction (High Performance)
+  public async putMany<T extends { id: string }>(
+    storeName: OfflineStoreName,
+    items: T[],
+    skipSync = false
+  ): Promise<void> {
+    if (!items || items.length === 0) return;
+    const db = await this.getDB();
+    if (!db.objectStoreNames.contains(storeName)) {
+      throw new Error(`Store '${storeName}' not found in database.`);
+    }
+
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(new Error('Transaction aborted'));
+
+      for (const item of items) {
+        if (item && item.id) {
+          store.put(item);
+        }
+      }
+    });
+
+    if (!skipSync && storeName !== 'sync_queue' && storeName !== 'app_settings') {
+      for (const item of items) {
+        await this.addToSyncQueue(storeName, 'update', item);
+      }
+    }
+  }
+
   // Add a Record to Store (New)
-  public async add<T>(
-    storeName: 'animals' | 'paddocks' | 'poultry_batches' | 'poultry_sheds',
-    value: T & { id: string },
+  public async add<T extends { id: string }>(
+    storeName: OfflineStoreName,
+    value: T,
     skipSync = false
   ): Promise<void> {
     const db = await this.getDB();
@@ -179,14 +339,14 @@ class IndexedDBService {
       request.onerror = () => reject(request.error);
     });
 
-    if (!skipSync) {
+    if (!skipSync && storeName !== 'sync_queue' && storeName !== 'app_settings') {
       await this.addToSyncQueue(storeName, 'insert', value);
     }
   }
 
   // Delete a Record from a Store
   public async delete(
-    storeName: 'animals' | 'paddocks' | 'poultry_batches' | 'poultry_sheds',
+    storeName: OfflineStoreName,
     id: string,
     skipSync = false
   ): Promise<void> {
@@ -204,14 +364,109 @@ class IndexedDBService {
       request.onerror = () => reject(request.error);
     });
 
-    if (!skipSync) {
+    if (!skipSync && storeName !== 'sync_queue' && storeName !== 'app_settings') {
       await this.addToSyncQueue(storeName, 'delete', { id });
     }
   }
 
+  // Clear all records in a store
+  public async clear(storeName: OfflineStoreName): Promise<void> {
+    try {
+      const db = await this.getDB();
+      if (!db.objectStoreNames.contains(storeName)) return;
+
+      const tx = db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
+
+      return new Promise((resolve, reject) => {
+        const request = store.clear();
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    } catch (err) {
+      console.warn(`[IndexedDB] clear error on store '${storeName}':`, err);
+    }
+  }
+
+  // Key-Value App Settings Store
+  public async setSetting<T>(key: string, value: T): Promise<void> {
+    const item = { id: key, value, updatedAt: Date.now() };
+    await this.put('app_settings', item, true);
+  }
+
+  public async getSetting<T>(key: string, defaultValue?: T): Promise<T | undefined> {
+    const record = await this.get<{ id: string; value: T }>('app_settings', key);
+    return record ? record.value : defaultValue;
+  }
+
+  // Bridge utility: Synchronize a memory or LocalStorage dataset into IndexedDB
+  public async syncEntityToIndexedDB<T extends { id: string }>(
+    storeName: OfflineStoreName,
+    items: T[]
+  ): Promise<void> {
+    try {
+      if (!Array.isArray(items)) return;
+      await this.putMany(storeName, items, true);
+    } catch (err) {
+      console.warn(`[IndexedDB] Error syncing ${storeName} to IndexedDB:`, err);
+    }
+  }
+
+  // Hydrate an entity from IndexedDB with fallback
+  public async hydrateEntityFromIndexedDB<T extends { id: string }>(
+    storeName: OfflineStoreName,
+    fallback: T[]
+  ): Promise<T[]> {
+    try {
+      const items = await this.getAll<T>(storeName);
+      if (items && items.length > 0) {
+        return items;
+      }
+      if (fallback && fallback.length > 0) {
+        await this.syncEntityToIndexedDB(storeName, fallback);
+        return fallback;
+      }
+      return [];
+    } catch (err) {
+      console.warn(`[IndexedDB] Error hydrating ${storeName} from IndexedDB:`, err);
+      return fallback || [];
+    }
+  }
+
+  // Auto-persist all known localStorage datasets to IndexedDB for complete offline resilience
+  public async persistAllEntitiesToIndexedDB(): Promise<void> {
+    if (typeof window === 'undefined') return;
+
+    const MAPPINGS: { localKey: string; store: OfflineStoreName }[] = [
+      { localKey: 'agronutri_companies', store: 'companies' },
+      { localKey: 'agronutri_agronomists', store: 'agronomists' },
+      { localKey: 'agronutri_producers', store: 'producers' },
+      { localKey: 'agronutri_farms', store: 'farms' },
+      { localKey: 'agronutri_soil_samples', store: 'soil_samples' },
+      { localKey: 'agronutri_leaf_samples', store: 'leaf_samples' },
+      { localKey: 'agronutri_water_analysis_v2', store: 'water_analysis' },
+      { localKey: 'agronutri_fieldbook_operations', store: 'fieldbook_operations' },
+      { localKey: 'agronutri_traceability_lots', store: 'traceability_lots' },
+    ];
+
+    for (const mapping of MAPPINGS) {
+      try {
+        const raw = localStorage.getItem(mapping.localKey);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            await this.putMany(mapping.store, parsed, true);
+          }
+        }
+      } catch (err) {
+        console.warn(`[IndexedDB] persistAllEntities error for ${mapping.localKey}:`, err);
+      }
+    }
+  }
+
   // Sync Queue Helpers
-  private async addToSyncQueue(
-    table: 'animals' | 'paddocks' | 'poultry_batches' | 'poultry_sheds',
+  public async addToSyncQueue(
+    table: OfflineStoreName,
     action: 'insert' | 'update' | 'delete',
     data: any
   ): Promise<void> {

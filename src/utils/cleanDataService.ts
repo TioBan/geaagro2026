@@ -90,7 +90,7 @@ const DEMO_STORAGE_KEYS = [
   'geaagro_gestao_clima',
 ];
 
-const CLEAN_STATE_FLAG = 'geaagro_clean_state_v7';
+const CLEAN_STATE_FLAG = 'geaagro_clean_state_v8';
 
 export function clearAllDemoData(): void {
   if (typeof window === 'undefined') return;

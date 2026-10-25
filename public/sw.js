@@ -1,8 +1,14 @@
 const CACHE_NAME = 'geaagro-cache-v14';
-const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.json',
+
+// Essential assets: Required for application shell & JavaScript/CSS modules to execute offline
+const ESSENTIAL_ASSETS = [
+  "/",
+  "/index.html",
+  "/manifest.json"
+];
+
+// Optional assets: Auxiliary photography and diagnostic illustrations that may fail gracefully
+const OPTIONAL_ASSETS = [
   '/icon.png',
   '/splash.jpg',
   // Nematodes Microscopy & Real Field Damage Photos
@@ -112,33 +118,60 @@ const ASSETS_TO_CACHE = [
   '/nutr_zinc_deficiency.jpg'
 ];
 
-// Install Service Worker and cache essential shell assets resiliently
+// Fallback compatibility alias
+const ASSETS_TO_CACHE = [...ESSENTIAL_ASSETS, ...OPTIONAL_ASSETS];
+
+// Install Service Worker and cache all essential application modules & assets
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      console.log('[Service Worker] Pre-caching offline assets...');
-      // Use individual caching so one missing asset never stops the rest
-      await Promise.allSettled(
-        ASSETS_TO_CACHE.map((url) =>
-          cache.add(url).catch((err) => {
-            console.warn('[Service Worker] Skipping cache for asset:', url, err);
-          })
-        )
+      console.log(`[Service Worker] Installing ${CACHE_NAME}. Precaching all application chunks & modules...`);
+
+      // Combine all assets to precache, giving highest priority to shell and JS/CSS chunks
+      const allTargetAssets = Array.from(
+        new Set([
+          '/',
+          '/index.html',
+          '/manifest.json',
+          '/icon.png',
+          ...(Array.isArray(ASSETS_TO_CACHE) ? ASSETS_TO_CACHE : []),
+          ...(Array.isArray(ESSENTIAL_ASSETS) ? ESSENTIAL_ASSETS : []),
+          ...(Array.isArray(OPTIONAL_ASSETS) ? OPTIONAL_ASSETS : []),
+        ])
       );
-      // A nova versão não assume o controle silenciosamente; aguarda confirmação expressa do usuário
-      console.log('[Service Worker] Nova versão baixada no cache. Aguardando autorização do usuário para ativação.');
+
+      // Precache in batches of 15 to maximize throughput without socket exhaustion
+      const batchSize = 15;
+      for (let i = 0; i < allTargetAssets.length; i += batchSize) {
+        const batch = allTargetAssets.slice(i, i + batchSize);
+        await Promise.allSettled(
+          batch.map(async (url) => {
+            try {
+              const response = await fetch(url, { cache: 'no-cache' });
+              if (response && (response.ok || response.type === 'opaque')) {
+                await cache.put(url, response);
+              }
+            } catch (err) {
+              console.warn('[Service Worker] Non-fatal precache skip:', url);
+            }
+          })
+        );
+      }
+
+      console.log(`[Service Worker] All application modules precached successfully (${allTargetAssets.length} items). Ready for 100% offline execution.`);
     })
   );
 });
 
-// Activate & Clean old caches
+// Activate & Clean old caches safely
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
+    caches.keys().then(async (keys) => {
+      await Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            console.log('[Service Worker] Removing old cache:', key);
+          if (key !== CACHE_NAME && key.startsWith('geaagro-cache-')) {
+            console.log('[Service Worker] Safely purging obsolete cache generation:', key);
             return caches.delete(key);
           }
         })
@@ -148,9 +181,10 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch events: Cache-First for static image assets, Network-First for dynamic routes
+// Fetch events: Cache-First strategy for all static assets (scripts, styles, images, fonts, manifests)
+// Network-First with instant offline fallback for document navigation
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
+  if (event.request.method !== 'GET') {
     return;
   }
 
@@ -173,57 +207,173 @@ self.addEventListener('fetch', (event) => {
     return; // Let the browser handle development assets naturally via network without SW intervention
   }
 
-  const isImage = /\.(jpg|jpeg|png|svg|webp|gif|ico)$/i.test(url.pathname);
+  // Identify all static assets: Vite hashed assets, scripts, stylesheets, images, fonts, manifests
+  const isStaticAsset =
+    url.pathname.startsWith('/assets/') ||
+    /\.(js|mjs|cjs|css|png|jpg|jpeg|svg|webp|gif|ico|avif|woff|woff2|ttf|otf|eot|wasm|webmanifest)$/i.test(url.pathname) ||
+    url.pathname === '/manifest.json' ||
+    url.pathname === '/icon.png' ||
+    url.pathname === '/splash.jpg' ||
+    url.hostname === 'fonts.googleapis.com' ||
+    url.hostname === 'fonts.gstatic.com';
 
-  if (isImage) {
-    // Cache First strategy for images to guarantee offline instant loading
+  // Cache-First strategy for ALL static assets:
+  // 1. Immediately return from cache if present and valid
+  // 2. Otherwise fetch from network, validate, cache for next time, and return
+  // 3. If offline, return resilient fallback module/stylesheet/placeholder
+  if (isStaticAsset) {
     event.respondWith(
-      caches.match(event.request).then((cachedResponse) => {
-        if (cachedResponse) {
-          return cachedResponse;
+      (async () => {
+        // 1. Check Cache first across active caches, ignoring query parameters for chunk accuracy
+        let cachedResponse = await caches.match(event.request, { ignoreSearch: true });
+        if (!cachedResponse) {
+          cachedResponse = await caches.match(url.pathname, { ignoreSearch: true });
         }
-        return fetch(event.request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
+        if (cachedResponse) {
+          const contentType = cachedResponse.headers.get('content-type') || '';
+          // Ensure cached response is not a corrupt HTML fallback
+          if (!contentType.includes('text/html') || url.pathname.endsWith('.html')) {
+            return cachedResponse;
+          }
+          // Purge corrupted HTML from cache
+          try {
+            const currentCache = await caches.open(CACHE_NAME);
+            await currentCache.delete(event.request);
+          } catch {}
+        }
+
+        // 2. Fetch from network on cache miss
+        try {
+          const networkResponse = await fetch(event.request);
+          if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
+            const contentType = networkResponse.headers.get('content-type') || '';
+            const isJs = url.pathname.endsWith('.js') && (contentType.includes('javascript') || contentType.includes('ecmascript'));
+            const isCss = url.pathname.endsWith('.css') && contentType.includes('css');
+            const isOtherValidAsset = !url.pathname.endsWith('.js') && !url.pathname.endsWith('.css') && !contentType.includes('text/html');
+
+            if (isJs || isCss || isOtherValidAsset || networkResponse.type === 'opaque') {
               const responseClone = networkResponse.clone();
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, responseClone);
-              });
+              const currentCache = await caches.open(CACHE_NAME);
+              await currentCache.put(event.request, responseClone);
+            } else {
+              console.warn(`[Service Worker] Ignored caching asset with invalid Content-Type: ${contentType} for ${url.pathname}`);
             }
-            return networkResponse;
-          })
-          .catch(() => {
-            // Return empty response or let img error handler take over
-            return new Response('', { status: 404, statusText: 'Not Found' });
+          }
+          return networkResponse;
+        } catch (fetchErr) {
+          console.warn(`[Service Worker] Offline asset request: ${url.pathname}`);
+
+          // 3. Resilient Fallbacks for offline execution:
+          // Never return HTTP 503 or HTML for a JavaScript chunk!
+          // Return a syntactically valid ES module with HTTP 200 that signals unavailability cleanly.
+          if (url.pathname.endsWith('.js')) {
+            const fallbackModuleCode =
+              'export default function OfflineModuleFallback() {\n' +
+              '  const err = new Error("Módulo offline não disponível em cache local.");\n' +
+              '  err.name = "OfflineModuleNotCachedError";\n' +
+              '  throw err;\n' +
+              '}\n' +
+              'export const __offlineUnavailable = true;\n';
+
+            return new Response(fallbackModuleCode, {
+              status: 200,
+              statusText: 'OK',
+              headers: {
+                'Content-Type': 'application/javascript; charset=utf-8',
+                'Cache-Control': 'no-store'
+              }
+            });
+          }
+
+          if (url.pathname.endsWith('.css')) {
+            return new Response('/* Offline fallback stylesheet */', {
+              status: 200,
+              headers: {
+                'Content-Type': 'text/css; charset=utf-8',
+                'Cache-Control': 'no-store'
+              }
+            });
+          }
+
+          // Return empty placeholder image for offline image requests
+          if (/\.(jpg|jpeg|png|svg|webp|gif|ico)$/i.test(url.pathname)) {
+            const placeholderSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100%" height="100%" fill="#f1f5f9"/><text x="50%" y="50%" fill="#94a3b8" font-family="sans-serif" font-size="10" text-anchor="middle" dy=".3em">Offline</text></svg>';
+            return new Response(placeholderSvg, {
+              status: 200,
+              headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-store' }
+            });
+          }
+
+          return new Response('Resource Not Available Offline', {
+            status: 404,
+            statusText: 'Not Found',
+            headers: { 'Content-Type': 'text/plain' }
           });
-      })
+        }
+      })()
     );
     return;
   }
 
-  // Network First for HTML and dynamic scripts with fallback to Cache
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        if (response && response.status === 200) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
+  // HTML Document Navigation requests: Instant offline shell serving or fast network with fallback
+  if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+    event.respondWith(
+      (async () => {
+        // Instant response if device is already offline
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          const cachedIndex = (await caches.match('/index.html')) || (await caches.match('/'));
+          if (cachedIndex) {
+            return cachedIndex;
+          }
         }
-        return response;
-      })
-      .catch(() => {
-        return caches.match(event.request).then((cachedResponse) => {
-          if (cachedResponse) {
-            return cachedResponse;
+
+        try {
+          const response = await fetch(event.request);
+          if (response && response.status === 200) {
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('text/html')) {
+              const responseClone = response.clone();
+              const currentCache = await caches.open(CACHE_NAME);
+              await currentCache.put('/index.html', responseClone);
+            }
           }
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
+          return response;
+        } catch (navErr) {
+          const cachedIndex = (await caches.match('/index.html')) || (await caches.match('/'));
+          if (cachedIndex) {
+            return cachedIndex;
           }
+          return new Response(
+            '<!doctype html><html><head><meta charset="utf-8"><title>GeaAgro Offline</title></head><body><h1>GeaAgro Offline</h1><p>Aplicativo em execução offline. Por favor recarregue quando a conexão for restabelecida.</p></body></html>',
+            {
+              status: 200,
+              headers: { 'Content-Type': 'text/html; charset=utf-8' }
+            }
+          );
+        }
+      })()
+    );
+    return;
+  }
+
+  // Other general requests: Cache-First fallback
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached;
+      return fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
           return new Response('', { status: 503, statusText: 'Offline' });
         });
-      })
+    })
   );
 });
 

@@ -298,4 +298,88 @@ describe('GeaAgro — Auditoria e Correções da Etapa 1', () => {
       expect(inspection.payload?.localStorageData.agronutri_producers).toContain('Produtor Antigo');
     });
   });
+
+  describe('4. PWA Manifest, Ícones e Idioma HTML — Conformidade da Etapa 2', () => {
+    it('deve ter o manifest.json com id, scope e campos obrigatórios de instalação', async () => {
+      const fs = await import('fs');
+      const manifestStr = fs.readFileSync('public/manifest.json', 'utf8');
+      const manifest = JSON.parse(manifestStr);
+
+      expect(manifest.id).toBe('/');
+      expect(manifest.scope).toBe('/');
+      expect(manifest.start_url).toBe('/');
+      expect(manifest.name).toBe('GeaAgro - Inteligência e Gestão Agropecuária');
+      expect(manifest.short_name).toBe('GeaAgro');
+      expect(manifest.display).toBe('standalone');
+      expect(manifest.theme_color).toBe('#059669');
+      expect(manifest.background_color).toBe('#000000');
+    });
+
+    it('deve separar os propósitos any e maskable e apontar para arquivos de ícones existentes', async () => {
+      const fs = await import('fs');
+      const manifestStr = fs.readFileSync('public/manifest.json', 'utf8');
+      const manifest = JSON.parse(manifestStr);
+
+      expect(manifest.icons).toBeDefined();
+      expect(manifest.icons.length).toBeGreaterThanOrEqual(4);
+
+      const anyIcons = manifest.icons.filter((i: any) => i.purpose === 'any');
+      const maskableIcons = manifest.icons.filter((i: any) => i.purpose === 'maskable');
+
+      expect(anyIcons.length).toBeGreaterThanOrEqual(2);
+      expect(maskableIcons.length).toBeGreaterThanOrEqual(2);
+
+      // Verificar que nenhum ícone mistura 'any maskable'
+      manifest.icons.forEach((icon: any) => {
+        expect(icon.purpose).not.toBe('any maskable');
+        const relativePath = 'public' + icon.src;
+        expect(fs.existsSync(relativePath)).toBe(true);
+        const stats = fs.statSync(relativePath);
+        expect(stats.size).toBeGreaterThan(0);
+      });
+    });
+
+    it('deve ter o atributo de idioma pt-BR configurado no index.html', async () => {
+      const fs = await import('fs');
+      const indexHtml = fs.readFileSync('index.html', 'utf8');
+      expect(indexHtml).toContain('<html lang="pt-BR">');
+    });
+
+    it('deve ter screenshots reais configurados para desktop (wide) e mobile', async () => {
+      const fs = await import('fs');
+      const manifestStr = fs.readFileSync('public/manifest.json', 'utf8');
+      const manifest = JSON.parse(manifestStr);
+
+      expect(manifest.screenshots).toBeDefined();
+      expect(manifest.screenshots.length).toBe(2);
+
+      const desktop = manifest.screenshots.find((s: any) => s.form_factor === 'wide');
+      const mobile = manifest.screenshots.find((s: any) => !s.form_factor || s.form_factor !== 'wide');
+
+      expect(desktop).toBeDefined();
+      expect(desktop.src).toBe('/screenshot-desktop.png');
+      expect(fs.existsSync('public' + desktop.src)).toBe(true);
+      expect(fs.statSync('public' + desktop.src).size).toBeGreaterThan(10000);
+
+      expect(mobile).toBeDefined();
+      expect(mobile.src).toBe('/screenshot-mobile.png');
+      expect(fs.existsSync('public' + mobile.src)).toBe(true);
+      expect(fs.statSync('public' + mobile.src).size).toBeGreaterThan(10000);
+    });
+
+    it('deve declarar corretamente as dimensões de icon.png como 1024x1024 e disponibilizar 512x512', async () => {
+      const fs = await import('fs');
+      const manifestStr = fs.readFileSync('public/manifest.json', 'utf8');
+      const manifest = JSON.parse(manifestStr);
+
+      const icon1024 = manifest.icons.find((i: any) => i.src === '/icon.png');
+      expect(icon1024).toBeDefined();
+      expect(icon1024.sizes).toBe('1024x1024');
+
+      const icon512 = manifest.icons.find((i: any) => i.sizes === '512x512' && i.purpose === 'any');
+      expect(icon512).toBeDefined();
+      expect(icon512.src).toBe('/icon-512x512.png');
+      expect(fs.existsSync('public' + icon512.src)).toBe(true);
+    });
+  });
 });

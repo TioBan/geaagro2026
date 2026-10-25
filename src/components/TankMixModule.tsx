@@ -66,27 +66,26 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
     return TANKMIX_PRODUCTS_DATABASE;
   });
 
-  // Selected products currently in virtual spray tank
+  // Selected products currently in virtual spray tank (starts clean and professional without mock items)
   const [selectedProducts, setSelectedProducts] = useState<TankSelectedProduct[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('geaagro_tankmix_current_tank');
       if (saved) {
         try {
-          return JSON.parse(saved);
+          const parsed = JSON.parse(saved);
+          const isLegacyDemo =
+            Array.isArray(parsed) &&
+            parsed.length === 3 &&
+            parsed.some((p: any) => p?.productId === 'roundup_transorb' || p?.product?.id === 'roundup_transorb');
+          if (!isLegacyDemo && Array.isArray(parsed)) {
+            return parsed;
+          }
         } catch (e) {
           console.error(e);
         }
       }
     }
-    // Default initial tank mix: Glyphosate + Clethodim + Adjuvant
-    const p1 = TANKMIX_PRODUCTS_DATABASE[0];
-    const p2 = TANKMIX_PRODUCTS_DATABASE[2];
-    const p3 = TANKMIX_PRODUCTS_DATABASE[4];
-    return [
-      { product: p1, dose: p1.defaultDose, doseUnit: p1.doseUnit, additionOrder: 1 },
-      { product: p2, dose: p2.defaultDose, doseUnit: p2.doseUnit, additionOrder: 2 },
-      { product: p3, dose: p3.defaultDose, doseUnit: p3.doseUnit, additionOrder: 3 },
-    ];
+    return [];
   });
 
   // Water quality state
@@ -144,80 +143,50 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
     return DEFAULT_SPRAYERS;
   });
 
+  // Tank capacity and spray volume state
+  const [tankVolumeL, setTankVolumeL] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('geaagro_tankmix_volume_l');
+      if (saved) return Number(saved) || 2000;
+    }
+    return 2000;
+  });
+
+  const [sprayVolumeLHa, setSprayVolumeLHa] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('geaagro_tankmix_spray_volume_lha');
+      if (saved) return Number(saved) || 100;
+    }
+    return 100;
+  });
+
   // Spray traceability application history
   const [applications, setApplications] = useState<SprayApplicationRecord[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('geaagro_tankmix_applications');
       if (saved) {
         try {
-          return JSON.parse(saved);
+          const parsed = JSON.parse(saved);
+          const isLegacyMock = Array.isArray(parsed) && parsed.length === 1 && parsed[0]?.id === 'app_sample_1';
+          if (!isLegacyMock && Array.isArray(parsed)) {
+            return parsed;
+          }
         } catch (e) {
           console.error(e);
         }
       }
     }
-    return [
-      {
-        id: 'app_sample_1',
-        farmId: 'farm_1',
-        farmName: farmName || 'Fazenda Modelo',
-        plotId: 'plot_01',
-        plotName: 'Talhão 04 - Sede (Pivô 1)',
-        crop: 'Soja',
-        cultivar: 'TMG 7062 IPRO',
-        areaHa: 85,
-        growthStage: 'V4 - Quarto Trifólio',
-        date: new Date().toISOString().split('T')[0],
-        startTime: '06:30',
-        endTime: '10:45',
-        operatorName: 'Carlos Silva (Certificado NR-31)',
-        equipmentId: DEFAULT_SPRAYERS[0]?.id || 'sprayer-01',
-        equipmentName: DEFAULT_SPRAYERS[0]?.name || 'Pulverizador Autopropelido',
-        totalSprayVolumeLHa: 100,
-        tankLoadsCount: 3,
-        productsUsed: [
-          {
-            productId: TANKMIX_PRODUCTS_DATABASE[0]?.id || 'roundup_transorb',
-            productName: TANKMIX_PRODUCTS_DATABASE[0]?.commercialName || 'Roundup Transorb R',
-            activeIngredient: TANKMIX_PRODUCTS_DATABASE[0]?.activeIngredient || 'Glifosato - Sal Potássico (480 g/L eq. ácido)',
-            formulation: TANKMIX_PRODUCTS_DATABASE[0]?.formulation || 'SL (Concentrado Solúvel)',
-            dosePerHa: 2.5,
-            doseUnit: 'L/ha',
-            totalAmountUsed: 212.5,
-            amountUnit: 'L',
-          },
-          {
-            productId: TANKMIX_PRODUCTS_DATABASE[2]?.id || 'priori_xtra',
-            productName: TANKMIX_PRODUCTS_DATABASE[2]?.commercialName || 'Priori Xtra',
-            activeIngredient: TANKMIX_PRODUCTS_DATABASE[2]?.activeIngredient || 'Azoxistrobina (200 g/L) + Ciproconazol (80 g/L)',
-            formulation: TANKMIX_PRODUCTS_DATABASE[2]?.formulation || 'SC (Suspensão Concentrada)',
-            dosePerHa: 0.45,
-            doseUnit: 'L/ha',
-            totalAmountUsed: 38.25,
-            amountUnit: 'L',
-          },
-        ],
-        waterQuality: {
-          ph: 5.8,
-          hardnessMgL: 60,
-          temperatureC: 22,
-        },
-        weather: {
-          temperatureC: 23,
-          relativeHumidityPct: 70,
-          windSpeedKmH: 6,
-          deltaT: 3.5,
-        },
-        icgScore: 88,
-        safetyIntervalDays: 14,
-        harvestSafetyDate: new Date(Date.now() + 14 * 86400000).toLocaleDateString('pt-BR'),
-        reentryDate: new Date(Date.now() + 86400000).toLocaleDateString('pt-BR'),
-        ppeChecklistCompleted: true,
-        tripleRinseCompleted: true,
-        notes: 'Dessecação e controle de capim-amargoso em pós-emergência inicial.',
-      },
-    ];
+    return [];
   });
+
+  // Auto-persist changes
+  useEffect(() => {
+    localStorage.setItem('geaagro_tankmix_volume_l', String(tankVolumeL));
+  }, [tankVolumeL]);
+
+  useEffect(() => {
+    localStorage.setItem('geaagro_tankmix_spray_volume_lha', String(sprayVolumeLHa));
+  }, [sprayVolumeLHa]);
 
   // Auto-persist changes
   useEffect(() => {
@@ -371,6 +340,15 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
           setSelectedProducts={setSelectedProducts}
           waterQuality={waterQuality}
           setWaterQuality={setWaterQuality}
+          tankVolumeL={tankVolumeL}
+          setTankVolumeL={setTankVolumeL}
+          sprayVolumeLHa={sprayVolumeLHa}
+          setSprayVolumeLHa={setSprayVolumeLHa}
+          onSaveRecipe={(name, description) => {
+            console.log(`Receita salva: ${name} - ${description}`);
+          }}
+          onOpenTraceabilityModal={() => handleSubTabChange('traceability')}
+          onNavigateToWaterQuality={() => handleSubTabChange('water_quality')}
           onRecordApplication={handleAddApplicationRecord}
           farmName={farmName}
         />

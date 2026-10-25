@@ -41,8 +41,16 @@ export const STORAGE_KEY_AUTO_CONFIG = 'geaagro_backup_autoconfig_v1';
 export const KNOWN_INDEXED_DATABASES: { name: string; version: number; stores: string[] }[] = [
   {
     name: 'GeaAgroOfflineDB',
-    version: 4,
-    stores: ['animals', 'paddocks', 'poultry_batches', 'poultry_sheds', 'sync_queue']
+    version: 5,
+    stores: [
+      'animals', 'paddocks', 'poultry_batches', 'poultry_sheds', 'buffalo_records',
+      'caprine_records', 'equine_records', 'swine_records', 'companies', 'agronomists',
+      'producers', 'farms', 'soil_samples', 'leaf_samples', 'recommendations',
+      'water_analysis', 'fieldbook_operations', 'traceability_lots', 'traceability_harvests',
+      'traceability_photos', 'gestao_rural', 'costs_records', 'plantability_records',
+      'irrigation_records', 'pests_records', 'nursery_records', 'offline_diagnostics',
+      'app_settings', 'sync_queue'
+    ]
   },
   {
     name: 'NemaAIChatsDB',
@@ -1380,7 +1388,7 @@ export function triggerFileDownload(
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 6000);
 }
 
 /**

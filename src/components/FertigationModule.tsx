@@ -84,12 +84,8 @@ export const FertigationModule: React.FC<FertigationModuleProps> = ({
   const [tankTemperatureC, setTankTemperatureC] = useState<number>(22);
   const [selectedWaterId, setSelectedWaterId] = useState<string>(WATER_QUALITY_PRESETS[0]?.id || '');
 
-  // Added fertilizers in current simulation
-  const [tankFertilizers, setTankFertilizers] = useState<TankFertilizerEntry[]>([
-    { fertilizerId: 'nitrato_calcio', doseKg: 40.0 },
-    { fertilizerId: 'nitrato_potassio', doseKg: 30.0 },
-    { fertilizerId: 'fe_edta', doseKg: 1.0 },
-  ]);
+  // Added fertilizers in current simulation (clean professional state)
+  const [tankFertilizers, setTankFertilizers] = useState<TankFertilizerEntry[]>([]);
 
   // Fertilizer to add in simulator selector
   const [selectedFertToAdd, setSelectedFertToAdd] = useState<string>('mkp');

@@ -30,6 +30,7 @@ import { NemaAIHistorySidebar } from './nema-ai/NemaAIHistorySidebar';
 import { NemaAIScoreView } from './nema-ai/NemaAIScoreView';
 import { NemaAIChatView } from './nema-ai/NemaAIChatView';
 import { exportChatToPdf, exportChatToTxt } from '../utils/nemaAiExport';
+import { generateOfflineNemaAIDiagnosis } from '../utils/offlineNemaAI';
 
 export const NemaAIConsole: React.FC<NemaAIConsoleProps> = ({
   currentFarm,
@@ -230,6 +231,8 @@ export const NemaAIConsole: React.FC<NemaAIConsoleProps> = ({
       leafSamples,
     };
 
+    let analysisData: any = null;
+
     try {
       const response = await fetch('/api/nema-ai', {
         method: 'POST',
@@ -242,52 +245,67 @@ export const NemaAIConsole: React.FC<NemaAIConsoleProps> = ({
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Falha ao processar análise técnica.');
       }
+      analysisData = data.data;
+    } catch (err: any) {
+      console.warn('[Nema AI] Servidor remoto offline. Ativando motor heurístico agronômico local embarcado:', err);
+      analysisData = generateOfflineNemaAIDiagnosis({
+        crop: cropOrPasture,
+        domain: activeDomain,
+        farmName: farmName || 'Fazenda Ativa',
+        fieldName,
+        areaHa,
+        prompt: promptToSend,
+      });
+    }
 
-      const botReply = data.data.reply || data.data.executiveSummary || 'Parecer técnico gerado com sucesso.';
-      const botMsg: ChatMessage = {
-        id: `bot_${Date.now()}`,
-        role: 'assistant',
-        content: botReply,
-        timestamp: Date.now(),
-        result: data.data,
-      };
-
-      const finalMessages = [...nextMessages, botMsg];
-      setChatMessages(finalMessages);
-      setAnalysisResult(data.data);
-
-      if (onApplyRecommendations) {
-        onApplyRecommendations(data.data);
-      }
-
-      // Save to IndexedDB local history
-      try {
-        const logId = selectedHistoryId || `diag_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        const log: NemaAIDiagnosisLog = {
-          id: logId,
+    try {
+      if (analysisData) {
+        const botReply = analysisData.reply || analysisData.executiveSummary || 'Parecer técnico gerado com sucesso.';
+        const botMsg: ChatMessage = {
+          id: `bot_${Date.now()}`,
+          role: 'assistant',
+          content: botReply,
           timestamp: Date.now(),
-          domain: activeDomain,
-          prompt: promptToSend,
-          farmName: farmName || 'Fazenda Ativa',
-          producerName: producerName || 'Produtor Rural',
-          fieldName,
-          areaHa,
-          cropOrPasture,
-          cultivarOrForage,
-          soilType,
-          result: data.data,
-          uploadedFileName: currentFile,
-          messages: finalMessages,
+          result: analysisData,
         };
-        await nemaAIDB.saveDiagnosis(log);
-        setSelectedHistoryId(logId);
-        await loadHistory();
-      } catch (saveErr) {
-        console.error('Erro ao salvar diagnóstico no histórico local:', saveErr);
+
+        const finalMessages = [...nextMessages, botMsg];
+        setChatMessages(finalMessages);
+        setAnalysisResult(analysisData);
+
+        if (onApplyRecommendations) {
+          onApplyRecommendations(analysisData);
+        }
+
+        // Save to IndexedDB local history
+        try {
+          const logId = selectedHistoryId || `diag_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+          const log: NemaAIDiagnosisLog = {
+            id: logId,
+            timestamp: Date.now(),
+            domain: activeDomain,
+            prompt: promptToSend,
+            farmName: farmName || 'Fazenda Ativa',
+            producerName: producerName || 'Produtor Rural',
+            fieldName,
+            areaHa,
+            cropOrPasture,
+            cultivarOrForage,
+            soilType,
+            result: analysisData,
+            uploadedFileName: currentFile,
+            messages: finalMessages,
+          };
+          await nemaAIDB.saveDiagnosis(log);
+          setSelectedHistoryId(logId);
+          await loadHistory();
+        } catch (saveErr) {
+          console.error('Erro ao salvar diagnóstico no histórico local:', saveErr);
+        }
       }
     } catch (err: any) {
       console.error(err);
-      setErrorMessage(err.message || 'Erro de comunicação com o servidor de Inteligência Artificial.');
+      setErrorMessage(err.message || 'Erro ao processar diagnóstico agronômico.');
     } finally {
       setLoading(false);
       removeUploadedFile();

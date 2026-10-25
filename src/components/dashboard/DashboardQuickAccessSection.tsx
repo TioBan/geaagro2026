@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Building2,
   FlaskConical,
@@ -24,8 +24,16 @@ import {
   RotateCcw,
   Check,
   SlidersHorizontal,
+  Settings2,
 } from 'lucide-react';
 import { ModuleTooltip } from '../common/ModuleTooltip';
+import {
+  isModuleActiveInCurrentProfile,
+  getActiveProfileId,
+  USER_PROFILES,
+  UserProfileId,
+} from '../../utils/userProfilesStorage';
+import { UserProfileCustomizationModal } from '../common/UserProfileCustomizationModal';
 
 const QUICK_ACCESS_ORDER_KEY = 'geaagro_quick_access_order_v1';
 
@@ -371,6 +379,19 @@ export const DashboardQuickAccessSection: React.FC<DashboardQuickAccessSectionPr
     return getStoredQuickAccessOrder() || QUICK_ACCESS_ITEMS.map(item => item.id);
   });
 
+  const [activeProfileId, setActiveProfileId] = useState<UserProfileId>(() => getActiveProfileId());
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  useEffect(() => {
+    const handleProfileChange = (e: any) => {
+      setActiveProfileId(e.detail?.profileId || getActiveProfileId());
+    };
+    window.addEventListener('geaagro:profile-changed', handleProfileChange);
+    return () => {
+      window.removeEventListener('geaagro:profile-changed', handleProfileChange);
+    };
+  }, []);
+
   const touchStartY = useRef<number>(0);
   const touchStartIndex = useRef<number | null>(null);
 
@@ -396,8 +417,12 @@ export const DashboardQuickAccessSection: React.FC<DashboardQuickAccessSectionPr
     for (const it of itemMap.values()) {
       result.push(it);
     }
-    return result;
-  }, [itemsOrder]);
+    // Filter according to active user profile (dashboard is always enabled)
+    return result.filter(item => {
+      if (item.tab === 'dashboard') return true;
+      return isModuleActiveInCurrentProfile(item.tab, activeProfileId);
+    });
+  }, [itemsOrder, activeProfileId]);
 
   const isCustomized = useMemo(() => {
     const defaultIds = QUICK_ACCESS_ITEMS.map(item => item.id);
@@ -534,7 +559,7 @@ export const DashboardQuickAccessSection: React.FC<DashboardQuickAccessSectionPr
       {/* Header & Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-zinc-200">
               {title}
@@ -542,6 +567,16 @@ export const DashboardQuickAccessSection: React.FC<DashboardQuickAccessSectionPr
             <span className="hidden sm:inline-block text-[10px] font-bold text-slate-600 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
               {filteredItems.length} ferramentas
             </span>
+            {/* Active User Profile Badge */}
+            <button
+              type="button"
+              onClick={() => setIsProfileModalOpen(true)}
+              className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-950/70 border border-emerald-300/60 dark:border-emerald-800 px-2 py-0.5 rounded-full hover:bg-emerald-200 dark:hover:bg-emerald-900 transition-colors cursor-pointer"
+              title="Personalizar ou alterar módulos deste perfil"
+            >
+              <span>Perfil: <strong>{USER_PROFILES[activeProfileId]?.name || 'Ativo'}</strong></span>
+              <SlidersHorizontal className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />
+            </button>
             {isCustomized && (
               <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
                 Ordem de Campo Ativa
@@ -864,6 +899,12 @@ export const DashboardQuickAccessSection: React.FC<DashboardQuickAccessSectionPr
           </div>
         </div>
       )}
+
+      {/* Modal de Personalização dos Módulos do Perfil */}
+      <UserProfileCustomizationModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+      />
     </div>
   );
 };

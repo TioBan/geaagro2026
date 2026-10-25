@@ -73,6 +73,11 @@ import {
   formatBytes
 } from '../utils/backupService';
 import { CryptoService } from '../services/cryptoService';
+import {
+  pickBackupFolder,
+  PRESET_BACKUP_FOLDERS,
+  saveBackupFileWithNativePicker
+} from '../services/folderPickerService';
 
 interface BackupModuleProps {
   activeSubTab?: string;
@@ -127,12 +132,14 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
   const [localFtpUrl, setLocalFtpUrl] = useState<string>('ftp://192.168.1.100:2121');
 
   const [includeMediaFiles, setIncludeMediaFiles] = useState<boolean>(true);
-  const [useEncryption, setUseEncryption] = useState<boolean>(true);
+  const [useEncryption, setUseEncryption] = useState<boolean>(false);
   const [encryptionPassword, setEncryptionPassword] = useState<string>('');
   const [recoveryKey, setRecoveryKey] = useState<string>('');
   const [isRecoveryKeyConfirmed, setIsRecoveryKeyConfirmed] = useState<boolean>(false);
   const [backupNotes, setBackupNotes] = useState<string>('');
   const [backupUser, setBackupUser] = useState<string>('Dr. Lucas Mendes (Agrônomo)');
+  const [backupFormError, setBackupFormError] = useState<string | null>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
 
   const handleGenerateRecoveryKey = () => {
     const keyDetails = CryptoService.generateRecoveryKey();
@@ -141,27 +148,31 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
     showToast('Nova chave de recuperação segura de 256 bits gerada com sucesso!', 'info');
   };
 
-  // Directory Folder Selector via File System Access API
+  // Directory Folder Selector with native System Directory API and preset shortcuts
+  // (Never triggers browser upload warnings)
   const handleSelectDirectoryFolder = async () => {
-    if (typeof window !== 'undefined' && 'showDirectoryPicker' in window) {
-      try {
-        const handle = await (window as any).showDirectoryPicker();
-        if (handle && handle.name) {
-          const newPath = `/Aparelho/${handle.name}/GeaAgro_Backups/`;
-          setCustomFolderPath(newPath);
-          showToast(`Pasta "${handle.name}" selecionada com sucesso!`, 'success');
-        }
-      } catch (e: any) {
-        if (e.name !== 'AbortError') {
-          showToast('Diretório customizado selecionado.', 'info');
-        }
+    try {
+      const result = await pickBackupFolder({
+        suggestedPath: customFolderPath,
+        allowWebkitFallback: false // Never trigger browser upload prompt
+      });
+
+      if (result.success && result.folderPath) {
+        setCustomFolderPath(result.folderPath);
+        showToast(result.message || `Pasta "${result.folderName}" selecionada com sucesso!`, 'success');
+      } else if (result.status === 'cancelled') {
+        // Cancelamento pelo usuário: não exibir alerta de erro
+        console.log('[BackupModule] Seleção de pasta cancelada pelo usuário.');
+      } else if (result.status === 'permission_denied') {
+        showToast('Permissão de acesso à pasta não concedida pelo navegador.', 'info');
+      } else if (result.status === 'restricted_system') {
+        showToast('Utilize os atalhos rápidos (Área de Trabalho, Downloads, Documentos) ou digite a pasta.', 'info');
+      } else if (result.message) {
+        showToast(result.message, 'info');
       }
-    } else {
-      const userPath = window.prompt('Digite ou cole o caminho completo da pasta no seu dispositivo:', customFolderPath);
-      if (userPath) {
-        setCustomFolderPath(userPath);
-        showToast(`Pasta alterada para: ${userPath}`, 'success');
-      }
+    } catch (err: any) {
+      console.warn('[BackupModule] Erro ao selecionar pasta:', err);
+      showToast('Selecione um dos atalhos rápidos abaixo ou digite o caminho desejado.', 'info');
     }
   };
 
@@ -192,6 +203,7 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
   const [executionProgress, setExecutionProgress] = useState<number>(0);
   const [executionStep, setExecutionStep] = useState<string>('');
   const [lastCreatedBackup, setLastCreatedBackup] = useState<BackupMetadata | null>(null);
+  const [lastCreatedBackupPayload, setLastCreatedBackupPayload] = useState<string | null>(null);
 
   // Restore State
   const restoreFileInputRef = useRef<HTMLInputElement>(null);
@@ -270,13 +282,20 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
 
   // Execute Creation of Backup
   const handleStartBackupCreation = () => {
+    setBackupFormError(null);
+
     if (useEncryption) {
       if (!encryptionPassword.trim()) {
-        showToast('Defina uma senha para criptografar o arquivo de backup.', 'error');
+        const msg = 'Defina uma senha para criptografar o backup ou desmarque a opção "Proteger com AES-256 e Senha" para gerar um backup rápido.';
+        setBackupFormError(msg);
+        showToast(msg, 'error');
+        passwordInputRef.current?.focus();
         return;
       }
       if (recoveryKey && !isRecoveryKeyConfirmed) {
-        showToast('Confirme que você copiou ou anotou a chave de recuperação antes de prosseguir.', 'error');
+        const msg = 'Confirme que você copiou ou anotou a chave de recuperação antes de prosseguir.';
+        setBackupFormError(msg);
+        showToast(msg, 'error');
         return;
       }
     }
@@ -322,15 +341,27 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
           }
         });
 
+        setExecutionProgress(90);
+        setExecutionStep('Salvando arquivo de backup no dispositivo...');
+
+        // Salva arquivo com seletor nativo do sistema ou download padrão do navegador
+        const saveResult = await saveBackupFileWithNativePicker(
+          result.metadata.filename,
+          result.jsonString,
+          'application/json'
+        );
+
         setExecutionProgress(100);
         setExecutionStep('Backup concluído com sucesso!');
         setHistory(getBackupHistory());
         setLastCreatedBackup(result.metadata);
+        setLastCreatedBackupPayload(result.jsonString);
 
-        // Download real cifrado
-        triggerFileDownload(result.metadata.filename, result.jsonString, 'application/json');
-
-        showToast(`Backup "${result.metadata.filename}" gerado e cifrado com sucesso!`, 'success');
+        if (saveResult.saved) {
+          showToast(`Backup "${result.metadata.filename}" gerado e salvo com sucesso!`, 'success');
+        } else {
+          showToast(`Backup "${result.metadata.filename}" empacotado e disponível para download.`, 'info');
+        }
       } catch (err: any) {
         console.error('[BackupModule] Falha na criação do backup:', err);
         showToast(`Falha na criação do backup: ${err?.message || String(err)}`, 'error');
@@ -1104,6 +1135,45 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
                       ✓ Pasta Valida
                     </span>
                   </div>
+
+                  {/* Atalhos Rápidos para Pastas do Computador */}
+                  <div className="pt-2 border-t border-emerald-200/60 dark:border-emerald-900/40 space-y-2">
+                    <span className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 block">
+                      Atalhos Rápidos de Pastas no Computador:
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {PRESET_BACKUP_FOLDERS.map((preset) => {
+                        const isPresetActive = customFolderPath === preset.path;
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => {
+                              setCustomFolderPath(preset.path);
+                              showToast(`Destino definido para: ${preset.name}`, 'success');
+                            }}
+                            className={`p-2 rounded-lg border text-left transition flex flex-col justify-between cursor-pointer ${
+                              isPresetActive
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:border-emerald-500'
+                            }`}
+                          >
+                            <span className="text-xs font-bold truncate">{preset.name}</span>
+                            <span className={`text-[10px] truncate ${isPresetActive ? 'text-emerald-100' : 'text-slate-400'}`}>
+                              {preset.description}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-emerald-100/60 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 text-[11px] text-emerald-900 dark:text-emerald-200 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                    <span>
+                      <strong>Armazenamento 100% Local:</strong> Os arquivos são gerados e salvos diretamente no seu aparelho, sem envio para servidores externos.
+                    </span>
+                  </div>
                 </div>
               )}
 
@@ -1323,12 +1393,25 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
                         Senha de Criptografia do Arquivo *
                       </label>
                       <input
+                        ref={passwordInputRef}
                         type="password"
                         value={encryptionPassword}
-                        onChange={(e) => setEncryptionPassword(e.target.value)}
-                        placeholder="Defina uma senha forte para este backup"
-                        className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-mono"
+                        onChange={(e) => {
+                          setEncryptionPassword(e.target.value);
+                          if (backupFormError) setBackupFormError(null);
+                        }}
+                        placeholder="Defina uma senha para este backup"
+                        className={`w-full px-3 py-2 rounded-lg border bg-white dark:bg-zinc-900 text-xs font-mono transition-all ${
+                          backupFormError && !encryptionPassword.trim()
+                            ? 'border-rose-500 ring-2 ring-rose-200 dark:ring-rose-900/50'
+                            : 'border-slate-300 dark:border-zinc-700'
+                        }`}
                       />
+                      {backupFormError && !encryptionPassword.trim() && (
+                        <span className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold mt-1 block">
+                          ⚠️ Digite uma senha ou desmarque a opção de criptografia acima.
+                        </span>
+                      )}
                     </div>
 
                     <div className="pt-2 border-t border-slate-200 dark:border-zinc-800 space-y-2">
@@ -1427,17 +1510,30 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
               </div>
             </div>
 
-            {/* Trigger Button */}
-            <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 flex justify-end">
-              <button
-                type="button"
-                onClick={handleStartBackupCreation}
-                disabled={isExecutingBackup}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-lg shadow-emerald-900/20 transition-all cursor-pointer disabled:opacity-50"
-              >
-                <Zap className="w-4 h-4 fill-white" />
-                {isExecutingBackup ? 'Gerando Backup...' : 'Iniciar Empacotamento de Backup'}
-              </button>
+            {/* Trigger Button & Validation Alert */}
+            <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 space-y-3">
+              {backupFormError && (
+                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800/60 flex items-center gap-2 text-rose-700 dark:text-rose-300 text-xs font-semibold animate-fadeIn">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-600 dark:text-rose-400" />
+                  <span>{backupFormError}</span>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400">
+                  {useEncryption ? '🔒 Backup protegido com criptografia AES-256' : '⚡ Backup padrão imediato (sem senha)'}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={handleStartBackupCreation}
+                  disabled={isExecutingBackup}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-lg shadow-emerald-900/20 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Zap className="w-4 h-4 fill-white" />
+                  {isExecutingBackup ? 'Gerando Backup...' : 'Iniciar Empacotamento e Backup'}
+                </button>
+              </div>
             </div>
 
           </div>
@@ -1497,16 +1593,29 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
                   <p className="text-[11px] font-mono text-slate-600 dark:text-zinc-400 break-all">
                     {lastCreatedBackup.filename}
                   </p>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {lastCreatedBackupPayload && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerFileDownload(lastCreatedBackup.filename, lastCreatedBackupPayload, 'application/json');
+                          showToast('Download do arquivo de backup iniciado.', 'success');
+                        }}
+                        className="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Baixar Arquivo
+                      </button>
+                    )}
                     <button
                       onClick={() => handleVerifyIntegrity(lastCreatedBackup)}
-                      className="flex-1 py-1.5 px-2 bg-emerald-600 text-white font-bold text-xs rounded-lg hover:bg-emerald-700 transition-all cursor-pointer"
+                      className="py-1.5 px-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-bold text-xs rounded-lg transition-all cursor-pointer"
                     >
                       Validar SHA-256
                     </button>
                     <button
                       onClick={() => setSelectedQrBackup(lastCreatedBackup)}
-                      className="py-1.5 px-3 bg-slate-200 dark:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-bold text-xs rounded-lg hover:bg-slate-300 transition-all cursor-pointer"
+                      className="py-1.5 px-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-bold text-xs rounded-lg transition-all cursor-pointer"
                     >
                       QR Code
                     </button>

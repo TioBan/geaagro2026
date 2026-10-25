@@ -15,6 +15,10 @@ export function lazyWithRetry<T extends React.ComponentType<any>>(
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const res = await importFn();
+        // Check if module resolved to Service Worker synthetic offline fallback
+        if (res && (res.__offlineUnavailable || res.default?.__offlineUnavailable)) {
+          throw new Error('Módulo não sincronizado no cache offline. Conecte-se à internet para sincronizá-lo.');
+        }
         if (typeof window !== 'undefined') {
           window.sessionStorage.removeItem('page_reloaded_for_chunk');
         }
@@ -23,16 +27,17 @@ export function lazyWithRetry<T extends React.ComponentType<any>>(
         lastError = error;
         console.warn(`[lazyWithRetry] Attempt ${attempt}/${maxRetries} failed:`, error);
         if (attempt < maxRetries) {
-          // Fast progressive backoff (300ms, 600ms, 1000ms, 1500ms)
-          await new Promise((resolve) => setTimeout(resolve, Math.min(attempt * 400, 2000)));
+          // Progressive backoff (200ms, 400ms, etc.)
+          await new Promise((resolve) => setTimeout(resolve, Math.min(attempt * 200, 1000)));
         }
       }
     }
 
     console.error(`[lazyWithRetry] All ${maxRetries} attempts failed to import chunk:`, lastError);
 
-    // If in browser and haven't reloaded yet for this session chunk error, attempt reload once
-    if (typeof window !== 'undefined') {
+    // Only attempt automatic page reload if the device is ONLINE.
+    // If the device is offline, reloading would cause infinite reloads or disruptive state loss.
+    if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && navigator.onLine) {
       const reloaded = window.sessionStorage.getItem('page_reloaded_for_chunk');
       if (!reloaded) {
         window.sessionStorage.setItem('page_reloaded_for_chunk', 'true');
@@ -44,6 +49,8 @@ export function lazyWithRetry<T extends React.ComponentType<any>>(
     // Graceful in-situ error component to prevent React.lazy permanent rejection trap
     return {
       default: function ResilientChunkFallback() {
+        const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
         return React.createElement(
           'div',
           {
@@ -57,9 +64,23 @@ export function lazyWithRetry<T extends React.ComponentType<any>>(
           React.createElement(
             'div',
             { className: 'space-y-1' },
-            React.createElement('h3', { className: 'text-base font-bold text-slate-900 dark:text-white' }, 'Módulo temporariamente indisponível'),
-            React.createElement('p', { className: 'text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto' }, 'Ocorreu uma instabilidade momentânea na conexão ou reinicialização do servidor. Seus dados permanecem salvos e seguros localmente.'),
-            lastError?.message && React.createElement('p', { className: 'text-[11px] font-mono text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-lg max-w-lg mx-auto overflow-x-auto text-left' }, lastError.message)
+            React.createElement(
+              'h3',
+              { className: 'text-base font-bold text-slate-900 dark:text-white' },
+              isOffline ? 'Módulo não disponível no modo offline' : 'Módulo temporariamente indisponível'
+            ),
+            React.createElement(
+              'p',
+              { className: 'text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto' },
+              isOffline
+                ? 'Este módulo ainda não foi sincronizado para acesso sem internet neste aparelho. Conecte-se à internet para sincronizá-lo. Seus dados continuam salvos com segurança no banco local.'
+                : 'Ocorreu uma instabilidade momentânea na conexão. Seus dados permanecem salvos e seguros localmente no banco de dados.'
+            ),
+            lastError?.message && React.createElement(
+              'p',
+              { className: 'text-[11px] font-mono text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-lg max-w-lg mx-auto overflow-x-auto text-left' },
+              lastError.message
+            )
           ),
           React.createElement(
             'div',

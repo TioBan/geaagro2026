@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="pwaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+    <linearGradient id="boltGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#34d399" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#pwaGrad)" />
+  <!-- Database Stack Symbol -->
+  <g fill="none" stroke="#ffffff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" transform="translate(106, 116)">
+    <!-- Top Disc -->
+    <ellipse cx="150" cy="50" rx="130" ry="45" fill="#047857" fill-opacity="0.4" />
+    <!-- Middle Ring -->
+    <path d="M 20 50 v 80 c 0 35 60 45 130 45 s 130 -10 130 -45 v -80" />
+    <!-- Bottom Ring -->
+    <path d="M 20 130 v 80 c 0 35 60 45 130 45 s 130 -10 130 -45 v -80" />
+    <!-- Lowest Ring -->
+    <path d="M 20 210 v 60 c 0 35 60 45 130 45 s 130 -10 130 -45 v -60" />
+    <!-- Checkmark Badge -->
+    <circle cx="230" cy="230" r="50" fill="#10b981" stroke="#ffffff" stroke-width="12" />
+    <path d="M 210 230 l 14 14 l 28 -28" stroke="#ffffff" stroke-width="14" />
+  </g>
+</svg>

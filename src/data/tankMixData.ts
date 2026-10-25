@@ -2095,11 +2095,20 @@ export function calculateTankMixEvaluation(
   }
 
   // 4. Cálculo do ICG (Índice de Compatibilidade GeaAgro - 0 a 100%)
-  let icgScore = 95;
-  if (worstRating === 'incompativel') icgScore = 20;
-  else if (worstRating === 'restricao_severa') icgScore = 55;
-  else if (worstRating === 'compativel_restricoes') icgScore = 75;
-  else if (activeAlerts.length > 0) icgScore = 85;
+  let icgScore = 0;
+  if (loadedProducts.length === 0) {
+    icgScore = 0;
+  } else if (worstRating === 'incompativel') {
+    icgScore = 20;
+  } else if (worstRating === 'restricao_severa') {
+    icgScore = 55;
+  } else if (worstRating === 'compativel_restricoes') {
+    icgScore = 75;
+  } else if (activeAlerts.length > 0) {
+    icgScore = 85;
+  } else {
+    icgScore = 95;
+  }
 
   // Penalidade por número excessivo de produtos no mesmo tanque (> 5 produtos)
   if (loadedProducts.length > 5) {
@@ -2107,13 +2116,14 @@ export function calculateTankMixEvaluation(
     activeAlerts.push(`Calda com ${loadedProducts.length} insumos simultâneos: Complexidade elevada aumenta exponencialmente o risco de desestabilização.`);
   }
 
-  // Verificar necessidade do Teste de Jarra
+  // Verificar necessidade do Teste de Jarra (apenas com produtos adicionados)
   const jarTestRequired =
-    worstRating !== 'compativel' ||
-    detectedRules.some(r => r.jarTestRequired) ||
-    loadedProducts.length >= 4 ||
-    isWaterHard ||
-    hasWsb;
+    loadedProducts.length > 0 &&
+    (worstRating !== 'compativel' ||
+      detectedRules.some(r => r.jarTestRequired) ||
+      loadedProducts.length >= 4 ||
+      isWaterHard ||
+      hasWsb);
 
   const recommendedMixingOrder = sortedByMixingOrder.map((item, idx) => {
     const stepInfo = getFormulationMixingStep(item.product.formulation, item.product.agrochemicalClass);

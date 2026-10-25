@@ -17,4 +17,28 @@ describe('TankMix Module & Subcomponents Integrity Verification', () => {
     expect(Array.isArray(data.TANKMIX_PRODUCTS_DATABASE)).toBe(true);
     expect(data.TANKMIX_PRODUCTS_DATABASE.length).toBeGreaterThan(0);
   });
+
+  it('TankMix virtual lab should evaluate empty tank cleanly without dummy parameters', async () => {
+    const { calculateTankMixEvaluation } = await import('../data/tankMixData');
+    const waterQuality = {
+      ph: 6.2,
+      electricalConductivityUsCm: 180,
+      hardnessMgL: 65,
+      alkalinityMgL: 45,
+      temperatureC: 24,
+      calciumMgL: 18,
+      magnesiumMgL: 5,
+      ironMgL: 0.1,
+      manganeseMgL: 0.05,
+      bicarbonatesMgL: 40,
+    };
+
+    const emptyEval = calculateTankMixEvaluation([], waterQuality, 2000, 100);
+    expect(emptyEval.loadedProducts).toHaveLength(0);
+    expect(emptyEval.detectedRules).toHaveLength(0);
+    expect(emptyEval.activeAlerts).toHaveLength(0);
+    expect(emptyEval.icgScore).toBe(0);
+    expect(emptyEval.jarTestRequired).toBe(false);
+    expect(emptyEval.totalHectaresPerTank).toBe(20);
+  });
 });

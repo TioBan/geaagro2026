@@ -1962,6 +1962,19 @@ async function startServer() {
       });
     }
   } else {
+    // In dev / preview mode, serve the actual service worker (preferring dist/sw.js if built, else public/sw.js)
+    app.get('/sw.js', (_req, res) => {
+      const swDistPath = path.join(distPath, 'sw.js');
+      const swPublicPath = path.resolve(process.cwd(), 'public/sw.js');
+      const filePath = fs.existsSync(swDistPath) ? swDistPath : swPublicPath;
+
+      res.setHeader('Content-Type', 'application/javascript');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.sendFile(filePath);
+    });
+
     try {
       const { createServer: createViteServer } = await import('vite');
       const vite = await createViteServer({
