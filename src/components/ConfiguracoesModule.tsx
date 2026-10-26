@@ -22,6 +22,8 @@ import {
   Laptop,
   CheckCircle2,
   Filter,
+  RefreshCw,
+  Download,
 } from 'lucide-react';
 import {
   UserProfileId,
@@ -48,10 +50,22 @@ interface ConfiguracoesModuleProps {
   onNavigateTab?: (tab: string, subTab?: string) => void;
   activeSubTab?: string;
   setActiveSubTab?: (subTab: string) => void;
+  updateAvailable?: boolean;
+  isCheckingUpdate?: boolean;
+  isUpToDate?: boolean;
+  onCheckForUpdates?: () => void;
+  onApplyUpdate?: () => void;
+  currentVersion?: string;
 }
 
 export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
   onNavigateTab,
+  updateAvailable = false,
+  isCheckingUpdate = false,
+  isUpToDate = false,
+  onCheckForUpdates,
+  onApplyUpdate,
+  currentVersion = '4.2.3.4',
 }) => {
   const [activeProfileId, setActiveProfile] = useState<UserProfileId>(() => getActiveProfileId());
   const [enabledModules, setEnabledModules] = useState<string[]>(() => {
@@ -194,6 +208,70 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Seção de Atualização e Controle de Versão */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 shrink-0">
+              <RefreshCw className={`w-6 h-6 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                  Atualizações do Sistema
+                </h2>
+                <span className="text-xs px-2.5 py-0.5 rounded-full font-extrabold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                  v{currentVersion}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed max-w-xl">
+                Você tem controle total sobre as atualizações do GeaAgro. O sistema detecta novas versões e solicita seu consentimento antes de aplicar, garantindo estabilidade nas suas operações no campo.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-center">
+            {updateAvailable ? (
+              <button
+                type="button"
+                onClick={onApplyUpdate}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md shadow-emerald-600/20 transition-all cursor-pointer flex items-center gap-2 active:scale-95"
+              >
+                <Download className="w-4 h-4" />
+                <span>Instalar Atualização Agora</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onCheckForUpdates}
+                disabled={isCheckingUpdate}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-bold text-xs transition cursor-pointer flex items-center gap-2 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
+                <span>{isCheckingUpdate ? 'Verificando...' : 'Verificar Atualizações'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Status Feedback Banner */}
+        {isUpToDate && (
+          <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300 text-xs font-bold flex items-center gap-2 animate-fade-in">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span>Sua aplicação já está executando a versão mais recente e estável (v{currentVersion}).</span>
+          </div>
+        )}
+
+        {updateAvailable && (
+          <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-200 text-xs font-medium flex items-center justify-between gap-3 animate-fade-in">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+              <span>Uma nova versão foi baixada! Clique em <strong>Instalar Atualização Agora</strong> para aplicar com segurança.</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Seção 1: Seleção de Perfis */}

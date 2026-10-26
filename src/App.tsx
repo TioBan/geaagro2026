@@ -4,6 +4,8 @@ import { LoginScreen } from './components/LoginScreen';
 import { LgpdConsentModal } from './components/LgpdConsentModal';
 import { AgroEasterEggModal } from './components/AgroEasterEggModal';
 import { NotificationCenterModal } from './components/NotificationCenterModal';
+import { useAppUpdate } from './hooks/useAppUpdate';
+import { AppUpdateModal } from './components/common/AppUpdateModal';
 import {
   Layers,
   Moon,
@@ -41,6 +43,7 @@ import {
   Beef,
   Info,
   Calendar,
+  GraduationCap,
   Compass,
   Settings,
 } from 'lucide-react';
@@ -73,6 +76,7 @@ export const TAB_METADATA: Record<string, { title: string; category: string; ico
   zarc_risco: { title: 'ZARC & Risco Climático', category: 'Planejamento & Risco', icon: CloudSun },
   gestao_rural: { title: 'Administração & Gestão Rural', category: 'ERP Agrícola 360°', icon: Building2 },
   forrageiras: { title: 'Informações sobre Forrageiras', category: 'Pastagens & Zootecnia', icon: Leaf },
+  geaagro_edu: { title: 'GeaAgro Edu', category: 'Educação & Conteúdo', icon: GraduationCap },
 };
 import {
   Company,
@@ -150,6 +154,7 @@ const GeoprocessamentoModule = lazyWithRetry(() => import('./components/Geoproce
 const ZarcRiscoModule = lazyWithRetry(() => import('./components/ZarcRiscoModule').then((m: any) => ({ default: m.ZarcRiscoModule || m.default })));
 const GestaoRuralModule = lazyWithRetry(() => import('./components/GestaoRuralModule').then((m: any) => ({ default: m.GestaoRuralModule || m.default })));
 const ForageCatalogModule = lazyWithRetry(() => import('./components/ForageCatalogModule').then((m: any) => ({ default: m.ForageCatalogModule || m.default })));
+const GeaAgroEduModule = lazyWithRetry(() => import('./components/GeaAgroEduModule').then((m: any) => ({ default: m.GeaAgroEduModule || m.default })));
 const ConfiguracoesModule = lazyWithRetry(() => import('./components/ConfiguracoesModule').then((m: any) => ({ default: m.ConfiguracoesModule || m.default })));
 
 // Error boundary to catch any runtime exceptions during module hydration or rendering
@@ -468,8 +473,17 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState<boolean>(false);
-  const [swWaiting, setSwWaiting] = useState<ServiceWorker | null>(null);
-  const [showSwUpdateBanner, setShowSwUpdateBanner] = useState<boolean>(false);
+  // Controlled App Update Management Hook
+  const {
+    updateAvailable,
+    isChecking: isCheckingUpdate,
+    isUpToDate,
+    showUpdateModal,
+    currentVersion,
+    checkForUpdates,
+    applyUpdate,
+    deferUpdate,
+  } = useAppUpdate();
 
 
   // Sync HTML root element class with theme state
@@ -540,33 +554,6 @@ export default function App() {
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('message', handleSWMessage);
-
-      // Listener para atualizações não silenciosas do Service Worker (Princípio 4 da Fase 1)
-      navigator.serviceWorker.ready.then((reg) => {
-        if (reg.waiting) {
-          setSwWaiting(reg.waiting);
-          setShowSwUpdateBanner(true);
-        }
-        reg.addEventListener('updatefound', () => {
-          const newWorker = reg.installing;
-          if (newWorker) {
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                setSwWaiting(newWorker);
-                setShowSwUpdateBanner(true);
-              }
-            });
-          }
-        });
-      });
-
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!refreshing) {
-          refreshing = true;
-          window.location.reload();
-        }
-      });
     }
 
     return () => {
@@ -576,13 +563,6 @@ export default function App() {
       }
     };
   }, []);
-
-  const handleApplySwUpdate = () => {
-    if (swWaiting) {
-      swWaiting.postMessage({ type: 'SKIP_WAITING' });
-    }
-    setShowSwUpdateBanner(false);
-  };
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
@@ -1049,6 +1029,8 @@ export default function App() {
               <span>{isOnline ? 'Online' : 'Local DB'}</span>
             </div>
 
+
+
             {/* Desktop Right Header: Company Name */}
             {currentCompany && (currentCompany.tradingName || currentCompany.name) && (
               <div className="hidden 2xl:flex items-center gap-2 bg-slate-100/60 dark:bg-zinc-900 px-2.5 py-1 rounded-lg border border-slate-200/40 dark:border-zinc-800">
@@ -1142,35 +1124,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Service Worker Explicit Update Banner */}
-          {showSwUpdateBanner && (
-            <div className="bg-gradient-to-r from-teal-900 to-emerald-950 text-white rounded-xl p-4 sm:p-5 shadow-md border border-teal-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in print:hidden">
-              <div className="flex items-start gap-3">
-                <div className="p-2 bg-teal-500/20 text-teal-300 border border-teal-500/30 rounded-lg shrink-0">
-                  <RefreshCw className="w-5 h-5 animate-spin" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm tracking-tight text-white">Nova versão do GeaAgro disponível</h4>
-                  <p className="text-xs text-teal-200/80 mt-0.5">Uma atualização da aplicação foi baixada com melhorias de segurança. Deseja aplicar a atualização agora?</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 self-end sm:self-center">
-                <button
-                  onClick={() => setShowSwUpdateBanner(false)}
-                  className="p-2 text-teal-300 hover:text-white hover:bg-teal-800/40 rounded-lg text-xs transition-colors cursor-pointer"
-                  aria-label="Atualizar mais tarde"
-                >
-                  Mais Tarde
-                </button>
-                <button
-                  onClick={handleApplySwUpdate}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs px-4 py-2.5 rounded-lg flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                >
-                  Atualizar Agora <RefreshCw className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          )}
 
           <ModuleErrorBoundary key={activeTab} fallbackTitle="Erro ao carregar o módulo solicitado">
             <Suspense fallback={<ModuleLoader />}>
@@ -1596,10 +1549,27 @@ export default function App() {
               />
             )}
 
+            {activeTab === 'geaagro_edu' && (
+              <GeaAgroEduModule
+                activeSubTab={activeSubTab}
+                setActiveSubTab={setActiveSubTab}
+                onNavigateTab={(tab, subTab) => {
+                  setActiveTab(tab as any);
+                  if (subTab) setActiveSubTab(subTab as any);
+                }}
+              />
+            )}
+
             {activeTab === 'configuracoes' && (
               <ConfiguracoesModule
                 activeSubTab={activeSubTab}
                 setActiveSubTab={setActiveSubTab}
+                updateAvailable={updateAvailable}
+                isCheckingUpdate={isCheckingUpdate}
+                isUpToDate={isUpToDate}
+                onCheckForUpdates={checkForUpdates}
+                onApplyUpdate={applyUpdate}
+                currentVersion={currentVersion}
               />
             )}
           </Suspense>
@@ -1613,7 +1583,7 @@ export default function App() {
             <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
               <span className="font-extrabold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
                 <Sprout className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                GeaAgro CRM <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 font-extrabold border border-emerald-300 dark:border-emerald-800/80">v4.2.3.2</span>
+                GeaAgro CRM <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 font-extrabold border border-emerald-300 dark:border-emerald-800/80">v4.2.3.4</span>
               </span>
               <span className="hidden sm:inline text-slate-300 dark:text-zinc-700">•</span>
               <span className="text-slate-600 dark:text-zinc-400 text-[11px] font-medium">Plataforma de Inteligência Agronômica</span>
@@ -1692,6 +1662,15 @@ export default function App() {
         }}
         onNavigate={handleNavigateFromNotification}
         activeFarmName={currentFarm?.name}
+      />
+
+      {/* User Controlled App Update Modal */}
+      <AppUpdateModal
+        isOpen={showUpdateModal}
+        onClose={deferUpdate}
+        onApplyUpdate={applyUpdate}
+        currentVersion={currentVersion}
+        isChecking={isCheckingUpdate}
       />
     </div>
   );

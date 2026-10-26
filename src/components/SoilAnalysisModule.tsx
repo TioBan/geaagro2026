@@ -27,6 +27,7 @@ import {
   TrendingUp,
   MapPin,
   List,
+  Compass,
 } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { SoilSample, Farm } from '../types/agronomy';
@@ -36,6 +37,7 @@ import {
   ImportValidationResult,
 } from '../utils/spreadsheetTemplate';
 import { calculateSoilIndices } from '../utils/agronomicCalculations';
+import { SoilSamplingMapView } from './soil/SoilSamplingMapView';
 
 interface SoilAnalysisModuleProps {
   soilSamples: SoilSample[];
@@ -54,7 +56,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
   activeSubTab,
   setActiveSubTab,
 }) => {
-  const [activeView, setActiveView] = useState<'list' | 'import' | 'manual' | 'ocr'>('list');
+  const [activeView, setActiveView] = useState<'list' | 'import' | 'manual' | 'ocr' | 'mapping'>('list');
 
   // Synchronize incoming activeSubTab with activeView
   useEffect(() => {
@@ -65,17 +67,20 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
       setActiveView('manual');
     } else if (activeSubTab === 'importar_csv' || activeSubTab === 'import') {
       setActiveView('import');
+    } else if (activeSubTab === 'mapeamento' || activeSubTab === 'mapping' || activeSubTab === 'georreferenciamento') {
+      setActiveView('mapping');
     } else if (activeSubTab === 'amostras' || activeSubTab === 'laudos' || activeSubTab === 'list') {
       setActiveView('list');
     }
   }, [activeSubTab]);
 
-  const handleSwitchView = (view: 'list' | 'import' | 'manual' | 'ocr') => {
+  const handleSwitchView = (view: 'list' | 'import' | 'manual' | 'ocr' | 'mapping') => {
     setActiveView(view);
     if (setActiveSubTab) {
       if (view === 'ocr') setActiveSubTab('leitura_ia');
       else if (view === 'manual') setActiveSubTab('cadastro_manual');
       else if (view === 'import') setActiveSubTab('importar_csv');
+      else if (view === 'mapping') setActiveSubTab('mapeamento');
       else setActiveSubTab('amostras');
     }
   };
@@ -734,6 +739,17 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
               <span className="whitespace-nowrap">Catálogo de Amostras</span>
             </button>
             <button
+              onClick={() => handleSwitchView('mapping')}
+              className={`flex-1 xl:flex-none px-4 py-2.5 text-xs sm:text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${
+                activeView === 'mapping'
+                  ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-600 dark:bg-emerald-600 dark:text-white'
+                  : 'bg-transparent text-slate-500 dark:text-zinc-400 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/20'
+              }`}
+            >
+              <Compass className="w-4 h-4" />
+              <span className="whitespace-nowrap">Mapeamento no Talhão</span>
+            </button>
+            <button
               onClick={() => { resetForm(); handleSwitchView('ocr'); }}
               className={`flex-1 xl:flex-none px-4 py-2.5 text-xs sm:text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${
                 activeView === 'ocr'
@@ -788,6 +804,26 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
 
         </div>
       </div>
+
+      {/* VIEW: FIELD MAPPING & SOIL SAMPLING POINTS */}
+      {activeView === 'mapping' && (
+        <SoilSamplingMapView
+          selectedFarm={selectedFarm}
+          soilSamples={soilSamples}
+          onNavigateToManualSample={(prefilled) => {
+            resetForm();
+            setFormData(prev => ({
+              ...prev,
+              code: (prefilled as any).sampleCode || (prefilled as any).code || prev.code,
+              plotId: prefilled.plotId || prev.plotId,
+              depth: ((prefilled.depth as any) === '20-40' ? '20-40' : '0-20'),
+              date: (prefilled as any).collectionDate || prefilled.date || prev.date,
+              notes: (prefilled as any).notes ? `Ponto de Coleta Georreferenciado: ${(prefilled as any).notes}` : prev.notes,
+            }));
+            handleSwitchView('manual');
+          }}
+        />
+      )}
 
       {/* VIEW: OCR & EXTRACTION FROM PHOTO OR PDF */}
       {activeView === 'ocr' && (

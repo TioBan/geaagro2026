@@ -75,7 +75,7 @@ export const MODULE_DESCRIPTIONS: Record<string, ModuleDescription> = {
     producerBenefit: 'Acesso às notas de atualização, novidades do sistema e suporte direto com a equipe técnica.',
     producerTip: 'Verifique se há atualizações para aproveitar novas tabelas de adubação e bulas do MAPA.',
     category: 'Gestão & Geral',
-    highlights: ['Versão 4.2.3.2 Pro', 'Termos de uso e privacidade', 'Suporte agronômico'],
+    highlights: ['Versão 4.2.3.4 Pro', 'Termos de uso e privacidade', 'Suporte agronômico'],
   },
   pericia_rural: {
     id: 'pericia_rural',
@@ -270,11 +270,11 @@ export const MODULE_DESCRIPTIONS: Record<string, ModuleDescription> = {
   geaagro_edu: {
     id: 'geaagro_edu',
     title: 'GeaAgro Edu (Portal Educacional)',
-    shortDescription: 'Biblioteca de artigos técnicos, cartilhas agronômicas, pesquisas da Embrapa e treinamentos práticos para o produtor.',
-    producerBenefit: 'Capacite sua equipe com materiais didáticos testados e comprovados pela ciência agrícola brasileira.',
-    producerTip: 'Acesse as cartilhas de calibração de pulverizador para treinar os operadores antes da safra.',
+    shortDescription: 'Hub de conteúdo agronômico: tutoriais do software no canal do YouTube (@Lucasgeaagrobr), artigos técnicos, cálculos e mapas mentais no Blog.',
+    producerBenefit: 'Capacite sua equipe com vídeos passo a passo demonstrando o uso dos aplicativos no campo e artigos técnicos científicos.',
+    producerTip: 'Inscreva-se no canal do YouTube @Lucasgeaagrobr e acesse o portal geaagrobrasil.blogspot.com.br para consultas diárias.',
     category: 'Capacitação',
-    highlights: ['Artigos agronômicos revisados', 'Guias práticos de manejo', 'Acesso direto ao portal GeaAgro Brasil'],
+    highlights: ['Canal do YouTube (@Lucasgeaagrobr)', 'Artigos no Blog GeaAgro Brasil', 'Mapas Mentais & Fórmulas Rápidas'],
   },
   avicultura: {
     id: 'avicultura',

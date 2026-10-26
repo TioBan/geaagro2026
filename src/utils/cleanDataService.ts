@@ -90,7 +90,7 @@ const DEMO_STORAGE_KEYS = [
   'geaagro_gestao_clima',
 ];
 
-const CLEAN_STATE_FLAG = 'geaagro_clean_state_v8';
+const CLEAN_STATE_FLAG = 'geaagro_clean_state_v9';
 
 export function clearAllDemoData(): void {
   if (typeof window === 'undefined') return;
@@ -98,6 +98,16 @@ export function clearAllDemoData(): void {
   try {
     DEMO_STORAGE_KEYS.forEach((key) => {
       localStorage.removeItem(key);
+    });
+
+    // Remoção de todos os contornos e pontos pré-preenchidos do Mapeamento de Coletas no Talhão
+    Object.keys(localStorage).forEach((key) => {
+      if (
+        key.startsWith('geaagro_plot_boundaries_') ||
+        key.startsWith('geaagro_soil_sampling_points_')
+      ) {
+        localStorage.removeItem(key);
+      }
     });
 
     // Also clear IndexedDB stores if present

@@ -43,6 +43,7 @@ import {
   Sliders,
   DollarSign,
   Activity,
+  BarChart2,
   BarChart3,
   Calendar,
   Layers3,
@@ -66,6 +67,7 @@ import {
   ChevronDown,
   ChevronUp,
   Filter,
+  Compass,
 } from 'lucide-react';
 import { useGeolocation } from '../hooks/useGeolocation';
 import {
@@ -96,6 +98,7 @@ import {
 import { SoilCalibrationCurves } from './SoilCalibrationCurves';
 import { IgfExplanationModal } from './IgfExplanationModal';
 import { PersonalizedRecommendationsTab } from './PersonalizedRecommendationsTab';
+import { SoilSamplingMapView } from './soil/SoilSamplingMapView';
 
 const POPULATION_CROP_PRESETS = [
   { id: 'soja', name: 'Soja (Glycine max)', rowSpacing: 0.45, plantsPerM: 12, pmv: 160, seedsBag: 60000, germ: 90, emerg: 92, targetPop: 266667 },
@@ -3709,38 +3712,112 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
           </div>
         </div>
 
-        {/* Action Buttons in Bottom Area */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-3.5 border-t border-emerald-800/50">
-          <div className="text-[11px] text-emerald-200/80 font-medium hidden sm:block">
-            Selecione uma ação rápida ou navegue pelos relatórios técnicos detalhados:
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2.5 w-full sm:w-auto">
+        {/* Unified Integrated Navigation Tabs Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3.5 border-t border-emerald-800/50">
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-black/40 rounded-xl border border-emerald-800/60 overflow-x-auto max-w-full">
+            <button
+              onClick={() => setActiveTab('mapeamento_talhao')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
+                activeTab === 'mapeamento_talhao' || activeTab === 'mapeamento'
+                  ? 'bg-emerald-400 text-slate-950 shadow-md font-black'
+                  : 'text-emerald-100 hover:text-white hover:bg-emerald-800/40'
+              }`}
+            >
+              <Compass className="w-3.5 h-3.5" />
+              <span>Mapeamento no Talhão</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
+                activeTab === 'dashboard'
+                  ? 'bg-emerald-400 text-slate-950 shadow-md font-black'
+                  : 'text-emerald-100 hover:text-white hover:bg-emerald-800/40'
+              }`}
+            >
+              <BarChart2 className="w-3.5 h-3.5" />
+              <span>Dashboard & IGF</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('calagem')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
+                activeTab === 'calagem'
+                  ? 'bg-emerald-400 text-slate-950 shadow-md font-black'
+                  : 'text-emerald-100 hover:text-white hover:bg-emerald-800/40'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Calagem</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('gessagem')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
+                activeTab === 'gessagem'
+                  ? 'bg-emerald-400 text-slate-950 shadow-md font-black'
+                  : 'text-emerald-100 hover:text-white hover:bg-emerald-800/40'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Gessagem</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('adubacao_plantio')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
+                activeTab === 'adubacao_plantio' || activeTab === 'adubacao_cobertura'
+                  ? 'bg-emerald-400 text-slate-950 shadow-md font-black'
+                  : 'text-emerald-100 hover:text-white hover:bg-emerald-800/40'
+              }`}
+            >
+              <Leaf className="w-3.5 h-3.5" />
+              <span>Adubação NPK</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('adubacao_organica')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
+                activeTab === 'adubacao_organica'
+                  ? 'bg-emerald-400 text-slate-950 shadow-md font-black'
+                  : 'text-emerald-100 hover:text-white hover:bg-emerald-800/40'
+              }`}
+            >
+              <Sprout className="w-3.5 h-3.5" />
+              <span>Orgânica</span>
+            </button>
             <button
               onClick={() => setActiveTab('recomendacoes_personalizadas')}
-              className="flex-1 sm:flex-initial bg-emerald-400 hover:bg-emerald-300 text-emerald-950 font-black px-4 py-2 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer"
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
+                activeTab === 'recomendacoes_personalizadas'
+                  ? 'bg-emerald-400 text-slate-950 shadow-md font-black'
+                  : 'text-emerald-100 hover:text-white hover:bg-emerald-800/40'
+              }`}
             >
-              <Sparkles className="w-4 h-4" />
-              Recomendações Personalizadas
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>Personalizadas</span>
             </button>
             <button
               onClick={() => setActiveTab('relatorio_laudo')}
-              className="flex-1 sm:flex-initial bg-slate-900/80 hover:bg-slate-800 text-white font-bold px-4 py-2 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer border border-emerald-500/30"
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
+                activeTab === 'relatorio_laudo'
+                  ? 'bg-emerald-400 text-slate-950 shadow-md font-black'
+                  : 'text-emerald-100 hover:text-white hover:bg-emerald-800/40'
+              }`}
             >
-              <FileText className="w-4 h-4" />
-              Ver Laudo
+              <FileText className="w-3.5 h-3.5" />
+              <span>Laudo Técnico</span>
             </button>
+          </div>
+
+          <div className="flex items-center gap-2">
             <button
               id="top-export-pdf-btn"
               onClick={handleExportPDF}
               disabled={isExportingPDF}
-              className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-600/60 text-white font-black px-4 py-2 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer border border-emerald-400/40"
+              className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-600/60 text-white font-black px-3.5 py-1.5 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer border border-emerald-400/40"
             >
               {isExportingPDF ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <Download className="w-4 h-4" />
+                <Download className="w-3.5 h-3.5" />
               )}
-              {isExportingPDF ? 'Gerando PDF...' : 'Exportar Laudo PDF'}
+              <span>{isExportingPDF ? 'Gerando...' : 'Exportar Laudo PDF'}</span>
             </button>
           </div>
         </div>
@@ -3782,6 +3859,19 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
               <span>Gerenciar no Módulo de Solos</span>
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('mapeamento_talhao')}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg border cursor-pointer transition-colors ${
+              activeTab === 'mapeamento_talhao' || activeTab === 'mapeamento'
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                : 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100'
+            }`}
+          >
+            <Compass className="w-3.5 h-3.5" />
+            <span>Mapeamento do Talhão</span>
+          </button>
         </div>
 
         <div className="flex items-center gap-3 text-slate-600 dark:text-zinc-400 text-[11px] flex-wrap">
@@ -3792,6 +3882,121 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
           </span>
         </div>
       </div>
+
+      {/* ========================================================= */}
+      {/* MAPEAMENTO NO TALHÃO (DESENHO E PONTOS DE AMOSTRAGEM)    */}
+      {/* ========================================================= */}
+      {(activeTab === 'mapeamento_talhao' || activeTab === 'mapeamento') && (
+        <div className="space-y-4 animate-fade-in">
+          {/* Card Resumo Integrado: Doses Recomendadas para o Talhão Mapeado */}
+          <div className="bg-white dark:bg-zinc-950 p-4 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 pb-3 mb-3 border-b border-slate-100 dark:border-zinc-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center font-bold">
+                  <Compass className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-zinc-100 text-sm flex items-center gap-2">
+                    <span>Mapeamento & Amostragem Integrada</span>
+                    <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                      {currentSoil.plotName}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                    Desenhe o contorno, marque pontos de amostragem no satélite e visualize as doses recomendadas para a cultura.
+                  </p>
+                </div>
+              </div>
+
+              {/* Botões de Ação Rápida Integrados */}
+              <div className="flex items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('calagem')}
+                  className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-xl font-bold cursor-pointer transition flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Doses de Calagem ({calagemResult.ncTonHa} t/ha)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('relatorio_laudo')}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold cursor-pointer transition flex items-center gap-1.5 shadow-xs"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Ver Laudo Oficial</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Doses Agronômicas do Talhão em Foco */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div className="p-2.5 bg-slate-50 dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800">
+                <span className="text-[10px] text-slate-500 block uppercase font-bold">Calagem Necessária</span>
+                <strong className="text-sm font-black text-amber-600 dark:text-amber-400">
+                  {calagemResult.ncTonHa} t/ha
+                </strong>
+                <span className="text-[10px] text-slate-600 dark:text-zinc-400 block truncate">
+                  {calagemResult.limestoneType}
+                </span>
+              </div>
+
+              <div className="p-2.5 bg-slate-50 dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800">
+                <span className="text-[10px] text-slate-500 block uppercase font-bold">Gessagem Agrícola</span>
+                <strong className="text-sm font-black text-teal-600 dark:text-teal-400">
+                  {gessagemResult.ngTonHa} t/ha
+                </strong>
+                <span className="text-[10px] text-slate-600 dark:text-zinc-400 block truncate">
+                  Subsolo (20-40 cm)
+                </span>
+              </div>
+
+              <div className="p-2.5 bg-slate-50 dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800">
+                <span className="text-[10px] text-slate-500 block uppercase font-bold">Adubação no Sulco</span>
+                <strong className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                  {plantingDoseKgHa} kg/ha
+                </strong>
+                <span className="text-[10px] text-slate-600 dark:text-zinc-400 block truncate">
+                  NPK 02-20-20
+                </span>
+              </div>
+
+              <div className="p-2.5 bg-slate-50 dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800">
+                <span className="text-[10px] text-slate-500 block uppercase font-bold">Cultura Alvo</span>
+                <strong className="text-sm font-black text-slate-900 dark:text-zinc-100 truncate block">
+                  {currentSoil.cropName}
+                </strong>
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold block">
+                  Meta: {currentSoil.expectedYield} {currentSoil.yieldUnit}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {selectedFarm ? (
+            <SoilSamplingMapView
+              selectedFarm={selectedFarm}
+              soilSamples={parentSoilSamples}
+              hideHeader={true}
+              onNavigateToManualSample={(prefilled) => {
+                if (onNavigateToSolos) {
+                  onNavigateToSolos('cadastro_manual');
+                } else {
+                  setActiveTab('cadastro_analise');
+                }
+              }}
+            />
+          ) : (
+            <div className="bg-white dark:bg-zinc-950 p-8 rounded-2xl border border-slate-200 dark:border-zinc-800 text-center space-y-3">
+              <MapPin className="w-10 h-10 text-slate-300 dark:text-zinc-600 mx-auto" />
+              <h4 className="font-bold text-slate-800 dark:text-zinc-200 text-sm">Nenhuma fazenda selecionada</h4>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto">
+                Selecione uma fazenda cadastrada para desenhar os talhões e georreferenciar os pontos de coleta de solo.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ========================================================= */}
       {/* 1. DASHBOARD & IGF (ÍNDICE GEAAGRO DE FERTILIDADE)        */}

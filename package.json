@@ -1,7 +1,7 @@
 {
   "name": "agronutri",
   "private": true,
-  "version": "4.2.3.2",
+  "version": "4.2.3.4",
   "type": "module",
   "engines": {
     "node": ">=20.0.0"
@@ -29,6 +29,7 @@
     "dotenv": "^17.2.3",
     "esbuild": "^0.25.0",
     "express": "^4.21.2",
+    "geotiff": "^3.0.5",
     "html2canvas": "^1.4.1",
     "html2canvas-pro": "^1.5.8",
     "jspdf": "^4.2.1",

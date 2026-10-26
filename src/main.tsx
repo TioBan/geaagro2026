@@ -98,6 +98,7 @@ function scheduleModulePreloading() {
     () => import('./components/ZarcRiscoModule'),
     () => import('./components/GestaoRuralModule'),
     () => import('./components/ForageCatalogModule'),
+    () => import('./components/GeaAgroEduModule'),
   ];
 
   let index = 0;

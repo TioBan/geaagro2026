@@ -71,6 +71,7 @@ import {
   Eye,
   CheckCircle2,
   Globe,
+  Youtube,
   Layers3,
   HelpCircle,
   Info,
@@ -236,6 +237,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       ],
     },
     { id: 'cadastros', label: 'Cadastro Técnico', icon: Building2 },
+    { id: 'geaagro_edu', label: 'GeaAgro Edu', icon: GraduationCap },
     {
       id: 'configuracoes',
       label: 'Configurações',
@@ -397,6 +399,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       icon: FlaskConical,
       subItems: [
         { id: 'amostras', label: 'Amostras & Laudos', icon: FlaskConical },
+        { id: 'mapeamento', label: 'Mapeamento no Talhão', icon: Compass, badge: 'Novo' },
         { id: 'leitura_ia', label: 'Leitura Inteligente (IA / OCR)', icon: Sparkles, badge: 'IA' },
         { id: 'cadastro_manual', label: 'Cadastro Manual Completo', icon: Plus },
         { id: 'importar_csv', label: 'Importação em Lote (CSV)', icon: FileSpreadsheet },
@@ -459,6 +462,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       icon: Calculator,
       subItems: [
         { id: 'dashboard', label: 'Dashboard & IGF', icon: BarChart2 },
+        { id: 'mapeamento_talhao', label: 'Mapeamento no Talhão', icon: Compass, badge: 'Novo' },
         { id: 'nutriinterpretacao', label: 'Nutriinterpretação', icon: HelpCircle },
         { id: 'curvas_calibracao', label: 'Curvas de Calibração', icon: Sliders },
         { id: 'calagem', label: 'Calagem & Calcário', icon: Sparkles },
@@ -611,19 +615,18 @@ export const Navbar: React.FC<NavbarProps> = ({
       id: 'geaagro_edu',
       label: 'GeaAgro Edu',
       icon: GraduationCap,
-      externalUrl: 'https://geaagrobrasil.blogspot.com/',
       subItems: [
         {
-          id: 'portal_educacional',
-          label: 'Portal GeaAgro Brasil',
-          icon: Globe,
-          externalUrl: 'https://geaagrobrasil.blogspot.com/',
+          id: 'tutoriais_youtube',
+          label: 'Vídeos no YouTube (@Lucasgeaagrobr)',
+          icon: Youtube,
+          externalUrl: 'https://www.youtube.com/@Lucasgeaagrobr',
         },
         {
-          id: 'artigos_tecnicos',
-          label: 'Artigos & Publicações',
-          icon: BookOpen,
-          externalUrl: 'https://geaagrobrasil.blogspot.com/',
+          id: 'portal_blog',
+          label: 'Blog Oficial (GeaAgro Brasil)',
+          icon: Globe,
+          externalUrl: 'https://geaagrobrasil.blogspot.com.br',
         },
       ],
     },
@@ -1231,7 +1234,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   GeaAgro CRM
                 </h1>
                 <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                  4.2.3.2
+                  4.2.3.4
                 </span>
               </div>
               <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-medium">Inteligência Agronômica</p>
@@ -1340,7 +1343,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     GeaAgro CRM
                   </h1>
                   <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                    4.2.3.2
+                    4.2.3.4
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400 dark:text-zinc-400 font-medium mt-0.5">
@@ -1447,7 +1450,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             onClick={() => handleNavClick('sobre')}
-            title="Sobre o GeaAgro 4.2.3.2"
+            title="Sobre o GeaAgro 4.2.3.4"
             className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
               activeTab === 'sobre'
                 ? 'bg-emerald-600 text-white shadow-xs hover:scale-105'

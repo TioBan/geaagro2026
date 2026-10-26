@@ -65,6 +65,14 @@ export const SYSTEM_MODULES: SystemModuleMetadata[] = [
     defaultInProfiles: ['agricultor', 'pecuarista', 'administrador', 'pericia', 'todos'],
   },
   {
+    id: 'geaagro_edu',
+    label: 'GeaAgro Edu',
+    category: 'geral',
+    categoryLabel: 'Educação & Conteúdo',
+    description: 'Portal de conhecimento agronômico: tutoriais em vídeo do software no YouTube, artigos técnicos, cálculos e mapas mentais.',
+    defaultInProfiles: ['agricultor', 'pecuarista', 'administrador', 'pericia', 'todos'],
+  },
+  {
     id: 'caderno_campo',
     label: 'Caderno de Campo Digital',
     category: 'agricultura',

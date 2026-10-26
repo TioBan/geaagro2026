@@ -123,7 +123,8 @@ const ASSETS_TO_CACHE = [...ESSENTIAL_ASSETS, ...OPTIONAL_ASSETS];
 
 // Install Service Worker and cache all essential application modules & assets
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
+  // NOTA: NÃO chamar self.skipWaiting() aqui!
+  // O Service Worker deve obrigatoriamente aguardar a confirmação do usuário via mensagem 'SKIP_WAITING'
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
       console.log(`[Service Worker] Installing ${CACHE_NAME}. Precaching all application chunks & modules...`);

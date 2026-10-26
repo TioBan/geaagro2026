@@ -1,5 +1,7 @@
 export type RecommendationTab =
   | 'dashboard'
+  | 'mapeamento_talhao'
+  | 'mapeamento'
   | 'cadastro_analise'
   | 'nutriinterpretacao'
   | 'curvas_calibracao'
