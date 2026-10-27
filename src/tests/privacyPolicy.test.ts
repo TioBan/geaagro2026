@@ -71,7 +71,7 @@ describe('LGPD Privacy Policy & Terms of Use Distinction', () => {
       // Save consent
       const saved = saveLgpdConsentStatus();
       expect(saved.accepted).toBe(true);
-      expect(saved.version).toBe('4.2.3.4');
+      expect(saved.version).toBe('4.2.3.5');
       expect(saved.timestamp).toBeDefined();
 
       // Retrieve consent

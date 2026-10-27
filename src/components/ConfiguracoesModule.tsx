@@ -65,7 +65,7 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
   isUpToDate = false,
   onCheckForUpdates,
   onApplyUpdate,
-  currentVersion = '4.2.3.4',
+  currentVersion = '4.2.3.5',
 }) => {
   const [activeProfileId, setActiveProfile] = useState<UserProfileId>(() => getActiveProfileId());
   const [enabledModules, setEnabledModules] = useState<string[]>(() => {

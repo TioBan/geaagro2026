@@ -252,7 +252,7 @@ export function exportToKML(
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
     <name>Mapeamento de Coleta de Solo - ${plotName || 'Talhão'} (${farmName || 'Fazenda'})</name>
-    <description>Mapeamento georreferenciado gerado no GeaAgro CRM 4.2.3.4</description>
+    <description>Mapeamento georreferenciado gerado no GeaAgro CRM 4.2.3.5</description>
 
     <!-- Estilos de Coleta -->
     <Style id="plotBoundaryStyle">
@@ -518,7 +518,7 @@ export async function exportToGPKG(
   const metadata = {
     gpkg_version: '1.2.0',
     title: `Mapeamento ${plotName} - GeaAgro`,
-    generator: 'GeaAgro CRM 4.2.3.4 Spatial Engine',
+    generator: 'GeaAgro CRM 4.2.3.5 Spatial Engine',
     srs_id: 4326,
     created_at: new Date().toISOString(),
     feature_count: (boundary ? 1 : 0) + points.length,

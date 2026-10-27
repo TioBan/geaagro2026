@@ -7,7 +7,7 @@ export interface PolicySection {
   subsections?: { title: string; text: string }[];
 }
 
-export const PRIVACY_POLICY_VERSION = '4.2.3.4';
+export const PRIVACY_POLICY_VERSION = '4.2.3.5';
 export const PRIVACY_POLICY_LAST_UPDATED = '14 de setembro de 2026';
 export const DPO_CONTACT_EMAIL = 'geaagrobrasil@gmail.com';
 

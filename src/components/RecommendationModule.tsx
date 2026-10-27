@@ -99,6 +99,7 @@ import { SoilCalibrationCurves } from './SoilCalibrationCurves';
 import { IgfExplanationModal } from './IgfExplanationModal';
 import { PersonalizedRecommendationsTab } from './PersonalizedRecommendationsTab';
 import { SoilSamplingMapView } from './soil/SoilSamplingMapView';
+import { useSoilCoordinates } from '../hooks/useSoilCoordinates';
 
 const POPULATION_CROP_PRESETS = [
   { id: 'soja', name: 'Soja (Glycine max)', rowSpacing: 0.45, plantsPerM: 12, pmv: 160, seedsBag: 60000, germ: 90, emerg: 92, targetPop: 266667 },
@@ -233,6 +234,8 @@ function mapSoilSampleToExtended(s: SoilSample, farm?: Farm): SoilAnalysisExtend
     cultivar: plot?.currentCrop || '',
     expectedYield: cropName.includes('Café') ? 45 : 75,
     yieldUnit: cropName.includes('Café') ? 'sc/ha' : 'sc/ha',
+    latitude: s.latitude,
+    longitude: s.longitude,
     
     phCacl2: s.phCaCl2,
     phH2o: s.phH2O || (s.phCaCl2 + 0.7),
@@ -465,15 +468,20 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
       setExternalSubTab(tab);
     }
   };
+  const { syncSamplesWithCoordinates } = useSoilCoordinates();
   const [soilAnalyses, setSoilAnalyses] = useState<SoilAnalysisExtended[]>(SAMPLE_SOIL_EXTENDED);
   const [selectedSoilId, setSelectedSoilId] = useState<string>(SAMPLE_SOIL_EXTENDED[0]?.id || '');
+  const [mappingViewMode, setMappingViewMode] = useState<'coletas_gps' | 'variabilidade_2d'>('coletas_gps');
 
-  // Sync parent soil samples with local state and select active one
+  // Sync parent soil samples with shared coordinates context and select active one
   useEffect(() => {
-    if (parentSoilSamples && (parentSoilSamples || []).length > 0) {
+    const rawSamples = parentSoilSamples && (parentSoilSamples || []).length > 0 ? parentSoilSamples : [];
+    const syncedSamples = syncSamplesWithCoordinates(rawSamples, selectedFarm?.id || '');
+
+    if (syncedSamples && (syncedSamples || []).length > 0) {
       const farmSamples = selectedFarm?.id
-        ? (parentSoilSamples || []).filter(s => s?.farmId === selectedFarm?.id)
-        : (parentSoilSamples || []);
+        ? (syncedSamples || []).filter(s => s?.farmId === selectedFarm?.id)
+        : (syncedSamples || []);
         
       if ((farmSamples || []).length > 0) {
         const mapped = farmSamples.map(s => mapSoilSampleToExtended(s, selectedFarm));
@@ -492,7 +500,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
       setSoilAnalyses(SAMPLE_SOIL_EXTENDED);
       setSelectedSoilId(SAMPLE_SOIL_EXTENDED[0]?.id || '');
     }
-  }, [parentSoilSamples, selectedFarm, initialSelectedSampleId]);
+  }, [parentSoilSamples, selectedFarm, initialSelectedSampleId, syncSamplesWithCoordinates]);
 
   const [isExportingPDF, setIsExportingPDF] = useState<boolean>(false);
 
@@ -10686,48 +10694,109 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
       )}
 
       {/* ========================================================= */}
-      {/* MAPAS DE FERTILIDADE (2D GRID VARIABILIDADE ESPACIAL)      */}
+      {/* MAPAS DE FERTILIDADE E MAPEAMENTO GEORREFERENCIADO       */}
       {/* ========================================================= */}
       {activeTab === 'mapas_fertilidade' && (
         <div className="space-y-6 animate-fade-in text-xs">
-          {/* Main Container */}
-          <div className="bg-white dark:bg-black border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 shadow-2xs space-y-5">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center border-b pb-4 dark:border-zinc-800 gap-3">
-              <div>
-                <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <Activity className="w-5 h-5 text-emerald-600" />
-                  Mapeamento de Variabilidade e Desenho Georreferenciado
-                </h3>
-                <p className="text-slate-400 text-[10px] mt-0.5">
-                  Cadastre talhões informando coordenadas geográficas ou clicando no mapa satélite interativo para desenhar o polígono.
-                </p>
-              </div>
+          {/* Seletor Integrado de Visão do Mapeamento */}
+          <div className="bg-slate-100 dark:bg-zinc-900/90 p-2.5 rounded-2xl border border-slate-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setMappingViewMode('coletas_gps')}
+                className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-2 ${
+                  mappingViewMode === 'coletas_gps'
+                    ? 'bg-emerald-600 text-white shadow-md font-extrabold'
+                    : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <Compass className="w-4 h-4 text-emerald-300" />
+                <span>1. Mapeamento de Coletas &amp; GPS no Talhão</span>
+                <span className="px-2 py-0.5 rounded text-[9px] bg-emerald-500/20 text-emerald-300 font-extrabold uppercase border border-emerald-400/30">
+                  100% Integrado Análise de Solo
+                </span>
+              </button>
 
-              {/* Selector to map different nutrients */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                {[
-                  { id: 'igf', label: 'Índice Geral (IGF)' },
-                  { id: 'ph', label: 'Acidez (pH)' },
-                  { id: 'p', label: 'Fósforo (P)' },
-                  { id: 'k', label: 'Potássio (K)' },
-                  { id: 'organicMatter', label: 'M. Orgânica' },
-                  { id: 'clay', label: 'Argila %' },
-                ].map((nut) => (
-                  <button
-                    key={nut.id}
-                    onClick={() => setMapSelectedNutrient(nut.id as any)}
-                    className={`px-3 py-1.5 rounded-lg font-bold text-[10px] transition-all cursor-pointer ${
-                      mapSelectedNutrient === nut.id
-                        ? 'bg-emerald-600 text-white font-extrabold shadow-xs'
-                        : 'bg-slate-100 hover:bg-slate-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300'
-                    }`}
-                  >
-                    {nut.label}
-                  </button>
-                ))}
-              </div>
+              <button
+                type="button"
+                onClick={() => setMappingViewMode('variabilidade_2d')}
+                className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-2 ${
+                  mappingViewMode === 'variabilidade_2d'
+                    ? 'bg-emerald-600 text-white shadow-md font-extrabold'
+                    : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <Layers className="w-4 h-4" />
+                <span>2. Zonas de Manejo &amp; Variabilidade de Nutrientes (2D)</span>
+              </button>
             </div>
+
+            <span className="text-[10px] text-slate-500 dark:text-zinc-400 font-bold hidden sm:inline">
+              📍 Os pontos e contornos definidos em campo são sincronizados em tempo real entre todos os módulos.
+            </span>
+          </div>
+
+          {/* VIEW 1: MAPA INTERATIVO LEAFLET COM COLETAS, GRADES E GPS INTEGRADO */}
+          {mappingViewMode === 'coletas_gps' && (
+            <div className="animate-fade-in">
+              <SoilSamplingMapView
+                selectedFarm={
+                  selectedFarm || {
+                    id: 'farm-1',
+                    name: 'Fazenda Santa Helena',
+                    city: 'Sorriso',
+                    state: 'MT',
+                    areaHa: 1200,
+                    plots: [
+                      { id: 'plot-1', name: 'Talhão 01 - Pivô Central', areaHa: 120, clayPercentage: 45, currentCrop: 'Soja' },
+                      { id: 'plot-2', name: 'Talhão 02 - Sede', areaHa: 85, clayPercentage: 38, currentCrop: 'Milho' },
+                    ],
+                  }
+                }
+                soilSamples={parentSoilSamples || []}
+              />
+            </div>
+          )}
+
+          {/* VIEW 2: MAPA DE VARIABILIDADE DE NUTRIENTES & DESENHO DE POLÍGONOS */}
+          {mappingViewMode === 'variabilidade_2d' && (
+            <div className="bg-white dark:bg-black border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 shadow-2xs space-y-5 animate-fade-in">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center border-b pb-4 dark:border-zinc-800 gap-3">
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <Activity className="w-5 h-5 text-emerald-600" />
+                    Mapeamento de Variabilidade e Desenho Georreferenciado
+                  </h3>
+                  <p className="text-slate-400 text-[10px] mt-0.5">
+                    Cadastre talhões informando coordenadas geográficas ou clicando no mapa satélite interativo para desenhar o polígono.
+                  </p>
+                </div>
+
+                {/* Selector to map different nutrients */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {[
+                    { id: 'igf', label: 'Índice Geral (IGF)' },
+                    { id: 'ph', label: 'Acidez (pH)' },
+                    { id: 'p', label: 'Fósforo (P)' },
+                    { id: 'k', label: 'Potássio (K)' },
+                    { id: 'organicMatter', label: 'M. Orgânica' },
+                    { id: 'clay', label: 'Argila %' },
+                  ].map((nut) => (
+                    <button
+                      key={nut.id}
+                      onClick={() => setMapSelectedNutrient(nut.id as any)}
+                      className={`px-3 py-1.5 rounded-lg font-bold text-[10px] transition-all cursor-pointer ${
+                        mapSelectedNutrient === nut.id
+                          ? 'bg-emerald-600 text-white font-extrabold shadow-xs'
+                          : 'bg-slate-100 hover:bg-slate-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300'
+                      }`}
+                    >
+                      {nut.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
             {/* Split Grid: Interactive Map + Registration Form */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -11358,8 +11427,9 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    )}
 
       {/* ========================================================= */}
       {/* SIMULADOR DE CENÁRIOS E RETORNO FINANCEIRO                */}

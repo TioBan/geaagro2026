@@ -46,6 +46,9 @@ import {
   GeoprocessamentoRasterUpload,
   TEMPORAL_STAGES_PROGRESSION
 } from '../../data/geoprocessamentoData';
+import { VraPrescriptionModal } from '../soil/VraPrescriptionModal';
+import { VraGridCanvasMap } from './VraGridCanvasMap';
+import { PrescriptionMapResult } from '../../utils/spatialInterpolationEngine';
 
 const FALLBACK_PLOT: GeoprocessamentoPlotState = {
   id: 'geo-tl-01',
@@ -192,6 +195,8 @@ export const GeoprocessamentoDashboard: React.FC<GeoprocessamentoDashboardProps>
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
   const [isInspectionMenuOpen, setIsInspectionMenuOpen] = useState<boolean>(true);
   const [inspectionFilter, setInspectionFilter] = useState<'all' | 'pendente' | 'em_vistoria' | 'concluido'>('all');
+  const [isVraModalOpen, setIsVraModalOpen] = useState<boolean>(false);
+  const [vraResult, setVraResult] = useState<PrescriptionMapResult | null>(null);
 
   // Aggregated KPIs
   const totalMonitoredPlots = plots.length;
@@ -1112,6 +1117,40 @@ export const GeoprocessamentoDashboard: React.FC<GeoprocessamentoDashboardProps>
                     <p className="text-[10px] text-slate-500 dark:text-zinc-400 mt-1">Resposta à fertirrigação</p>
                   </div>
                 </div>
+
+                {/* Seção do Mapa de Grid Interpolado VRA (IDW / Krigagem) */}
+                <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-zinc-800">
+                    <div>
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+                        <Compass className="w-4 h-4 text-emerald-600" />
+                        <span>Mapeamento Espacial de Nutrientes &amp; Taxa Variável (VRA)</span>
+                      </h4>
+                      <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                        Interpolação de solo por Inverso do Peso da Distância (IDW) e Krigagem Ordinária com geração de arquivo ISOXML.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsVraModalOpen(true)}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md transition cursor-pointer flex items-center gap-2 active:scale-95 shrink-0"
+                    >
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                      <span>Gerar / Interpolar Grid de Nutrientes</span>
+                    </button>
+                  </div>
+
+                  {/* Componente de Visualização do Grid no Leaflet */}
+                  <VraGridCanvasMap
+                    prescriptionResult={vraResult}
+                    height="460px"
+                    nutrientName={vraResult?.metadata.nutrientName || vraResult?.metadata.nutrient || 'Fósforo (P)'}
+                    plotName={selectedPlot.name}
+                    farmName={selectedPlot.farmName}
+                    onOpenModalToReinterpolate={() => setIsVraModalOpen(true)}
+                  />
+                </div>
               </div>
             )}
 
@@ -1256,6 +1295,15 @@ export const GeoprocessamentoDashboard: React.FC<GeoprocessamentoDashboardProps>
           </div>
         </div>
       </div>
+
+      {/* Modal de Prescrição VRA e Interpolação Espacial */}
+      <VraPrescriptionModal
+        isOpen={isVraModalOpen}
+        onClose={() => setIsVraModalOpen(false)}
+        plotName={selectedPlot.name}
+        farmName={selectedPlot.farmName}
+        onPrescriptionGenerated={(res) => setVraResult(res)}
+      />
     </div>
   );
 };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { SoilCoordinatesProvider } from './context/SoilCoordinatesContext';
 import { Navbar } from './components/Navbar';
 import { LoginScreen } from './components/LoginScreen';
 import { LgpdConsentModal } from './components/LgpdConsentModal';
@@ -904,7 +905,8 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'dark bg-[#0b110d] text-zinc-100' : 'bg-[#f3f6f2] text-slate-800'} flex flex-col lg:flex-row font-sans antialiased transition-colors duration-200`}>
+    <SoilCoordinatesProvider>
+      <div className={`min-h-screen ${isDarkMode ? 'dark bg-[#0b110d] text-zinc-100' : 'bg-[#f3f6f2] text-slate-800'} flex flex-col lg:flex-row font-sans antialiased transition-colors duration-200`}>
       {/* Responsive Sidebar Navigation & Mobile Drawer */}
       <Navbar
         activeTab={activeTab}
@@ -1583,7 +1585,7 @@ export default function App() {
             <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
               <span className="font-extrabold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
                 <Sprout className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                GeaAgro CRM <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 font-extrabold border border-emerald-300 dark:border-emerald-800/80">v4.2.3.4</span>
+                GeaAgro CRM <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 font-extrabold border border-emerald-300 dark:border-emerald-800/80">v4.2.3.5</span>
               </span>
               <span className="hidden sm:inline text-slate-300 dark:text-zinc-700">•</span>
               <span className="text-slate-600 dark:text-zinc-400 text-[11px] font-medium">Plataforma de Inteligência Agronômica</span>
@@ -1672,7 +1674,8 @@ export default function App() {
         currentVersion={currentVersion}
         isChecking={isCheckingUpdate}
       />
-    </div>
+      </div>
+    </SoilCoordinatesProvider>
   );
 }
 

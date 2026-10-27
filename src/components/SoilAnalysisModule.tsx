@@ -38,6 +38,7 @@ import {
 } from '../utils/spreadsheetTemplate';
 import { calculateSoilIndices } from '../utils/agronomicCalculations';
 import { SoilSamplingMapView } from './soil/SoilSamplingMapView';
+import { useSoilCoordinates } from '../hooks/useSoilCoordinates';
 
 interface SoilAnalysisModuleProps {
   soilSamples: SoilSample[];
@@ -56,7 +57,12 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
   activeSubTab,
   setActiveSubTab,
 }) => {
+  const { syncSamplesWithCoordinates } = useSoilCoordinates();
   const [activeView, setActiveView] = useState<'list' | 'import' | 'manual' | 'ocr' | 'mapping'>('list');
+
+  const syncedSoilSamples = React.useMemo(() => {
+    return syncSamplesWithCoordinates(soilSamples || [], selectedFarm?.id || '');
+  }, [soilSamples, selectedFarm?.id, syncSamplesWithCoordinates]);
 
   // Synchronize incoming activeSubTab with activeView
   useEffect(() => {
@@ -663,7 +669,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
   };
 
   // Filtered Samples
-  const filteredSamples = soilSamples
+  const filteredSamples = syncedSoilSamples
     .filter(s => s.farmId === selectedFarm?.id)
     .filter(s => filterPlotId === 'all' || s.plotId === filterPlotId)
     .filter(s => filterDepth === 'all' || s.depth === filterDepth);
@@ -809,7 +815,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
       {activeView === 'mapping' && (
         <SoilSamplingMapView
           selectedFarm={selectedFarm}
-          soilSamples={soilSamples}
+          soilSamples={syncedSoilSamples}
           onNavigateToManualSample={(prefilled) => {
             resetForm();
             setFormData(prev => ({

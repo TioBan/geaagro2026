@@ -33,6 +33,8 @@ export interface SoilAnalysisExtended {
   cultivar: string;
   expectedYield: number; // t/ha or sc/ha
   yieldUnit: string;
+  latitude?: number;
+  longitude?: number;
 
   // Atributos Químicos
   phCacl2: number;

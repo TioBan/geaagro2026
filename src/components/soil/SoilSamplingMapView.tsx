@@ -68,8 +68,8 @@ import {
   BRAZILIAN_AGRO_CITIES,
   searchLocalBrazilianCities,
   searchOnlineCityNominatim,
-  AgroCity
 } from '../../data/brazilianAgroCities';
+import { VraPrescriptionModal } from './VraPrescriptionModal';
 
 interface SoilSamplingMapViewProps {
   selectedFarm: Farm;
@@ -121,6 +121,7 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
   });
 
   const [isGridModalOpen, setIsGridModalOpen] = useState(false);
+  const [isVraModalOpen, setIsVraModalOpen] = useState(false);
   const [gridDensityHa, setGridDensityHa] = useState<number>(2);
   const [gridDepth, setGridDepth] = useState<'0-20' | '20-40'>('0-20');
   const [gridSubsamples, setGridSubsamples] = useState<number>(15);
@@ -400,11 +401,41 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
     }
   }, [selectedFarm?.id]);
 
+  // Listener para sincronização em tempo real entre abas e módulos
+  useEffect(() => {
+    if (!selectedFarm?.id) return;
+
+    const handleExternalPoints = (e: CustomEvent) => {
+      if (e.detail?.farmId === selectedFarm.id && e.detail?.points) {
+        setPoints(e.detail.points);
+      }
+    };
+
+    const handleExternalBoundaries = (e: CustomEvent) => {
+      if (e.detail?.farmId === selectedFarm.id && e.detail?.boundaries) {
+        setBoundaries(e.detail.boundaries);
+      }
+    };
+
+    window.addEventListener('geaagro_soil_points_updated', handleExternalPoints as EventListener);
+    window.addEventListener('geaagro_plot_boundaries_updated', handleExternalBoundaries as EventListener);
+
+    return () => {
+      window.removeEventListener('geaagro_soil_points_updated', handleExternalPoints as EventListener);
+      window.removeEventListener('geaagro_plot_boundaries_updated', handleExternalBoundaries as EventListener);
+    };
+  }, [selectedFarm?.id]);
+
   // Salvar limites no localStorage
   const saveBoundariesToStorage = (updated: Record<string, PlotBoundary>) => {
     setBoundaries(updated);
     try {
-      localStorage.setItem(`geaagro_plot_boundaries_${selectedFarm.id}`, JSON.stringify(updated));
+      if (selectedFarm?.id) {
+        localStorage.setItem(`geaagro_plot_boundaries_${selectedFarm.id}`, JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('geaagro_plot_boundaries_updated', {
+          detail: { farmId: selectedFarm.id, boundaries: updated }
+        }));
+      }
     } catch (e) {
       console.error(e);
     }
@@ -414,7 +445,12 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
   const savePointsToStorage = (updated: SoilSamplingPoint[]) => {
     setPoints(updated);
     try {
-      localStorage.setItem(`geaagro_soil_sampling_points_${selectedFarm.id}`, JSON.stringify(updated));
+      if (selectedFarm?.id) {
+        localStorage.setItem(`geaagro_soil_sampling_points_${selectedFarm.id}`, JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('geaagro_soil_points_updated', {
+          detail: { farmId: selectedFarm.id, points: updated }
+        }));
+      }
     } catch (e) {
       console.error(e);
     }
@@ -1445,6 +1481,15 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setIsVraModalOpen(true)}
+              className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-600 hover:to-emerald-700 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition cursor-pointer shadow-md"
+              title="Gerar mapa de prescrição em taxa variável (IDW / Krigagem Ordinária) e exportar ISOXML / GeoJSON"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+              <span>Taxa Variável VRA (IDW / Krigagem)</span>
+            </button>
+
             <button
               onClick={() => setIsImportModalOpen(true)}
               className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
@@ -2747,6 +2792,16 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal de Prescrição VRA e Interpolação Espacial */}
+      <VraPrescriptionModal
+        isOpen={isVraModalOpen}
+        onClose={() => setIsVraModalOpen(false)}
+        plotName={currentPlot.name}
+        farmName={selectedFarm?.name || 'Fazenda'}
+        boundaryCoordinates={currentBoundary?.coordinates}
+        existingPoints={plotPoints}
+      />
     </div>
   );
 };
