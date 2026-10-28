@@ -1949,6 +1949,15 @@ async function startServer() {
           }
         }
       }));
+
+      // Block SPA fallback for /assets/ and return 404 for missing static assets
+      app.use((req, res, next) => {
+        if (req.path.startsWith('/assets/')) {
+          return res.status(404).type('text/plain').send('Asset Not Found');
+        }
+        next();
+      });
+
       app.get('*', (req, res) => {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.setHeader('Pragma', 'no-cache');

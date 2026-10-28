@@ -75,7 +75,7 @@ export const MODULE_DESCRIPTIONS: Record<string, ModuleDescription> = {
     producerBenefit: 'Acesso às notas de atualização, novidades do sistema e suporte direto com a equipe técnica.',
     producerTip: 'Verifique se há atualizações para aproveitar novas tabelas de adubação e bulas do MAPA.',
     category: 'Gestão & Geral',
-    highlights: ['Versão 4.2.3.5 Pro', 'Termos de uso e privacidade', 'Suporte agronômico'],
+    highlights: ['Versão 4.2.3.7 Pro', 'Termos de uso e privacidade', 'Suporte agronômico'],
   },
   pericia_rural: {
     id: 'pericia_rural',

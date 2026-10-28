@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Calculator,
   HelpCircle,
@@ -11,19 +11,24 @@ import {
   BookOpen,
   Sparkles,
 } from 'lucide-react';
+import { loadCostModuleData } from '../../utils/costStorage';
 
 interface DashboardKpiSectionProps {
+  farmId?: string;
   totalCultivatedAreaHa: number;
   totalAreaHa: number;
   activeCropName?: string;
   activeCropTargetVPercent?: number;
+  onNavigateToCosts?: () => void;
 }
 
 export const DashboardKpiSection: React.FC<DashboardKpiSectionProps> = ({
+  farmId,
   totalCultivatedAreaHa,
   totalAreaHa,
   activeCropName = 'Soja',
   activeCropTargetVPercent = 70,
+  onNavigateToCosts,
 }) => {
   const [showBaseInfo, setShowBaseInfo] = useState<boolean>(true);
   const [highlightedMetric, setHighlightedMetric] = useState<'todos' | 'area' | 'custo' | 'colheita'>('todos');
@@ -31,6 +36,76 @@ export const DashboardKpiSection: React.FC<DashboardKpiSectionProps> = ({
   const cultivatedPercentage = Math.round((totalCultivatedAreaHa / (totalAreaHa || 1)) * 100);
   const totalBagsHarvestForecast = Math.round(totalCultivatedAreaHa * 74);
   const netTonsForecast = ((totalCultivatedAreaHa * 74 * 60) / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+
+  // Cálculo Dinâmico dos Custos Reais da Propriedade (Sem dados fictícios/pré-preenchidos)
+  const costCalculation = useMemo(() => {
+    try {
+      const data = loadCostModuleData();
+      const operations = (data.operations || []).filter(op => !farmId || op.farmId === farmId);
+      const implementations = (data.implementations || []).filter(imp => !farmId || imp.farmId === farmId);
+      const labor = (data.labor || []).filter(lab => !farmId || lab.farmId === farmId);
+      const irrigation = (data.irrigation || []).filter(irr => !farmId || irr.farmId === farmId);
+
+      const opsCost = operations.reduce((sum, op) => sum + (Number(op.totalOperationCost) || 0), 0);
+      const implCost = implementations.reduce((sum, imp) => sum + (Number(imp.totalCost) || 0), 0);
+      const laborCost = labor.reduce((sum, lab) => sum + (Number(lab.totalCost) || 0), 0);
+      const irrCost = irrigation.reduce((sum, irr) => sum + (Number(irr.totalIrrigationCost) || 0), 0);
+
+      const totalCost = opsCost + implCost + laborCost + irrCost;
+      const totalRecords = operations.length + implementations.length + labor.length + irrigation.length;
+
+      const area = totalCultivatedAreaHa > 0 ? totalCultivatedAreaHa : (totalAreaHa > 0 ? totalAreaHa : 0);
+      const costPerHa = area > 0 && totalCost > 0 ? totalCost / area : 0;
+
+      const items: { label: string; value: number; percent: number }[] = [];
+      if (totalCost > 0) {
+        if (opsCost > 0) {
+          items.push({
+            label: 'Operações Agrícolas & Tratos',
+            value: opsCost,
+            percent: Math.round((opsCost / totalCost) * 100),
+          });
+        }
+        if (implCost > 0) {
+          items.push({
+            label: 'Insumos & Implantação',
+            value: implCost,
+            percent: Math.round((implCost / totalCost) * 100),
+          });
+        }
+        if (laborCost > 0) {
+          items.push({
+            label: 'Mão de Obra Operacional',
+            value: laborCost,
+            percent: Math.round((laborCost / totalCost) * 100),
+          });
+        }
+        if (irrCost > 0) {
+          items.push({
+            label: 'Irrigação & Energia',
+            value: irrCost,
+            percent: Math.round((irrCost / totalCost) * 100),
+          });
+        }
+      }
+
+      return {
+        hasRealCosts: totalCost > 0 && totalRecords > 0,
+        totalCost,
+        totalRecords,
+        costPerHa,
+        items,
+      };
+    } catch {
+      return {
+        hasRealCosts: false,
+        totalCost: 0,
+        totalRecords: 0,
+        costPerHa: 0,
+        items: [],
+      };
+    }
+  }, [farmId, totalCultivatedAreaHa, totalAreaHa]);
 
   return (
     <div className="space-y-4">
@@ -121,12 +196,14 @@ export const DashboardKpiSection: React.FC<DashboardKpiSectionProps> = ({
             <div className="flex items-baseline gap-1">
               <span className="text-xs text-slate-500 dark:text-zinc-400 font-semibold">R$</span>
               <span className="text-2xl font-black text-slate-800 dark:text-zinc-100 tracking-tight">
-                3.840
+                {costCalculation.hasRealCosts
+                  ? costCalculation.costPerHa.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                  : '0,00'}
               </span>
               <span className="text-[10px] text-slate-400 font-bold">/ha</span>
             </div>
-            <span className="text-[9px] text-slate-500 dark:text-zinc-400 block">
-              Benchmark da safra regional
+            <span className={`text-[9px] block ${costCalculation.hasRealCosts ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-slate-400 dark:text-zinc-500'}`}>
+              {costCalculation.hasRealCosts ? 'Base: Lançamentos da safra' : 'Nenhum custo lançado'}
             </span>
           </div>
           <div className="w-12 h-12 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-100 dark:border-amber-900/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
@@ -289,36 +366,67 @@ export const DashboardKpiSection: React.FC<DashboardKpiSectionProps> = ({
                       2. Custo Médio por Hectare
                     </h4>
                   </div>
-                  <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-900/40">
-                    R$ 3.840/ha
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                    costCalculation.hasRealCosts
+                      ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border-amber-200 dark:border-amber-900/40'
+                      : 'text-slate-500 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-800 border-slate-200 dark:border-zinc-700'
+                  }`}>
+                    {costCalculation.hasRealCosts
+                      ? `R$ ${costCalculation.costPerHa.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/ha`
+                      : 'Sem lançamentos'}
                   </span>
                 </div>
 
                 <div className="space-y-2 text-[11px] text-slate-600 dark:text-zinc-400 leading-relaxed">
                   <p>
-                    <strong>Origem da Base:</strong> Custo Operacional Efetivo (COE) médio regional levantado para lavouras de grãos na safra atual.
+                    <strong>Origem da Base:</strong> {costCalculation.hasRealCosts 
+                      ? `Custo Operacional Efetivo (COE) calculado a partir de ${costCalculation.totalRecords} lançamento(s) reais registrados na propriedade ativa.`
+                      : 'Custo apurado dinamicamente a partir dos lançamentos reais de operações, insumos e serviços no módulo de Gestão de Custos.'}
                   </p>
-                  <div className="p-2.5 bg-white dark:bg-zinc-950 rounded-lg border border-slate-200/70 dark:border-zinc-800 text-[10px] space-y-1">
-                    <span className="font-bold text-slate-700 dark:text-zinc-300 block">Composição Estimada do Custo:</span>
-                    <ul className="space-y-0.5 text-[10px]">
-                      <li className="flex justify-between">
-                        <span>• Nutrição, Calcário e NPK (42%):</span>
-                        <strong className="text-slate-700 dark:text-zinc-300">R$ 1.613</strong>
-                      </li>
-                      <li className="flex justify-between">
-                        <span>• Defensivos e Biológicos (26%):</span>
-                        <strong className="text-slate-700 dark:text-zinc-300">R$ 998</strong>
-                      </li>
-                      <li className="flex justify-between">
-                        <span>• Sementes Certificadas (16%):</span>
-                        <strong className="text-slate-700 dark:text-zinc-300">R$ 614</strong>
-                      </li>
-                      <li className="flex justify-between">
-                        <span>• Máquinas, Diesel e Manejo (16%):</span>
-                        <strong className="text-slate-700 dark:text-zinc-300">R$ 615</strong>
-                      </li>
-                    </ul>
-                  </div>
+                  
+                  {costCalculation.hasRealCosts ? (
+                    <div className="p-2.5 bg-white dark:bg-zinc-950 rounded-lg border border-slate-200/70 dark:border-zinc-800 text-[10px] space-y-1">
+                      <span className="font-bold text-slate-700 dark:text-zinc-300 block">Composição Real dos Custos:</span>
+                      <ul className="space-y-0.5 text-[10px]">
+                        {costCalculation.items.map((item, idx) => (
+                          <li key={idx} className="flex justify-between">
+                            <span>• {item.label} ({item.percent}%):</span>
+                            <strong className="text-slate-700 dark:text-zinc-300">
+                              R$ {item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </strong>
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="pt-1.5 mt-1.5 border-t border-slate-100 dark:border-zinc-800 flex justify-between font-bold text-slate-800 dark:text-zinc-200">
+                        <span>Total Acumulado:</span>
+                        <span>R$ {costCalculation.totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-amber-50/50 dark:bg-amber-950/20 rounded-lg border border-amber-200/60 dark:border-amber-900/40 text-[11px] space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-300 font-bold">
+                        <Info className="w-3.5 h-3.5 shrink-0" />
+                        <span>Nenhum custo operacional lançado para esta propriedade.</span>
+                      </div>
+                      <p className="text-[10px] text-slate-600 dark:text-zinc-400">
+                        Os dados não contêm valores fictícios ou pré-preenchidos. Lance operações, insumos ou serviços na aba Gestão de Custos para apurar o custo real por hectare.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onNavigateToCosts) {
+                            onNavigateToCosts();
+                          } else if (typeof window !== 'undefined') {
+                            window.dispatchEvent(new CustomEvent('app:navigate', { detail: { tab: 'custos' } }));
+                          }
+                        }}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 hover:underline cursor-pointer pt-0.5"
+                      >
+                        Acessar Gestão de Custos →
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

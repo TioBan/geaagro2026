@@ -11,7 +11,7 @@ export interface AppUpdateState {
   currentVersion: string;
 }
 
-const CURRENT_VERSION = '4.2.3.6';
+const CURRENT_VERSION = '4.2.3.7';
 const UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000; // 15 minutos
 
 export function useAppUpdate() {

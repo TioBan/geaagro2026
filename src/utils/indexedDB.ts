@@ -1,3 +1,5 @@
+import { opfsWasmDB, OpfsEngineDiagnostics } from '../services/opfsWasmDatabase';
+
 export const DB_NAME = 'GeaAgroOfflineDB';
 export const DB_VERSION = 5;
 
@@ -11,30 +13,38 @@ export const REQUIRED_OBJECT_STORES = [
   'caprine_records',
   'equine_records',
   'swine_records',
+
   // Cadastros Mestres & Estrutura
   'companies',
   'agronomists',
   'producers',
   'farms',
+
   // Solos, Diagnose Foliar & Nutrição
   'soil_samples',
   'leaf_samples',
   'recommendations',
   'water_analysis',
+
   // Operações de Campo & Rastreabilidade
   'fieldbook_operations',
   'traceability_lots',
   'traceability_harvests',
   'traceability_photos',
+
   // Gestão Rural, Custos & Engenharia
   'gestao_rural',
   'costs_records',
   'plantability_records',
   'irrigation_records',
-  // Fitossanidade, Viveiro & Diagnósticos
+
+  // Fitossanidade, Viveiro, Perícias & Diagnósticos
   'pests_records',
   'nursery_records',
   'offline_diagnostics',
+  'pericias_records',
+  'seed_analysis_records',
+
   // Configurações & Sincronização Offline-First
   'app_settings',
   'sync_queue',
@@ -61,7 +71,6 @@ class IndexedDBService {
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
-
         // Ensure all required object stores exist
         REQUIRED_OBJECT_STORES.forEach((storeName) => {
           if (!db.objectStoreNames.contains(storeName)) {
@@ -72,7 +81,6 @@ class IndexedDBService {
 
       request.onsuccess = async (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
-
         // Self-healing check: verify that all expected object stores actually exist
         const missingStores = REQUIRED_OBJECT_STORES.filter(
           (store) => !db.objectStoreNames.contains(store)
@@ -110,43 +118,32 @@ class IndexedDBService {
     if (this.dbPromise) {
       return this.dbPromise;
     }
-
     this.dbPromise = this.openDatabase().catch((err) => {
       this.dbPromise = null;
       throw err;
     });
-
     return this.dbPromise;
   }
 
-  // Initialize Database and request persistent browser storage
+  // Initialize Database with OPFS + WASM engine and request persistent browser storage
   public async initializeDefaultData(): Promise<void> {
     try {
-      await this.getDB();
+      // 1. Initialize next-generation OPFS + WASM Engine with automatic migration
+      await opfsWasmDB.initialize();
+
+      // 2. Purga total e segura do IndexedDB legado (GeaAgroOfflineDB, NemaAIChatsDB, AgroNutriBularioDB_v11)
+      await opfsWasmDB.purgeLegacyIndexedDb();
+
       await this.requestPersistentStorage();
       await this.persistAllEntitiesToIndexedDB();
     } catch (err) {
-      console.warn('[IndexedDB] initializeDefaultData warning:', err);
+      console.warn('[Storage] initializeDefaultData warning:', err);
     }
   }
 
   // Request Persistent Storage from the browser to prevent eviction
   public async requestPersistentStorage(): Promise<boolean> {
-    if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
-      try {
-        const isPersisted = await navigator.storage.persisted();
-        if (isPersisted) {
-          return true;
-        }
-        const granted = await navigator.storage.persist();
-        console.log(`[IndexedDB] Persistent storage request: ${granted ? 'GRANTED' : 'DENIED'}`);
-        return granted;
-      } catch (err) {
-        console.warn('[IndexedDB] Could not request persistent storage:', err);
-        return false;
-      }
-    }
-    return false;
+    return opfsWasmDB.requestPersistentStorage();
   }
 
   // Get storage usage estimate
@@ -156,30 +153,12 @@ class IndexedDBService {
     percentage: number;
     isPersistent: boolean;
   }> {
-    let quota = 0;
-    let usage = 0;
-    let percentage = 0;
-    let isPersistent = false;
+    return opfsWasmDB.getStorageEstimate();
+  }
 
-    if (typeof navigator !== 'undefined' && navigator.storage) {
-      if (navigator.storage.estimate) {
-        try {
-          const estimate = await navigator.storage.estimate();
-          quota = estimate.quota || 0;
-          usage = estimate.usage || 0;
-          if (quota > 0) {
-            percentage = parseFloat(((usage / quota) * 100).toFixed(2));
-          }
-        } catch {}
-      }
-      if (navigator.storage.persisted) {
-        try {
-          isPersistent = await navigator.storage.persisted();
-        } catch {}
-      }
-    }
-
-    return { quota, usage, percentage, isPersistent };
+  // Get diagnostic information about the active OPFS + WASM engine
+  public async getEngineDiagnostics(): Promise<OpfsEngineDiagnostics> {
+    return opfsWasmDB.getEngineDiagnostics();
   }
 
   // Safely close connection before restorations or upgrades
@@ -188,135 +167,44 @@ class IndexedDBService {
       try {
         const db = await this.dbPromise;
         db.close();
-      } catch {
-        // Ignora erro no fechamento
-      }
+      } catch {}
       this.dbPromise = null;
     }
+    await opfsWasmDB.close();
   }
 
-  // Get Single Record from a Store by ID
+  // Get Single Record from a Store by ID (Puramente OPFS + WASM)
   public async get<T>(storeName: OfflineStoreName, id: string): Promise<T | null> {
-    try {
-      const db = await this.getDB();
-      if (!db.objectStoreNames.contains(storeName)) {
-        return null;
-      }
-
-      const tx = db.transaction(storeName, 'readonly');
-      const store = tx.objectStore(storeName);
-
-      return new Promise((resolve, reject) => {
-        const request = store.get(id);
-        request.onsuccess = () => resolve((request.result as T) || null);
-        request.onerror = () => reject(request.error);
-      });
-    } catch (error) {
-      console.warn(`[IndexedDB] get error on store '${storeName}':`, error);
-      return null;
-    }
+    return opfsWasmDB.get<T>(storeName as any, id);
   }
 
-  // Get All Records from a Store
+  // Get All Records from a Store (Puramente OPFS + WASM)
   public async getAll<T>(storeName: OfflineStoreName): Promise<T[]> {
-    try {
-      const db = await this.getDB();
-      if (!db.objectStoreNames.contains(storeName)) {
-        console.warn(`[IndexedDB] Store '${storeName}' not found in current schema, returning empty.`);
-        return [];
-      }
-
-      const tx = db.transaction(storeName, 'readonly');
-      const store = tx.objectStore(storeName);
-
-      return new Promise((resolve, reject) => {
-        const request = store.getAll();
-        request.onsuccess = () => resolve((request.result || []) as T[]);
-        request.onerror = () => reject(request.error);
-      });
-    } catch (error) {
-      console.warn(`[IndexedDB] getAll error on store '${storeName}':`, error);
-      return [];
-    }
+    return opfsWasmDB.getAll<T>(storeName as any);
   }
 
-  // Count records in a store
+  // Count records in a store (Puramente OPFS + WASM)
   public async count(storeName: OfflineStoreName): Promise<number> {
-    try {
-      const db = await this.getDB();
-      if (!db.objectStoreNames.contains(storeName)) {
-        return 0;
-      }
-      const tx = db.transaction(storeName, 'readonly');
-      const store = tx.objectStore(storeName);
-
-      return new Promise((resolve, reject) => {
-        const request = store.count();
-        request.onsuccess = () => resolve(request.result || 0);
-        request.onerror = () => reject(request.error);
-      });
-    } catch {
-      return 0;
-    }
+    return opfsWasmDB.count(storeName as any);
   }
 
-  // Save/Update a Record in a Store
+  // Save/Update a Record in a Store (Puramente OPFS + WASM)
   public async put<T extends { id: string }>(
     storeName: OfflineStoreName,
     value: T,
     skipSync = false
   ): Promise<void> {
-    const db = await this.getDB();
-    if (!db.objectStoreNames.contains(storeName)) {
-      throw new Error(`Store '${storeName}' not found in database.`);
-    }
-
-    const tx = db.transaction(storeName, 'readwrite');
-    const store = tx.objectStore(storeName);
-
-    await new Promise<void>((resolve, reject) => {
-      const request = store.put(value);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-
-    if (!skipSync && storeName !== 'sync_queue' && storeName !== 'app_settings') {
-      await this.addToSyncQueue(storeName, 'update', value);
-    }
+    await opfsWasmDB.put(storeName as any, value, skipSync);
   }
 
-  // Bulk Put Many Records in a Single Transaction (High Performance)
+  // Bulk Put Many Records in a Single Transaction (High Performance OPFS + WASM)
   public async putMany<T extends { id: string }>(
     storeName: OfflineStoreName,
     items: T[],
     skipSync = false
   ): Promise<void> {
     if (!items || items.length === 0) return;
-    const db = await this.getDB();
-    if (!db.objectStoreNames.contains(storeName)) {
-      throw new Error(`Store '${storeName}' not found in database.`);
-    }
-
-    const tx = db.transaction(storeName, 'readwrite');
-    const store = tx.objectStore(storeName);
-
-    await new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(new Error('Transaction aborted'));
-
-      for (const item of items) {
-        if (item && item.id) {
-          store.put(item);
-        }
-      }
-    });
-
-    if (!skipSync && storeName !== 'sync_queue' && storeName !== 'app_settings') {
-      for (const item of items) {
-        await this.addToSyncQueue(storeName, 'update', item);
-      }
-    }
+    await opfsWasmDB.putMany(storeName as any, items, skipSync);
   }
 
   // Add a Record to Store (New)
@@ -325,81 +213,33 @@ class IndexedDBService {
     value: T,
     skipSync = false
   ): Promise<void> {
-    const db = await this.getDB();
-    if (!db.objectStoreNames.contains(storeName)) {
-      throw new Error(`Store '${storeName}' not found in database.`);
-    }
-
-    const tx = db.transaction(storeName, 'readwrite');
-    const store = tx.objectStore(storeName);
-
-    await new Promise<void>((resolve, reject) => {
-      const request = store.add(value);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-
-    if (!skipSync && storeName !== 'sync_queue' && storeName !== 'app_settings') {
-      await this.addToSyncQueue(storeName, 'insert', value);
-    }
+    await this.put(storeName, value, skipSync);
   }
 
-  // Delete a Record from a Store
+  // Delete a Record from a Store (Puramente OPFS + WASM)
   public async delete(
     storeName: OfflineStoreName,
     id: string,
     skipSync = false
   ): Promise<void> {
-    const db = await this.getDB();
-    if (!db.objectStoreNames.contains(storeName)) {
-      return;
-    }
-
-    const tx = db.transaction(storeName, 'readwrite');
-    const store = tx.objectStore(storeName);
-
-    await new Promise<void>((resolve, reject) => {
-      const request = store.delete(id);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-
-    if (!skipSync && storeName !== 'sync_queue' && storeName !== 'app_settings') {
-      await this.addToSyncQueue(storeName, 'delete', { id });
-    }
+    await opfsWasmDB.delete(storeName as any, id, skipSync);
   }
 
-  // Clear all records in a store
+  // Clear all records in a store (Puramente OPFS + WASM)
   public async clear(storeName: OfflineStoreName): Promise<void> {
-    try {
-      const db = await this.getDB();
-      if (!db.objectStoreNames.contains(storeName)) return;
-
-      const tx = db.transaction(storeName, 'readwrite');
-      const store = tx.objectStore(storeName);
-
-      return new Promise((resolve, reject) => {
-        const request = store.clear();
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    } catch (err) {
-      console.warn(`[IndexedDB] clear error on store '${storeName}':`, err);
-    }
+    await opfsWasmDB.clear(storeName as any);
   }
 
-  // Key-Value App Settings Store
+  // Key-Value App Settings Store (Puramente OPFS + WASM)
   public async setSetting<T>(key: string, value: T): Promise<void> {
-    const item = { id: key, value, updatedAt: Date.now() };
-    await this.put('app_settings', item, true);
+    await opfsWasmDB.setSetting(key, value);
   }
 
   public async getSetting<T>(key: string, defaultValue?: T): Promise<T | undefined> {
-    const record = await this.get<{ id: string; value: T }>('app_settings', key);
-    return record ? record.value : defaultValue;
+    return opfsWasmDB.getSetting<T>(key, defaultValue);
   }
 
-  // Bridge utility: Synchronize a memory or LocalStorage dataset into IndexedDB
+  // Bridge utility: Synchronize a memory or LocalStorage dataset into OPFS + IndexedDB
   public async syncEntityToIndexedDB<T extends { id: string }>(
     storeName: OfflineStoreName,
     items: T[]
@@ -408,11 +248,11 @@ class IndexedDBService {
       if (!Array.isArray(items)) return;
       await this.putMany(storeName, items, true);
     } catch (err) {
-      console.warn(`[IndexedDB] Error syncing ${storeName} to IndexedDB:`, err);
+      console.warn(`[Storage] Error syncing ${storeName}:`, err);
     }
   }
 
-  // Hydrate an entity from IndexedDB with fallback
+  // Hydrate an entity with fallback
   public async hydrateEntityFromIndexedDB<T extends { id: string }>(
     storeName: OfflineStoreName,
     fallback: T[]
@@ -428,12 +268,12 @@ class IndexedDBService {
       }
       return [];
     } catch (err) {
-      console.warn(`[IndexedDB] Error hydrating ${storeName} from IndexedDB:`, err);
+      console.warn(`[Storage] Error hydrating ${storeName}:`, err);
       return fallback || [];
     }
   }
 
-  // Auto-persist all known localStorage datasets to IndexedDB for complete offline resilience
+  // Auto-persist all known localStorage datasets to OPFS and IndexedDB
   public async persistAllEntitiesToIndexedDB(): Promise<void> {
     if (typeof window === 'undefined') return;
 
@@ -459,109 +299,35 @@ class IndexedDBService {
           }
         }
       } catch (err) {
-        console.warn(`[IndexedDB] persistAllEntities error for ${mapping.localKey}:`, err);
+        console.warn(`[Storage] persistAllEntities error for ${mapping.localKey}:`, err);
       }
     }
   }
 
-  // Sync Queue Helpers
+  // Sync Queue Helpers (Puramente OPFS + WASM)
   public async addToSyncQueue(
     table: OfflineStoreName,
     action: 'insert' | 'update' | 'delete',
     data: any
   ): Promise<void> {
-    try {
-      const db = await this.getDB();
-      if (!db.objectStoreNames.contains('sync_queue')) return;
-
-      const tx = db.transaction('sync_queue', 'readwrite');
-      const store = tx.objectStore('sync_queue');
-
-      const syncItem: SyncItem = {
-        id: `${table}_${data.id || Math.random().toString(36).substring(2)}_${Date.now()}`,
-        table,
-        action,
-        data,
-        timestamp: Date.now(),
-        status: 'pending',
-      };
-
-      return new Promise((resolve, reject) => {
-        const request = store.put(syncItem);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    } catch (err) {
-      console.warn('[IndexedDB] addToSyncQueue error:', err);
-    }
+    await opfsWasmDB.addToSyncQueue(table as any, action, data);
   }
 
   public async getSyncQueue(): Promise<SyncItem[]> {
-    return this.getAll<SyncItem>('sync_queue');
+    const queue = await opfsWasmDB.getSyncQueue();
+    return (queue || []) as unknown as SyncItem[];
   }
 
   public async updateSyncStatus(id: string, status: SyncItem['status']): Promise<void> {
-    try {
-      const db = await this.getDB();
-      if (!db.objectStoreNames.contains('sync_queue')) return;
-
-      const tx = db.transaction('sync_queue', 'readwrite');
-      const store = tx.objectStore('sync_queue');
-
-      return new Promise((resolve, reject) => {
-        const getRequest = store.get(id);
-        getRequest.onsuccess = () => {
-          const item = getRequest.result as SyncItem;
-          if (item) {
-            item.status = status;
-            const putRequest = store.put(item);
-            putRequest.onsuccess = () => resolve();
-            putRequest.onerror = () => reject(putRequest.error);
-          } else {
-            resolve();
-          }
-        };
-        getRequest.onerror = () => reject(getRequest.error);
-      });
-    } catch (err) {
-      console.warn('[IndexedDB] updateSyncStatus error:', err);
-    }
+    await opfsWasmDB.updateSyncStatus(id, status);
   }
 
   public async removeSyncItem(id: string): Promise<void> {
-    try {
-      const db = await this.getDB();
-      if (!db.objectStoreNames.contains('sync_queue')) return;
-
-      const tx = db.transaction('sync_queue', 'readwrite');
-      const store = tx.objectStore('sync_queue');
-
-      return new Promise((resolve, reject) => {
-        const request = store.delete(id);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    } catch (err) {
-      console.warn('[IndexedDB] removeSyncItem error:', err);
-    }
+    await opfsWasmDB.removeSyncItem(id);
   }
 
   public async clearSyncQueue(): Promise<void> {
-    try {
-      const db = await this.getDB();
-      if (!db.objectStoreNames.contains('sync_queue')) return;
-
-      const tx = db.transaction('sync_queue', 'readwrite');
-      const store = tx.objectStore('sync_queue');
-
-      return new Promise((resolve, reject) => {
-        const request = store.clear();
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    } catch (err) {
-      console.warn('[IndexedDB] clearSyncQueue error:', err);
-    }
+    await opfsWasmDB.clearSyncQueue();
   }
 }
 

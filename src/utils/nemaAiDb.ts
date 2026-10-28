@@ -1,3 +1,5 @@
+import { opfsWasmDB } from '../services/opfsWasmDatabase';
+
 export const NEMA_DB_NAME = 'NemaAIChatsDB';
 export const NEMA_DB_VERSION = 2;
 export const STORE_NAME = 'diagnoses';
@@ -88,89 +90,106 @@ export class NemaAIDBService {
     if (this.dbPromise) {
       return this.dbPromise;
     }
-
     this.dbPromise = this.openDatabase().catch((err) => {
       this.dbPromise = null;
       throw err;
     });
-
     return this.dbPromise;
   }
 
   // Get all diagnoses sorted by timestamp descending
   public async getAllDiagnoses(): Promise<NemaAIDiagnosisLog[]> {
-    try {
-      const db = await this.getDB();
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-
-      return new Promise((resolve, reject) => {
-        const request = store.getAll();
-        request.onsuccess = () => {
-          const results = (request.result as NemaAIDiagnosisLog[]) || [];
-          // Sort descending by timestamp
-          results.sort((a, b) => b.timestamp - a.timestamp);
-          resolve(results);
-        };
-        request.onerror = () => reject(request.error);
-      });
-    } catch (err) {
-      console.error('[NemaAIDB] Error getting all diagnoses', err);
-      return [];
+    if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
+      try {
+        const db = await this.getDB();
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const results = await new Promise<NemaAIDiagnosisLog[]>((resolve, reject) => {
+          const request = store.getAll();
+          request.onsuccess = () => resolve((request.result as NemaAIDiagnosisLog[]) || []);
+          request.onerror = () => reject(request.error);
+        });
+        results.sort((a, b) => b.timestamp - a.timestamp);
+        return results;
+      } catch (err) {
+        console.warn('[NemaAIDB] Warning reading diagnoses from IndexedDB:', err);
+      }
     }
+
+    try {
+      const opfsRecords = await opfsWasmDB.getAll<NemaAIDiagnosisLog>('diagnoses' as any);
+      if (opfsRecords && opfsRecords.length > 0) {
+        opfsRecords.sort((a, b) => b.timestamp - a.timestamp);
+        return opfsRecords;
+      }
+    } catch {}
+
+    return [];
   }
 
   // Save or update a diagnosis
   public async saveDiagnosis(log: NemaAIDiagnosisLog): Promise<void> {
-    try {
-      const db = await this.getDB();
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
+    // 1. Mirror to OPFS + WASM engine
+    await opfsWasmDB.put('diagnoses' as any, log, true).catch(() => {});
 
-      return new Promise<void>((resolve, reject) => {
-        const request = store.put(log);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    } catch (err) {
-      console.error('[NemaAIDB] Error saving diagnosis', err);
-      throw err;
+    // 2. Save in IndexedDB if available
+    if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
+      try {
+        const db = await this.getDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        await new Promise<void>((resolve, reject) => {
+          const request = store.put(log);
+          request.onsuccess = () => resolve();
+          request.onerror = () => reject(request.error);
+        });
+      } catch (err) {
+        console.warn('[NemaAIDB] Warning saving diagnosis to IndexedDB:', err);
+      }
     }
   }
 
   // Delete a single diagnosis
   public async deleteDiagnosis(id: string): Promise<void> {
-    try {
-      const db = await this.getDB();
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
+    // 1. Delete from OPFS + WASM engine
+    await opfsWasmDB.delete('diagnoses' as any, id, true).catch(() => {});
 
-      return new Promise<void>((resolve, reject) => {
-        const request = store.delete(id);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    } catch (err) {
-      console.error('[NemaAIDB] Error deleting diagnosis', err);
-      throw err;
+    // 2. Delete from IndexedDB if available
+    if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
+      try {
+        const db = await this.getDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        await new Promise<void>((resolve, reject) => {
+          const request = store.delete(id);
+          request.onsuccess = () => resolve();
+          request.onerror = () => reject(request.error);
+        });
+      } catch (err) {
+        console.warn('[NemaAIDB] Warning deleting diagnosis from IndexedDB:', err);
+      }
     }
   }
 
   // Clear all history
   public async clearHistory(): Promise<void> {
-    try {
-      const db = await this.getDB();
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
+    // 1. Clear OPFS + WASM engine
+    await opfsWasmDB.clear('diagnoses' as any).catch(() => {});
 
-      return new Promise<void>((resolve, reject) => {
-        const request = store.clear();
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    } catch (err) {
-      console.error('[NemaAIDB] Error clearing diagnoses history', err);
-      throw err;
+    // 2. Clear IndexedDB if available
+    if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
+      try {
+        const db = await this.getDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        await new Promise<void>((resolve, reject) => {
+          const request = store.clear();
+          request.onsuccess = () => resolve();
+          request.onerror = () => reject(request.error);
+        });
+      } catch (err) {
+        console.warn('[NemaAIDB] Warning clearing diagnoses history from IndexedDB:', err);
+      }
     }
   }
 }

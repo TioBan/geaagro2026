@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { offlineDB } from './utils/indexedDB';
+import { opfsWasmDB } from './services/opfsWasmDatabase';
 import { ensureCleanProductionState } from './utils/cleanDataService';
 import { checkAndRecoverAbruptInterruption } from './services/backupService';
 
@@ -125,6 +126,13 @@ function scheduleModulePreloading() {
 
 // Inicialização orquestrada da aplicação com recuperação de interrupções abruptas
 async function startApplication() {
+  // 0. Inicialização antecipada do motor OPFS + WASM e ponte universal de dados
+  try {
+    await opfsWasmDB.initialize();
+  } catch (opfsErr) {
+    console.warn('[GeaAgro Startup] Aviso ao inicializar motor OPFS + WASM:', opfsErr);
+  }
+
   // 1. Recuperação imediata pós-interrupção abrupta (queda de energia / kill do navegador)
   // DEVE rodar e concluir antes de qualquer módulo carregar ou modificar dados persistidos
   try {
@@ -139,12 +147,12 @@ async function startApplication() {
   // 2. Ensure clean initial state for professional field operations
   ensureCleanProductionState();
 
-  // 3. Initialize offline DB without demo data
+  // 3. Initialize OPFS + WASM database engine with automated migration & resilience
   try {
     await offlineDB.initializeDefaultData();
-    console.log('[App] Offline IndexedDB Initialized successfully');
+    console.log('[App] OPFS + WASM Database Engine Initialized and Migrated successfully');
   } catch (err) {
-    console.error('[App] Failed to initialize Offline IndexedDB:', err);
+    console.error('[App] Failed to initialize OPFS + WASM Database:', err);
   }
 
   // 4. Montar a árvore React com os dados já íntegros e auditados

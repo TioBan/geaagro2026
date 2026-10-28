@@ -4,7 +4,8 @@ const CACHE_NAME = 'geaagro-cache-v14';
 const ESSENTIAL_ASSETS = [
   "/",
   "/index.html",
-  "/manifest.json"
+  "/manifest.json",
+  "/geaagro-engine.wasm"
 ];
 
 // Optional assets: Auxiliary photography and diagnostic illustrations that may fail gracefully
@@ -123,8 +124,7 @@ const ASSETS_TO_CACHE = [...ESSENTIAL_ASSETS, ...OPTIONAL_ASSETS];
 
 // Install Service Worker and cache all essential application modules & assets
 self.addEventListener('install', (event) => {
-  // NOTA: NÃO chamar self.skipWaiting() aqui!
-  // O Service Worker deve obrigatoriamente aguardar a confirmação do usuário via mensagem 'SKIP_WAITING'
+  // NOTA: O Service Worker deve aguardar a confirmação do usuário via mensagem SKIP_WAITING
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
       console.log(`[Service Worker] Installing ${CACHE_NAME}. Precaching all application chunks & modules...`);
@@ -146,12 +146,14 @@ self.addEventListener('install', (event) => {
       const batchSize = 15;
       for (let i = 0; i < allTargetAssets.length; i += batchSize) {
         const batch = allTargetAssets.slice(i, i + batchSize);
-        await Promise.allSettled(
+        await Promise.all(
           batch.map(async (url) => {
             try {
               const response = await fetch(url, { cache: 'no-cache' });
               if (response && (response.ok || response.type === 'opaque')) {
                 await cache.put(url, response);
+              } else if (Array.isArray(ESSENTIAL_ASSETS) && ESSENTIAL_ASSETS.includes(url)) {
+                console.warn('[Service Worker] FATAL: Essential asset failed to cache:', url);
               }
             } catch (err) {
               console.warn('[Service Worker] Non-fatal precache skip:', url);
@@ -169,9 +171,11 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then(async (keys) => {
+      const cachesToKeep = new Set([CACHE_NAME]);
+      // Preservar cache de abas ativas em transição: cachesToKeep.add(prevCache)
       await Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME && key.startsWith('geaagro-cache-')) {
+          if (!cachesToKeep.has(key) && key.startsWith('geaagro-cache-')) {
             console.log('[Service Worker] Safely purging obsolete cache generation:', key);
             return caches.delete(key);
           }
@@ -217,6 +221,69 @@ self.addEventListener('fetch', (event) => {
     url.pathname === '/splash.jpg' ||
     url.hostname === 'fonts.googleapis.com' ||
     url.hostname === 'fonts.gstatic.com';
+
+  // ---------------------------------------------------------------------------
+  // Estratégia Stale-While-Revalidate especificamente para o binário WebAssembly (.wasm)
+  // Garante que o banco de dados OPFS carregue instantaneamente mesmo sob condições de rede instáveis.
+  // ---------------------------------------------------------------------------
+  const isWasmBinary =
+    /\.wasm$/i.test(url.pathname) ||
+    url.pathname.endsWith('.wasm') ||
+    url.pathname === '/geaagro-engine.wasm' ||
+    event.request.destination === 'webassembly';
+
+  if (isWasmBinary) {
+    event.respondWith(
+      (async () => {
+        const cache = await caches.open(CACHE_NAME);
+        // 1. Busca resposta rápida em cache (stale)
+        let cachedResponse = await cache.match(event.request, { ignoreSearch: true });
+        if (!cachedResponse) {
+          cachedResponse = await cache.match(url.pathname, { ignoreSearch: true });
+        }
+        if (cachedResponse) {
+          const cType = cachedResponse.headers.get('content-type') || '';
+          if (cType.includes('text/html')) {
+            cachedResponse = null;
+          }
+        }
+
+        // 2. Dispara revalidação em segundo plano pela rede (revalidate)
+        const networkRevalidatePromise = (async () => {
+          try {
+            const networkResponse = await fetch(event.request);
+            if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
+              const contentType = networkResponse.headers.get('content-type') || '';
+              if (!contentType.includes('text/html')) {
+                const clone = networkResponse.clone();
+                await cache.put(event.request, clone);
+                console.log(`[Service Worker] Stale-While-Revalidate: WASM binary updated in cache (${url.pathname})`);
+              }
+            }
+            return networkResponse;
+          } catch (fetchErr) {
+            console.warn('[Service Worker] Falha na revalidação do binário WASM em segundo plano (offline/instável):', fetchErr);
+            return null;
+          }
+        })();
+
+        // 3. Se temos resposta em cache, retorna imediatamente (Stale) para carga instantânea do OPFS
+        if (cachedResponse) {
+          event.waitUntil(networkRevalidatePromise);
+          return cachedResponse;
+        }
+
+        // 4. Se não há cache prévio (primeiro acesso), aguarda a revalidação da rede
+        const freshResponse = await networkRevalidatePromise;
+        if (freshResponse) {
+          return freshResponse;
+        }
+
+        throw new Error(`[Service Worker] WASM binary offline and not in cache: ${url.pathname}`);
+      })()
+    );
+    return;
+  }
 
   // Cache-First strategy for ALL static assets:
   // 1. Immediately return from cache if present and valid

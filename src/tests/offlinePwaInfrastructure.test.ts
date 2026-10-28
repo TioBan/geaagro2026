@@ -36,19 +36,17 @@ describe('GeaAgro PWA Offline Infrastructure & Service Worker Automation', () =>
       fs.writeFileSync(path.join(distDir, 'splash.jpg'), '', 'utf-8');
     }
 
-    if (!fs.existsSync(distSwPath)) {
-      const distAssets = fs.readdirSync(assetsDir).filter(f => !f.endsWith('.map')).map(f => `/assets/${f}`);
-      const rootFiles = fs.readdirSync(distDir).filter(f => f !== 'assets' && f !== 'sw.js' && f !== 'server.js' && !f.endsWith('.map')).map(f => `/${f}`);
-      const allAssets = Array.from(new Set(['/', '/index.html', ...rootFiles, ...distAssets])).sort();
-      const digest = crypto.createHash('sha256').update(allAssets.join('\n')).digest('hex').slice(0, 12);
-      const cacheVersion = `geaagro-cache-v${digest}`;
+    const distAssets = fs.readdirSync(assetsDir).filter(f => !f.endsWith('.map')).map(f => `/assets/${f}`);
+    const rootFiles = fs.readdirSync(distDir).filter(f => f !== 'assets' && f !== 'sw.js' && f !== 'server.js' && !f.endsWith('.map')).map(f => `/${f}`);
+    const allAssets = Array.from(new Set(['/', '/index.html', ...rootFiles, ...distAssets])).sort();
+    const digest = crypto.createHash('sha256').update(allAssets.join('\n')).digest('hex').slice(0, 12);
+    const cacheVersion = `geaagro-cache-v${digest}`;
 
-      let swContent = fs.readFileSync(publicSwPath, 'utf-8');
-      swContent = swContent.replace(/const CACHE_NAME = ['"][^'"]+['"];/, `const CACHE_NAME = '${cacheVersion}';`);
-      swContent = swContent.replace(/const ESSENTIAL_ASSETS = \[[^\]]*\];/s, `const ESSENTIAL_ASSETS = ${JSON.stringify(allAssets, null, 2)};`);
-      swContent = swContent.replace(/const ASSETS_TO_CACHE = \[[^\]]*\];/s, `const ASSETS_TO_CACHE = ${JSON.stringify(allAssets, null, 2)};`);
-      fs.writeFileSync(distSwPath, swContent, 'utf-8');
-    }
+    let swContent = fs.readFileSync(publicSwPath, 'utf-8');
+    swContent = swContent.replace(/const CACHE_NAME = ['"][^'"]+['"];/, `const CACHE_NAME = '${cacheVersion}';`);
+    swContent = swContent.replace(/const ESSENTIAL_ASSETS = \[[^\]]*\];/s, `const ESSENTIAL_ASSETS = ${JSON.stringify(allAssets, null, 2)};`);
+    swContent = swContent.replace(/const ASSETS_TO_CACHE = \[[^\]]*\];/s, `const ASSETS_TO_CACHE = ${JSON.stringify(allAssets, null, 2)};`);
+    fs.writeFileSync(distSwPath, swContent, 'utf-8');
   });
 
   it('1. dist/sw.js should exist and be generated with a dynamic versioned cache name', () => {

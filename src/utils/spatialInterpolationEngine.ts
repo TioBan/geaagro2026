@@ -610,8 +610,8 @@ export function exportToISOXMLStructure(
   const dateStr = new Date().toISOString();
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
-<ISO11783_TaskData VersionMajor="4" VersionMinor="0" ManagementSoftwareManufacturer="GeaAgro CRM" ManagementSoftwareVersion="4.2.3.5" DataTransferOrigin="1">
-  <XSC A="XSC1" B="GeaAgro Brasil" C="4.2.3.5" />
+<ISO11783_TaskData VersionMajor="4" VersionMinor="0" ManagementSoftwareManufacturer="GeaAgro CRM" ManagementSoftwareVersion="4.2.3.7" DataTransferOrigin="1">
+  <XSC A="XSC1" B="GeaAgro Brasil" C="4.2.3.7" />
   <CTR A="CTR1" B="Proprietario Agrícola" />
   <FRM A="FRM1" B="Fazenda Ativa" />
   <PDT A="PDT1" B="${meta.nutrient} VRA" C="0" D="1" />

@@ -498,7 +498,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-zinc-900/60">
-            <span>GeaAgro v4.2.3.5</span>
+            <span>GeaAgro v4.2.3.7</span>
             <span className="text-emerald-700 dark:text-emerald-400 font-bold inline-flex items-center gap-1 flex-wrap">
               <span>🌱 Desenvolvido por</span>
               <a

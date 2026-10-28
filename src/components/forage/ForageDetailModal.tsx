@@ -925,7 +925,7 @@ export const ForageDetailModal: React.FC<ForageDetailModalProps> = ({ forage, on
               </div>
 
               <div className="pt-4 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-between text-[11px] text-slate-500">
-                <span>Consulta realizada no módulo de Análise Técnica &bull; GeaAgro 4.2.3.5</span>
+                <span>Consulta realizada no módulo de Análise Técnica &bull; GeaAgro 4.2.3.7</span>
                 <button
                   type="button"
                   onClick={handlePrint}

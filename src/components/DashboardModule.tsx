@@ -91,10 +91,17 @@ export const DashboardModule: React.FC<DashboardModuleProps> = ({
 
       {/* 2. KPI Cards & Interactive Calculation Methodology */}
       <DashboardKpiSection
+        farmId={farm?.id}
         totalCultivatedAreaHa={totalCultivatedAreaHa}
         totalAreaHa={totalAreaHa}
         activeCropName={activeCrop?.name}
         activeCropTargetVPercent={activeCrop?.targetVPercent}
+        onNavigateToCosts={() => {
+          setActiveTab('custos');
+          if (setActiveSubTab) {
+            setActiveSubTab('painel_geral');
+          }
+        }}
       />
 
       {/* 3. Acesso Rápido às Funcionalidades */}

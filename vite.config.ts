@@ -73,6 +73,10 @@ function geaAgroPwaPrecachePlugin(): Plugin {
 
       const jsonList = JSON.stringify(allAssets, null, 2);
       swContent = swContent.replace(
+        /const ESSENTIAL_ASSETS = \[[^\]]*\];/s,
+        `const ESSENTIAL_ASSETS = ${jsonList};`
+      );
+      swContent = swContent.replace(
         /const ASSETS_TO_CACHE = \[[^\]]*\];/s,
         `const ASSETS_TO_CACHE = ${jsonList};`
       );

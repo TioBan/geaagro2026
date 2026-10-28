@@ -65,6 +65,8 @@ import {
   Clock,
   DollarSign,
   Settings,
+  RefreshCw,
+  MessageSquarePlus,
   Package,
   Egg,
   TrendingUp,
@@ -243,12 +245,14 @@ export const Navbar: React.FC<NavbarProps> = ({
       label: 'Configurações',
       icon: Settings,
       subItems: [
-        { id: 'modulos', label: 'Perfis & Módulos', icon: Sliders },
-        { id: 'agricultor', label: 'Perfil Agricultor', icon: Sprout },
-        { id: 'pecuarista', label: 'Perfil Pecuarista', icon: Beef },
-        { id: 'administrador', label: 'Perfil Administrador', icon: Building2 },
-        { id: 'pericia', label: 'Perfil Perícia', icon: Scale },
-        { id: 'todos', label: 'Todos os Módulos', icon: Layers },
+        { id: 'perfil_uso', label: 'Perfil de Uso', icon: Sliders },
+        { id: 'atualizacoes', label: 'Atualizações do Sistema', icon: RefreshCw },
+        {
+          id: 'feedback',
+          label: 'Feedback',
+          icon: MessageSquarePlus,
+          externalUrl: 'https://docs.google.com/forms/d/e/1FAIpQLSfFbadWdvEIkXgLVJRHl_Tqmz_nKirv88GsoygKI2VynSJeSQ/viewform?usp=publish-editor',
+        },
       ],
     },
     { id: 'sobre', label: 'Sobre', icon: Info },
@@ -1234,7 +1238,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   GeaAgro CRM
                 </h1>
                 <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                  4.2.3.5
+                  4.2.3.7
                 </span>
               </div>
               <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-medium">Inteligência Agronômica</p>
@@ -1343,7 +1347,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     GeaAgro CRM
                   </h1>
                   <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                    4.2.3.5
+                    4.2.3.7
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400 dark:text-zinc-400 font-medium mt-0.5">
@@ -1450,7 +1454,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             onClick={() => handleNavClick('sobre')}
-            title="Sobre o GeaAgro 4.2.3.5"
+            title="Sobre o GeaAgro 4.2.3.7"
             className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
               activeTab === 'sobre'
                 ? 'bg-emerald-600 text-white shadow-xs hover:scale-105'

@@ -1,5 +1,6 @@
 import { PesticideProduct } from '../types/pesticideLeaflet';
 import { INITIAL_PESTICIDES_CATALOG } from '../data/pesticidesData';
+import { opfsWasmDB } from './opfsWasmDatabase';
 
 const DB_NAME = 'AgroNutriBularioDB_v11';
 const DB_VERSION = 11;
@@ -149,36 +150,42 @@ class PesticideIndexedDBService {
    * Fast asynchronous retrieval of all products
    */
   public async getAllProducts(): Promise<PesticideProduct[]> {
-    if (this.isMemoryMode) {
-      return Array.from(this.memoryFallbackStore.values());
+    if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined' && !this.isMemoryMode) {
+      try {
+        const db = await this.getDB();
+        const products = await new Promise<PesticideProduct[]>((resolve, reject) => {
+          const tx = db.transaction(PRODUCTS_STORE, 'readonly');
+          const store = tx.objectStore(PRODUCTS_STORE);
+          const req = store.getAll();
+          req.onsuccess = () => resolve(req.result || []);
+          req.onerror = () => reject(req.error);
+        });
+        if (products.length > 0) {
+          return products;
+        }
+      } catch (err) {
+        console.warn('[PesticideIndexedDB] getAllProducts fallback:', err);
+      }
     }
 
     try {
-      const db = await this.getDB();
-      return new Promise<PesticideProduct[]>((resolve, reject) => {
-        const tx = db.transaction(PRODUCTS_STORE, 'readonly');
-        const store = tx.objectStore(PRODUCTS_STORE);
-        const req = store.getAll();
+      const opfsProducts = await opfsWasmDB.getAll<PesticideProduct>('pesticide_products' as any);
+      if (opfsProducts && opfsProducts.length > 0) {
+        return opfsProducts;
+      }
+    } catch {}
 
-        req.onsuccess = () => {
-          resolve(req.result || []);
-        };
-
-        req.onerror = () => {
-          reject(req.error);
-        };
-      });
-    } catch (err) {
-      console.warn('[PesticideIndexedDB] getAllProducts fallback:', err);
-      return Array.from(this.memoryFallbackStore.values());
-    }
+    return Array.from(this.memoryFallbackStore.values());
   }
 
   /**
-   * Bulk save products using a single high-efficiency readwrite transaction
+   * Bulk save products using a single high-efficiency readwrite transaction (OPFS + WASM)
    */
   public async saveAllProducts(products: PesticideProduct[]): Promise<void> {
-    if (this.isMemoryMode) {
+    // 1. Unconditionally persist to OPFS + WASM engine
+    await opfsWasmDB.putMany('pesticide_products' as any, products as any, true).catch(() => {});
+
+    if (this.isMemoryMode || typeof window === 'undefined' || typeof indexedDB === 'undefined') {
       this.memoryFallbackStore.clear();
       products.forEach(p => this.memoryFallbackStore.set(p.id, p));
       return;
@@ -205,13 +212,8 @@ class PesticideIndexedDBService {
           lastUpdated: Date.now(),
         });
 
-        tx.oncomplete = () => {
-          resolve();
-        };
-
-        tx.onerror = () => {
-          reject(tx.error);
-        };
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
       });
     } catch (err) {
       console.warn('[PesticideIndexedDB] saveAllProducts fallback:', err);

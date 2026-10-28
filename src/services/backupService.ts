@@ -25,6 +25,7 @@ import {
   bytesToBase64,
   base64ToBytes
 } from './cryptoService';
+import { opfsWasmDB } from './opfsWasmDatabase';
 
 export const BACKUP_FORMAT_MAGIC = 'GEAAGRO_BACKUP';
 export const BACKUP_FORMAT_VERSION = 1;
@@ -138,6 +139,15 @@ export interface IndexedDBDatabaseDump {
   stores: IndexedDBStoreDump[];
 }
 
+export interface OpfsBackupDump {
+  version: string;
+  engine: string;
+  exportedAt: number;
+  manifest: any;
+  tables: Record<string, any[]>;
+  kv: Record<string, any>;
+}
+
 export interface DecryptedBackupPayload {
   system: 'GeaAgro Suite';
   schemaVersion: number;
@@ -148,6 +158,7 @@ export interface DecryptedBackupPayload {
   indexedDBData: IndexedDBDatabaseDump[];
   attachments: StoredAttachment[];
   syncQueue: any[];
+  opfsData?: OpfsBackupDump;
 }
 
 export interface GeaAgroBackupFile {
@@ -541,13 +552,15 @@ export async function createEmergencySnapshot(
 ): Promise<string> {
   const localStorageDump = collectAllLocalStorageData();
   const indexedDump = await collectAllIndexedDBData();
+  const opfsDump = await opfsWasmDB.exportOpfsDump().catch(() => null);
 
   const snapshotPayload = {
     id: `snap-emer-${Date.now()}`,
     timestamp: new Date().toISOString(),
     title,
     localStorage: localStorageDump,
-    indexedDB: indexedDump
+    indexedDB: indexedDump,
+    opfs: opfsDump
   };
 
   // Garante retenção em memória imediatamente para garantir rollback mesmo com QuotaExceededError
@@ -620,6 +633,15 @@ export async function rollbackEmergencySnapshot(targetSnapshotId?: string): Prom
   try {
     if (!parsed || !parsed.localStorage || !parsed.indexedDB) {
       throw new Error('Estrutura do snapshot de emergência inválida.');
+    }
+
+    // 0. Restaura OPFS + WASM se capturado no snapshot
+    if (parsed.opfs) {
+      try {
+        await opfsWasmDB.importOpfsDump(parsed.opfs);
+      } catch (opfsErr) {
+        console.warn('[BackupService Rollback] Aviso ao restaurar OPFS snapshot:', opfsErr);
+      }
     }
 
     // 1. Restaura localStorage
@@ -733,9 +755,68 @@ export async function createFullBackup(options: {
   customLocalStorageData?: Record<string, any>;
   customIndexedData?: IndexedDBDatabaseDump[];
 }): Promise<{ backupFile: GeaAgroBackupFile; jsonString: string; metadata: BackupMetadata }> {
-  // 1. Coletar dados
-  const localStorageData = options.customLocalStorageData || collectAllLocalStorageData();
-  const indexedDBData = options.customIndexedData || (await collectAllIndexedDBData());
+  // 1. Coleta nativa do novo motor OPFS + WASM
+  const opfsDump = await opfsWasmDB.exportOpfsDump().catch(() => ({
+    manifest: { version: '4.2.3.7' },
+    tables: {},
+    kv: {},
+    exportedAt: Date.now()
+  }));
+
+  const hasCustomIndexed = options.customIndexedData !== undefined;
+  const hasCustomLocal = options.customLocalStorageData !== undefined;
+
+  const opfsData: OpfsBackupDump = {
+    version: opfsDump.manifest?.version || '4.2.3.7',
+    engine: 'OPFS_WASM',
+    exportedAt: opfsDump.exportedAt,
+    manifest: opfsDump.manifest,
+    tables: hasCustomIndexed && options.customIndexedData!.length === 0 ? {} : opfsDump.tables,
+    kv: hasCustomLocal ? { ...options.customLocalStorageData } : opfsDump.kv
+  };
+
+  // 2. Coletar dados de compatibilidade legado (localStorage e IndexedDB)
+  const localStorageData = hasCustomLocal
+    ? { ...options.customLocalStorageData }
+    : collectAllLocalStorageData();
+
+  // Mescla o KV do OPFS no localStorageData apenas se não for fornecido customLocalStorageData
+  if (!hasCustomLocal && opfsData.kv) {
+    for (const [k, v] of Object.entries(opfsData.kv)) {
+      if (localStorageData[k] === undefined) {
+        localStorageData[k] = v;
+      }
+    }
+  }
+
+  let indexedDBData = options.customIndexedData;
+  if (!indexedDBData) {
+    const liveIndexed = await collectAllIndexedDBData();
+    const hasLiveRecords = liveIndexed.some(db => db.stores.some(s => (s.records || []).length > 0));
+    if (hasLiveRecords) {
+      indexedDBData = liveIndexed;
+    } else {
+      // Sintetiza indexedDBData a partir das tabelas do OPFS para compatibilidade total
+      const synthesizedStores: IndexedDBStoreDump[] = [];
+      for (const [storeName, records] of Object.entries(opfsData.tables)) {
+        synthesizedStores.push({
+          storeName,
+          keyPath: 'id',
+          autoIncrement: false,
+          indexes: [],
+          records: Array.isArray(records) ? records : []
+        });
+      }
+      indexedDBData = [
+        {
+          dbName: 'GeaAgroOfflineDB',
+          version: 5,
+          stores: synthesizedStores
+        }
+      ];
+    }
+  }
+
   const attachments = await extractAttachments(localStorageData, indexedDBData);
 
   // Coleta registros da fila de sincronização
@@ -815,7 +896,8 @@ export async function createFullBackup(options: {
     localStorageData,
     indexedDBData,
     attachments,
-    syncQueue: syncQueueRecords
+    syncQueue: syncQueueRecords,
+    opfsData
   };
 
   const payloadJson = JSON.stringify(payload);
@@ -1190,11 +1272,12 @@ export async function restoreBackup(
       throw new Error('Falha intencional simulada para validação de reversão segura (rollback).');
     }
 
-    // A. Escreve chaves do localStorage
+    // A. Escreve chaves do localStorage e hidrata KV do OPFS
     if (typeof window !== 'undefined' && window.localStorage && payload.localStorageData) {
       for (const [key, val] of Object.entries(payload.localStorageData)) {
         try {
           localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val));
+          opfsWasmDB.setKv(key, val);
           result.restoredKeysCount++;
         } catch (storageErr) {
           throw new Error(`Falha ao gravar chave ${key} no localStorage: ${String(storageErr)}`);
@@ -1202,14 +1285,49 @@ export async function restoreBackup(
       }
     }
 
-    // B. Escreve bases e stores do IndexedDB
-    if (payload.indexedDBData && payload.indexedDBData.length > 0) {
-      for (const dbDump of payload.indexedDBData) {
-        await writeIndexedDBDump(dbDump);
-        result.restoredDatabasesCount++;
-        for (const store of dbDump.stores) {
-          result.restoredRecordsCount += (store.records || []).length;
+    // B. Restaura o formato nova versão estruturado em OPFS + WASM se disponível
+    const hasOpfsData = Boolean(
+      payload.opfsData &&
+      payload.opfsData.tables &&
+      Object.values(payload.opfsData.tables).some(arr => Array.isArray(arr) && arr.length > 0)
+    );
+    if (hasOpfsData && payload.opfsData) {
+      await opfsWasmDB.importOpfsDump({
+        tables: payload.opfsData.tables,
+        kv: payload.opfsData.kv
+      });
+      result.restoredDatabasesCount = Math.max(result.restoredDatabasesCount, (payload.indexedDBData || []).length || 1);
+      for (const items of Object.values(payload.opfsData.tables)) {
+        if (Array.isArray(items)) {
+          result.restoredRecordsCount += items.length;
         }
+      }
+    }
+
+    // C. Compatibilidade com Versão Antiga:
+    // Se o backup veio de versão anterior (ou contém indexedDBData),
+    // ingere diretamente todas as stores e registros no OPFS + WASM!
+    if (payload.indexedDBData && payload.indexedDBData.length > 0) {
+      if (!hasOpfsData) {
+        result.restoredDatabasesCount = payload.indexedDBData.length;
+      }
+      for (const dbDump of payload.indexedDBData) {
+        for (const store of dbDump.stores) {
+          if (!hasOpfsData) {
+            result.restoredRecordsCount += (store.records || []).length;
+          }
+          if (store.records && store.records.length > 0) {
+            try {
+              await opfsWasmDB.putMany(store.storeName as any, store.records, true);
+            } catch (err) {
+              console.warn(`[BackupService] Falha ao importar store legada ${store.storeName} para OPFS:`, err);
+            }
+          }
+        }
+        // Escreve de volta no indexedDB se o ambiente suportar para compatibilidade
+        try {
+          await writeIndexedDBDump(dbDump);
+        } catch {}
       }
     }
 

@@ -751,7 +751,7 @@ export const ReportExportModal: React.FC<ReportExportModalProps> = ({
         // Page 1 Footer
         doc.setFontSize(7.5);
         doc.setTextColor(148, 163, 184);
-        doc.text(`Página 1 de 4 • GeaAgro Suite v4.2.3.5 • Relatório Técnico de Geoprocessamento • ${plot.code}`, 14, 287);
+        doc.text(`Página 1 de 4 • GeaAgro Suite v4.2.3.7 • Relatório Técnico de Geoprocessamento • ${plot.code}`, 14, 287);
         doc.text(`Código de Autenticidade: ${reportCode}`, 128, 287);
 
         // =========================================================================
@@ -930,7 +930,7 @@ export const ReportExportModal: React.FC<ReportExportModalProps> = ({
         // Page 2 Footer
         doc.setFontSize(7.5);
         doc.setTextColor(148, 163, 184);
-        doc.text(`Página 2 de 4 • GeaAgro Suite v4.2.3.5 • Relatório Técnico de Geoprocessamento • ${plot.code}`, 14, 287);
+        doc.text(`Página 2 de 4 • GeaAgro Suite v4.2.3.7 • Relatório Técnico de Geoprocessamento • ${plot.code}`, 14, 287);
         doc.text(`Código de Autenticidade: ${reportCode}`, 128, 287);
 
         // =========================================================================
@@ -1075,7 +1075,7 @@ export const ReportExportModal: React.FC<ReportExportModalProps> = ({
         // Page 3 Footer
         doc.setFontSize(7.5);
         doc.setTextColor(148, 163, 184);
-        doc.text(`Página 3 de 4 • GeaAgro Suite v4.2.3.5 • Relatório Técnico de Geoprocessamento • ${plot.code}`, 14, 287);
+        doc.text(`Página 3 de 4 • GeaAgro Suite v4.2.3.7 • Relatório Técnico de Geoprocessamento • ${plot.code}`, 14, 287);
         doc.text(`Código de Autenticidade: ${reportCode}`, 128, 287);
 
         // =========================================================================
@@ -1280,7 +1280,7 @@ export const ReportExportModal: React.FC<ReportExportModalProps> = ({
         // Page 4 Footer
         doc.setFontSize(7.5);
         doc.setTextColor(148, 163, 184);
-        doc.text(`Página 4 de 4 • GeaAgro Suite v4.2.3.5 • Relatório Técnico de Geoprocessamento • ${plot.code}`, 14, 287);
+        doc.text(`Página 4 de 4 • GeaAgro Suite v4.2.3.7 • Relatório Técnico de Geoprocessamento • ${plot.code}`, 14, 287);
         doc.text(`Código de Autenticidade: ${reportCode}`, 128, 287);
 
         // Save PDF file

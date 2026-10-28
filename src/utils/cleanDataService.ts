@@ -1,3 +1,5 @@
+import { opfsWasmDB } from '../services/opfsWasmDatabase';
+
 /**
  * Clean Data Service for GeaAgro
  * Ensures that the application starts with a clean, professional state without demo/mock data.
@@ -110,26 +112,14 @@ export function clearAllDemoData(): void {
       }
     });
 
-    // Also clear IndexedDB stores if present
-    if ('indexedDB' in window) {
-      try {
-        const req = indexedDB.open('GeaAgroOfflineDB');
-        req.onsuccess = (e: any) => {
-          const db = e.target.result;
-          ['animals', 'paddocks', 'poultry_batches', 'poultry_sheds'].forEach((store) => {
-            if (db.objectStoreNames.contains(store)) {
-              try {
-                const tx = db.transaction(store, 'readwrite');
-                tx.objectStore(store).clear();
-              } catch (err) {
-                console.warn(`[CleanData] Could not clear IndexedDB store: ${store}`, err);
-              }
-            }
-          });
-        };
-      } catch (err) {
-        console.warn('[CleanData] IndexedDB clear skipped', err);
-      }
+    // Also clear OPFS + WASM stores if present
+    ['animals', 'paddocks', 'poultry_batches', 'poultry_sheds'].forEach((store) => {
+      opfsWasmDB.clear(store as any).catch(() => {});
+    });
+
+    // Purga total dos bancos legados do IndexedDB para limpeza completa
+    if (typeof indexedDB !== 'undefined') {
+      opfsWasmDB.purgeLegacyIndexedDb().catch(() => {});
     }
 
     localStorage.setItem(CLEAN_STATE_FLAG, 'true');
