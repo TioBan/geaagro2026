@@ -107,20 +107,28 @@ export const BuffaloReportsView: React.FC<BuffaloReportsViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
-              {animals.map((animal) => (
-                <tr key={animal.id} className="hover:bg-slate-50 dark:hover:bg-zinc-800/50">
-                  <td className="p-3 font-bold text-slate-900 dark:text-white">{animal.identificationNumber}</td>
-                  <td className="p-3 font-medium text-slate-700 dark:text-zinc-300">{animal.name}</td>
-                  <td className="p-3">{animal.breed} ({animal.bloodDegree})</td>
-                  <td className="p-3">{animal.category}</td>
-                  <td className="p-3 font-bold">{animal.currentWeightKg} kg</td>
-                  <td className="p-3 font-semibold">{animal.bodyConditionScore}</td>
-                  <td className="p-3 font-bold text-teal-600">{animal.status}</td>
-                  <td className="p-3 font-black text-blue-600">
-                    {animal.averageDailyMilkLiters ? `${animal.averageDailyMilkLiters} L/dia (${animal.averageFatPct}%)` : '-'}
+              {animals.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-slate-500 text-xs">
+                    Nenhum animal cadastrado para exibição no relatório.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                animals.map((animal) => (
+                  <tr key={animal.id} className="hover:bg-slate-50 dark:hover:bg-zinc-800/50">
+                    <td className="p-3 font-bold text-slate-900 dark:text-white">{animal.identificationNumber}</td>
+                    <td className="p-3 font-medium text-slate-700 dark:text-zinc-300">{animal.name}</td>
+                    <td className="p-3">{animal.breed} ({animal.bloodDegree})</td>
+                    <td className="p-3">{animal.category}</td>
+                    <td className="p-3 font-bold">{animal.currentWeightKg} kg</td>
+                    <td className="p-3 font-semibold">{animal.bodyConditionScore}</td>
+                    <td className="p-3 font-bold text-teal-600">{animal.status}</td>
+                    <td className="p-3 font-black text-blue-600">
+                      {animal.averageDailyMilkLiters ? `${animal.averageDailyMilkLiters} L/dia (${animal.averageFatPct}%)` : '-'}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

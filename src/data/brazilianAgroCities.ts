@@ -257,3 +257,197 @@ export async function searchOnlineCityNominatim(query: string, limit = 6): Promi
     return [];
   }
 }
+
+/**
+ * Mapeamento dos Estados Brasileiros para siglas oficiais (UF).
+ */
+export const BRAZIL_STATE_TO_UF: Record<string, string> = {
+  acre: 'AC',
+  alagoas: 'AL',
+  amapa: 'AP',
+  amazonas: 'AM',
+  bahia: 'BA',
+  ceara: 'CE',
+  'distrito federal': 'DF',
+  'espirito santo': 'ES',
+  goias: 'GO',
+  maranhao: 'MA',
+  'mato grosso': 'MT',
+  'mato grosso do sul': 'MS',
+  'minas gerais': 'MG',
+  para: 'PA',
+  paraiba: 'PB',
+  parana: 'PR',
+  pernambuco: 'PE',
+  piaui: 'PI',
+  'rio de janeiro': 'RJ',
+  'rio grande do norte': 'RN',
+  'rio grande do sul': 'RS',
+  rondonia: 'RO',
+  roraima: 'RR',
+  'santa catarina': 'SC',
+  'sao paulo': 'SP',
+  sergipe: 'SE',
+  tocantins: 'TO',
+};
+
+export function getStateUf(stateNameOrUf?: string): string {
+  if (!stateNameOrUf) return '';
+  const clean = stateNameOrUf.trim().toUpperCase();
+  if (clean.length === 2) return clean;
+  const norm = normalizeText(stateNameOrUf);
+  return BRAZIL_STATE_TO_UF[norm] || clean.substring(0, 2);
+}
+
+/**
+ * Calcula a distância Haversine em km entre dois pontos geográficos.
+ */
+function haversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Raio da Terra em km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * Encontra a cidade agrícola cadastrada mais próxima de uma coordenada geográfica (100% offline).
+ */
+export function findNearestBrazilianCity(lat: number, lng: number): AgroCity {
+  let nearest = BRAZILIAN_AGRO_CITIES[0];
+  let minDistance = Infinity;
+
+  for (const city of BRAZILIAN_AGRO_CITIES) {
+    const dist = haversineDistanceKm(lat, lng, city.lat, city.lng);
+    if (dist < minDistance) {
+      minDistance = dist;
+      nearest = city;
+    }
+  }
+
+  return nearest;
+}
+
+export interface ReverseGeocodeResult {
+  city: string;
+  state: string;
+  uf: string;
+  displayName: string;
+  lat: number;
+  lng: number;
+  isApproximate?: boolean;
+}
+
+/**
+ * Realiza Geocodificação Reversa (Latitude, Longitude -> Cidade e UF)
+ * Utiliza o serviço Nominatim OpenStreetMap com fallback offline automático para a cidade brasileira mais próxima.
+ */
+export async function reverseGeocodeNominatim(
+  lat: number,
+  lng: number
+): Promise<ReverseGeocodeResult> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`;
+    const res = await fetch(url, {
+      headers: {
+        'Accept-Language': 'pt-BR,pt;q=0.9',
+        'User-Agent': 'GeaAgro-AgroMap-ReverseGPS',
+      },
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const addr = data.address || {};
+      const cityName =
+        addr.city ||
+        addr.town ||
+        addr.municipality ||
+        addr.village ||
+        addr.county ||
+        addr.suburb ||
+        '';
+      const stateName = addr.state || addr.region || '';
+      const uf = getStateUf(stateName) || (addr['ISO3166-2-lvl4']?.split('-')[1] || '');
+
+      if (cityName) {
+        return {
+          city: cityName,
+          state: stateName,
+          uf: uf || 'BR',
+          displayName: data.display_name || `${cityName} - ${uf}`,
+          lat,
+          lng,
+          isApproximate: false,
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[AgroCitySearch] Falha no reverse geocode Nominatim, acionando fallback offline:', err);
+  }
+
+  // Fallback offline: Cidade agro mais próxima
+  const nearest = findNearestBrazilianCity(lat, lng);
+  return {
+    city: nearest.name,
+    state: nearest.state,
+    uf: nearest.state,
+    displayName: `${nearest.name} - ${nearest.state} (Aproximado)`,
+    lat,
+    lng,
+    isApproximate: true,
+  };
+}
+
+/**
+ * Busca coordenadas de uma cidade informada (por nome e opcionalmente UF)
+ * Tenta busca local em memória primeiro (0ms) e depois Nominatim se não encontrada.
+ */
+export async function findCityCoordinates(
+  cityName: string,
+  stateUf?: string
+): Promise<{ lat: number; lng: number; city: string; uf: string } | null> {
+  if (!cityName || cityName.trim().length === 0) return null;
+
+  const normTarget = normalizeText(cityName);
+  const normState = stateUf ? normalizeText(stateUf) : '';
+
+  // 1. Tenta correspondência exata ou aproximada no banco local
+  const localMatch = BRAZILIAN_AGRO_CITIES.find(c => {
+    const cName = normalizeText(c.name);
+    const cState = normalizeText(c.state);
+    if (normState) {
+      return (cName === normTarget || cName.includes(normTarget)) && (cState === normState || c.state.toLowerCase() === normState);
+    }
+    return cName === normTarget;
+  }) || BRAZILIAN_AGRO_CITIES.find(c => normalizeText(c.name).includes(normTarget));
+
+  if (localMatch) {
+    return {
+      lat: localMatch.lat,
+      lng: localMatch.lng,
+      city: localMatch.name,
+      uf: localMatch.state,
+    };
+  }
+
+  // 2. Tenta busca online no Nominatim OpenStreetMap
+  const onlineResults = await searchOnlineCityNominatim(`${cityName} ${stateUf || ''}`);
+  if (onlineResults.length > 0) {
+    const first = onlineResults[0];
+    return {
+      lat: first.lat,
+      lng: first.lng,
+      city: first.name,
+      uf: getStateUf(first.state) || first.state,
+    };
+  }
+
+  return null;
+}
+

@@ -27,11 +27,9 @@ import { GLOBACHEM_OFFICIAL_CATALOG } from './globachemCatalogData';
 import { PILARQUIM_OFFICIAL_CATALOG } from './pilarquimCatalogData';
 import {
   deduplicatePesticideCatalog,
-  analyzePesticideDuplicates,
   normalizePesticideName,
   normalizeRegistrationNumber,
   STANDARD_AGRICULTURAL_CROPS,
-  analyzeCropAndDosageCoverage,
 } from '../utils/pesticideDeduplication';
 
 // 1. Initial deduplication across all authentic base catalogs
@@ -1457,71 +1455,7 @@ const CHEMICAL_DATABASE: ChemTemplate[] = [
   },
 ];
 
-// Target manufacturers requested by the user including Corteva, Sumitomo, Nutrien, Globalchem, Anvac, TechniControl, Agbitech, Volcano, Avgust Crop, Tecnomyl, Cropchem, Adama, Agrobiológica, FMC, Pilarquim BR, CCAB Agro, Vittia, Alamos, Solus, Ameribrás, Prentiss, Oxon, Rotam, Allier Brasil, Sabero, Biosphere, ISK, Bio Controle, MFB Agrícola, AgroImport, CTVA, Dupont, Alta, Dow AgroSciences, Tide, Nichino
-const PRIORITY_MANUFACTURERS = [
-  'Corteva Agriscience do Brasil Ltda.',
-  'Sumitomo Chemical Brasil Indústria Química S.A.',
-  'Nutrien Soluções Agrícolas Ltda.',
-  'Globalchem Agroquímica Ltda.',
-  'Anvac do Brasil Defensivos Agrícolas Ltda.',
-  'TechniControl Métodos Biológicos e Agroquímica Ltda.',
-  'Agbitech Brasil Tecnologia Biológica Ltda.',
-  'Volcano Agrosciences Brasil Ltda.',
-  'Avgust Crop Protection do Brasil Ltda.',
-  'Tecnomyl Brasil Ltda.',
-  'Cropchem Ltda.',
-  'Adama Brasil S.A.',
-  'Agrobiológica Sustentabilidade S.A.',
-  'Agrobiológica Sustentabilidade S.A. - Filial',
-  'Agrobiológica Soluções Naturais Ltda - Leme/SP',
-  'FMC Química do Brasil Ltda.',
-  'Pilarquim do Brasil Agroquímica Ltda.',
-  'CCAB Agro S.A.',
-  'Vittia Fertilizantes e Biológicos S.A.',
-  'Alamos do Brasil Ltda.',
-  'Solus Agroquímica Ltda.',
-  'Ameribrás Indústria e Comércio de Defensivos Agrícolas Ltda.',
-  'Prentiss Química Ltda.',
-  'Oxon Brasil Defensivos Agrícolas Ltda.',
-  'Rotam do Brasil Agroquímica Ltda.',
-  'Allier Brasil Agroquímica Ltda.',
-  'Sabero Organics do Brasil Ltda.',
-  'Biosphere Agroquímica Ltda.',
-  'ISK Biosciences do Brasil Ltda.',
-  'Bio Controle Métodos de Controle Biológico Ltda.',
-  'MFB Agrícola Ltda.',
-  'AgroImport do Brasil Ltda.',
-  'CTVA Proteção de Cultivos Ltda.',
-  'Dupont do Brasil S.A.',
-  'Alta Brasil Agroquímica Ltda.',
-  'Dow AgroSciences Industrial Ltda.',
-  'Tide Brasil Agroquímica Ltda.',
-  'Nichino do Brasil Agroquímica Ltda.',
-];
-
-// Complementary market leaders
-const COMPLEMENTARY_MANUFACTURERS = [
-  'Rainbow Defensivos Agrícolas S.A.',
-  'Rainbow Agro / Shandong Rainbow Agrosciences',
-  'Bayer S.A.',
-  'BASF S.A.',
-  'Syngenta Proteção de Cultivos Ltda.',
-  'Corteva Agriscience do Brasil Ltda.',
-  'UPL do Brasil Indústria e Comércio de Insumos Agropecuários S.A.',
-  'IHARA - Iharabras S.A. Indústrias Químicas',
-  'Sumitomo Chemical Brasil',
-  'Nortox S.A.',
-  'Ourofino Agrociência',
-  'Albaugh Brasil Agroquímica',
-  'Helm do Brasil Mercantil Ltda.',
-  'Sipcam Nichino Brasil S.A.',
-  'Koppert Biological Systems Brasil',
-  'Ballagro Agro Tecnologia Ltda.',
-  'Agrivalle Brasil',
-  'Stoller do Brasil Ltda.',
-];
-
-// Build catalog ensuring exactly TARGET_CATALOG_SIZE unique products
+// Build catalog ensuring unique products
 const catalogPool: PesticideProduct[] = [...deduplicatedBase];
 
 // Track uniqueness sets
@@ -2010,11 +1944,5 @@ export function enrichPesticideIndications(p: PesticideProduct): PesticideProduc
   };
 }
 
-// Map the enriched crop coverage to all 2000 pesticides in the catalog
+// Map the enriched crop coverage to all pesticides in the catalog
 export const INITIAL_PESTICIDES_CATALOG: PesticideProduct[] = catalogPool.map(enrichPesticideIndications);
-
-// Run static integrity validation (duplicates verification)
-export const CATALOG_INTEGRITY_REPORT = analyzePesticideDuplicates(INITIAL_PESTICIDES_CATALOG);
-
-// Run static crop & dosage coverage validation
-export const CATALOG_CROP_COVERAGE_REPORT = analyzeCropAndDosageCoverage(INITIAL_PESTICIDES_CATALOG, STANDARD_CROPS);

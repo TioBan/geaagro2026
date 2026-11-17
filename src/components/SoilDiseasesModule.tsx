@@ -700,16 +700,16 @@ export const SoilDiseasesModule: React.FC<SoilDiseasesModuleProps> = ({
       id: `laudo-${Date.now()}`,
       labProtocol: newLabReport.labProtocol || `LAUDO-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       labName: newLabReport.labName || 'Laboratório Fitopatológico',
-      propertyId: newLabReport.propertyId || properties[0]?.id || 'prop-01',
-      propertyName: propObj?.farmName || 'Fazenda Principal',
-      fieldId: newLabReport.fieldId || fields[0]?.id || 'fld-01',
-      fieldName: fieldObj?.name || 'Talhão 01',
+      propertyId: newLabReport.propertyId || properties[0]?.id || '',
+      propertyName: propObj?.farmName || 'Propriedade não informada',
+      fieldId: newLabReport.fieldId || fields[0]?.id || '',
+      fieldName: fieldObj?.name || 'Talhão não informado',
       sampleDate: newLabReport.sampleDate || new Date().toISOString().split('T')[0],
       reportDate: newLabReport.reportDate || new Date().toISOString().split('T')[0],
-      crop: newLabReport.crop || 'Soja',
-      cultivar: newLabReport.cultivar || 'Cultivar Registrada',
-      agronomist: newLabReport.agronomist || 'Eng. Agrônomo',
-      crea: newLabReport.crea || 'CREA-PR 12345/D',
+      crop: newLabReport.crop || 'Cultura não informada',
+      cultivar: newLabReport.cultivar || '',
+      agronomist: newLabReport.agronomist || '',
+      crea: newLabReport.crea || '',
       labFileAttached: newLabReport.labFileAttached || 'Laudo_Anexado.pdf',
       overallRiskLevel: calculatedOverall as 'Baixo' | 'Médio' | 'Alto' | 'Crítico',
       pathogens: modalPathogens,
@@ -2812,8 +2812,12 @@ export const SoilDiseasesModule: React.FC<SoilDiseasesModuleProps> = ({
 
             <div className="relative z-10 flex justify-between items-start text-white text-xs">
               <div>
-                <span className="font-bold text-emerald-300 block">Cascavel - PR (Fazenda Santa Maria)</span>
-                <span className="text-[10px] text-slate-300">Modo Offline • Lat -24.9555, Lng -53.4552</span>
+                <span className="font-bold text-emerald-300 block">
+                  {properties[0] ? `${properties[0].municipality} - ${properties[0].state} (${properties[0].farmName})` : 'Nenhuma propriedade cadastrada'}
+                </span>
+                <span className="text-[10px] text-slate-300">
+                  {properties[0] ? `Modo Offline • Lat ${properties[0].gpsLatitude}, Lng ${properties[0].gpsLongitude}` : 'Modo Offline • Aguardando coordenadas'}
+                </span>
               </div>
               <div className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 space-y-1 text-[11px]">
                 <div className="flex items-center gap-1.5">

@@ -93,37 +93,36 @@ export function getPlantabilitySummaryMetrics(operations?: FieldOperation[]): Pl
   // Also include plantability operations logged in fieldbook
   const plantabilityOps = (operations || []).filter(o => o?.type === 'plantability_evaluation' || o?.details?.acceptablePct !== undefined);
 
-  const totalPointsCount = Math.max(samplings.length, plantabilityOps.length, 12);
-  const plantersCount = Math.max(planters.length, 3);
+  const totalPointsCount = samplings.length + plantabilityOps.length;
+  const plantersCount = planters.length;
   
   let totalAcceptableSum = samplings.reduce((sum, s) => {
-    const acceptable = (s as any).metrics?.acceptablePercent ?? (s as any).acceptablePercent ?? 88;
+    const acceptable = (s as any).metrics?.acceptablePercent ?? (s as any).acceptablePercent ?? 0;
     return sum + acceptable;
   }, 0);
 
   if (plantabilityOps.length > 0) {
-    totalAcceptableSum += plantabilityOps.reduce((sum, o) => sum + (o.details?.acceptablePct || 88), 0);
+    totalAcceptableSum += plantabilityOps.reduce((sum, o) => sum + (o.details?.acceptablePct || 0), 0);
   }
 
-  const denominator = (samplings.length + plantabilityOps.length) || 1;
   const avgAcceptablePct = totalPointsCount > 0 
-    ? parseFloat((totalAcceptableSum / denominator).toFixed(1))
-    : 89.4;
+    ? parseFloat((totalAcceptableSum / totalPointsCount).toFixed(1))
+    : 0;
 
   let totalCvSum = samplings.reduce((sum, s) => {
-    const cv = (s as any).metrics?.cvPercent ?? (s as any).cvPercent ?? 18;
+    const cv = (s as any).metrics?.cvPercent ?? (s as any).cvPercent ?? 0;
     return sum + cv;
   }, 0);
 
   if (plantabilityOps.length > 0) {
-    totalCvSum += plantabilityOps.reduce((sum, o) => sum + (o.details?.cvPct || 18), 0);
+    totalCvSum += plantabilityOps.reduce((sum, o) => sum + (o.details?.cvPct || 0), 0);
   }
 
   const avgCvPct = totalPointsCount > 0 
-    ? parseFloat((totalCvSum / denominator).toFixed(1))
-    : 16.2;
+    ? parseFloat((totalCvSum / totalPointsCount).toFixed(1))
+    : 0;
 
-  const totalEvaluatedHa = fields.reduce((sum, f) => sum + (f.areaHa || 0), 185.5);
+  const totalEvaluatedHa = fields.reduce((sum, f) => sum + (f.areaHa || 0), 0);
 
   return {
     totalPointsCount,

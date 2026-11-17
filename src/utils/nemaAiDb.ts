@@ -1,4 +1,5 @@
 import { opfsWasmDB } from '../services/opfsWasmDatabase';
+import type { AIDomain } from '../components/nema-ai/types';
 
 export const NEMA_DB_NAME = 'NemaAIChatsDB';
 export const NEMA_DB_VERSION = 2;
@@ -7,7 +8,7 @@ export const STORE_NAME = 'diagnoses';
 export interface NemaAIDiagnosisLog {
   id: string;
   timestamp: number;
-  domain: 'geral' | 'fertilidade' | 'nematologia' | 'pecuaria' | 'avicultura';
+  domain: AIDomain;
   prompt: string;
   farmName: string;
   producerName: string;

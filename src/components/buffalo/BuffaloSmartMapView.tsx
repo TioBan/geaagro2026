@@ -53,46 +53,56 @@ export const BuffaloSmartMapView: React.FC<BuffaloSmartMapViewProps> = ({
           <div>
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <span className="text-xs font-black uppercase text-teal-400">Layout Espacial da Fazenda (Vista Aérea)</span>
-              <span className="text-xs text-slate-400 font-mono">Área Total: 52.5 ha</span>
+              <span className="text-xs text-slate-400 font-mono">
+                Área Total: {paddocks.reduce((acc, p) => acc + (p.areaHa || 0), 0).toFixed(1)} ha
+              </span>
             </div>
 
             {/* Grid dos Piquetes e Pontos Hídricos */}
             <div className="grid grid-cols-2 gap-4 mt-4">
-              {paddocks.map((p) => {
-                const isSelected = selectedPaddock?.id === p.id;
-                return (
-                  <div
-                    key={p.id}
-                    onClick={() => setSelectedPaddock(p)}
-                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                      isSelected
-                        ? 'bg-teal-950/80 border-teal-400 shadow-lg'
-                        : 'bg-slate-900/80 border-slate-800 hover:border-slate-600'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <span className="text-xs font-black text-white">{p.name.split('-')[0]}</span>
-                      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold rounded">
-                        {p.areaHa} ha
-                      </span>
+              {paddocks.length === 0 ? (
+                <div className="col-span-2 text-center py-16 text-slate-500 text-xs">
+                  Nenhum piquete mapeado. Cadastre piquetes na aba Pastagens para visualizar o layout da propriedade.
+                </div>
+              ) : (
+                paddocks.map((p) => {
+                  const isSelected = selectedPaddock?.id === p.id;
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => setSelectedPaddock(p)}
+                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                        isSelected
+                          ? 'bg-teal-950/80 border-teal-400 shadow-lg'
+                          : 'bg-slate-900/80 border-slate-800 hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <span className="text-xs font-black text-white">{p.name.split('-')[0]}</span>
+                        <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold rounded">
+                          {p.areaHa} ha
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1 truncate">{p.forageSpecies}</p>
+                      
+                      <div className="mt-3 flex items-center justify-between text-[10px] text-slate-300 pt-2 border-t border-slate-800">
+                        <span>Lotação: <strong>{p.currentStockingRateUaHa} UA/ha</strong></span>
+                        <span className="text-blue-400 flex items-center gap-1">
+                          <Waves className="w-3 h-3" /> {p.waterPointType}
+                        </span>
+                      </div>
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-1 truncate">{p.forageSpecies}</p>
-                    
-                    <div className="mt-3 flex items-center justify-between text-[10px] text-slate-300 pt-2 border-t border-slate-800">
-                      <span>Lotação: <strong>{p.currentStockingRateUaHa} UA/ha</strong></span>
-                      <span className="text-blue-400 flex items-center gap-1">
-                        <Waves className="w-3 h-3" /> {p.waterPointType}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
 
           <div className="p-3 bg-slate-900/90 rounded-xl border border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
             <span>💡 Clique em qualquer piquete para inspecionar os animais e qualidade forrageira.</span>
-            <span className="text-teal-400 font-bold">Açude Central Operacional</span>
+            <span className="text-teal-400 font-bold">
+              {waterPoints.length > 0 ? `${waterPoints.length} Fontes Hídricas Cadastradas` : 'Sem fontes hídricas'}
+            </span>
           </div>
         </div>
 

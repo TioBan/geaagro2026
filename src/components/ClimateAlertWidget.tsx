@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { Farm } from '../types/agronomy';
 import { CropDigitalTwin } from '../types/phenology';
-import { initialCropDigitalTwins, SOJA_PHENOLOGICAL_STAGES } from '../data/phenologyData';
+import { SOJA_PHENOLOGICAL_STAGES } from '../data/phenologyData';
 import { daily15ForecastData } from '../data/weatherData';
 
 interface ClimateAlertWidgetProps {
@@ -97,7 +97,7 @@ export const ClimateAlertWidget: React.FC<ClimateAlertWidgetProps> = ({ farm, on
     // 1. Calculate rain forecast in next 5 days from daily15ForecastData
     const next5DaysForecast = daily15ForecastData.slice(0, 5);
     const totalRainMmForecast = next5DaysForecast.reduce((acc, d) => acc + d.rainExpectedMm, 0);
-    const maxTempForecast = Math.max(...next5DaysForecast.map(d => d.tempMaxC));
+    const maxTempForecast = next5DaysForecast.length > 0 ? Math.max(...next5DaysForecast.map(d => d.tempMaxC)) : 0;
 
     if (!selectedTwin || !stageDetails) {
       return {
@@ -116,7 +116,6 @@ export const ClimateAlertWidget: React.FC<ClimateAlertWidgetProps> = ({ farm, on
 
     // 2. Crop Water Sensitivity
     const sensitivity = stageDetails.waterDemand.waterStressSensitivity; // 'baixa' | 'moderada' | 'alta' | 'critica maxima'
-    const cropType = selectedTwin.cropName; // e.g. 'Soja'
     const dailyNeed = stageDetails.waterDemand.dailyConsumptionMm; // e.g. [4.0, 5.5] mm/dia
     const avgDailyNeed = (dailyNeed[0] + dailyNeed[1]) / 2;
 
@@ -227,8 +226,8 @@ export const ClimateAlertWidget: React.FC<ClimateAlertWidgetProps> = ({ farm, on
               onChange={(e) => setSelectedTwinId(e.target.value)}
               className="bg-transparent font-bold text-slate-800 dark:text-zinc-200 focus:outline-none cursor-pointer"
             >
-              {farmTwins.filter(Boolean).map(t => (
-                <option key={t?.id || Math.random()} value={t?.id || ''} className="bg-white dark:bg-zinc-900">
+              {farmTwins.filter(Boolean).map((t, idx) => (
+                <option key={t?.id || `twin-${idx}`} value={t?.id || ''} className="bg-white dark:bg-zinc-900">
                   {t?.plotName || 'Talhão'} ({t?.cropName || 'Cultura'})
                 </option>
               ))}
@@ -238,16 +237,7 @@ export const ClimateAlertWidget: React.FC<ClimateAlertWidgetProps> = ({ farm, on
       </div>
 
       {/* Main Grid: Alert Banner & Interactive Simulator */}
-      {!selectedTwin ? (
-        <div className="p-8 border border-dashed border-slate-200 dark:border-zinc-800 rounded-xl text-center text-slate-400 dark:text-zinc-500">
-          <Sprout className="w-10 h-10 mx-auto text-emerald-500/60 mb-2" />
-          <h4 className="font-bold text-sm text-slate-700 dark:text-zinc-300">Nenhum talhão com cultura cadastrado</h4>
-          <p className="text-xs max-w-sm mx-auto mt-1 text-slate-400 dark:text-zinc-500">
-            Cadastre os talhões da propriedade com suas respectivas culturas no módulo de Cadastros para ativar o monitoramento agroclimático em tempo real.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         
         {/* Left Side: Dynamic Status Banner */}
         <div className="lg:col-span-8 space-y-4">
@@ -444,10 +434,8 @@ export const ClimateAlertWidget: React.FC<ClimateAlertWidgetProps> = ({ farm, on
 
         </div>
       </div>
-    )}
-
-  </div>
-);
+    </div>
+  );
 };
 
 export default ClimateAlertWidget;

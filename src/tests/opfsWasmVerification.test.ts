@@ -7,18 +7,27 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 describe('OPFS + WASM Engine Full Verification Audit', () => {
-  it('1. opfsWasmDB must be initialized as primary storage engine with 37 active stores', async () => {
-    expect(REQUIRED_OPFS_STORES.length).toBe(37);
+  it('1. opfsWasmDB must be initialized as primary storage engine with 46 active stores (including GeaAgro Estatística)', async () => {
+    expect(REQUIRED_OPFS_STORES.length).toBe(46);
     expect(REQUIRED_OPFS_STORES).toContain('farms');
     expect(REQUIRED_OPFS_STORES).toContain('soil_samples');
     expect(REQUIRED_OPFS_STORES).toContain('fieldbook_operations');
     expect(REQUIRED_OPFS_STORES).toContain('costs_records');
     expect(REQUIRED_OPFS_STORES).toContain('diagnoses');
     expect(REQUIRED_OPFS_STORES).toContain('pesticide_products');
+    expect(REQUIRED_OPFS_STORES).toContain('estatistica_projetos');
+    expect(REQUIRED_OPFS_STORES).toContain('estatistica_experimentos');
+    expect(REQUIRED_OPFS_STORES).toContain('estatistica_dados');
+    expect(REQUIRED_OPFS_STORES).toContain('estatistica_variaveis');
+    expect(REQUIRED_OPFS_STORES).toContain('estatistica_analises');
+    expect(REQUIRED_OPFS_STORES).toContain('estatistica_resultados');
+    expect(REQUIRED_OPFS_STORES).toContain('estatistica_graficos');
+    expect(REQUIRED_OPFS_STORES).toContain('estatistica_historico');
+    expect(REQUIRED_OPFS_STORES).toContain('estatistica_backups_metadata');
 
     const diagnostics = await opfsWasmDB.getEngineDiagnostics();
     expect(diagnostics.engine).toMatch(/^OPFS_WASM/);
-    expect(diagnostics.totalStores).toBe(37);
+    expect(diagnostics.totalStores).toBe(46);
     expect(diagnostics.version).toBeDefined();
   });
 

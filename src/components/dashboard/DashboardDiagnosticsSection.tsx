@@ -1,12 +1,21 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Sparkles } from 'lucide-react';
 import { Farm, SoilSample, LeafSample, CropNutritionalTarget } from '../../types/agronomy';
 import { AIFarmScoreWidget } from '../AIFarmScoreWidget';
 import { SmartWidgets } from '../SmartWidgets';
 import { WeatherSummaryWidget } from '../WeatherSummaryWidget';
 import { ClimateAlertWidget } from '../ClimateAlertWidget';
-import { BaseSaturationChart } from '../BaseSaturationChart';
-import { FinancialEfficiencyChart } from '../FinancialEfficiencyChart';
+
+const BaseSaturationChart = lazy(() =>
+  import('../BaseSaturationChart').then(m => ({ default: m.BaseSaturationChart }))
+);
+const FinancialEfficiencyChart = lazy(() =>
+  import('../FinancialEfficiencyChart').then(m => ({ default: m.FinancialEfficiencyChart }))
+);
+
+const ChartSkeleton = () => (
+  <div className="h-72 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 animate-pulse" />
+);
 
 interface DashboardDiagnosticsSectionProps {
   farm: Farm;
@@ -38,15 +47,17 @@ export const DashboardDiagnosticsSection: React.FC<DashboardDiagnosticsSectionPr
         <WeatherSummaryWidget farm={farm} onClickDetails={() => setActiveTab('meteorologia')} />
         <ClimateAlertWidget farm={farm} onNavigatePhenology={() => setActiveTab('fenologia')} />
 
-        <div className="space-y-6">
-          <BaseSaturationChart
-            farm={farm}
-            soilSamples={soilSamples}
-            targetVPercent={activeCrop?.targetVPercent || 70}
-          />
+        <Suspense fallback={<ChartSkeleton />}>
+          <div className="space-y-6">
+            <BaseSaturationChart
+              farm={farm}
+              soilSamples={soilSamples}
+              targetVPercent={activeCrop?.targetVPercent || 70}
+            />
 
-          <FinancialEfficiencyChart farm={farm} soilSamples={soilSamples} />
-        </div>
+            <FinancialEfficiencyChart farm={farm} soilSamples={soilSamples} />
+          </div>
+        </Suspense>
       </div>
     </div>
   );

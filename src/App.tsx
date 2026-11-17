@@ -8,6 +8,15 @@ import { NotificationCenterModal } from './components/NotificationCenterModal';
 import { useAppUpdate } from './hooks/useAppUpdate';
 import { AppUpdateModal } from './components/common/AppUpdateModal';
 import {
+  ThemeMode,
+  getSavedThemeMode,
+  setSystemThemeMode,
+  applyThemeModeToDOM,
+  getSavedPowerSettings,
+  isPowerSaverActive,
+  applyPowerSaverToDOM,
+} from './utils/systemPreferences';
+import {
   Layers,
   Moon,
   Sun,
@@ -47,9 +56,12 @@ import {
   GraduationCap,
   Compass,
   Settings,
+  Landmark,
 } from 'lucide-react';
 
 export const TAB_METADATA: Record<string, { title: string; category: string; icon: any }> = {
+  recupera: { title: 'Recupera — Áreas Degradadas', category: 'Recuperação Ambiental & Solo', icon: Sprout },
+  avaliacao_imoveis: { title: 'Avaliação de Imóveis Rurais', category: 'Perícias & Vistorias', icon: Landmark },
   dashboard: { title: 'Dashboard Geral', category: 'Visão Geral', icon: Warehouse },
   configuracoes: { title: 'Configurações', category: 'Principal', icon: Settings },
   nema_ia: { title: 'Nema IA', category: 'Inteligência Artificial', icon: Sparkles },
@@ -78,6 +90,7 @@ export const TAB_METADATA: Record<string, { title: string; category: string; ico
   gestao_rural: { title: 'Administração & Gestão Rural', category: 'ERP Agrícola 360°', icon: Building2 },
   forrageiras: { title: 'Informações sobre Forrageiras', category: 'Pastagens & Zootecnia', icon: Leaf },
   geaagro_edu: { title: 'GeaAgro Edu', category: 'Educação & Conteúdo', icon: GraduationCap },
+  estatistica: { title: 'GeaAgro Estatística', category: 'Experimentação & Ciência', icon: BarChart2 },
 };
 import {
   Company,
@@ -151,12 +164,15 @@ const CostManagementModule = lazyWithRetry(() => import('./components/costs/Cost
 const IrrigationModule = lazyWithRetry(() => import('./components/irrigation/IrrigationModule').then((m: any) => ({ default: m.IrrigationModule || m.default })));
 const TraceabilityModule = lazyWithRetry(() => import('./components/TraceabilityModule').then((m: any) => ({ default: m.TraceabilityModule || m.default })));
 const PericiaModule = lazyWithRetry(() => import('./components/pericia/PericiaModule').then((m: any) => ({ default: m.PericiaModule || m.default })));
+const AvaliacaoImoveisModule = lazyWithRetry(() => import('./components/AvaliacaoImoveisModule').then((m: any) => ({ default: m.AvaliacaoImoveisModule || m.default })));
+const RecuperaModule = lazyWithRetry(() => import('./components/RecuperaModule').then((m: any) => ({ default: m.RecuperaModule || m.default })));
 const GeoprocessamentoModule = lazyWithRetry(() => import('./components/GeoprocessamentoModule').then((m: any) => ({ default: m.GeoprocessamentoModule || m.default })));
 const ZarcRiscoModule = lazyWithRetry(() => import('./components/ZarcRiscoModule').then((m: any) => ({ default: m.ZarcRiscoModule || m.default })));
 const GestaoRuralModule = lazyWithRetry(() => import('./components/GestaoRuralModule').then((m: any) => ({ default: m.GestaoRuralModule || m.default })));
 const ForageCatalogModule = lazyWithRetry(() => import('./components/ForageCatalogModule').then((m: any) => ({ default: m.ForageCatalogModule || m.default })));
 const GeaAgroEduModule = lazyWithRetry(() => import('./components/GeaAgroEduModule').then((m: any) => ({ default: m.GeaAgroEduModule || m.default })));
 const ConfiguracoesModule = lazyWithRetry(() => import('./components/ConfiguracoesModule').then((m: any) => ({ default: m.ConfiguracoesModule || m.default })));
+const GeaAgroEstatisticaModule = lazyWithRetry(() => import('./components/GeaAgroEstatisticaModule').then((m: any) => ({ default: m.GeaAgroEstatisticaModule || m.default })));
 
 // Error boundary to catch any runtime exceptions during module hydration or rendering
 interface ErrorBoundaryProps {
@@ -359,11 +375,16 @@ export function parseRouteFromUrl(): { tab: string; subTab: string } {
         'config': 'configuracoes',
         'perfil': 'configuracoes',
         'perfis': 'configuracoes',
+        'estatistica': 'estatistica',
+        'estatisticas': 'estatistica',
         'backup': 'backup',
-        'sobre': 'sobre',
+        'sobre': 'configuracoes',
       };
 
       if (tabMap[rootSegment]) {
+        if (rootSegment === 'sobre') {
+          return { tab: 'configuracoes', subTab: subSegment ? `sobre_${subSegment}` : 'sobre' };
+        }
         return { tab: tabMap[rootSegment], subTab: subSegment || 'dashboard' };
       }
     }
@@ -444,15 +465,19 @@ export default function App() {
     return false;
   });
 
-  // Theme State: Dark Mode AMOLED
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('agronutri_theme');
-      if (saved) return saved === 'dark';
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    return false;
-  });
+  // Theme State: Claro ('light') | Escuro ('dark') | AMOLED 100% ('amoled')
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => getSavedThemeMode());
+  const isDarkMode = themeMode === 'dark' || themeMode === 'amoled';
+
+  const setIsDarkMode: React.Dispatch<React.SetStateAction<boolean>> = (valOrFn) => {
+    setThemeMode(prev => {
+      const prevDark = prev === 'dark' || prev === 'amoled';
+      const nextDark = typeof valOrFn === 'function' ? valOrFn(prevDark) : valOrFn;
+      const nextMode: ThemeMode = nextDark ? (prev === 'amoled' ? 'amoled' : 'dark') : 'light';
+      setSystemThemeMode(nextMode);
+      return nextMode;
+    });
+  };
 
   // Mobile Drawer State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -487,16 +512,80 @@ export default function App() {
   } = useAppUpdate();
 
 
-  // Sync HTML root element class with theme state
+  // Sync HTML root element class with theme state & listen for external theme changes
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('agronutri_theme', 'dark');
+    applyThemeModeToDOM(themeMode);
+  }, [themeMode]);
+
+  useEffect(() => {
+    const handleThemeChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<{ mode?: ThemeMode }>;
+      if (customEvent.detail?.mode) {
+        setThemeMode(customEvent.detail.mode);
+      } else {
+        setThemeMode(getSavedThemeMode());
+      }
+    };
+    window.addEventListener('geaagro:theme-changed', handleThemeChanged);
+    return () => window.removeEventListener('geaagro:theme-changed', handleThemeChanged);
+  }, []);
+
+  // Global Battery & Power Saving Listener
+  useEffect(() => {
+    let batteryManager: any = null;
+    let isMounted = true;
+
+    const evaluatePowerState = (levelPercent: number, charging: boolean) => {
+      const settings = getSavedPowerSettings();
+      const active = isPowerSaverActive(settings, {
+        supported: true,
+        levelPercent,
+        charging,
+        chargingTimeSeconds: null,
+        dischargingTimeSeconds: null,
+        isSimulated: false,
+      });
+      applyPowerSaverToDOM(active, settings);
+    };
+
+    const syncFromBattery = () => {
+      if (!isMounted || !batteryManager) return;
+      evaluatePowerState(Math.round((batteryManager.level ?? 1) * 100), Boolean(batteryManager.charging));
+    };
+
+    const nav = navigator as any;
+    if (nav && typeof nav.getBattery === 'function') {
+      nav.getBattery().then((bm: any) => {
+        if (!isMounted) return;
+        batteryManager = bm;
+        syncFromBattery();
+        bm.addEventListener('levelchange', syncFromBattery);
+        bm.addEventListener('chargingchange', syncFromBattery);
+      }).catch(() => {
+        evaluatePowerState(100, true);
+      });
     } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('agronutri_theme', 'light');
+      evaluatePowerState(100, true);
     }
-  }, [isDarkMode]);
+
+    const handlePowerChanged = () => {
+      if (batteryManager) {
+        syncFromBattery();
+      } else {
+        evaluatePowerState(100, true);
+      }
+    };
+    window.addEventListener('geaagro:power-changed', handlePowerChanged);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('geaagro:power-changed', handlePowerChanged);
+      if (batteryManager) {
+        batteryManager.removeEventListener('levelchange', syncFromBattery);
+        batteryManager.removeEventListener('chargingchange', syncFromBattery);
+      }
+    };
+  }, []);
 
   // Handle Online/Offline Status and PWA installation prompt
   useEffect(() => {
@@ -747,7 +836,7 @@ export default function App() {
   const [selectedSampleForRec, setSelectedSampleForRec] = useState<string>(() => soilSamples[0]?.id || '');
   const [selectedCropForReport, setSelectedCropForReport] = useState<CropNutritionalTarget>(CROPS_CATALOG[0]);
   const [targetYieldForReport, setTargetYieldForReport] = useState<number>(75);
-  const [limingPrntForReport, setLimingPrntForReport] = useState<number>(85);
+  const [limingPrntForReport, setLimingPrntForReport] = useState<number>(100);
   const [depthForReport, setDepthForReport] = useState<number>(20);
 
   // Derived Active Contexts
@@ -906,7 +995,7 @@ export default function App() {
 
   return (
     <SoilCoordinatesProvider>
-      <div className={`min-h-screen ${isDarkMode ? 'dark bg-[#0b110d] text-zinc-100' : 'bg-[#f3f6f2] text-slate-800'} flex flex-col lg:flex-row font-sans antialiased transition-colors duration-200`}>
+      <div className={`min-h-screen ${isDarkMode ? (themeMode === 'amoled' ? 'dark amoled bg-black text-white' : 'dark bg-[#0f172a] text-zinc-100') : 'bg-[#f3f6f2] text-slate-800'} flex flex-col lg:flex-row font-sans antialiased transition-colors duration-200`}>
       {/* Responsive Sidebar Navigation & Mobile Drawer */}
       <Navbar
         activeTab={activeTab}
@@ -949,7 +1038,7 @@ export default function App() {
       {/* Main Content Viewport */}
       <div className={`flex-1 flex flex-col min-w-0 ${isSidebarCollapsed ? '' : 'lg:pl-68'} transition-all duration-300`}>
         {/* Desktop Top Header Bar (Desktop only, mobile/tablet uses Navbar header) */}
-        <header className="hidden lg:flex h-16 bg-white dark:bg-zinc-950 border-b border-slate-200 dark:border-zinc-800/80 px-4 sm:px-6 lg:px-8 items-center justify-between sticky top-0 z-[100] print:hidden transition-colors shadow-2xs">
+        <header className="hidden lg:flex h-16 bg-white dark:bg-zinc-950 border-b border-slate-200 dark:border-zinc-800/80 px-4 sm:px-6 lg:px-8 items-center justify-between sticky top-0 z-[1200] print:hidden transition-colors shadow-2xs">
           {/* Left: Sidebar toggle + Dynamic Breadcrumb */}
           <div className="flex items-center gap-3 min-w-0">
             <button
@@ -1174,11 +1263,20 @@ export default function App() {
             {activeTab === 'caderno_campo' && (
               <FieldBookModule
                 farm={currentFarm || farms?.[0] || INITIAL_FARMS[0]}
+                farms={farms}
                 activeSubTab={activeSubTab}
                 setActiveSubTab={setActiveSubTab}
                 soilSamples={soilSamples}
+                setSoilSamples={setSoilSamples}
+                leafSamples={leafSamples}
+                setLeafSamples={setLeafSamples}
+                producer={currentProducer}
+                producers={producers}
                 agronomist={currentAgronomist}
                 company={currentCompany}
+                companies={companies}
+                isDarkMode={isDarkMode}
+                setIsDarkMode={setIsDarkMode}
                 onNavigateToRegister={() => {
                   setActiveTab('cadastros');
                   setActiveSubTab('fazendas');
@@ -1544,6 +1642,16 @@ export default function App() {
               />
             )}
 
+            {activeTab === 'avaliacao_imoveis' && (
+              <AvaliacaoImoveisModule
+                initialSubTab={activeSubTab}
+              />
+            )}
+
+            {activeTab === 'recupera' && (
+              <RecuperaModule initialSubTab={activeSubTab} />
+            )}
+
             {activeTab === 'forrageiras' && (
               <ForageCatalogModule
                 initialSubTab={activeSubTab}
@@ -1559,6 +1667,13 @@ export default function App() {
                   setActiveTab(tab as any);
                   if (subTab) setActiveSubTab(subTab as any);
                 }}
+              />
+            )}
+
+            {activeTab === 'estatistica' && (
+              <GeaAgroEstatisticaModule
+                activeSubTab={activeSubTab}
+                setActiveSubTab={setActiveSubTab}
               />
             )}
 
@@ -1589,7 +1704,7 @@ export default function App() {
             <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
               <span className="font-extrabold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
                 <Sprout className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                GeaAgro CRM <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 font-extrabold border border-emerald-300 dark:border-emerald-800/80">v4.2.3.7</span>
+                GeaAgro CRM <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 font-extrabold border border-emerald-300 dark:border-emerald-800/80">v4.2.3.8</span>
               </span>
               <span className="hidden sm:inline text-slate-300 dark:text-zinc-700">•</span>
               <span className="text-slate-600 dark:text-zinc-400 text-[11px] font-medium">Plataforma de Inteligência Agronômica</span>
@@ -1601,8 +1716,8 @@ export default function App() {
                 id="btn-footer-privacy"
                 data-testid="btn-footer-privacy"
                 onClick={() => {
-                  setActiveTab('sobre');
-                  if (setActiveSubTab) setActiveSubTab('privacidade');
+                  setActiveTab('configuracoes');
+                  if (setActiveSubTab) setActiveSubTab('sobre_privacidade');
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-zinc-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 text-slate-700 dark:text-zinc-300 hover:text-emerald-700 dark:hover:text-emerald-400 font-semibold text-[11px] border border-slate-200 dark:border-zinc-800 hover:border-emerald-300 dark:hover:border-emerald-800 transition-all cursor-pointer shadow-2xs"
               >
@@ -1613,8 +1728,8 @@ export default function App() {
                 id="btn-footer-terms"
                 data-testid="btn-footer-terms"
                 onClick={() => {
-                  setActiveTab('sobre');
-                  if (setActiveSubTab) setActiveSubTab('termos');
+                  setActiveTab('configuracoes');
+                  if (setActiveSubTab) setActiveSubTab('sobre_termos');
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-zinc-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 text-slate-700 dark:text-zinc-300 hover:text-emerald-700 dark:hover:text-emerald-400 font-semibold text-[11px] border border-slate-200 dark:border-zinc-800 hover:border-emerald-300 dark:hover:border-emerald-800 transition-all cursor-pointer shadow-2xs"
               >
@@ -1635,16 +1750,6 @@ export default function App() {
                 title="Instagram: @fatiima.leao"
               >
                 Fátima Leão
-              </a>
-              <span>&amp;</span>
-              <a
-                href="https://www.instagram.com/lucas.agrobr/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-slate-700 dark:text-zinc-200 font-semibold hover:underline hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer"
-                title="Instagram: @lucas.agrobr"
-              >
-                Lucas Mendes
               </a>
               <span>❤️</span>
             </div>

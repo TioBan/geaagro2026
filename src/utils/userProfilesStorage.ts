@@ -383,12 +383,36 @@ export const SYSTEM_MODULES: SystemModuleMetadata[] = [
     defaultInProfiles: ['pericia', 'todos'],
   },
   {
+    id: 'avaliacao_imoveis',
+    label: 'Avaliação de Imóveis Rurais',
+    category: 'pericia',
+    categoryLabel: 'Perícia & Avaliação',
+    description: 'Avaliação mercadológica completa ABNT NBR 14653-3, Ross-Heidecke, vistorias georreferenciadas e laudos periciais.',
+    defaultInProfiles: ['agricultor', 'pecuarista', 'administrador', 'pericia', 'todos'],
+  },
+  {
+    id: 'recupera',
+    label: 'Recupera — Áreas Degradadas',
+    category: 'agricultura',
+    categoryLabel: 'Recuperação Ambiental & Solo',
+    description: 'Diagnóstico, planejamento, dimensionamento (calagem, gesso, NPK, sementes, mudas, terraços) e monitoramento com índice IGRA.',
+    defaultInProfiles: ['agricultor', 'pecuarista', 'administrador', 'pericia', 'todos'],
+  },
+  {
     id: 'historico',
     label: 'Histórico & Comparativo de Safras',
     category: 'gestao',
     categoryLabel: 'Auditoria',
     description: 'Evolução de produtividade e comparativo multi-safras.',
     defaultInProfiles: ['agricultor', 'administrador', 'todos'],
+  },
+  {
+    id: 'estatistica',
+    label: 'GeaAgro Estatística',
+    category: 'agricultura',
+    categoryLabel: 'Experimentação & Ciência',
+    description: 'Análises estatísticas experimentais offline: ANOVA multi-estratos, médias, regressão, pressupostos, multivariada, gráficos e laudos.',
+    defaultInProfiles: ['agricultor', 'pecuarista', 'administrador', 'pericia', 'todos'],
   },
   {
     id: 'backup',
@@ -580,8 +604,8 @@ export function resetProfileToDefault(profileId: UserProfileId): string[] {
  * Verifica se um módulo está ativo no perfil atual
  */
 export function isModuleActiveInCurrentProfile(moduleId: string, activeProfileId?: UserProfileId): boolean {
-  // O dashboard e as configurações são permanentes no módulo Principal
-  if (moduleId === 'dashboard' || moduleId === 'configuracoes') return true;
+  // O dashboard, as configurações e a avaliação de imóveis rurais permanecem sempre habilitados
+  if (moduleId === 'dashboard' || moduleId === 'configuracoes' || moduleId === 'avaliacao_imoveis') return true;
 
   const currentProfile = activeProfileId || getActiveProfileId();
   if (currentProfile === 'todos') {

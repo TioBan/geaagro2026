@@ -76,7 +76,9 @@ export const IrrigationReportsView: React.FC<Props> = ({
 
           <div className="text-right">
             <span className="text-[10px] text-slate-400 font-bold uppercase block">Nota IGEH</span>
-            <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{kpis.igehScore} / 100</span>
+            <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+              {kpis.igehScore > 0 ? `${kpis.igehScore} / 100` : '--'}
+            </span>
           </div>
         </div>
 

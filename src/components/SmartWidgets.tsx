@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Sparkles,
   Bug,
   CloudSun,
   CalendarClock,
@@ -11,7 +10,6 @@ import {
   ChevronUp,
   ShieldAlert,
   Wind,
-  Droplet,
   CheckCircle2,
   Clock,
   X,
@@ -38,83 +36,96 @@ export const SmartWidgets: React.FC<SmartWidgetsProps> = ({ farm }) => {
     managementDetails: [] as string[],
   });
 
-  const loadOfflineInsights = () => {
-    setInsights({
-      phyto: `Alerta moderado: Condições favoráveis para proliferação de Lagarta-da-soja e ferrugem devido à umidade recente. Última inspeção no ${farm?.plots?.[0]?.name || 'Talhão 1'} indicou nível baixo.`,
-      weather: 'Previsão de precipitação (15mm) para as próximas 48h. Janela ideal de pulverização foliar amanhã entre 06:00 e 09:30 (Vento < 8 km/h e UR > 60%).',
-      management: 'Aplicação preventiva de biofungicida e nutrição foliar com Boro/Potássio programada para daqui a 3 dias. Prazo para fechamento do laudo foliar em aberto.',
-      phytoDetails: [
-        'Monitorar bordaduras dos talhões com pano de batida (nível de ação: 2 lagartas grandes/pano).',
-        'Avaliar sintomas iniciais de mancha-alvo e ferrugem asiática no terço inferior da planta.',
-        'Considerar controle biológico com Bacillus thuringiensis ou Trichogramma pretiosum.'
-      ],
-      weatherDetails: [
-        'Temperatura média: 24°C - 31°C com umidade relativa oscilando entre 55% e 85%.',
-        'Condições micrometeorológicas excelentes para absorção de adubação foliar no início da manhã.',
-        'Evitar aplicações com temperatura acima de 30°C ou ventos superiores a 10 km/h para evitar deriva.'
-      ],
-      managementDetails: [
-        'Revisão dos bicos de pulverização (pontas anti-deriva com indução de ar para gotas médias/grossas).',
-        'Checagem do pH da calda (manter entre 5.0 e 6.0 para máxima estabilidade dos ativos e micronutrientes).',
-        'Registro digital no Caderno de Campo com coordenadas do talhão e lote de insumos.'
-      ]
-    });
-  };
+  const firstPlotName = farm?.plots?.[0]?.name || 'Talhão 1';
 
-  const fetchOnlineInsights = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/nema-ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          farmName: farm.name,
-          domain: 'geral',
-          userPrompt: 'Gere 3 resumos curtos no formato JSON com as chaves "phyto", "weather" e "management" para o dashboard principal, baseando-se em alertas fitossanitários e nematoides, previsão do tempo/janela de pulverização e próximos vencimentos operacionais.'
-        })
-      });
-      
-      if (!response.ok) throw new Error('API error');
-      
-      const data = await response.json();
-      if (data && data.success && data.data) {
-        setInsights({
-          phyto: data.data.dominantSpeciesOrTargets?.join(', ') 
-            ? `Alvos detectados: ${data.data.dominantSpeciesOrTargets.join(', ')}. ${data.data.damageThresholdAssessment || 'Manter monitoramento de rotina.'}`
-            : 'Monitoramento fitossanitário ativo. Nenhuma anomalia severa acima do nível de dano econômico detectada.',
-          weather: 'Sincronizado com API Climática e Janelas Operacionais. Condições adequadas para pulverização no período matutino.',
-          management: data.data.actionChecklist?.[0] || 'Revisar operações no Field Book e planejar as próximas adubações.',
-          phytoDetails: data.data.actionChecklist || [
-            'Monitorar talhões com histórico de pressão.',
-            'Preservar inimigos naturais e rotacionar ingredientes ativos.'
-          ],
-          weatherDetails: [
-            'Janela de aplicação segura: 06:00 às 09:30 e após as 16:30.',
-            'Déficit de Pressão de Vapor (DPV) favorável para abertura estomática e absorção cuticular.'
-          ],
-          managementDetails: data.data.soilHealthAndBioASRecommendations || [
-            'Ajustar calibração dos pulverizadores terrestres.',
-            'Conferir compatibilidade química de tanque antes do preparo da calda.'
-          ]
-        });
-      } else {
-        throw new Error('Invalid response format');
-      }
-    } catch (error) {
-      console.warn('Failed to fetch online insights, falling back to offline', error);
-      loadOfflineInsights();
-    } finally {
-      setLoading(false);
-    }
-  };
+  const getOfflineInsights = (plotName: string) => ({
+    phyto: `Alerta moderado: Condições favoráveis para proliferação de Lagarta-da-soja e ferrugem devido à umidade recente. Última inspeção no ${plotName} indicou nível baixo.`,
+    weather: 'Previsão de precipitação (15mm) para as próximas 48h. Janela ideal de pulverização foliar amanhã entre 06:00 e 09:30 (Vento < 8 km/h e UR > 60%).',
+    management: 'Aplicação preventiva de biofungicida e nutrição foliar com Boro/Potássio programada para daqui a 3 dias. Prazo para fechamento do laudo foliar em aberto.',
+    phytoDetails: [
+      'Monitorar bordaduras dos talhões com pano de batida (nível de ação: 2 lagartas grandes/pano).',
+      'Avaliar sintomas iniciais de mancha-alvo e ferrugem asiática no terço inferior da planta.',
+      'Considerar controle biológico com Bacillus thuringiensis ou Trichogramma pretiosum.'
+    ],
+    weatherDetails: [
+      'Temperatura média: 24°C - 31°C com umidade relativa oscilando entre 55% e 85%.',
+      'Condições micrometeorológicas excelentes para absorção de adubação foliar no início da manhã.',
+      'Evitar aplicações com temperatura acima de 30°C ou ventos superiores a 10 km/h para evitar deriva.'
+    ],
+    managementDetails: [
+      'Revisão dos bicos de pulverização (pontas anti-deriva com indução de ar para gotas médias/grossas).',
+      'Checagem do pH da calda (manter entre 5.0 e 6.0 para máxima estabilidade dos ativos e micronutrientes).',
+      'Registro digital no Caderno de Campo com coordenadas do talhão e lote de insumos.'
+    ]
+  });
 
   useEffect(() => {
-    if (isOnline) {
-      fetchOnlineInsights();
-    } else {
-      loadOfflineInsights();
+    if (!isOnline || !navigator.onLine) {
+      setLoading(false);
+      setInsights(getOfflineInsights(firstPlotName));
+      return;
     }
-  }, [isOnline, farm]);
+
+    const controller = new AbortController();
+    let cancelled = false;
+
+    const fetchOnlineInsights = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch('/api/nema-ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            farmName: farm?.name,
+            domain: 'geral',
+            userPrompt: 'Gere 3 resumos curtos no formato JSON com as chaves "phyto", "weather" e "management" para o dashboard principal, baseando-se em alertas fitossanitários e nematoides, previsão do tempo/janela de pulverização e próximos vencimentos operacionais.'
+          })
+        });
+
+        if (!response.ok) throw new Error('API error');
+
+        const data = await response.json();
+        if (cancelled) return;
+        if (data && data.success && data.data) {
+          setInsights({
+            phyto: data.data.dominantSpeciesOrTargets?.join(', ')
+              ? `Alvos detectados: ${data.data.dominantSpeciesOrTargets.join(', ')}. ${data.data.damageThresholdAssessment || 'Manter monitoramento de rotina.'}`
+              : 'Monitoramento fitossanitário ativo. Nenhuma anomalia severa acima do nível de dano econômico detectada.',
+            weather: 'Sincronizado com API Climática e Janelas Operacionais. Condições adequadas para pulverização no período matutino.',
+            management: data.data.actionChecklist?.[0] || 'Revisar operações no Field Book e planejar as próximas adubações.',
+            phytoDetails: data.data.actionChecklist || [
+              'Monitorar talhões com histórico de pressão.',
+              'Preservar inimigos naturais e rotacionar ingredientes ativos.'
+            ],
+            weatherDetails: [
+              'Janela de aplicação segura: 06:00 às 09:30 e após as 16:30.',
+              'Déficit de Pressão de Vapor (DPV) favorável para abertura estomática e absorção cuticular.'
+            ],
+            managementDetails: data.data.soilHealthAndBioASRecommendations || [
+              'Ajustar calibração dos pulverizadores terrestres.',
+              'Conferir compatibilidade química de tanque antes do preparo da calda.'
+            ]
+          });
+        } else {
+          throw new Error('Invalid response format');
+        }
+      } catch (error: any) {
+        if (cancelled || error?.name === 'AbortError') return;
+        console.warn('Failed to fetch online insights, falling back to offline', error);
+        setInsights(getOfflineInsights(firstPlotName));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchOnlineInsights();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [isOnline, farm?.id, farm?.name, firstPlotName]);
 
   const toggleSmartCard = (card: ExpandedSmartCard) => {
     setExpandedCard(prev => prev === card ? null : card);

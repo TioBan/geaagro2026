@@ -273,7 +273,7 @@ export const NEMATODE_MEDIA_ATLAS: Record<string, NematodeMediaData> = {
 
   pratylenchus_coffeae: {
     microscope: {
-      url: '/pratylenchus_brachyurus_microscope.jpg',
+      url: '/pratylenchus_coffeae_microscope.jpg',
       magnification: '800x DIC',
       staining: 'Contraste de Interferência Diferencial',
       markers: [
@@ -286,7 +286,7 @@ export const NEMATODE_MEDIA_ATLAS: Record<string, NematodeMediaData> = {
       severityScore: 5
     },
     fieldDamage: {
-      url: '/pratylenchus_root_damage.jpg',
+      url: '/pratylenchus_coffeae_root_damage.jpg',
       symptomTitle: 'Podridão Negra e Morte das Raízes Absorventes no Café',
       organ: 'Raízes de Cafeeiro, Bananeira e Citros',
       markers: [
@@ -331,7 +331,7 @@ export const NEMATODE_MEDIA_ATLAS: Record<string, NematodeMediaData> = {
 
   pratylenchus_penetrans: {
     microscope: {
-      url: '/pratylenchus_vulnus_microscope.jpg',
+      url: '/pratylenchus_penetrans_microscope.jpg',
       magnification: '800x DIC',
       staining: 'DIC Nomarski',
       markers: [
@@ -344,7 +344,7 @@ export const NEMATODE_MEDIA_ATLAS: Record<string, NematodeMediaData> = {
       severityScore: 4
     },
     fieldDamage: {
-      url: '/pratylenchus_root_damage.jpg',
+      url: '/pratylenchus_penetrans_root_damage.jpg',
       symptomTitle: 'Necrose Cortical em Fruteiras & Batata',
       organ: 'Raízes de Macieira, Pessegueiro e Tubérculos',
       markers: [
@@ -360,7 +360,7 @@ export const NEMATODE_MEDIA_ATLAS: Record<string, NematodeMediaData> = {
 
   pratylenchus_jaehni: {
     microscope: {
-      url: '/pratylenchus_zeae_microscope.jpg',
+      url: '/pratylenchus_jaehni_microscope.jpg',
       magnification: '600x Campo Claro',
       staining: 'Fucsina Ácida',
       markers: [
@@ -373,7 +373,7 @@ export const NEMATODE_MEDIA_ATLAS: Record<string, NematodeMediaData> = {
       severityScore: 4
     },
     fieldDamage: {
-      url: '/pratylenchus_root_damage.jpg',
+      url: '/pratylenchus_jaehni_root_damage.jpg',
       symptomTitle: 'Declínio Lento dos Pomares Cítricos',
       organ: 'Raízes de Citros (Porta-Enxertos Cravo e Sunki)',
       markers: [
@@ -1009,7 +1009,7 @@ export const NEMATODE_MEDIA_ATLAS: Record<string, NematodeMediaData> = {
 
   mesocriconema_xenoplax: {
     microscope: {
-      url: '/hemicycliophora_arenaria_microscope.jpg',
+      url: '/mesocriconema_xenoplax_microscope.jpg',
       magnification: '500x MEV / DIC',
       staining: 'Microscopia Eletrônica de Varredura',
       markers: [
@@ -1022,7 +1022,7 @@ export const NEMATODE_MEDIA_ATLAS: Record<string, NematodeMediaData> = {
       severityScore: 5
     },
     fieldDamage: {
-      url: '/hemicycliophora_arenaria_root_damage.jpg',
+      url: '/mesocriconema_xenoplax_root_damage.jpg',
       symptomTitle: 'Complexo do Cancro Bacteriano & Morte Precoce do Pessegueiro (PTSD)',
       organ: 'Raízes Lenhosas de Fruteiras de Caroço (Prunus)',
       markers: [
@@ -1160,7 +1160,7 @@ export const NEMATODE_MEDIA_ATLAS: Record<string, NematodeMediaData> = {
   // =========================================================================
   paratrichodorus_minor: {
     microscope: {
-      url: '/trichodorus_christiei_microscope.jpg',
+      url: '/paratrichodorus_minor_microscope.jpg',
       magnification: '600x DIC',
       staining: 'Contraste Nomarski',
       markers: [
@@ -1172,7 +1172,7 @@ export const NEMATODE_MEDIA_ATLAS: Record<string, NematodeMediaData> = {
       credit: 'University of Florida IFAS Nematology & SBN'
     },
     fieldDamage: {
-      url: '/trichodorus_christiei_root_damage.jpg',
+      url: '/paratrichodorus_minor_root_damage.jpg',
       symptomTitle: 'Sintoma de "Raízes Grossas e Curtas" (Stubby Root) & Vetor do Vírus TRV',
       organ: 'Pontas de Raízes de Milho, Batata e Tomate',
       markers: [
@@ -1393,7 +1393,7 @@ export const NEMATODE_MEDIA_ATLAS: Record<string, NematodeMediaData> = {
 
   paratylenchus_dianectus: {
     microscope: {
-      url: '/subanguina_radicicola_microscope.jpg',
+      url: '/paratylenchus_dianectus_microscope.jpg',
       magnification: '800x DIC',
       staining: 'Contraste Nomarski',
       markers: [
@@ -1406,7 +1406,7 @@ export const NEMATODE_MEDIA_ATLAS: Record<string, NematodeMediaData> = {
       severityScore: 3
     },
     fieldDamage: {
-      url: '/subanguina_radicicola_root_damage.jpg',
+      url: '/paratylenchus_dianectus_root_damage.jpg',
       symptomTitle: 'Definhamento Lento em Hortaliças e Frutíferas',
       organ: 'Raízes Absorventes de Aipo, Cenoura e Ornamentais',
       markers: [

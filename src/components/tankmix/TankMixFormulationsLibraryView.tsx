@@ -1,21 +1,15 @@
 import React, { useState } from 'react';
 import {
-  Layers,
   Search,
-  BookOpen,
-  Info,
   CheckCircle2,
   AlertTriangle,
-  RotateCw,
-  Sparkles,
   Droplets,
-  HelpCircle,
   Filter,
   ShieldAlert,
   PackageCheck,
 } from 'lucide-react';
 import { FORMULATION_DATABASE, TANKMIX_PRODUCTS_DATABASE } from '../../data/tankMixData';
-import { PesticideFormulationCode, FormulationInfo } from '../../types/tankMix';
+import { FormulationInfo } from '../../types/tankMix';
 
 export const TankMixFormulationsLibraryView: React.FC = () => {
   const [selectedFormulation, setSelectedFormulation] = useState<FormulationInfo>(FORMULATION_DATABASE[0]);

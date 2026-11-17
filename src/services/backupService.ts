@@ -50,7 +50,10 @@ export const KNOWN_INDEXED_DATABASES: { name: string; version: number; stores: s
       'water_analysis', 'fieldbook_operations', 'traceability_lots', 'traceability_harvests',
       'traceability_photos', 'gestao_rural', 'costs_records', 'plantability_records',
       'irrigation_records', 'pests_records', 'nursery_records', 'offline_diagnostics',
-      'app_settings', 'sync_queue'
+      'app_settings', 'sync_queue',
+      'estatistica_projetos', 'estatistica_experimentos', 'estatistica_dados', 'estatistica_variaveis',
+      'estatistica_analises', 'estatistica_resultados', 'estatistica_graficos', 'estatistica_historico',
+      'estatistica_backups_metadata'
     ]
   },
   {
@@ -146,6 +149,7 @@ export interface OpfsBackupDump {
   manifest: any;
   tables: Record<string, any[]>;
   kv: Record<string, any>;
+  files?: Record<string, any>;
 }
 
 export interface DecryptedBackupPayload {
@@ -757,9 +761,10 @@ export async function createFullBackup(options: {
 }): Promise<{ backupFile: GeaAgroBackupFile; jsonString: string; metadata: BackupMetadata }> {
   // 1. Coleta nativa do novo motor OPFS + WASM
   const opfsDump = await opfsWasmDB.exportOpfsDump().catch(() => ({
-    manifest: { version: '4.2.3.7' },
+    manifest: { version: '4.2.3.8' },
     tables: {},
     kv: {},
+    files: {},
     exportedAt: Date.now()
   }));
 
@@ -767,12 +772,13 @@ export async function createFullBackup(options: {
   const hasCustomLocal = options.customLocalStorageData !== undefined;
 
   const opfsData: OpfsBackupDump = {
-    version: opfsDump.manifest?.version || '4.2.3.7',
+    version: opfsDump.manifest?.version || '4.2.3.8',
     engine: 'OPFS_WASM',
     exportedAt: opfsDump.exportedAt,
     manifest: opfsDump.manifest,
     tables: hasCustomIndexed && options.customIndexedData!.length === 0 ? {} : opfsDump.tables,
-    kv: hasCustomLocal ? { ...options.customLocalStorageData } : opfsDump.kv
+    kv: hasCustomLocal ? { ...options.customLocalStorageData } : opfsDump.kv,
+    files: hasCustomIndexed && options.customIndexedData!.length === 0 ? {} : (opfsDump as any).files || {}
   };
 
   // 2. Coletar dados de compatibilidade legado (localStorage e IndexedDB)
@@ -862,7 +868,9 @@ export async function createFullBackup(options: {
     'pericias',
     'geoprocessamento',
     'gestao_rural',
-    'rastreabilidade'
+    'rastreabilidade',
+    'recupera',
+    'estatistica'
   ];
 
   const metadata: BackupMetadata = {
@@ -1291,10 +1299,12 @@ export async function restoreBackup(
       payload.opfsData.tables &&
       Object.values(payload.opfsData.tables).some(arr => Array.isArray(arr) && arr.length > 0)
     );
-    if (hasOpfsData && payload.opfsData) {
+    const hasOpfsFiles = Boolean(payload.opfsData?.files && Object.keys(payload.opfsData.files).length > 0);
+    if ((hasOpfsData || hasOpfsFiles) && payload.opfsData) {
       await opfsWasmDB.importOpfsDump({
         tables: payload.opfsData.tables,
-        kv: payload.opfsData.kv
+        kv: payload.opfsData.kv,
+        files: payload.opfsData.files
       });
       result.restoredDatabasesCount = Math.max(result.restoredDatabasesCount, (payload.indexedDBData || []).length || 1);
       for (const items of Object.values(payload.opfsData.tables)) {

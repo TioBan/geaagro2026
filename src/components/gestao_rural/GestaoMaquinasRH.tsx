@@ -2,14 +2,6 @@ import React, { useState } from 'react';
 import {
   Tractor,
   Users,
-  Wrench,
-  ShieldCheck,
-  Plus,
-  Clock,
-  DollarSign,
-  AlertTriangle,
-  CheckCircle2,
-  Calendar,
 } from 'lucide-react';
 import {
   MaquinaImplementoRecord,
@@ -23,7 +15,7 @@ interface GestaoMaquinasRHProps {
   funcionarios: FuncionarioRuralRecord[];
   onAddMaquina: (maquina: MaquinaImplementoRecord) => void;
   onAddFuncionario: (func: FuncionarioRuralRecord) => void;
-  onAddManutencao: (manut: ManutencaoPreventivaRecord) => void;
+  onAddManutencao?: (manut: ManutencaoPreventivaRecord) => void;
 }
 
 export const GestaoMaquinasRH: React.FC<GestaoMaquinasRHProps> = ({
@@ -32,7 +24,6 @@ export const GestaoMaquinasRH: React.FC<GestaoMaquinasRHProps> = ({
   funcionarios,
   onAddMaquina,
   onAddFuncionario,
-  onAddManutencao,
 }) => {
   const [activeTab, setActiveTab] = useState<'maquinas' | 'rh' | 'manutencoes'>('maquinas');
   const [showAddMaqModal, setShowAddMaquinaModal] = useState(false);
@@ -85,6 +76,19 @@ export const GestaoMaquinasRH: React.FC<GestaoMaquinasRHProps> = ({
 
     onAddMaquina(created);
     setShowAddMaquinaModal(false);
+    setNewMaq({
+      codigo: `TR-0${maquinas.length + 2}`,
+      nome: '',
+      tipo: 'Trator',
+      marcaModelo: '',
+      anoFabricacao: new Date().getFullYear(),
+      horimetroOuKmAtual: 0,
+      consumoMedioLitersHour: 0,
+      status: 'ativo',
+      proximaManutencaoHorimetro: 0,
+      custoManutencaoAcumuladoR$: 0,
+      observacoes: '',
+    });
   };
 
   const handleSaveFuncionario = (e: React.FormEvent) => {
@@ -110,6 +114,17 @@ export const GestaoMaquinasRH: React.FC<GestaoMaquinasRHProps> = ({
 
     onAddFuncionario(created);
     setShowAddFuncionarioModal(false);
+    setNewFunc({
+      nome: '',
+      cpf: '',
+      cargoFuncao: 'Operador de Máquinas',
+      salarioBaseR$: 0,
+      dataAdmissao: new Date().toISOString().split('T')[0],
+      treinamentosEPIs: [],
+      jornadaHorasDiarias: 8,
+      horasExtrasMes: 0,
+      status: 'ativo',
+    });
   };
 
   return (
@@ -237,6 +252,11 @@ export const GestaoMaquinasRH: React.FC<GestaoMaquinasRHProps> = ({
               </div>
             );
           })}
+          {maquinas.length === 0 && (
+            <div className="col-span-full p-8 text-center bg-slate-50 dark:bg-zinc-800/20 rounded-2xl border border-dashed border-slate-300 dark:border-zinc-700 text-slate-500 dark:text-zinc-400">
+              Nenhuma máquina ou implemento cadastrado. Clique em &ldquo;Nova Máquina&rdquo; para adicionar.
+            </div>
+          )}
         </div>
       )}
 
@@ -290,9 +310,47 @@ export const GestaoMaquinasRH: React.FC<GestaoMaquinasRHProps> = ({
               </div>
             </div>
           ))}
-          {maquinas.length === 0 && (
+          {funcionarios.length === 0 && (
             <div className="col-span-full p-8 text-center bg-slate-50 dark:bg-zinc-800/20 rounded-2xl border border-dashed border-slate-300 dark:border-zinc-700 text-slate-500 dark:text-zinc-400">
-              Nenhuma máquina ou implemento cadastrado. Clique em &ldquo;Cadastrar Máquina&rdquo; para adicionar.
+              Nenhum funcionário cadastrado. Clique em &ldquo;Novo Funcionário&rdquo; para adicionar.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MANUTENÇÕES TAB */}
+      {activeTab === 'manutencoes' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {manutencoes.map(man => (
+            <div
+              key={man.id}
+              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 space-y-2 shadow-2xs"
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md">
+                    {man.tipoManutencao}
+                  </span>
+                  <h4 className="font-black text-sm text-slate-900 dark:text-white mt-1">
+                    {man.maquinaNome}
+                  </h4>
+                </div>
+                <span className="font-mono text-xs font-bold text-slate-600 dark:text-zinc-400">
+                  {man.dataManutencao}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600 dark:text-zinc-300">{man.descricaoServico}</p>
+              <div className="flex items-center justify-between text-[11px] border-t pt-2">
+                <span className="text-slate-400">Horímetro: {man.horimetroNoAto} h</span>
+                <span className="font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                  R$ {man.custoTotalR$.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+          ))}
+          {manutencoes.length === 0 && (
+            <div className="col-span-full p-8 text-center bg-slate-50 dark:bg-zinc-800/20 rounded-2xl border border-dashed border-slate-300 dark:border-zinc-700 text-slate-500 dark:text-zinc-400">
+              Nenhuma manutenção preventiva ou corretiva registrada até o momento.
             </div>
           )}
         </div>

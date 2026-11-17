@@ -2,21 +2,16 @@ import React, { useState } from 'react';
 import {
   Calendar,
   Wheat,
-  Clock,
   Plus,
-  CheckCircle2,
-  AlertTriangle,
-  Users,
-  Check,
   ListTodo,
-  Sparkles,
 } from 'lucide-react';
-import { SafraAgragricola, TarefaCronograma, TalhaoRural } from '../../types/gestaoRural';
+import { SafraAgragricola, TarefaCronograma, TalhaoRural, ConfigCulturaIntegrada } from '../../types/gestaoRural';
 
 interface GestaoPlanejamentoAgricolaProps {
   safras: SafraAgragricola[];
   cronograma: TarefaCronograma[];
   talhoes: TalhaoRural[];
+  configCultura?: ConfigCulturaIntegrada;
   onAddSafra: (safra: SafraAgragricola) => void;
   onAddTarefa: (tarefa: TarefaCronograma) => void;
   onToggleChecklistItem: (tarefaId: string, checklistId: string) => void;
@@ -26,6 +21,7 @@ export const GestaoPlanejamentoAgricola: React.FC<GestaoPlanejamentoAgricolaProp
   safras,
   cronograma,
   talhoes,
+  configCultura,
   onAddSafra,
   onAddTarefa,
   onToggleChecklistItem,
@@ -33,19 +29,22 @@ export const GestaoPlanejamentoAgricola: React.FC<GestaoPlanejamentoAgricolaProp
   const [showAddSafraModal, setShowAddSafraModal] = useState(false);
   const [showAddTarefaModal, setShowAddTarefaModal] = useState(false);
 
+  const activeCultura = configCultura?.cultura || 'Banana';
+  const activeUnit = configCultura?.unidadeComercializacaoPrincipal || 'cx';
+
   // New Safra Form State
   const [newSafra, setNewSafra] = useState<Partial<SafraAgragricola>>({
     nomeSafra: '',
     anoAgricola: `${new Date().getFullYear()}/${new Date().getFullYear() + 1}`,
-    cultura: 'Soja',
-    cultivar: '',
+    cultura: activeCultura,
+    cultivar: configCultura?.variedade || '',
     talhaoId: talhoes[0]?.id || '',
     areaHa: 0,
     sistemaCultivo: 'Plantio Direto',
-    cicloDias: 115,
+    cicloDias: 120,
     dataPrevistaPlantio: new Date().toISOString().split('T')[0],
     dataPrevistaColheita: '',
-    metaProdutividadeSacasHa: 0,
+    metaProdutividadeSacasHa: configCultura?.metaProdutividadePadraoHa || 1500,
     status: 'planejada',
   });
 
@@ -84,6 +83,20 @@ export const GestaoPlanejamentoAgricola: React.FC<GestaoPlanejamentoAgricolaProp
 
     onAddSafra(created);
     setShowAddSafraModal(false);
+    setNewSafra({
+      nomeSafra: '',
+      anoAgricola: `${new Date().getFullYear()}/${new Date().getFullYear() + 1}`,
+      cultura: activeCultura,
+      cultivar: configCultura?.variedade || '',
+      talhaoId: talhoes[0]?.id || '',
+      areaHa: 0,
+      sistemaCultivo: 'Plantio Direto',
+      cicloDias: 120,
+      dataPrevistaPlantio: new Date().toISOString().split('T')[0],
+      dataPrevistaColheita: '',
+      metaProdutividadeSacasHa: configCultura?.metaProdutividadePadraoHa || 1500,
+      status: 'planejada',
+    });
   };
 
   const handleCreateTarefa = (e: React.FormEvent) => {
@@ -112,6 +125,16 @@ export const GestaoPlanejamentoAgricola: React.FC<GestaoPlanejamentoAgricolaProp
 
     onAddTarefa(created);
     setShowAddTarefaModal(false);
+    setNewTarefa({
+      titulo: '',
+      tipoOperacao: 'Pulverização',
+      safraId: safras[0]?.id || '',
+      talhaoId: talhoes[0]?.id || '',
+      dataPrevista: new Date().toISOString().split('T')[0],
+      responsavel: '',
+      prioridade: 'media',
+      observacoes: '',
+    });
   };
 
   const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -196,7 +219,7 @@ export const GestaoPlanejamentoAgricola: React.FC<GestaoPlanejamentoAgricolaProp
                 <div>
                   <span className="block text-slate-400 font-bold">Meta Produtividade:</span>
                   <span className="font-bold text-emerald-600">
-                    {s.metaProdutividadeSacasHa} sc/ha
+                    {s.metaProdutividadeSacasHa} {activeUnit}/ha
                   </span>
                 </div>
                 <div>
@@ -345,13 +368,12 @@ export const GestaoPlanejamentoAgricola: React.FC<GestaoPlanejamentoAgricolaProp
                 {t.checklist.map(ck => (
                   <label
                     key={ck.id}
-                    onClick={() => onToggleChecklistItem(t.id, ck.id)}
                     className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-zinc-300 cursor-pointer select-none"
                   >
                     <input
                       type="checkbox"
                       checked={ck.concluido}
-                      onChange={() => {}}
+                      onChange={() => onToggleChecklistItem(t.id, ck.id)}
                       className="w-4 h-4 text-emerald-600 rounded"
                     />
                     <span className={ck.concluido ? 'line-through text-slate-400' : ''}>

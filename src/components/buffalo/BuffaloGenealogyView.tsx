@@ -44,7 +44,7 @@ export const BuffaloGenealogyView: React.FC<BuffaloGenealogyViewProps> = ({
         </div>
       </div>
 
-      {selectedAnimal && (
+      {selectedAnimal ? (
         <div className="space-y-6">
           {/* Card Central do Animal Selecionado */}
           <div className="bg-gradient-to-r from-teal-900 via-slate-900 to-slate-950 border border-teal-500/30 rounded-3xl p-6 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
@@ -161,6 +161,14 @@ export const BuffaloGenealogyView: React.FC<BuffaloGenealogyViewProps> = ({
               </p>
             </div>
           </div>
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-zinc-900 border border-dashed border-slate-300 dark:border-zinc-700 rounded-3xl p-12 text-center space-y-3">
+          <Dna className="w-12 h-12 text-slate-300 dark:text-zinc-600 mx-auto" />
+          <h3 className="text-base font-black text-slate-800 dark:text-zinc-200">Nenhum animal cadastrado no rebanho</h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            Cadastre animais na aba <strong>Registro Individual</strong> para visualizar a árvore genealógica e linhagens de 3 gerações.
+          </p>
         </div>
       )}
     </div>

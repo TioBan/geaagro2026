@@ -29,8 +29,29 @@ import {
   List,
   Compass,
 } from 'lucide-react';
-import Tesseract from 'tesseract.js';
 import { SoilSample, Farm } from '../types/agronomy';
+
+async function loadTesseractFromCdn(): Promise<any> {
+  const w = window as any;
+  if (w.Tesseract) return w.Tesseract;
+  await new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector('script[data-tesseract-cdn="true"]') as HTMLScriptElement | null;
+    if (existing) {
+      if (w.Tesseract) return resolve();
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => reject(new Error('Falha ao carregar motor OCR')), { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    script.async = true;
+    script.dataset.tesseractCdn = 'true';
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Falha ao carregar motor OCR'));
+    document.head.appendChild(script);
+  });
+  return w.Tesseract;
+}
 import {
   downloadSoilCsvTemplate,
   validateAndParseSoilCsv,
@@ -118,32 +139,32 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
     plotId: selectedFarm?.plots?.[0]?.id || '',
     depth: '0-20' as '0-20' | '20-40',
     date: new Date().toISOString().split('T')[0],
-    lab: 'LabSolos Análise Agronômica',
-    protocol: `PROT-${Math.floor(10000 + Math.random() * 90000)}`,
+    lab: '',
+    protocol: '',
     // Acidez & M.O.
-    ph: 5.2,
+    ph: '' as number | string,
     phH2O: '' as number | string,
     phSmp: '' as number | string,
-    mo: 25.0,
-    al: 0.15,
-    hAl: 3.5,
+    mo: '' as number | string,
+    al: '' as number | string,
+    hAl: '' as number | string,
     // Macronutrientes
-    p: 12.0, // P Mehlich 1
+    p: '' as number | string, // P Mehlich 1
     pMehlich3: '' as number | string,
     pResina: '' as number | string,
     pRem: '' as number | string, // P Remanescente (mg/L)
     pRem3: '' as number | string, // Remanescente 3 (mg/L)
-    k: 0.22 as number | string,
-    ca: 2.8,
-    mg: 0.9,
-    s: 6.0,
+    k: '' as number | string,
+    ca: '' as number | string,
+    mg: '' as number | string,
+    s: '' as number | string,
     // Micronutrientes
-    b: 0.35,
-    cu: 1.2,
-    fe: 45.0,
-    mn: 18.0,
-    zn: 2.4,
-    molibdenio: "" as number | string,
+    b: '' as number | string,
+    cu: '' as number | string,
+    fe: '' as number | string,
+    mn: '' as number | string,
+    zn: '' as number | string,
+    molibdenio: '' as number | string,
     // Elementos Benéficos & Funcionais
     si: '' as number | string, // Silício
     co: '' as number | string, // Cobalto
@@ -151,9 +172,9 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
     se: '' as number | string, // Selênio
     na: '' as number | string, // Sódio
     // Granulometria
-    clay: selectedFarm?.plots?.[0]?.clayPercentage || 38,
-    sand: 42,
-    silt: 20,
+    clay: '' as number | string,
+    sand: '' as number | string,
+    silt: '' as number | string,
     // BioAS (Bioanálise de Solo Embrapa)
     hasBioAS: false,
     arylsulfatase: '' as number | string,
@@ -192,13 +213,17 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
 
   // Calculate live preview indices from form data
   const liveIndices = calculateSoilIndices({
-    caCmolcDm3: formData.ca,
-    mgCmolcDm3: formData.mg,
+    phCaCl2: Number(formData.ph) || 0,
+    organicMatterGdm3: Number(formData.mo) || 0,
+    pMehlich1MgDm3: Number(formData.p) || 0,
+    pResinaMgDm3: formData.pResina !== '' ? Number(formData.pResina) : undefined,
+    caCmolcDm3: Number(formData.ca) || 0,
+    mgCmolcDm3: Number(formData.mg) || 0,
     kCmolcDm3: effectiveKCmolc,
     kMgDm3: kUnit === 'mg' ? (formData.k !== '' ? Number(formData.k) : 0) : Number((effectiveKCmolc * 391).toFixed(1)),
-    alCmolcDm3: formData.al,
-    hAlCmolcDm3: formData.hAl,
-    clayPercent: formData.clay,
+    alCmolcDm3: Number(formData.al) || 0,
+    hAlCmolcDm3: Number(formData.hAl) || 0,
+    clayPercent: Number(formData.clay) || 0,
     hasBioAS: formData.hasBioAS,
     arylsulfataseMgPnpKgH: formData.hasBioAS && formData.arylsulfatase !== '' ? Number(formData.arylsulfatase) : undefined,
     betaGlucosidaseMgPnpKgH: formData.hasBioAS && formData.betaGlucosidase !== '' ? Number(formData.betaGlucosidase) : undefined,
@@ -214,37 +239,37 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
       plotId: selectedFarm?.plots?.[0]?.id || '',
       depth: '0-20',
       date: new Date().toISOString().split('T')[0],
-      lab: 'LabSolos Análise Agronômica',
-      protocol: `PROT-${Math.floor(10000 + Math.random() * 90000)}`,
-      ph: 5.2,
+      lab: '',
+      protocol: '',
+      ph: '',
       phH2O: '',
       phSmp: '',
-      mo: 25.0,
-      p: 12.0,
+      mo: '',
+      p: '',
       pMehlich3: '',
       pResina: '',
       pRem: '',
       pRem3: '',
-      k: 0.22,
-      ca: 2.8,
-      mg: 0.9,
-      al: 0.15,
-      hAl: 3.5,
-      s: 6.0,
-      b: 0.35,
-      cu: 1.2,
-      fe: 45.0,
-      mn: 18.0,
-      zn: 2.4,
-    molibdenio: "" as number | string,
+      k: '',
+      ca: '',
+      mg: '',
+      al: '',
+      hAl: '',
+      s: '',
+      b: '',
+      cu: '',
+      fe: '',
+      mn: '',
+      zn: '',
+      molibdenio: '',
       si: '',
       co: '',
       ni: '',
       se: '',
       na: '',
-      clay: selectedFarm?.plots?.[0]?.clayPercentage || 38,
-      sand: 42,
-      silt: 20,
+      clay: '',
+      sand: '',
+      silt: '',
       hasBioAS: false,
       arylsulfatase: '',
       betaGlucosidase: '',
@@ -340,6 +365,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
         }
 
         try {
+          const Tesseract = await loadTesseractFromCdn();
           const result = await Tesseract.recognize(file, 'por');
           const text = result.data.text;
           
@@ -604,36 +630,36 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
       depth: formData.depth,
       labName: formData.lab.trim(),
       labProtocol: formData.protocol.trim(),
-      phCaCl2: formData.ph,
+      phCaCl2: Number(formData.ph) || 0,
       phH2O: formData.phH2O !== '' ? Number(formData.phH2O) : undefined,
       phSmp: formData.phSmp !== '' ? Number(formData.phSmp) : undefined,
-      organicMatterGdm3: formData.mo,
-      pMehlich1MgDm3: formData.p,
+      organicMatterGdm3: Number(formData.mo) || 0,
+      pMehlich1MgDm3: Number(formData.p) || 0,
       pMehlich3MgDm3: formData.pMehlich3 !== '' ? Number(formData.pMehlich3) : undefined,
       pResinaMgDm3: formData.pResina !== '' ? Number(formData.pResina) : undefined,
       pRemanescenteMgL: formData.pRem !== '' ? Number(formData.pRem) : undefined,
       pRemanescente3MgL: formData.pRem3 !== '' ? Number(formData.pRem3) : undefined,
       kCmolcDm3: finalKCmolc,
       kMgDm3: Number((finalKCmolc * 391).toFixed(1)),
-      caCmolcDm3: formData.ca,
-      mgCmolcDm3: formData.mg,
-      alCmolcDm3: formData.al,
-      hAlCmolcDm3: formData.hAl,
-      sSO4MgDm3: formData.s,
-      bMgDm3: formData.b,
-      cuMgDm3: formData.cu,
-      feMgDm3: formData.fe,
-      mnMgDm3: formData.mn,
-      znMgDm3: formData.zn,
+      caCmolcDm3: Number(formData.ca) || 0,
+      mgCmolcDm3: Number(formData.mg) || 0,
+      alCmolcDm3: Number(formData.al) || 0,
+      hAlCmolcDm3: Number(formData.hAl) || 0,
+      sSO4MgDm3: Number(formData.s) || 0,
+      bMgDm3: Number(formData.b) || 0,
+      cuMgDm3: Number(formData.cu) || 0,
+      feMgDm3: Number(formData.fe) || 0,
+      mnMgDm3: Number(formData.mn) || 0,
+      znMgDm3: Number(formData.zn) || 0,
       moMgDm3: formData.molibdenio !== '' ? Number(formData.molibdenio) : undefined,
       siMgDm3: formData.si !== '' ? Number(formData.si) : undefined,
       coMgDm3: formData.co !== '' ? Number(formData.co) : undefined,
       niMgDm3: formData.ni !== '' ? Number(formData.ni) : undefined,
       seMgDm3: formData.se !== '' ? Number(formData.se) : undefined,
       naCmolcDm3: formData.na !== '' ? Number(formData.na) : undefined,
-      clayPercent: formData.clay,
-      sandPercent: formData.sand,
-      siltPercent: formData.silt,
+      clayPercent: Number(formData.clay) || 0,
+      sandPercent: Number(formData.sand) || 0,
+      siltPercent: Number(formData.silt) || 0,
       hasBioAS: formData.hasBioAS,
       arylsulfataseMgPnpKgH: formData.hasBioAS && formData.arylsulfatase !== '' ? Number(formData.arylsulfatase) : undefined,
       betaGlucosidaseMgPnpKgH: formData.hasBioAS && formData.betaGlucosidase !== '' ? Number(formData.betaGlucosidase) : undefined,
@@ -1098,8 +1124,9 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                         <input
                           type="number"
                           step="0.01"
+                          placeholder="Ex: 5.2"
                           value={formData.ph}
-                          onChange={e => setFormData({ ...formData, ph: Number(e.target.value) })}
+                          onChange={e => setFormData({ ...formData, ph: e.target.value })}
                           className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-bold"
                         />
                       </div>
@@ -1113,7 +1140,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                           step="0.01"
                           placeholder="Ex: 5.8"
                           value={formData.phH2O}
-                          onChange={e => setFormData({ ...formData, phH2O: e.target.value ? Number(e.target.value) : '' })}
+                          onChange={e => setFormData({ ...formData, phH2O: e.target.value })}
                           className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100"
                         />
                       </div>
@@ -1127,7 +1154,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                           step="0.01"
                           placeholder="Ex: 5.6"
                           value={formData.phSmp}
-                          onChange={e => setFormData({ ...formData, phSmp: e.target.value ? Number(e.target.value) : '' })}
+                          onChange={e => setFormData({ ...formData, phSmp: e.target.value })}
                           className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100"
                         />
                       </div>
@@ -1139,8 +1166,9 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                         <input
                           type="number"
                           step="0.1"
+                          placeholder="Ex: 25.0"
                           value={formData.mo}
-                          onChange={e => setFormData({ ...formData, mo: Number(e.target.value) })}
+                          onChange={e => setFormData({ ...formData, mo: e.target.value })}
                           className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-medium"
                         />
                       </div>
@@ -1152,8 +1180,9 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                         <input
                           type="number"
                           step="0.01"
+                          placeholder="Ex: 0.15"
                           value={formData.al}
-                          onChange={e => setFormData({ ...formData, al: Number(e.target.value) })}
+                          onChange={e => setFormData({ ...formData, al: e.target.value })}
                           className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100"
                         />
                       </div>
@@ -1165,8 +1194,9 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                         <input
                           type="number"
                           step="0.01"
+                          placeholder="Ex: 3.5"
                           value={formData.hAl}
-                          onChange={e => setFormData({ ...formData, hAl: Number(e.target.value) })}
+                          onChange={e => setFormData({ ...formData, hAl: e.target.value })}
                           className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100"
                         />
                       </div>
@@ -1188,8 +1218,9 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                         <input
                           type="number"
                           step="0.1"
+                          placeholder="Ex: 12.0"
                           value={formData.p}
-                          onChange={e => setFormData({ ...formData, p: Number(e.target.value) })}
+                          onChange={e => setFormData({ ...formData, p: e.target.value })}
                           className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-bold text-amber-700 dark:text-amber-400"
                         />
                       </div>
@@ -1203,7 +1234,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                           step="0.1"
                           placeholder="Ex: 15.0"
                           value={formData.pResina}
-                          onChange={e => setFormData({ ...formData, pResina: e.target.value ? Number(e.target.value) : '' })}
+                          onChange={e => setFormData({ ...formData, pResina: e.target.value })}
                           className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100"
                         />
                       </div>
@@ -1217,7 +1248,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                           step="0.1"
                           placeholder="Ex: 14.0"
                           value={formData.pMehlich3}
-                          onChange={e => setFormData({ ...formData, pMehlich3: e.target.value ? Number(e.target.value) : '' })}
+                          onChange={e => setFormData({ ...formData, pMehlich3: e.target.value })}
                           className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100"
                         />
                       </div>
@@ -1231,7 +1262,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                           step="0.1"
                           placeholder="P-Rem (mg/L)"
                           value={formData.pRem}
-                          onChange={e => setFormData({ ...formData, pRem: e.target.value ? Number(e.target.value) : '' })}
+                          onChange={e => setFormData({ ...formData, pRem: e.target.value })}
                           className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100"
                         />
                       </div>
@@ -1245,7 +1276,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                           step="0.1"
                           placeholder="Rem-3 (mg/L)"
                           value={formData.pRem3}
-                          onChange={e => setFormData({ ...formData, pRem3: e.target.value ? Number(e.target.value) : '' })}
+                          onChange={e => setFormData({ ...formData, pRem3: e.target.value })}
                           className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100"
                         />
                       </div>
@@ -1279,7 +1310,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                           step={kUnit === 'cmolc' ? '0.01' : '1'}
                           placeholder={kUnit === 'cmolc' ? 'Ex: 0.22' : 'Ex: 86'}
                           value={formData.k}
-                          onChange={e => setFormData({ ...formData, k: e.target.value === '' ? '' : Number(e.target.value) })}
+                          onChange={e => setFormData({ ...formData, k: e.target.value })}
                           className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-medium"
                         />
                         <div className="text-[9px] text-slate-400 dark:text-zinc-500 mt-0.5 flex justify-between">
@@ -1299,8 +1330,9 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                         <input
                           type="number"
                           step="0.01"
+                          placeholder="Ex: 2.8"
                           value={formData.ca}
-                          onChange={e => setFormData({ ...formData, ca: Number(e.target.value) })}
+                          onChange={e => setFormData({ ...formData, ca: e.target.value })}
                           className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-bold text-emerald-800 dark:text-emerald-400"
                         />
                       </div>
@@ -1312,8 +1344,9 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                         <input
                           type="number"
                           step="0.01"
+                          placeholder="Ex: 0.9"
                           value={formData.mg}
-                          onChange={e => setFormData({ ...formData, mg: Number(e.target.value) })}
+                          onChange={e => setFormData({ ...formData, mg: e.target.value })}
                           className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-bold text-emerald-800 dark:text-emerald-400"
                         />
                       </div>
@@ -1325,8 +1358,9 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                         <input
                           type="number"
                           step="0.1"
+                          placeholder="Ex: 6.0"
                           value={formData.s}
-                          onChange={e => setFormData({ ...formData, s: Number(e.target.value) })}
+                          onChange={e => setFormData({ ...formData, s: e.target.value })}
                           className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100"
                         />
                       </div>
@@ -1345,35 +1379,35 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                           <span>Ferro (Fe)</span>
                           {extractedFields.has('fe') && <span className="text-[9px] text-emerald-600 font-bold">✓</span>}
                         </label>
-                        <input type="number" step="0.1" value={formData.fe} onChange={e => setFormData({ ...formData, fe: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-semibold" />
+                        <input type="number" step="0.1" placeholder="Ex: 45" value={formData.fe} onChange={e => setFormData({ ...formData, fe: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-semibold" />
                       </div>
                       <div>
                         <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5 flex justify-between">
                           <span>Manganês (Mn)</span>
                           {extractedFields.has('mn') && <span className="text-[9px] text-emerald-600 font-bold">✓</span>}
                         </label>
-                        <input type="number" step="0.1" value={formData.mn} onChange={e => setFormData({ ...formData, mn: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-semibold" />
+                        <input type="number" step="0.1" placeholder="Ex: 18" value={formData.mn} onChange={e => setFormData({ ...formData, mn: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-semibold" />
                       </div>
                       <div>
                         <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5 flex justify-between">
                           <span>Zinco (Zn)</span>
                           {extractedFields.has('zn') && <span className="text-[9px] text-emerald-600 font-bold">✓</span>}
                         </label>
-                        <input type="number" step="0.01" value={formData.zn} onChange={e => setFormData({ ...formData, zn: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                        <input type="number" step="0.01" placeholder="Ex: 2.4" value={formData.zn} onChange={e => setFormData({ ...formData, zn: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                       </div>
                       <div>
                         <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5 flex justify-between">
                           <span>Boro (B)</span>
                           {extractedFields.has('b') && <span className="text-[9px] text-emerald-600 font-bold">✓</span>}
                         </label>
-                        <input type="number" step="0.01" value={formData.b} onChange={e => setFormData({ ...formData, b: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                        <input type="number" step="0.01" placeholder="Ex: 0.35" value={formData.b} onChange={e => setFormData({ ...formData, b: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                       </div>
                       <div>
                         <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5 flex justify-between">
                           <span>Cobre (Cu)</span>
                           {extractedFields.has('cu') && <span className="text-[9px] text-emerald-600 font-bold">✓</span>}
                         </label>
-                        <input type="number" step="0.01" value={formData.cu} onChange={e => setFormData({ ...formData, cu: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                        <input type="number" step="0.01" placeholder="Ex: 1.2" value={formData.cu} onChange={e => setFormData({ ...formData, cu: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                       </div>
                     </div>
                   </div>
@@ -1391,35 +1425,35 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                         <span>Silício Si (mg/dm³)</span>
                         {extractedFields.has('si') && <span className="text-[9px] text-emerald-600 font-bold">✓</span>}
                       </label>
-                      <input type="number" step="0.1" placeholder="Ex: 15.0" value={formData.si} onChange={e => setFormData({ ...formData, si: e.target.value ? Number(e.target.value) : '' })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.1" placeholder="Ex: 15.0" value={formData.si} onChange={e => setFormData({ ...formData, si: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5 flex justify-between">
                         <span>Cobalto Co (mg/dm³)</span>
                         {extractedFields.has('co') && <span className="text-[9px] text-emerald-600 font-bold">✓</span>}
                       </label>
-                      <input type="number" step="0.01" placeholder="Ex: 0.15" value={formData.co} onChange={e => setFormData({ ...formData, co: e.target.value ? Number(e.target.value) : '' })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.01" placeholder="Ex: 0.15" value={formData.co} onChange={e => setFormData({ ...formData, co: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5 flex justify-between">
                         <span>Níquel Ni (mg/dm³)</span>
                         {extractedFields.has('ni') && <span className="text-[9px] text-emerald-600 font-bold">✓</span>}
                       </label>
-                      <input type="number" step="0.01" placeholder="Ex: 0.25" value={formData.ni} onChange={e => setFormData({ ...formData, ni: e.target.value ? Number(e.target.value) : '' })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.01" placeholder="Ex: 0.25" value={formData.ni} onChange={e => setFormData({ ...formData, ni: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5 flex justify-between">
                         <span>Selênio Se (mg/dm³)</span>
                         {extractedFields.has('se') && <span className="text-[9px] text-emerald-600 font-bold">✓</span>}
                       </label>
-                      <input type="number" step="0.01" placeholder="Ex: 0.08" value={formData.se} onChange={e => setFormData({ ...formData, se: e.target.value ? Number(e.target.value) : '' })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.01" placeholder="Ex: 0.08" value={formData.se} onChange={e => setFormData({ ...formData, se: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5 flex justify-between">
                         <span>Sódio Na (cmolc)</span>
                         {extractedFields.has('na') && <span className="text-[9px] text-emerald-600 font-bold">✓</span>}
                       </label>
-                      <input type="number" step="0.01" placeholder="Ex: 0.03" value={formData.na} onChange={e => setFormData({ ...formData, na: e.target.value ? Number(e.target.value) : '' })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.01" placeholder="Ex: 0.03" value={formData.na} onChange={e => setFormData({ ...formData, na: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                     </div>
                   </div>
                 </div>
@@ -1431,15 +1465,15 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                     <div className="grid grid-cols-3 gap-2 text-xs">
                       <div>
                         <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Argila (%)</label>
-                        <input type="number" value={formData.clay} onChange={e => setFormData({ ...formData, clay: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-right font-bold text-emerald-800 dark:text-emerald-400" />
+                        <input type="number" placeholder="Ex: 38" value={formData.clay} onChange={e => setFormData({ ...formData, clay: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-right font-bold text-emerald-800 dark:text-emerald-400" />
                       </div>
                       <div>
                         <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Areia (%)</label>
-                        <input type="number" value={formData.sand} onChange={e => setFormData({ ...formData, sand: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-right text-slate-900 dark:text-zinc-100" />
+                        <input type="number" placeholder="Ex: 42" value={formData.sand} onChange={e => setFormData({ ...formData, sand: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-right text-slate-900 dark:text-zinc-100" />
                       </div>
                       <div>
                         <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Silte (%)</label>
-                        <input type="number" value={formData.silt} onChange={e => setFormData({ ...formData, silt: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-right text-slate-900 dark:text-zinc-100" />
+                        <input type="number" placeholder="Ex: 20" value={formData.silt} onChange={e => setFormData({ ...formData, silt: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-right text-slate-900 dark:text-zinc-100" />
                       </div>
                     </div>
                   </div>
@@ -1505,7 +1539,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                             step="0.1"
                             placeholder="Ex: 280.0 (Ciclo do S)"
                             value={formData.arylsulfatase}
-                            onChange={e => setFormData({ ...formData, arylsulfatase: e.target.value ? Number(e.target.value) : '' })}
+                            onChange={e => setFormData({ ...formData, arylsulfatase: e.target.value })}
                             className="w-full px-2.5 py-1.5 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-bold"
                           />
                           <span className="text-[10px] text-slate-500 dark:text-zinc-400 mt-1 block">Referência Embrapa: &gt; 350 (Alta)</span>
@@ -1521,7 +1555,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                             step="0.1"
                             placeholder="Ex: 145.0 (Ciclo do C)"
                             value={formData.betaGlucosidase}
-                            onChange={e => setFormData({ ...formData, betaGlucosidase: e.target.value ? Number(e.target.value) : '' })}
+                            onChange={e => setFormData({ ...formData, betaGlucosidase: e.target.value })}
                             className="w-full px-2.5 py-1.5 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-bold"
                           />
                           <span className="text-[10px] text-slate-500 dark:text-zinc-400 mt-1 block">Referência Embrapa: &gt; 170 (Alta)</span>
@@ -1537,7 +1571,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                             step="0.1"
                             placeholder="Ex: 580.0 (Ciclo do P)"
                             value={formData.acidPhosphatase}
-                            onChange={e => setFormData({ ...formData, acidPhosphatase: e.target.value ? Number(e.target.value) : '' })}
+                            onChange={e => setFormData({ ...formData, acidPhosphatase: e.target.value })}
                             className="w-full px-2.5 py-1.5 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-bold"
                           />
                           <span className="text-[10px] text-slate-500 dark:text-zinc-400 mt-1 block">Referência Embrapa: &gt; 600 (Alta)</span>
@@ -1697,6 +1731,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                   <label className="block text-slate-700 dark:text-zinc-300 font-semibold mb-1">Laboratório Emissor</label>
                   <input
                     type="text"
+                    placeholder="Ex: Nome do laboratório"
                     value={formData.lab}
                     onChange={e => setFormData({ ...formData, lab: e.target.value })}
                     className="w-full px-3 py-1.5 border border-slate-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-black text-slate-900 dark:text-zinc-100"
@@ -1707,6 +1742,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                   <label className="block text-slate-700 dark:text-zinc-300 font-semibold mb-1">Protocolo / Laudo</label>
                   <input
                     type="text"
+                    placeholder="Ex: LAU-2026-001"
                     value={formData.protocol}
                     onChange={e => setFormData({ ...formData, protocol: e.target.value })}
                     className="w-full px-3 py-1.5 border border-slate-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-mono"
@@ -1727,27 +1763,27 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">pH CaCl2 *</label>
-                      <input type="number" step="0.01" value={formData.ph} onChange={e => setFormData({ ...formData, ph: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-bold" />
+                      <input type="number" step="0.01" placeholder="Ex: 5.2" value={formData.ph} onChange={e => setFormData({ ...formData, ph: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-bold" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">pH H2O (Água)</label>
-                      <input type="number" step="0.01" placeholder="Ex: 5.8" value={formData.phH2O} onChange={e => setFormData({ ...formData, phH2O: e.target.value ? Number(e.target.value) : '' })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.01" placeholder="Ex: 5.8" value={formData.phH2O} onChange={e => setFormData({ ...formData, phH2O: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">pH SMP (Índice)</label>
-                      <input type="number" step="0.01" placeholder="Ex: 5.6" value={formData.phSmp} onChange={e => setFormData({ ...formData, phSmp: e.target.value ? Number(e.target.value) : '' })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.01" placeholder="Ex: 5.6" value={formData.phSmp} onChange={e => setFormData({ ...formData, phSmp: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">M.O. (g/dm³)</label>
-                      <input type="number" step="0.1" value={formData.mo} onChange={e => setFormData({ ...formData, mo: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-medium" />
+                      <input type="number" step="0.1" placeholder="Ex: 25" value={formData.mo} onChange={e => setFormData({ ...formData, mo: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-medium" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Al³⁺ (cmolc/dm³)</label>
-                      <input type="number" step="0.01" value={formData.al} onChange={e => setFormData({ ...formData, al: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.01" placeholder="Ex: 0.15" value={formData.al} onChange={e => setFormData({ ...formData, al: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">H+Al (cmolc/dm³)</label>
-                      <input type="number" step="0.01" value={formData.hAl} onChange={e => setFormData({ ...formData, hAl: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.01" placeholder="Ex: 3.5" value={formData.hAl} onChange={e => setFormData({ ...formData, hAl: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                     </div>
                   </div>
                 </div>
@@ -1761,23 +1797,23 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">P Mehlich-1 (mg/dm³)</label>
-                      <input type="number" step="0.1" value={formData.p} onChange={e => setFormData({ ...formData, p: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-bold text-amber-700 dark:text-amber-400" />
+                      <input type="number" step="0.1" placeholder="Ex: 12.0" value={formData.p} onChange={e => setFormData({ ...formData, p: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-bold text-amber-700 dark:text-amber-400" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">P Resina (mg/dm³)</label>
-                      <input type="number" step="0.1" placeholder="Ex: 15.0" value={formData.pResina} onChange={e => setFormData({ ...formData, pResina: e.target.value ? Number(e.target.value) : '' })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.1" placeholder="Ex: 15.0" value={formData.pResina} onChange={e => setFormData({ ...formData, pResina: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">P Mehlich-3 (mg/dm³)</label>
-                      <input type="number" step="0.1" placeholder="Ex: 14.0" value={formData.pMehlich3} onChange={e => setFormData({ ...formData, pMehlich3: e.target.value ? Number(e.target.value) : '' })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.1" placeholder="Ex: 14.0" value={formData.pMehlich3} onChange={e => setFormData({ ...formData, pMehlich3: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">P Remanescente (mg/L)</label>
-                      <input type="number" step="0.1" placeholder="P-Rem" value={formData.pRem} onChange={e => setFormData({ ...formData, pRem: e.target.value ? Number(e.target.value) : '' })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.1" placeholder="P-Rem" value={formData.pRem} onChange={e => setFormData({ ...formData, pRem: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Remanescente 3 (mg/L)</label>
-                      <input type="number" step="0.1" placeholder="Rem-3" value={formData.pRem3} onChange={e => setFormData({ ...formData, pRem3: e.target.value ? Number(e.target.value) : '' })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.1" placeholder="Rem-3" value={formData.pRem3} onChange={e => setFormData({ ...formData, pRem3: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-0.5">
@@ -1808,7 +1844,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                         step={kUnit === 'cmolc' ? '0.01' : '1'}
                         placeholder={kUnit === 'cmolc' ? 'Ex: 0.22' : 'Ex: 86'}
                         value={formData.k}
-                        onChange={e => setFormData({ ...formData, k: e.target.value === '' ? '' : Number(e.target.value) })}
+                        onChange={e => setFormData({ ...formData, k: e.target.value })}
                         className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-medium"
                       />
                       <div className="text-[9px] text-slate-400 dark:text-zinc-500 mt-0.5 flex justify-between">
@@ -1822,15 +1858,15 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Ca (cmolc/dm³)</label>
-                      <input type="number" step="0.01" value={formData.ca} onChange={e => setFormData({ ...formData, ca: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-bold text-emerald-800 dark:text-emerald-400" />
+                      <input type="number" step="0.01" placeholder="Ex: 2.8" value={formData.ca} onChange={e => setFormData({ ...formData, ca: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-bold text-emerald-800 dark:text-emerald-400" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Mg (cmolc/dm³)</label>
-                      <input type="number" step="0.01" value={formData.mg} onChange={e => setFormData({ ...formData, mg: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-bold text-emerald-800 dark:text-emerald-400" />
+                      <input type="number" step="0.01" placeholder="Ex: 0.9" value={formData.mg} onChange={e => setFormData({ ...formData, mg: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-bold text-emerald-800 dark:text-emerald-400" />
                     </div>
                     <div className="col-span-2">
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">S-SO4 (mg/dm³)</label>
-                      <input type="number" step="0.1" value={formData.s} onChange={e => setFormData({ ...formData, s: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.1" placeholder="Ex: 6.0" value={formData.s} onChange={e => setFormData({ ...formData, s: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                     </div>
                   </div>
                 </div>
@@ -1844,37 +1880,37 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                   <div className="grid grid-cols-3 gap-2">
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Argila (%)</label>
-                      <input type="number" value={formData.clay} onChange={e => setFormData({ ...formData, clay: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-right font-bold text-emerald-800 dark:text-emerald-400" />
+                      <input type="number" placeholder="Ex: 38" value={formData.clay} onChange={e => setFormData({ ...formData, clay: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-right font-bold text-emerald-800 dark:text-emerald-400" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Areia (%)</label>
-                      <input type="number" value={formData.sand} onChange={e => setFormData({ ...formData, sand: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-right" />
+                      <input type="number" placeholder="Ex: 42" value={formData.sand} onChange={e => setFormData({ ...formData, sand: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-right" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Silte (%)</label>
-                      <input type="number" value={formData.silt} onChange={e => setFormData({ ...formData, silt: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-right" />
+                      <input type="number" placeholder="Ex: 20" value={formData.silt} onChange={e => setFormData({ ...formData, silt: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-right" />
                     </div>
                   </div>
                   <div className="grid grid-cols-3 gap-2 pt-1">
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Ferro (Fe)</label>
-                      <input type="number" step="0.1" value={formData.fe} onChange={e => setFormData({ ...formData, fe: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black font-semibold text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.1" placeholder="Ex: 45" value={formData.fe} onChange={e => setFormData({ ...formData, fe: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black font-semibold text-slate-900 dark:text-zinc-100" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Manganês (Mn)</label>
-                      <input type="number" step="0.1" value={formData.mn} onChange={e => setFormData({ ...formData, mn: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black font-semibold text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.1" placeholder="Ex: 18" value={formData.mn} onChange={e => setFormData({ ...formData, mn: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black font-semibold text-slate-900 dark:text-zinc-100" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Zinco (Zn)</label>
-                      <input type="number" step="0.01" value={formData.zn} onChange={e => setFormData({ ...formData, zn: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.01" placeholder="Ex: 2.4" value={formData.zn} onChange={e => setFormData({ ...formData, zn: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                     </div>
                     <div>
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Boro (B)</label>
-                      <input type="number" step="0.01" value={formData.b} onChange={e => setFormData({ ...formData, b: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.01" placeholder="Ex: 0.35" value={formData.b} onChange={e => setFormData({ ...formData, b: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                     </div>
                     <div className="col-span-2">
                       <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Cobre (Cu)</label>
-                      <input type="number" step="0.01" value={formData.cu} onChange={e => setFormData({ ...formData, cu: Number(e.target.value) })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                      <input type="number" step="0.01" placeholder="Ex: 1.2" value={formData.cu} onChange={e => setFormData({ ...formData, cu: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                     </div>
                   </div>
                 </div>
@@ -1889,23 +1925,23 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                   <div>
                     <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Silício Si (mg/dm³)</label>
-                    <input type="number" step="0.1" placeholder="Ex: 15.0" value={formData.si} onChange={e => setFormData({ ...formData, si: e.target.value ? Number(e.target.value) : '' })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                    <input type="number" step="0.1" placeholder="Ex: 15.0" value={formData.si} onChange={e => setFormData({ ...formData, si: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                   </div>
                   <div>
                     <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Cobalto Co (mg/dm³)</label>
-                    <input type="number" step="0.01" placeholder="Ex: 0.15" value={formData.co} onChange={e => setFormData({ ...formData, co: e.target.value ? Number(e.target.value) : '' })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                    <input type="number" step="0.01" placeholder="Ex: 0.15" value={formData.co} onChange={e => setFormData({ ...formData, co: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                   </div>
                   <div>
                     <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Níquel Ni (mg/dm³)</label>
-                    <input type="number" step="0.01" placeholder="Ex: 0.25" value={formData.ni} onChange={e => setFormData({ ...formData, ni: e.target.value ? Number(e.target.value) : '' })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                    <input type="number" step="0.01" placeholder="Ex: 0.25" value={formData.ni} onChange={e => setFormData({ ...formData, ni: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                   </div>
                   <div>
                     <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Selênio Se (mg/dm³)</label>
-                    <input type="number" step="0.01" placeholder="Ex: 0.08" value={formData.se} onChange={e => setFormData({ ...formData, se: e.target.value ? Number(e.target.value) : '' })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                    <input type="number" step="0.01" placeholder="Ex: 0.08" value={formData.se} onChange={e => setFormData({ ...formData, se: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                   </div>
                   <div>
                     <label className="block text-slate-600 dark:text-zinc-400 text-[10px] mb-0.5">Sódio Na (cmolc)</label>
-                    <input type="number" step="0.01" placeholder="Ex: 0.03" value={formData.na} onChange={e => setFormData({ ...formData, na: e.target.value ? Number(e.target.value) : '' })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
+                    <input type="number" step="0.01" placeholder="Ex: 0.03" value={formData.na} onChange={e => setFormData({ ...formData, na: e.target.value })} className="w-full px-2 py-1 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100" />
                   </div>
                 </div>
               </div>
@@ -1960,7 +1996,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                         step="0.1"
                         placeholder="Ex: 280.0 (Ciclo S)"
                         value={formData.arylsulfatase}
-                        onChange={e => setFormData({ ...formData, arylsulfatase: e.target.value ? Number(e.target.value) : '' })}
+                        onChange={e => setFormData({ ...formData, arylsulfatase: e.target.value })}
                         className="w-full px-2.5 py-1.5 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-bold"
                       />
                       <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Ref. Embrapa: &gt; 350 (Alta)</span>
@@ -1976,7 +2012,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                         step="0.1"
                         placeholder="Ex: 145.0 (Ciclo C)"
                         value={formData.betaGlucosidase}
-                        onChange={e => setFormData({ ...formData, betaGlucosidase: e.target.value ? Number(e.target.value) : '' })}
+                        onChange={e => setFormData({ ...formData, betaGlucosidase: e.target.value })}
                         className="w-full px-2.5 py-1.5 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-bold"
                       />
                       <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Ref. Embrapa: &gt; 170 (Alta)</span>
@@ -1992,7 +2028,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                         step="0.1"
                         placeholder="Ex: 580.0 (Ciclo P)"
                         value={formData.acidPhosphatase}
-                        onChange={e => setFormData({ ...formData, acidPhosphatase: e.target.value ? Number(e.target.value) : '' })}
+                        onChange={e => setFormData({ ...formData, acidPhosphatase: e.target.value })}
                         className="w-full px-2.5 py-1.5 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100 font-bold"
                       />
                       <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Ref. Embrapa: &gt; 600 (Alta)</span>
@@ -2008,7 +2044,7 @@ export const SoilAnalysisModule: React.FC<SoilAnalysisModuleProps> = ({
                         step="0.01"
                         placeholder="Automático ou Laudo"
                         value={formData.iqsBio}
-                        onChange={e => setFormData({ ...formData, iqsBio: e.target.value ? Number(e.target.value) : '' })}
+                        onChange={e => setFormData({ ...formData, iqsBio: e.target.value })}
                         className="w-full px-2.5 py-1.5 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100"
                       />
                       <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Calculado automaticamente</span>

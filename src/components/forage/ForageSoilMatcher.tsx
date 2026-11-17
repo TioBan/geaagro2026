@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { SoilFertilityLevel, SoilDrainageLevel, ForageItem, ForageCategory } from '../../types/forage';
+import React, { useState, useMemo } from 'react';
+import { SoilFertilityLevel, SoilDrainageLevel, ForageItem } from '../../types/forage';
 import { filterForagesBySoilAndClimate } from '../../data/foragesCatalogData';
 import { Compass, Sparkles, Award, ArrowRight, CheckCircle2, AlertTriangle, Layers, Droplets } from 'lucide-react';
 
@@ -12,15 +12,17 @@ export const ForageSoilMatcher: React.FC<ForageSoilMatcherProps> = ({ onSelectFo
   const [drainage, setDrainage] = useState<SoilDrainageLevel>('bem_drenado');
   const [animalCategory, setAnimalCategory] = useState<string>('Bovinos de Corte');
   const [isIlpf, setIsIlpf] = useState<boolean>(false);
-  const [category, setCategory] = useState<ForageCategory | 'todas'>('todas');
 
-  const matches = filterForagesBySoilAndClimate({
-    fertility,
-    drainage,
-    animalType: animalCategory,
-    category: category === 'todas' ? undefined : category,
-    isIlpf,
-  });
+  const matches = useMemo(
+    () =>
+      filterForagesBySoilAndClimate({
+        fertility,
+        drainage,
+        animalType: animalCategory,
+        isIlpf,
+      }),
+    [fertility, drainage, animalCategory, isIlpf]
+  );
 
   return (
     <div className="space-y-6">

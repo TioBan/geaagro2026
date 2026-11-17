@@ -449,8 +449,8 @@ export function printSoilDiseaseReport(
       <div class="grid">
         <div class="card">
           <div class="label">Propriedade & Localização</div>
-          <div class="value">${prop?.farmName || 'Fazenda GeaAgro'} - ${prop?.municipality || 'Cascavel'}/${prop?.state || 'PR'}</div>
-          <div style="font-size: 12px; margin-top: 4px;">CREA: ${prop?.crea || 'N/A'} | GPS: ${occ.gpsPoint?.lat || -24.9560}, ${occ.gpsPoint?.lng || -53.4560}</div>
+          <div class="value">${prop ? `${prop.farmName} - ${prop.municipality}/${prop.state}` : 'Propriedade não informada'}</div>
+          <div style="font-size: 12px; margin-top: 4px;">CREA: ${prop?.crea || 'N/A'} | GPS: ${occ.gpsPoint ? `${occ.gpsPoint.lat}, ${occ.gpsPoint.lng}` : 'Não informado'}</div>
         </div>
         <div class="card">
           <div class="label">Talhão & Cultura</div>

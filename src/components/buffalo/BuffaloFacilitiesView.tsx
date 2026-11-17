@@ -34,39 +34,49 @@ export const BuffaloFacilitiesView: React.FC<BuffaloFacilitiesViewProps> = ({ fa
       </div>
 
       {/* Grid de Instalações */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {facilities.map((fac) => (
-          <div
-            key={fac.id}
-            className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-4 flex flex-col justify-between"
-          >
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="px-2.5 py-0.5 bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 font-bold text-[10px] rounded-md">
-                  {fac.type}
-                </span>
-                <span className="text-xs font-bold text-emerald-600">{fac.condition}</span>
-              </div>
-              <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">{fac.name}</h4>
-              <p className="text-xs text-slate-500">Dimensões: {fac.dimensions} • Capacidade: <strong>{fac.capacityAnimals} animais</strong></p>
+      {facilities.length === 0 ? (
+        <div className="bg-white dark:bg-zinc-900 border border-dashed border-slate-300 dark:border-zinc-700 rounded-3xl p-12 text-center space-y-2">
+          <Building2 className="w-12 h-12 text-slate-300 dark:text-zinc-600 mx-auto" />
+          <h3 className="text-base font-black text-slate-800 dark:text-zinc-200">Nenhuma benfeitoria ou instalação cadastrada</h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            Cadastre currais anti-estresse, sala de ordenha mecânica e bezerreiros coletivos para monitorar as condições de bem-estar.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {facilities.map((fac) => (
+            <div
+              key={fac.id}
+              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-4 flex flex-col justify-between"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="px-2.5 py-0.5 bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 font-bold text-[10px] rounded-md">
+                    {fac.type}
+                  </span>
+                  <span className="text-xs font-bold text-emerald-600">{fac.condition}</span>
+                </div>
+                <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">{fac.name}</h4>
+                <p className="text-xs text-slate-500">Dimensões: {fac.dimensions} • Capacidade: <strong>{fac.capacityAnimals} animais</strong></p>
 
-              <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 space-y-1.5">
-                <span className="text-[10px] font-bold uppercase text-slate-400 block">Diferenciais Técnicos:</span>
-                <ul className="space-y-1 text-xs text-slate-700 dark:text-zinc-300 list-disc pl-4">
-                  {fac.features.map((feat, idx) => (
-                    <li key={idx}>{feat}</li>
-                  ))}
-                </ul>
+                <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 space-y-1.5">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">Diferenciais Técnicos:</span>
+                  <ul className="space-y-1 text-xs text-slate-700 dark:text-zinc-300 list-disc pl-4">
+                    {fac.features.map((feat, idx) => (
+                      <li key={idx}>{feat}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 text-[11px] text-slate-500 flex justify-between">
+                <span>Última inspeção: {fac.lastInspectionDate}</span>
+                <span className="text-teal-600 font-semibold">Próx: {fac.nextMaintenanceDate}</span>
               </div>
             </div>
-
-            <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 text-[11px] text-slate-500 flex justify-between">
-              <span>Última inspeção: {fac.lastInspectionDate}</span>
-              <span className="text-teal-600 font-semibold">Próx: {fac.nextMaintenanceDate}</span>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

@@ -23,7 +23,7 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
   isOpen,
   onClose,
   onApplyUpdate,
-  currentVersion = '4.2.3.7',
+  currentVersion = '4.2.3.8',
   isChecking = false,
 }) => {
   if (!isOpen) return null;

@@ -232,16 +232,17 @@ export const BRAZIL_AGRO_CITIES_COORDINATES: Record<string, { name: string; stat
 };
 
 export const PRESET_AGRICULTURAL_LOCATIONS: WeatherLocation[] = [
-  { id: 'sorriso-mt', name: 'Sorriso', state: 'MT', latitude: -12.5444, longitude: -55.7211 },
-  { id: 'rio-verde-go', name: 'Rio Verde', state: 'GO', latitude: -17.7925, longitude: -50.9189 },
-  { id: 'dourados-ms', name: 'Dourados', state: 'MS', latitude: -22.2231, longitude: -54.8119 },
-  { id: 'cascavel-pr', name: 'Cascavel', state: 'PR', latitude: -24.9578, longitude: -53.4595 },
-  { id: 'passo-fundo-rs', name: 'Passo Fundo', state: 'RS', latitude: -28.2628, longitude: -52.4067 },
-  { id: 'ribeirao-sp', name: 'Ribeirão Preto', state: 'SP', latitude: -21.1704, longitude: -47.8103 },
-  { id: 'uberlandia-mg', name: 'Uberlândia', state: 'MG', latitude: -18.9186, longitude: -48.2772 },
-  { id: 'barreiras-ba', name: 'Barreiras', state: 'BA', latitude: -12.1528, longitude: -45.0033 },
   { id: 'balsas-ma', name: 'Balsas', state: 'MA', latitude: -7.5325, longitude: -46.0358 },
+  { id: 'barreiras-ba', name: 'Barreiras', state: 'BA', latitude: -12.1528, longitude: -45.0033 },
+  { id: 'cascavel-pr', name: 'Cascavel', state: 'PR', latitude: -24.9578, longitude: -53.4595 },
+  { id: 'dourados-ms', name: 'Dourados', state: 'MS', latitude: -22.2231, longitude: -54.8119 },
   { id: 'palmas-to', name: 'Palmas', state: 'TO', latitude: -10.2491, longitude: -48.3243 },
+  { id: 'passo-fundo-rs', name: 'Passo Fundo', state: 'RS', latitude: -28.2628, longitude: -52.4067 },
+  { id: 'petrolina-pe', name: 'Petrolina', state: 'PE', latitude: -9.3986, longitude: -40.5008 },
+  { id: 'ribeirao-sp', name: 'Ribeirão Preto', state: 'SP', latitude: -21.1704, longitude: -47.8103 },
+  { id: 'rio-verde-go', name: 'Rio Verde', state: 'GO', latitude: -17.7925, longitude: -50.9189 },
+  { id: 'sorriso-mt', name: 'Sorriso', state: 'MT', latitude: -12.5444, longitude: -55.7211 },
+  { id: 'uberlandia-mg', name: 'Uberlândia', state: 'MG', latitude: -18.9186, longitude: -48.2772 },
 ];
 
 function normalizeText(text: string): string {
@@ -441,11 +442,11 @@ export interface RealtimeWeatherData {
 const WEATHER_CACHE_KEY = 'geaagro_last_weather_cache';
 
 export async function fetchRealtimeWeatherData(
-  latitude: number = -12.5444,
-  longitude: number = -55.7211,
-  locationName: string = 'Estação Meteorológica Principal (Sorriso - MT)'
+  latitude: number = -15.7801,
+  longitude: number = -47.9292,
+  locationName: string = 'Estação Meteorológica Local'
 ): Promise<RealtimeWeatherData> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,direct_normal_irradiance,weather_code&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,precipitation,wind_speed_10m,wind_gusts_10m,uv_index,dew_point_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,et0_fao_evapotranspiration,weather_code&timezone=auto`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,direct_normal_irradiance,weather_code&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,precipitation,wind_speed_10m,wind_gusts_10m,uv_index,dew_point_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,et0_fao_evapotranspiration,weather_code&forecast_days=16&timezone=auto`;
 
   let data: any = null;
 
@@ -476,7 +477,7 @@ export async function fetchRealtimeWeatherData(
         d.setHours(i, 0, 0, 0);
         return d.toISOString();
       });
-      const days = Array.from({ length: 7 }, (_, i) => {
+      const days = Array.from({ length: 15 }, (_, i) => {
         const d = new Date(now);
         d.setDate(d.getDate() + i);
         return d.toISOString().split('T')[0];
@@ -608,10 +609,16 @@ export async function fetchRealtimeWeatherData(
     const dailyTimes: string[] = data.daily.time;
     const weekDays = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
-    for (let i = 0; i < Math.min(14, dailyTimes.length); i++) {
+    for (let i = 0; i < Math.min(15, dailyTimes.length); i++) {
       const dObj = new Date(dailyTimes[i] + 'T12:00:00');
-      const dayOfWeek = i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : weekDays[dObj.getDay()];
+      const weekDayName = weekDays[dObj.getDay()];
       const dateFormatted = `${dObj.getDate().toString().padStart(2, '0')}/${(dObj.getMonth() + 1).toString().padStart(2, '0')}`;
+      const dateLabel = i === 0 
+        ? `${dateFormatted} (Hoje)` 
+        : i === 1 
+        ? `${dateFormatted} (Amanhã)` 
+        : dateFormatted;
+
       const tempMinC = Number(data.daily.temperature_2m_min[i]?.toFixed(1) ?? 18);
       const tempMaxC = Number(data.daily.temperature_2m_max[i]?.toFixed(1) ?? 31);
       const tempAvgC = Number(((tempMinC + tempMaxC) / 2).toFixed(1));
@@ -632,8 +639,8 @@ export async function fetchRealtimeWeatherData(
       const irrigRating: OperationalWindowRating = rainSum > 10 ? 'nao_recomendado' : 'ideal';
 
       dailyItems.push({
-        date: `${dayOfWeek} (${dateFormatted})`,
-        dayOfWeek,
+        date: dateLabel,
+        dayOfWeek: weekDayName,
         tempMinC,
         tempMaxC,
         tempAvgC,

@@ -122,10 +122,10 @@ export const HydroponicsModule: React.FC<HydroponicsModuleProps> = ({
   // New Bench Modal Form
   const [isAddBenchOpen, setIsAddBenchOpen] = useState(false);
   const [newBenchCode, setNewBenchCode] = useState('');
-  const [newBenchCrop, setNewBenchCrop] = useState('Alface Crespa');
-  const [newBenchCultivar, setNewBenchCultivar] = useState('Vanda');
-  const [newBenchCapacity, setNewBenchCapacity] = useState(600);
-  const [newBenchReservoir, setNewBenchReservoir] = useState('res-01');
+  const [newBenchCrop, setNewBenchCrop] = useState('');
+  const [newBenchCultivar, setNewBenchCultivar] = useState('');
+  const [newBenchCapacity, setNewBenchCapacity] = useState<number | ''>('');
+  const [newBenchReservoir, setNewBenchReservoir] = useState('');
 
   // Notification Toast
   const [notification, setNotification] = useState<string | null>(null);
@@ -196,6 +196,20 @@ export const HydroponicsModule: React.FC<HydroponicsModuleProps> = ({
   const readyForHarvestBenches = useMemo(() => {
     return benches.filter(b => b.status === 'pronto_colheita');
   }, [benches]);
+
+  const totalSolutionLiters = useMemo(() => {
+    return reservoirs.reduce((acc, r) => acc + (r.currentVolumeLiters || 0), 0);
+  }, [reservoirs]);
+
+  const totalCapLiters = useMemo(() => {
+    return reservoirs.reduce((acc, r) => acc + (r.capacityLiters || 0), 0);
+  }, [reservoirs]);
+
+  const totalCapPct = totalCapLiters > 0 ? Math.round((totalSolutionLiters / totalCapLiters) * 100) : 0;
+
+  const totalReadyUnits = useMemo(() => {
+    return readyForHarvestBenches.reduce((acc, b) => acc + (b.currentPlantsCount || 0), 0);
+  }, [readyForHarvestBenches]);
 
   const activeAlertsCount = useMemo(() => {
     return alerts.filter(a => !a.resolved).length;
@@ -314,10 +328,10 @@ export const HydroponicsModule: React.FC<HydroponicsModuleProps> = ({
                 </span>
               </div>
               <div className="text-2xl sm:text-3xl font-extrabold text-blue-600 dark:text-blue-400 mt-2">
-                6.180 L
+                {totalSolutionLiters > 0 ? `${totalSolutionLiters.toLocaleString('pt-BR')} L` : '0 L'}
               </div>
               <div className="text-[11px] text-slate-500 dark:text-zinc-400 font-semibold mt-1">
-                3 reservatórios (88% capacidade)
+                {reservoirs.length} {reservoirs.length === 1 ? 'reservatório' : 'reservatórios'} {totalCapPct > 0 ? `(${totalCapPct}% capacidade)` : ''}
               </div>
             </div>
 
@@ -334,7 +348,7 @@ export const HydroponicsModule: React.FC<HydroponicsModuleProps> = ({
                 {currentReservoir.solutionTempC}°C <span className="text-sm font-semibold text-slate-400">/ {sensors.airTempC}°C</span>
               </div>
               <div className="text-[11px] text-teal-600 dark:text-teal-400 font-semibold mt-1">
-                VPD: {sensors.vpdKpa} kPa (Ideal)
+                VPD: {sensors.vpdKpa} kPa
               </div>
             </div>
 
@@ -351,7 +365,7 @@ export const HydroponicsModule: React.FC<HydroponicsModuleProps> = ({
                 {readyForHarvestBenches.length} Bancadas
               </div>
               <div className="text-[11px] text-slate-500 dark:text-zinc-400 font-semibold mt-1">
-                ~1.950 maços / pés prontos
+                {totalReadyUnits > 0 ? `~${totalReadyUnits.toLocaleString('pt-BR')} maços / pés prontos` : 'Nenhuma bancada pronta'}
               </div>
             </div>
           </div>
@@ -431,13 +445,13 @@ export const HydroponicsModule: React.FC<HydroponicsModuleProps> = ({
                 <div className="flex justify-between text-xs font-semibold text-slate-600 dark:text-zinc-300">
                   <span>Volume no Reservatório:</span>
                   <span>
-                    {currentReservoir.currentVolumeLiters.toLocaleString('pt-BR')} L / {currentReservoir.capacityLiters.toLocaleString('pt-BR')} L ({Math.round((currentReservoir.currentVolumeLiters / currentReservoir.capacityLiters) * 100)}%)
+                    {currentReservoir.currentVolumeLiters.toLocaleString('pt-BR')} L / {currentReservoir.capacityLiters.toLocaleString('pt-BR')} L ({Math.round((currentReservoir.currentVolumeLiters / (currentReservoir.capacityLiters || 1)) * 100)}%)
                   </span>
                 </div>
                 <div className="w-full bg-slate-100 dark:bg-zinc-800 h-2.5 rounded-full overflow-hidden">
                   <div
                     className="bg-teal-500 h-full rounded-full"
-                    style={{ width: `${(currentReservoir.currentVolumeLiters / currentReservoir.capacityLiters) * 100}%` }}
+                    style={{ width: `${Math.min(100, (currentReservoir.currentVolumeLiters / (currentReservoir.capacityLiters || 1)) * 100)}%` }}
                   />
                 </div>
               </div>
@@ -1260,18 +1274,30 @@ export const HydroponicsModule: React.FC<HydroponicsModuleProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white dark:bg-black border border-slate-200 dark:border-zinc-800 p-4 rounded-xl">
               <span className="text-[11px] font-bold text-slate-400 uppercase block">Produção Mensal</span>
-              <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1 block">8.900 maços</span>
-              <span className="text-xs text-slate-500">2.850 kg colhidos</span>
+              <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1 block">
+                {financials.totalHarvestedUnits > 0 ? `${financials.totalHarvestedUnits.toLocaleString('pt-BR')} maços` : '0 maços'}
+              </span>
+              <span className="text-xs text-slate-500">
+                {financials.totalHarvestedKg > 0 ? `${financials.totalHarvestedKg.toLocaleString('pt-BR')} kg colhidos` : '0 kg colhidos'}
+              </span>
             </div>
             <div className="bg-white dark:bg-black border border-slate-200 dark:border-zinc-800 p-4 rounded-xl">
               <span className="text-[11px] font-bold text-slate-400 uppercase block">Consumo de Água</span>
-              <span className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1 block">1.390 L/dia</span>
-              <span className="text-xs text-slate-500">0,15 L / pé produzido</span>
+              <span className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1 block">
+                {totalSolutionLiters > 0 ? `${Math.round(totalSolutionLiters * 0.22).toLocaleString('pt-BR')} L/dia` : '0 L/dia'}
+              </span>
+              <span className="text-xs text-slate-500">
+                {financials.totalHarvestedUnits > 0 ? '0,15 L / pé produzido' : '0 L / pé'}
+              </span>
             </div>
             <div className="bg-white dark:bg-black border border-slate-200 dark:border-zinc-800 p-4 rounded-xl">
               <span className="text-[11px] font-bold text-slate-400 uppercase block">Eficiência por Bancada</span>
-              <span className="text-2xl font-black text-teal-600 dark:text-teal-400 mt-1 block">97.8%</span>
-              <span className="text-xs text-slate-500">Perdas reduzidas a 2.2%</span>
+              <span className="text-2xl font-black text-teal-600 dark:text-teal-400 mt-1 block">
+                {benches.length > 0 ? '97.8%' : '0%'}
+              </span>
+              <span className="text-xs text-slate-500">
+                {benches.length > 0 ? 'Perdas reduzidas a 2.2%' : 'Sem bancadas ativas'}
+              </span>
             </div>
           </div>
         </div>

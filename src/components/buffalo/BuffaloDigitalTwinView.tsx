@@ -44,14 +44,14 @@ export const BuffaloDigitalTwinView: React.FC<BuffaloDigitalTwinViewProps> = ({
   
   // Modal de Adicionar Pesagem
   const [showWeighingModal, setShowWeighingModal] = useState(false);
-  const [newWeightKg, setNewWeightKg] = useState(animal?.currentWeightKg || 650);
-  const [newBcs, setNewBcs] = useState(animal?.bodyConditionScore || 3.5);
+  const [newWeightKg, setNewWeightKg] = useState(animal?.currentWeightKg || 0);
+  const [newBcs, setNewBcs] = useState(animal?.bodyConditionScore || 3.0);
 
   // Modal de Adicionar Controle Leiteiro
   const [showMilkModal, setShowMilkModal] = useState(false);
-  const [newMilkLiters, setNewMilkLiters] = useState(15.0);
-  const [newFatPct, setNewFatPct] = useState(7.8);
-  const [newProteinPct, setNewProteinPct] = useState(4.4);
+  const [newMilkLiters, setNewMilkLiters] = useState(animal?.averageDailyMilkLiters || 0);
+  const [newFatPct, setNewFatPct] = useState(animal?.averageFatPct || 0);
+  const [newProteinPct, setNewProteinPct] = useState(animal?.averageProteinPct || 0);
 
   if (!animal) {
     return (

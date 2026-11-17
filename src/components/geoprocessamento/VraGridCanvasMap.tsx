@@ -212,7 +212,7 @@ export const VraGridCanvasMap: React.FC<VraGridCanvasMapProps> = ({
   return (
     <div
       className={`relative rounded-3xl overflow-hidden border border-slate-200 dark:border-zinc-800 bg-slate-900 shadow-xl flex flex-col transition-all ${
-        isFullscreen ? 'fixed inset-4 z-[3000] h-[calc(100vh-2rem)]' : ''
+        isFullscreen ? 'fixed inset-4 z-[3000] h-[calc(100vh-2rem)]' : 'isolate z-0'
       }`}
       style={{ height: isFullscreen ? undefined : height }}
     >

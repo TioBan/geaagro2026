@@ -7,21 +7,12 @@ import {
   Scale,
   ArrowLeftRight,
   FlaskConical,
-  Leaf,
-  Layers,
   Sparkles,
-  Droplets,
   Calendar,
   CheckCircle2,
   AlertTriangle,
   Info,
-  Tractor,
-  ShieldCheck,
-  ChevronDown,
-  Search,
   Printer,
-  Compass,
-  ArrowRight,
   Award,
 } from 'lucide-react';
 
@@ -49,7 +40,6 @@ export const ForageSideBySideCompareModal: React.FC<ForageSideBySideCompareModal
   );
 
   const [activeTab, setActiveTab] = useState<'solo_adubacao' | 'nutricao_bromatologia' | 'sintese_veredito' | 'manejo_fenologia'>('solo_adubacao');
-  const [searchBQuery, setSearchBQuery] = useState<string>('');
 
   const forageA = FORAGES_CATALOG.find(f => f.id === forageAId) || primaryForage;
   const forageB = FORAGES_CATALOG.find(f => f.id === forageBId) || FORAGES_CATALOG[1];
@@ -63,14 +53,6 @@ export const ForageSideBySideCompareModal: React.FC<ForageSideBySideCompareModal
     setForageAId(forageBId);
     setForageBId(temp);
   };
-
-  const filteredForagesForB = FORAGES_CATALOG.filter(
-    f =>
-      f.id !== forageAId &&
-      (f.commonName.toLowerCase().includes(searchBQuery.toLowerCase()) ||
-        f.cultivar.toLowerCase().includes(searchBQuery.toLowerCase()) ||
-        f.scientificName.toLowerCase().includes(searchBQuery.toLowerCase()))
-  );
 
   const handlePrint = () => {
     window.print();

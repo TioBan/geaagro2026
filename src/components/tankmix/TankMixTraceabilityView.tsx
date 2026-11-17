@@ -2,39 +2,20 @@ import React, { useState } from 'react';
 import {
   Tractor,
   Calendar,
-  Clock,
-  User,
-  MapPin,
   ShieldCheck,
-  AlertTriangle,
-  CheckCircle2,
-  Camera,
   FileText,
-  Plus,
   Trash2,
-  Layers,
-  Thermometer,
-  Droplets,
-  Wind,
-  Zap,
 } from 'lucide-react';
-import { SprayApplicationRecord, TankSelectedProduct, WeatherCondition, CompatibilityRating } from '../../types/tankMix';
-import { TANKMIX_PRODUCTS_DATABASE } from '../../data/tankMixData';
+import { SprayApplicationRecord } from '../../types/tankMix';
 
 interface Props {
   applications: SprayApplicationRecord[];
-  onAddApplication: (record: SprayApplicationRecord) => void;
   onDeleteApplication: (id: string) => void;
-  farms: { id: string; name: string }[];
-  currentFarmId: string;
 }
 
 export const TankMixTraceabilityView: React.FC<Props> = ({
   applications,
-  onAddApplication,
   onDeleteApplication,
-  farms,
-  currentFarmId,
 }) => {
   const [selectedAppDetail, setSelectedAppDetail] = useState<SprayApplicationRecord | null>(null);
 

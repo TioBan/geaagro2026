@@ -1,7 +1,7 @@
 import React from 'react';
 import { ForageItem } from '../../types/forage';
 import { FORAGES_CATALOG } from '../../data/foragesCatalogData';
-import { Scale, X, Sparkles, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Scale, X, ArrowRight } from 'lucide-react';
 
 interface ForageComparatorProps {
   selectedIds: string[];

@@ -42,7 +42,7 @@ export interface GeoprocessamentoPlotState {
   estimatedYieldKgHa: number;
   yieldPotentialPct: number; // 0-100%
   // Integrations
-  phenologyStage: 'Plantio' | 'Emergência' | 'Desenvolvimento Vegetativo' | 'Florescimento' | 'Enchimento de Grãos' | 'Maturação';
+  phenologyStage: 'Plantio' | 'Emergência' | 'Desenvolvimento Vegetativo' | 'Florescimento' | 'Enchimento de Grãos' | 'Maturação' | 'Aguardando monitoramento' | 'Não informado';
   gddAccumulated: number;
   irrigationDeficitMm: number;
   soilMoisturePct: number;

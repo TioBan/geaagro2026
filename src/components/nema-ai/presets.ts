@@ -11,32 +11,50 @@ export const DOMAINS_CONFIG: DomainOption[] = [
   {
     id: 'geral',
     label: 'Agronomia',
-    sublabel: 'Grandes Culturas',
+    sublabel: 'Culturas & Campo',
     defaultCrop: 'Soja',
   },
   {
     id: 'fertilidade',
     label: 'Solos & Nutrição',
-    sublabel: 'Fertilidade & BioAS',
+    sublabel: 'Adubação & BioAS',
     defaultCrop: 'Milho',
   },
   {
     id: 'nematologia',
     label: 'Fitossanidade',
-    sublabel: 'Nematoides & Patol.',
+    sublabel: 'Nema, Doenças & Rec.',
     defaultCrop: 'Soja',
   },
   {
     id: 'pecuaria',
-    label: 'Pecuária',
-    sublabel: 'Corte, Leite & Pastos',
+    label: 'Pecuária & Vet',
+    sublabel: 'Bovino, Suíno & Búfalo',
     defaultCrop: 'Brachiaria brizantha',
   },
   {
     id: 'avicultura',
     label: 'Avicultura',
-    sublabel: 'Corte, Ovos & Amb.',
+    sublabel: 'Corte, Postura & Amb.',
     defaultCrop: 'Frango de Corte',
+  },
+  {
+    id: 'geoprocessamento',
+    label: 'Geo, NDVI & Máquinas',
+    sublabel: 'Plantab. & Seringueira',
+    defaultCrop: 'Seringueira (Hevea)',
+  },
+  {
+    id: 'pericia_avaliacao',
+    label: 'Perícia & Avaliação',
+    sublabel: 'NBR 14653-3 & Laudos',
+    defaultCrop: 'Imóvel Rural',
+  },
+  {
+    id: 'ensino_pesquisa',
+    label: 'Ensino & Pesquisa',
+    sublabel: 'Educação & Dúvidas',
+    defaultCrop: 'Pesquisa Agrícola',
   },
 ];
 
@@ -44,91 +62,145 @@ export const PRESET_PROMPTS: Record<AIDomain, { title: string; prompt: string }[
   geral: [
     {
       title: 'Planejamento de Semeadura',
-      prompt: 'Como planejar a população de plantas, espaçamento e época de plantio da Soja/Milho frente às previsões climáticas de El Niño/La Niña?',
+      prompt: 'Como planejar a população de plantas, espaçamento e janela de semeadura considerando umidade do solo e risco climático?',
     },
     {
-      title: 'Manejo Integrado de Pragas (MIP)',
-      prompt: 'Quais os Níveis de Ação críticos para lagartas e percevejos na cultura e como calibrar pulverizadores terrestres de forma eficiente?',
+      title: 'Receituário Agronômico Técnico',
+      prompt: 'Estruture um modelo de recomendação técnica / receituário agronômico para controle de pragas e doenças, indicando princípio ativo, dose, volume de calda, EPI e período de carência.',
     },
     {
-      title: 'Pulverização com Drones',
-      prompt: 'Como configurar taxa de aplicação (L/ha), altura e velocidade de voo de drones de pulverização para aplicação de bioinsumos?',
+      title: 'Manejo Integrado de Pragas',
+      prompt: 'Quais os níveis de ação e rotação de ingredientes ativos (IRAC/FRAC) mais recomendados para evitar resistência em grandes culturas?',
     },
     {
-      title: 'Estresse Hídrico & Veranicos',
-      prompt: 'Quais as melhores estratégias fisiológicas e hormonais para mitigar os efeitos de veranicos e altas temperaturas na fase reprodutiva da cultura?',
+      title: 'Heveicultura (Seringueira)',
+      prompt: 'Quais as boas práticas de manejo de painel, sistema de sangria (ex: 1/2S d/3 ou d/4), uso de etefon e controle do mal-das-folhas e seca de painel na heveicultura?',
     },
   ],
   fertilidade: [
     {
-      title: 'Equilíbrio de Bases Ca-Mg-K',
-      prompt: 'Como calcular a calagem pelos métodos de Saturação por Bases (V%) versus Solução Tampão SMP, visando um equilíbrio ideal de Ca, Mg e K?',
+      title: 'Adubação NPK & Parcelamento',
+      prompt: 'Com base na análise de solo e expectativa de produtividade, como calcular a adubação de plantio (P2O5, K2O, S, B, Zn) e parcelamento de N em cobertura?',
     },
     {
-      title: 'Gessagem e Subsuperfície',
-      prompt: 'Qual o critério técnico para aplicação de gesso agrícola visando aprofundamento radicular e neutralização do Alumínio tóxico em subsuperfície?',
+      title: 'Equilíbrio Físico-Químico-Biológico',
+      prompt: 'Como integrar indicadores físicos (densidade aparente, macroporosidade, compactação), químicos (CTC, V%, Al3+) e biológicos (BioAS Embrapa: Beta-glicosidase, Arilsulfatase, Fosfatase ácida) no manejo do solo?',
     },
     {
-      title: 'Adubação de Plantio NPK',
-      prompt: 'Como formular uma adubação fosfatada e potássica de plantio balanceada com base no teor de argila do solo e metas elevadas de produtividade?',
+      title: 'Calagem & Gessagem Profunda',
+      prompt: 'Qual a diferença prática entre os critérios de calagem (V%, SMP, Al/Ca+Mg) e quando entrar com gessagem agrícola para condicionar a camada 20–40 cm?',
     },
     {
-      title: 'Interpretação BioAS (Enzimas)',
-      prompt: 'Como interpretar os teores das enzimas Beta-glicosidase, Fosfatase ácida e Arilsulfatase na avaliação da qualidade e saúde biológica do solo?',
+      title: 'Nutrição Foliar & Correção Rápida',
+      prompt: 'Como interpretar a relação N/K, Ca/Mg e P/Zn na análise foliar e definir a melhor formulação foliar para o estádio reprodutivo?',
     },
   ],
   nematologia: [
     {
-      title: 'Auditoria de Laudo Técnico',
-      prompt: 'Realize uma auditoria completa das populações de nematóides no solo e na raiz deste talhão, calculando o Nível de Dano Econômico (NDE) e risco de perdas.',
+      title: 'Diagnóstico de Nematoides & Doenças de Solo',
+      prompt: 'Analise o risco de Pratylenchus brachyurus, Meloidogyne spp., Heterodera glycines e fungos de solo (Fusarium, Macrophomina, Rhizoctonia), diferenciando sintomas de reboleira no campo.',
+    },
+    {
+      title: 'Protocolo Biológico (TS + Sulco)',
+      prompt: 'Monte um protocolo técnico com bionematicidas e biofungicidas (Purpureocillium lilacinum, Bacillus firmus/velezensis, Trichoderma) indicando compatibilidade de calda e doses.',
     },
     {
       title: 'Rotação Redutora (FR < 1)',
-      prompt: 'Gere um plano de rotação e cobertura na entressafra (ex: Crotalaria spectabilis, ochroleuca, Milheto ADR 300) para derrubar o Fator de Reprodução (FR) dos fitonematoides.',
+      prompt: 'Indique espécies de cobertura (Crotalaria spectabilis/ochroleuca, milheto, braquiária) para reduzir o Fator de Reprodução (FR < 1) na entressafra.',
     },
     {
-      title: 'Prescrição de Bioinsumos',
-      prompt: 'Escreva um protocolo agronômico detalhado de controle biológico com Purpureocillium lilacinum, Bacillus firmus/velezensis e Trichoderma, indicando dosagens e momentos.',
-    },
-    {
-      title: 'Sintomatologia de Reboleiras',
-      prompt: 'Como diferenciar no campo sintomas de reboleiras causadas por nematoides de sintomas causados por compactação de solo ou deficiência de micronutrientes?',
+      title: 'Auditoria de Laudo Nematológico',
+      prompt: 'Avalie os níveis populacionais em solo e raiz frente ao Nível de Dano Econômico (NDE) e defina prioridades por ordem de severidade.',
     },
   ],
   pecuaria: [
     {
-      title: 'Manejo de Pastejo Rotacionado',
-      prompt: 'Qual a altura ideal de entrada e saída para pastagens de Brachiaria brizantha e Panicum maximum (Mombaça/Zuri), e como planejar os dias de descanso?',
+      title: 'Bovinocultura (Corte & Leite)',
+      prompt: 'Como ajustar taxa de lotação (UA/ha), altura de manejo de pasto e suplementação proteico-energética na seca e nas águas para maximizar o GMD ou produção leiteira?',
     },
     {
-      title: 'Taxa de Lotação (UA/ha)',
-      prompt: 'Como calcular a capacidade de suporte (UA/ha) de um pasto rotacionado com base na produção de matéria seca e estacionalidade das chuvas?',
+      title: 'Suinocultura (Maternidade a Terminação)',
+      prompt: 'Quais os principais indicadores zootécnicos, controle térmico, biosseguridade e manejo nutricional por fase na suinocultura moderna?',
     },
     {
-      title: 'Suplementação Seca vs Águas',
-      prompt: 'Estratégia de suplementação proteico-energética de precisão no cocho para gado de corte (recria/engorda) no período seco do ano.',
+      title: 'Bubalinocultura (Búfalos Leite/Corte)',
+      prompt: 'Quais as particularidades de manejo nutricional, reprodutivo, conforto térmico (acesso a áreas de imersão/sombra) e sanidade na bubalinocultura?',
     },
     {
-      title: 'Dieta e Formulação no Confinamento',
-      prompt: 'Como formular uma ração eficiente com silagem de milho, farelo de soja e caroço de algodão visando GMD de 1,4 a 1,6 kg/dia em confinamento?',
+      title: 'Receituário Médico-Veterinário',
+      prompt: 'Estruture um protocolo sanitário e orientação de receituário médico-veterinário (princípio ativo, via de administração, dose por kg de peso vivo e período de carência para abate/leite).',
     },
   ],
   avicultura: [
     {
       title: 'Conversão Alimentar & IEP',
-      prompt: 'Como otimizar a conversão alimentar (CA), viabilidade e IEP (Índice de Eficiência Produtiva) de um lote de frangos de corte de 1 a 42 dias?',
+      prompt: 'Como otimizar a conversão alimentar (CA), ganho de peso diário e IEP (Índice de Eficiência Produtiva) em lotes de frangos de corte?',
     },
     {
-      title: 'Ambiência Dark House',
-      prompt: 'Quais as melhores práticas de ambiência de galpão Dark House (velocidade do ar, umidade e nebulização) em dias de calor extremo para evitar estresse térmico?',
+      title: 'Ambiência & Ventilação em Galpão',
+      prompt: 'Como regular exaustores, placas evaporativas, velocidade do ar e temperatura efetiva nas primeiras semanas de vida versus fase de terminação?',
     },
     {
-      title: 'Biosseguridade & Vazio Sanitário',
-      prompt: 'Protocolo completo de desinfecção de aviários no vazio sanitário, controle de cascudinho (Alphitobius diaperinus) e biosseguridade de galpão.',
+      title: 'Biosseguridade & Cascudinho',
+      prompt: 'Detalhe o protocolo completo de vazio sanitário, fermentação de cama, controle de cascudinho (Alphitobius diaperinus) e qualidade microbiológica da água.',
     },
     {
-      title: 'Curva de Peso por Fase',
-      prompt: 'Como ajustar a nutrição (dietas pré-inicial, inicial, crescimento e terminação) para acompanhar a curva de peso padrão da linhagem Cobb/Ross?',
+      title: 'Avicultura de Postura',
+      prompt: 'Como equilibrar cálcio granular, fósforo disponível e programa de luz para manter qualidade de casca e pico de postura acima de 92%?',
+    },
+  ],
+  geoprocessamento: [
+    {
+      title: 'Interpretação de Mapas NDVI / Vigor',
+      prompt: 'Como interpretar zonas de baixo, médio e alto NDVI na lavoura, distinguir falhas de estande de estresse nutricional/hídrico e gerar prescrição em taxa variável (VRA)?',
+    },
+    {
+      title: 'Plantabilidade & Semeadoras',
+      prompt: 'Como auditar e melhorar a plantabilidade (coeficiente de variação, duplas, falhas, singularidade e profundidade) regulando dosadores pneumáticos/mecânicos, vácuo e velocidade?',
+    },
+    {
+      title: 'Máquinas, Tratores & Pulverizadores',
+      prompt: 'Como calcular lastro de trator, índice de patinagem ideal (8–12%), seleção de pontas de pulverização e calibração de vazão para evitar deriva?',
+    },
+    {
+      title: 'Análise KML / GeoTIFF / Grid Amostral',
+      prompt: 'Como estruturar um grid amostral georreferenciado eficiente e cruzar camadas vetoriais (KML/GeoJSON) com mapas de colheita e altimetria?',
+    },
+  ],
+  pericia_avaliacao: [
+    {
+      title: 'Avaliação Rural (ABNT NBR 14653-3)',
+      prompt: 'Quais os passos metodológicos para avaliação de imóvel rural pela ABNT NBR 14653-3 (tratamento de fatores vs regressão linear, saneamento de amostras e graus de fundamentação)?',
+    },
+    {
+      title: 'Depreciação de Benfeitorias (Ross-Heidecke)',
+      prompt: 'Como aplicar corretamente o critério de Ross-Heidecke combinando idade aparente, vida útil provável e estado de conservação em benfeitorias rurais?',
+    },
+    {
+      title: 'Perícia Agronômica de Sinistros e Danos',
+      prompt: 'Como estruturar um laudo pericial rural para quantificação de perdas por deriva de herbicida, granizo, seca ou quebra contratual de arrendamento?',
+    },
+    {
+      title: 'Vistoria & Capacidade de Uso das Terras',
+      prompt: 'Como classificar glebas por Capacidade de Uso do Solo e aplicar a Nota Agronômica / Índice de Terra Nua na valoração rural?',
+    },
+  ],
+  ensino_pesquisa: [
+    {
+      title: 'Delineamento Experimental Agrícola',
+      prompt: 'Qual a diferença entre DIC, DBC e Parcelas Subdivididas na pesquisa agronômica, e quando aplicar Tukey versus Scott-Knott ou regressão?',
+    },
+    {
+      title: 'Aula Prática & Didática Rural',
+      prompt: 'Explique de forma didática para aula ou treinamento de equipe de campo como funcionam a CTC do solo, a saturação por bases (V%) e a fixação biológica de nitrogênio.',
+    },
+    {
+      title: 'Estruturação de TCC / Artigo Científico',
+      prompt: 'Ajude a estruturar um protocolo de pesquisa experimental (objetivos, variáveis respostas, repetições e análise estatística) sobre manejo biológico ou fertilidade.',
+    },
+    {
+      title: 'Tira-Dúvidas Técnico Livre',
+      prompt: 'Tenho uma dúvida conceitual ou de cálculo agronômico/zootécnico: explique passo a passo com fórmulas e exemplos práticos.',
     },
   ],
 };

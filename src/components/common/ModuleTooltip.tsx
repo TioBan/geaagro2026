@@ -5,8 +5,6 @@ import {
   CheckCircle2,
   Lightbulb,
   ArrowRight,
-  HelpCircle,
-  ChevronRight,
   Compass,
 } from 'lucide-react';
 import { MODULE_DESCRIPTIONS, ModuleDescription } from '../../data/moduleDescriptions';
@@ -22,7 +20,7 @@ interface ModuleTooltipProps {
   placement?: 'right' | 'bottom' | 'auto';
 }
 
-export const ModuleTooltip: React.FC<ModuleTooltipProps> = ({
+export const ModuleTooltip: React.FC<ModuleTooltipProps> = React.memo(({
   moduleId,
   targetRef,
   isOpen,
@@ -30,7 +28,6 @@ export const ModuleTooltip: React.FC<ModuleTooltipProps> = ({
   onOpen,
   onNavigate,
   subItems,
-  placement = 'right',
 }) => {
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState<{ top: number; left: number; arrowTop?: number; placement: 'right' | 'bottom' | 'left' }>({
@@ -278,4 +275,4 @@ export const ModuleTooltip: React.FC<ModuleTooltipProps> = ({
   );
 
   return createPortal(content, document.body);
-};
+});

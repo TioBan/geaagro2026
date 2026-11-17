@@ -31,7 +31,7 @@ export interface HourlyForecastItem {
 }
 
 export interface DailyForecastItem {
-  date: string; // Ex: 'Hoje (19/08)', 'Amanhã (20/08)'
+  date: string; // Ex: '15/11 (Hoje)', '16/11 (Amanhã)', '17/11'
   dayOfWeek: string;
   tempMinC: number;
   tempMaxC: number;

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
 import { 
   Sprout, 
   Lock, 
@@ -299,12 +298,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
         {/* Main Center Auth Form */}
         <div className="my-auto py-8">
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="space-y-6 max-w-sm mx-auto w-full"
-          >
+          <div className="space-y-6 max-w-sm mx-auto w-full animate-in fade-in duration-500">
             <div className="space-y-1.5 text-center sm:text-left">
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">
                 Olá! Bem-vindo a GeaAgro!
@@ -456,7 +450,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 </div>
               </div>
             </form>
-          </motion.div>
+          </div>
         </div>
 
         {/* Footer Section with Terms, Privacy Policy & Developers */}
@@ -498,7 +492,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-zinc-900/60">
-            <span>GeaAgro v4.2.3.7</span>
+            <span>GeaAgro v4.2.3.8</span>
             <span className="text-emerald-700 dark:text-emerald-400 font-bold inline-flex items-center gap-1 flex-wrap">
               <span>🌱 Desenvolvido por</span>
               <a
@@ -509,16 +503,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 title="Instagram: @fatiima.leao"
               >
                 Fátima Leão
-              </a>
-              <span>&amp;</span>
-              <a
-                href="https://www.instagram.com/lucas.agrobr/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:underline hover:text-emerald-900 dark:hover:text-emerald-300 transition-colors cursor-pointer"
-                title="Instagram: @lucas.agrobr"
-              >
-                Lucas Mendes
               </a>
               <span>❤️</span>
             </span>
@@ -558,12 +542,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
             {/* Information card overlapping background */}
             <div className="absolute bottom-10 left-10 right-10 z-2 text-white flex flex-col justify-end space-y-4 max-w-2xl">
-              <motion.div
+              <div
                 key={selectedTheme.id}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.6 }}
-                className="bg-black/65 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-white/15 shadow-2xl space-y-3.5 cursor-pointer hover:border-emerald-500/40 transition-all"
+                className="bg-black/65 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-white/15 shadow-2xl space-y-3.5 cursor-pointer hover:border-emerald-500/40 transition-all animate-in fade-in duration-500"
                 onClick={() => setIsPhotoModalOpen(true)}
               >
                 <div className="flex items-center justify-between">
@@ -592,7 +573,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     {selectedTheme.hudReadout || "FOTO REAL LOCAL"}
                   </span>
                 </div>
-              </motion.div>
+              </div>
             </div>
           </>
         )}
@@ -743,12 +724,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
           {/* Technical Explanation HUD Footer */}
           <div className="w-full max-w-5xl mx-auto z-10 space-y-2">
-            <motion.div
+            <div
               key={selectedTheme.id}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-              className="bg-black/80 backdrop-blur-xl p-5 sm:p-6 rounded-2xl border border-white/20 shadow-2xl space-y-3"
+              className="bg-black/80 backdrop-blur-xl p-5 sm:p-6 rounded-2xl border border-white/20 shadow-2xl space-y-3 animate-in fade-in duration-300"
             >
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2.5">
                 <div className="flex items-center gap-2">
@@ -799,7 +777,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   </button>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         </div>
       )}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FORAGES_CATALOG } from '../../data/foragesCatalogData';
-import { Calculator, Sparkles, Scale, DollarSign, Sprout, ArrowRight, Layers, HelpCircle } from 'lucide-react';
+import { Calculator, Sprout } from 'lucide-react';
 
 export const ForageSeedingCalculator: React.FC = () => {
   const [selectedForageId, setSelectedForageId] = useState<string>(FORAGES_CATALOG[0].id);

@@ -1,29 +1,33 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, Suspense } from 'react';
 import { FORAGES_CATALOG, FORAGE_CATEGORIES_INFO, searchForages } from '../data/foragesCatalogData';
 import { ForageItem, ForageCategory } from '../types/forage';
 import { ForagePhotoCard } from './forage/ForagePhotoCard';
-import { ForageDetailModal } from './forage/ForageDetailModal';
-import { ForageSoilMatcher } from './forage/ForageSoilMatcher';
-import { ForageSeedingCalculator } from './forage/ForageSeedingCalculator';
-import { ForageDiseasesGuide } from './forage/ForageDiseasesGuide';
-import { ForageComparator } from './forage/ForageComparator';
+import { lazyWithRetry } from '../utils/lazyWithRetry';
 import {
   Leaf,
   Search,
-  SlidersHorizontal,
   Compass,
   Calculator,
   Bug,
   Scale,
-  Sparkles,
   BookOpen,
-  Filter,
-  CheckCircle2,
-  RefreshCw,
-  Trash2,
-  MapPin,
-  Tractor,
 } from 'lucide-react';
+
+const ForageDetailModal = lazyWithRetry(() =>
+  import('./forage/ForageDetailModal').then(m => ({ default: m.ForageDetailModal }))
+);
+const ForageSoilMatcher = lazyWithRetry(() =>
+  import('./forage/ForageSoilMatcher').then(m => ({ default: m.ForageSoilMatcher }))
+);
+const ForageSeedingCalculator = lazyWithRetry(() =>
+  import('./forage/ForageSeedingCalculator').then(m => ({ default: m.ForageSeedingCalculator }))
+);
+const ForageDiseasesGuide = lazyWithRetry(() =>
+  import('./forage/ForageDiseasesGuide').then(m => ({ default: m.ForageDiseasesGuide }))
+);
+const ForageComparator = lazyWithRetry(() =>
+  import('./forage/ForageComparator').then(m => ({ default: m.ForageComparator }))
+);
 
 interface ForageCatalogModuleProps {
   initialSubTab?: string;
@@ -38,7 +42,6 @@ export const ForageCatalogModule: React.FC<ForageCatalogModuleProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<ForageCategory | 'todas'>('todas');
   const [selectedSoilDrainage, setSelectedSoilDrainage] = useState<string>('todos');
-  const [selectedFertility, setSelectedFertility] = useState<string>('todos');
   const [selectedForageModal, setSelectedForageModal] = useState<ForageItem | null>(null);
   const [comparedForageIds, setComparedForageIds] = useState<string[]>([]);
 
@@ -79,12 +82,8 @@ export const ForageCatalogModule: React.FC<ForageCatalogModuleProps> = ({
       list = list.filter(f => f.soilAndClimate.drainageRequirement === selectedSoilDrainage);
     }
 
-    if (selectedFertility !== 'todos') {
-      list = list.filter(f => f.soilAndClimate.fertilityRequirement === selectedFertility);
-    }
-
     return list;
-  }, [searchQuery, selectedCategory, selectedSoilDrainage, selectedFertility]);
+  }, [searchQuery, selectedCategory, selectedSoilDrainage]);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-2 sm:px-4 pb-12 pt-2">
@@ -299,7 +298,6 @@ export const ForageCatalogModule: React.FC<ForageCatalogModuleProps> = ({
                   setSearchQuery('');
                   setSelectedCategory('todas');
                   setSelectedSoilDrainage('todos');
-                  setSelectedFertility('todos');
                 }}
                 className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
               >
@@ -310,37 +308,47 @@ export const ForageCatalogModule: React.FC<ForageCatalogModuleProps> = ({
         </div>
       )}
 
-      {/* TAB 2: RECOMENDADOR POR SOLO E CLIMA */}
-      {activeSubTab === 'indicacao_solo' && (
-        <ForageSoilMatcher onSelectForage={f => setSelectedForageModal(f)} />
-      )}
+      <Suspense
+        fallback={
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-8 text-center text-xs font-medium text-slate-500 dark:text-zinc-400">
+            Carregando módulo de forrageiras...
+          </div>
+        }
+      >
+        {/* TAB 2: RECOMENDADOR POR SOLO E CLIMA */}
+        {activeSubTab === 'indicacao_solo' && (
+          <ForageSoilMatcher onSelectForage={f => setSelectedForageModal(f)} />
+        )}
 
-      {/* TAB 3: SANIDADE E DOENÇAS */}
-      {activeSubTab === 'doencas' && (
-        <ForageDiseasesGuide onSelectForage={f => setSelectedForageModal(f)} />
-      )}
+        {/* TAB 3: SANIDADE E DOENÇAS */}
+        {activeSubTab === 'doencas' && (
+          <ForageDiseasesGuide onSelectForage={f => setSelectedForageModal(f)} />
+        )}
 
-      {/* TAB 4: CALCULADORA DE SEMEADURA */}
-      {activeSubTab === 'calculadora_semeadura' && (
-        <ForageSeedingCalculator />
-      )}
+        {/* TAB 4: CALCULADORA DE SEMEADURA */}
+        {activeSubTab === 'calculadora_semeadura' && (
+          <ForageSeedingCalculator />
+        )}
 
-      {/* TAB 5: COMPARADOR LADO A LADO */}
-      {activeSubTab === 'comparador' && (
-        <ForageComparator
-          selectedIds={comparedForageIds}
-          onRemove={id => handleToggleCompare(id)}
-          onSelectForage={f => setSelectedForageModal(f)}
-          onAddMore={() => setActiveSubTab('catalogo')}
-        />
-      )}
+        {/* TAB 5: COMPARADOR LADO A LADO */}
+        {activeSubTab === 'comparador' && (
+          <ForageComparator
+            selectedIds={comparedForageIds}
+            onRemove={id => handleToggleCompare(id)}
+            onSelectForage={f => setSelectedForageModal(f)}
+            onAddMore={() => setActiveSubTab('catalogo')}
+          />
+        )}
 
-      {/* Detailed Modal */}
-      <ForageDetailModal
-        forage={selectedForageModal}
-        onClose={() => setSelectedForageModal(null)}
-        onSelectAnotherForage={f => setSelectedForageModal(f)}
-      />
+        {/* Detailed Modal */}
+        {selectedForageModal && (
+          <ForageDetailModal
+            forage={selectedForageModal}
+            onClose={() => setSelectedForageModal(null)}
+            onSelectAnotherForage={f => setSelectedForageModal(f)}
+          />
+        )}
+      </Suspense>
     </div>
   );
 };

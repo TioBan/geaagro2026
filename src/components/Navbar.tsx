@@ -1,5 +1,4 @@
-// @ts-nocheck
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { handleAgroLogoClick } from '../utils/agroEasterEgg';
 import {
   Layers,
@@ -14,7 +13,6 @@ import {
   UploadCloud,
   Menu,
   X,
-  ChevronDown,
   ChevronRight,
   History,
   Moon,
@@ -55,7 +53,6 @@ import {
   Dna,
   Camera,
   Search,
-  ShieldAlert,
   BarChart2,
   FileSpreadsheet,
   Sliders,
@@ -92,23 +89,18 @@ import {
   Users,
   BarChart3,
   LogOut,
+  Building,
+  UserCheck,
 } from 'lucide-react';
 import { SuinoIcon } from './icons/SuinoIcon';
 import { CaprinoIcon } from './icons/CaprinoIcon';
 import { EquinoIcon } from './icons/EquinoIcon';
 import { BovinoIcon } from './icons/BovinoIcon';
 import { BubalinoIcon } from './icons/BubalinoIcon';
+import { NemaIAEstatisticaIcon } from './icons/NemaIAEstatisticaIcon';
 import { Farm, RuralProducer, Agronomist, Company } from '../types/agronomy';
-import { downloadSoilCsvTemplate } from '../utils/spreadsheetTemplate';
 import { ModuleTooltip } from './common/ModuleTooltip';
-import { MenuCustomizationModal } from './common/MenuCustomizationModal';
-import { UserProfileCustomizationModal } from './common/UserProfileCustomizationModal';
-import {
-  loadMenuPreferences,
-  saveMenuPreferences,
-  applyMenuCustomization,
-  MenuPreferences,
-} from '../utils/menuCustomizationStorage';
+import { lazyWithRetry } from '../utils/lazyWithRetry';
 import {
   isModuleActiveInCurrentProfile,
   getActiveProfileId,
@@ -116,6 +108,10 @@ import {
   UserProfileId,
 } from '../utils/userProfilesStorage';
 import { usePWAInstall } from '../hooks/usePWAInstall';
+
+const UserProfileCustomizationModal = lazyWithRetry(() =>
+  import('./common/UserProfileCustomizationModal').then(m => ({ default: m.UserProfileCustomizationModal }))
+);
 
 export interface NavSubItem {
   id: string;
@@ -156,65 +152,68 @@ interface NavbarProps {
   onLogout?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({
-  activeTab,
-  setActiveTab,
-  activeSubTab = 'dashboard',
-  setActiveSubTab,
-  farms,
-  producers,
-  agronomists,
-  company,
-  selectedFarmId,
-  setSelectedFarmId,
-  isDarkMode,
-  setIsDarkMode,
-  isMobileMenuOpen,
-  setIsMobileMenuOpen,
-  isSidebarCollapsed = false,
-  setIsSidebarCollapsed,
-  onOpenNotifications,
-  unreadNotificationsCount = 0,
-  onLogout,
-}) => {
+const AVALIACAO_IMOVEIS_NAV_ITEM: NavItem = {
+  id: 'avaliacao_imoveis',
+  label: 'Avaliação de Imóveis Rurais',
+  icon: Landmark,
+  badge: 'NBR 14653-3',
+  subItems: [
+    { id: 'dashboard', label: 'Dashboard & Indicadores', icon: LayoutGrid },
+    { id: 'propriedade', label: '1. Imóvel & Território', icon: Building2 },
+    { id: 'solicitante', label: '2. Solicitante & Finalidade', icon: UserCheck },
+    { id: 'vistoria', label: '3. Vistoria & Pontos GPS', icon: MapPin },
+    { id: 'benfeitorias', label: '4. Benfeitorias Ross-Heidecke', icon: Building },
+    { id: 'solos_aptidao', label: '5. Solos & Aptidão Embrapa', icon: Sprout },
+    { id: 'pesquisa_mercado', label: '6. Pesquisa de Mercado', icon: TrendingUp },
+    { id: 'estatistica', label: '7. Tratamento Estatístico', icon: Calculator },
+    { id: 'metodos', label: '8. Métodos de Avaliação', icon: Scale },
+    { id: 'mapa', label: '9. Mapa Interativo OSM', icon: Compass },
+    { id: 'due_diligence', label: '10. Due Diligence Legal', icon: FileCheck2 },
+    { id: 'simulador', label: '11. CapEx & Valorização', icon: Sparkles },
+    { id: 'laudo_emissao', label: '12. Emissão de Laudo PDF', icon: FileText },
+    { id: 'indicadores_gea', label: '13. Índices GeaAgro', icon: Award },
+    { id: 'ia_assistente', label: '14. Assistente Técnico IA', icon: Bot },
+    { id: 'biblioteca', label: '15. Biblioteca de Normas', icon: BookOpen },
+  ],
+};
 
-  const currentFarm = (farms || []).find(f => f?.id === selectedFarmId) || farms?.[0];
-  const currentProducer = (producers || []).find(p => p?.id === currentFarm?.producerId) || producers?.[0];
-  const currentAgronomist = (agronomists || []).find(a => a?.id === ((currentFarm as any)?.agronomistId || currentFarm?.responsibleAgronomistId)) || agronomists?.[0];
-  const { isInstallable, isInstalled, install } = usePWAInstall();
+const RECUPERA_NAV_ITEM: NavItem = {
+  id: 'recupera',
+  label: 'Recupera — Áreas Degradadas',
+  icon: Sprout,
+  badge: 'PWA 7 Fases',
+  subItems: [
+    { id: 'dashboard', label: 'Dashboard & KPIs', icon: LayoutGrid },
+    { id: 'propriedades', label: '1. Propriedades & Território', icon: Building2 },
+    { id: 'areas', label: '2. Áreas Degradadas', icon: MapPin },
+    { id: 'diagnostico', label: '3. Diagnóstico Técnico', icon: FlaskConical },
+    { id: 'analises_solo', label: '4. Análise de Solo', icon: Sprout },
+    { id: 'projetos', label: '5. Projetos de Recuperação', icon: FileText },
+    { id: 'calculadoras', label: '6. Calculadoras Agronômicas', icon: Calculator },
+    { id: 'pastagens', label: '7. Pastagens Degradadas', icon: Beef },
+    { id: 'cobertura', label: '8. Plantas de Cobertura', icon: Leaf },
+    { id: 'conservacao_solo', label: '9. Conservação & Terraços', icon: Layers },
+    { id: 'ambiental', label: '10. APP, Reserva & Mudas', icon: Flower2 },
+    { id: 'mapas', label: '11. Mapeamento & GPS', icon: Compass },
+    { id: 'monitoramento', label: '12. Monitoramento & IGRA', icon: Activity },
+    { id: 'custos', label: '13. Custos & Orçamento', icon: DollarSign },
+    { id: 'cronogramas', label: '14. Cronograma Operacional', icon: Calendar },
+    { id: 'relatorios', label: '15. Relatórios & Laudos PDF', icon: FileCheck2 },
+    { id: 'biblioteca', label: '16. Biblioteca Técnica Embrapa', icon: BookOpen },
+  ],
+};
 
-  // Accordion expanded state for modules with sub-functionalities
-  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>(() => ({
-    [activeTab]: true,
-    avicultura: activeTab === 'avicultura',
-  }));
-
-  // Keep the active tab expanded
-  useEffect(() => {
-    if (activeTab) {
-      setExpandedMenus(prev => ({
-        ...prev,
-        [activeTab]: true,
-      }));
-    }
-  }, [activeTab]);
-
-  const toggleExpand = (itemId: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    setExpandedMenus(prev => ({
-      ...prev,
-      [itemId]: !prev[itemId],
-    }));
-  };
-
-  const navPrincipal: NavItem[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: Warehouse },
+const NAV_PRINCIPAL: NavItem[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: Warehouse },
+  AVALIACAO_IMOVEIS_NAV_ITEM,
+  RECUPERA_NAV_ITEM,
     {
       id: 'nema_ia',
       label: 'Nema IA',
       icon: Sprout,
       subItems: [
         { id: 'nema_ia_chat', label: 'Conversa com Nema IA', icon: Bot },
+        { id: 'ia_estatistica', label: 'Nema IA Estatística', icon: NemaIAEstatisticaIcon },
       ],
     },
     {
@@ -246,7 +245,11 @@ export const Navbar: React.FC<NavbarProps> = ({
       icon: Settings,
       subItems: [
         { id: 'perfil_uso', label: 'Perfil de Uso', icon: Sliders },
+        { id: 'memoria', label: 'Módulo de Memória', icon: Cpu },
+        { id: 'energia', label: 'Módulo de Energia', icon: Zap },
+        { id: 'tema', label: 'Módulo Tema', icon: Sun },
         { id: 'atualizacoes', label: 'Atualizações do Sistema', icon: RefreshCw },
+        { id: 'sobre', label: 'Sobre', icon: Info },
         {
           id: 'feedback',
           label: 'Feedback',
@@ -255,10 +258,9 @@ export const Navbar: React.FC<NavbarProps> = ({
         },
       ],
     },
-    { id: 'sobre', label: 'Sobre', icon: Info },
-  ];
+];
 
-  const navTecnico: NavItem[] = [
+const NAV_TECNICO: NavItem[] = [
     {
       id: 'forrageiras',
       label: 'Informações sobre Forrageiras',
@@ -304,6 +306,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         { id: 'laudo', label: '5. Laudo Oficial & Quesitos', icon: FileCheck2 },
       ],
     },
+    AVALIACAO_IMOVEIS_NAV_ITEM,
+    RECUPERA_NAV_ITEM,
     {
       id: 'rastreabilidade',
       label: 'Rastreabilidade Agrícola',
@@ -877,6 +881,29 @@ export const Navbar: React.FC<NavbarProps> = ({
       ],
     },
     {
+      id: 'estatistica',
+      label: 'GeaAgro Estatística',
+      icon: BarChart3,
+      badge: 'PWA Científico',
+      subItems: [
+        { id: 'projetos', label: 'Projetos & Experimentos', icon: Layers },
+        { id: 'dados', label: 'Dados & Importação', icon: UploadCloud },
+        { id: 'ia_estatistica', label: 'Nema IA Estatística', icon: NemaIAEstatisticaIcon },
+        { id: 'descritiva', label: 'Estatística Descritiva', icon: Calculator },
+        { id: 'delineamentos', label: 'Delineamentos Experimentais', icon: LayoutGrid },
+        { id: 'anova', label: 'Análise de Variância (ANOVA)', icon: BarChart3 },
+        { id: 'medias', label: 'Comparação de Médias', icon: Sparkles },
+        { id: 'regressao', label: 'Regressão & Modelos', icon: Zap },
+        { id: 'correlacao', label: 'Correlação Linear & Postos', icon: Compass },
+        { id: 'pressupostos', label: 'Pressupostos & Diagnóstico', icon: ShieldCheck },
+        { id: 'nao_parametrica', label: 'Não Paramétrica', icon: Scale },
+        { id: 'multivariada', label: 'Multivariada (PCA & Clusters)', icon: Cpu },
+        { id: 'especiais', label: 'Séries, Logística & Sobrevivência', icon: History },
+        { id: 'graficos', label: 'Gráficos Científicos', icon: BarChart3 },
+        { id: 'relatorios', label: 'Relatórios & Exportação', icon: FileText },
+      ],
+    },
+    {
       id: 'backup',
       label: 'Backup e Restauração',
       icon: Database,
@@ -885,6 +912,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         { id: 'criacao', label: 'Criar Backup Completo', icon: UploadCloud },
         { id: 'snapshots', label: 'Snapshots & Versionamento', icon: Sparkles },
         { id: 'modulos', label: 'Backup por Módulo', icon: Layers },
+        { id: 'estatistica_opfs', label: 'Backup & Integridade OPFS (Estatística)', icon: BarChart3 },
         { id: 'restauracao', label: 'Restauração de Dados', icon: History },
         { id: 'historico', label: 'Histórico & SHA-256', icon: ShieldCheck },
         { id: 'agendamento', label: 'Agendamento & Eventos', icon: Calendar },
@@ -892,20 +920,220 @@ export const Navbar: React.FC<NavbarProps> = ({
         { id: 'qrcode', label: 'Backup por QR Code', icon: QrCode },
       ],
     },
-  ];
+];
 
-  // Menu Customization for Análise Técnica
-  const [isMenuCustomizationOpen, setIsMenuCustomizationOpen] = useState(false);
-  const [menuPreferences, setMenuPreferences] = useState<MenuPreferences>(() => {
-    return loadMenuPreferences(navTecnico);
-  });
+interface NavItemRowProps {
+  item: NavItem;
+  isActive: boolean;
+  isExpanded: boolean;
+  activeSubTab: string;
+  onParentClick: (item: NavItem) => void;
+  onToggleExpand: (itemId: string, e?: React.MouseEvent) => void;
+  onSubClick: (tabId: string, subId?: string, externalUrl?: string) => void;
+}
 
-  const handleSaveMenuPreferences = (newPrefs: MenuPreferences) => {
-    setMenuPreferences(newPrefs);
-    saveMenuPreferences(newPrefs);
+const NavItemRow: React.FC<NavItemRowProps> = React.memo(({
+  item,
+  isActive,
+  isExpanded,
+  activeSubTab,
+  onParentClick,
+  onToggleExpand,
+  onSubClick,
+}) => {
+  const Icon = item.icon;
+  const hasSubItems = Boolean(item.subItems && item.subItems.length > 0);
+  const iconTriggerRef = React.useRef<HTMLDivElement>(null);
+  const [isTooltipOpen, setIsTooltipOpen] = React.useState(false);
+  const hoverTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleIconMouseEnter = () => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsTooltipOpen(true);
+    }, 180);
   };
 
-  const customizedNavTecnico = applyMenuCustomization(navTecnico, menuPreferences);
+  const handleIconMouseLeave = () => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsTooltipOpen(false);
+    }, 220);
+  };
+
+  const handleTooltipOpen = () => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    setIsTooltipOpen(true);
+  };
+
+  const handleTooltipClose = () => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    setIsTooltipOpen(false);
+  };
+
+  React.useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    };
+  }, []);
+
+  return (
+    <div className="space-y-0.5 relative">
+      {/* Main Module Button */}
+      <div
+        className={`group w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs sm:text-sm transition-all text-left cursor-pointer ${
+          isActive
+            ? 'bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 font-bold border-l-3 border-emerald-600 dark:border-emerald-400 shadow-2xs'
+            : 'text-slate-700 dark:text-zinc-300 hover:bg-slate-100/80 dark:hover:bg-zinc-900/80 hover:text-slate-900 dark:hover:text-white'
+        }`}
+        onClick={() => {
+          setIsTooltipOpen(false);
+          onParentClick(item);
+        }}
+      >
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          {/* Module Icon Container with Interactive Tooltip Trigger on Hover */}
+          <div
+            ref={iconTriggerRef}
+            onMouseEnter={handleIconMouseEnter}
+            onMouseLeave={handleIconMouseLeave}
+            className="p-1 -m-1 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-950/80 hover:scale-110 transition-all shrink-0 cursor-help flex items-center justify-center"
+            title={`Guia rápido: ${item.label}`}
+          >
+            <Icon
+              className={`w-4 h-4 shrink-0 transition-colors ${
+                isActive
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : 'text-slate-500 dark:text-zinc-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400'
+              }`}
+            />
+          </div>
+
+          <span className="truncate">{item.label}</span>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          {item.externalUrl && (
+            <ExternalLink className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 group-hover:text-emerald-600 dark:group-hover:text-emerald-400" />
+          )}
+
+          {hasSubItems && !item.externalUrl && (
+            <button
+              type="button"
+              onClick={e => onToggleExpand(item.id, e)}
+              className={`p-1 rounded-md transition-transform duration-200 text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-200 cursor-pointer ${
+                isExpanded ? 'rotate-90 text-emerald-600 dark:text-emerald-400' : ''
+              }`}
+              aria-label={`Expandir funcionalidades de ${item.label}`}
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Interactive Tooltip Card for Rural Producer (mounted only when open) */}
+      {isTooltipOpen && (
+        <ModuleTooltip
+          moduleId={item.id}
+          targetRef={iconTriggerRef}
+          isOpen={isTooltipOpen}
+          onClose={handleTooltipClose}
+          onOpen={handleTooltipOpen}
+          onNavigate={(modId, subId) => {
+            setIsTooltipOpen(false);
+            onParentClick(item);
+            if (subId) {
+              onSubClick(modId, subId);
+            }
+          }}
+          subItems={item.subItems}
+        />
+      )}
+
+      {/* Sub-menu Items (Expanded Accordion) */}
+      {hasSubItems && isExpanded && (
+        <div className="ml-3.5 pl-3 border-l-2 border-slate-200 dark:border-zinc-800 space-y-0.5 pt-0.5 pb-1">
+          {item.subItems!.map(sub => {
+            const SubIcon = sub.icon || Target;
+            const isSubActive = isActive && activeSubTab === sub.id;
+
+            return (
+              <button
+                key={sub.id}
+                id={`nav-sub-${item.id}-${sub.id}`}
+                onClick={() => onSubClick(item.id, sub.id, sub.externalUrl)}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors text-left cursor-pointer ${
+                  isSubActive
+                    ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                    : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-900 hover:text-slate-900 dark:hover:text-zinc-200'
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <SubIcon className={`w-3.5 h-3.5 shrink-0 ${isSubActive ? 'text-white' : 'text-slate-400 dark:text-zinc-500'}`} />
+                  <span className="truncate">{sub.label}</span>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {sub.externalUrl && (
+                    <ExternalLink className="w-3 h-3 text-slate-400 dark:text-zinc-500" />
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+});
+
+export const Navbar: React.FC<NavbarProps> = ({
+  activeTab,
+  setActiveTab,
+  activeSubTab = 'dashboard',
+  setActiveSubTab,
+  farms,
+  agronomists,
+  company,
+  selectedFarmId,
+  isDarkMode,
+  setIsDarkMode,
+  isMobileMenuOpen,
+  setIsMobileMenuOpen,
+  isSidebarCollapsed = false,
+  onOpenNotifications,
+  unreadNotificationsCount = 0,
+  onLogout,
+}) => {
+  const currentFarm = (farms || []).find(f => f?.id === selectedFarmId) || farms?.[0];
+  const currentAgronomist =
+    (agronomists || []).find(a => a?.id === (currentFarm?.agronomistId || (currentFarm as any)?.responsibleAgronomistId)) ||
+    agronomists?.[0];
+  const { isInstallable, isInstalled, install } = usePWAInstall();
+
+  // Accordion expanded state for modules with sub-functionalities
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>(() => ({
+    [activeTab]: true,
+    avicultura: activeTab === 'avicultura',
+  }));
+
+  // Keep the active tab expanded
+  useEffect(() => {
+    if (activeTab) {
+      setExpandedMenus(prev => ({
+        ...prev,
+        [activeTab]: true,
+      }));
+    }
+  }, [activeTab]);
+
+  const toggleExpand = useCallback((itemId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setExpandedMenus(prev => ({
+      ...prev,
+      [itemId]: !prev[itemId],
+    }));
+  }, []);
 
   // User Profile state (Agricultor, Pecuarista, Administrador, Perícia, Todos)
   const [activeProfileId, setActiveProfileIdState] = useState<UserProfileId>(() => getActiveProfileId());
@@ -922,29 +1150,54 @@ export const Navbar: React.FC<NavbarProps> = ({
     };
   }, []);
 
-  // Filter modules according to active user profile and user customizations
+  // Filter modules according to active user profile
   const filteredNavPrincipal = useMemo(() => {
-    return navPrincipal.filter(item => {
-      if (item.id === 'dashboard' || item.id === 'configuracoes') return true;
+    return NAV_PRINCIPAL.filter(item => {
+      if (item.id === 'dashboard' || item.id === 'configuracoes' || item.id === 'avaliacao_imoveis' || item.id === 'recupera') return true;
       return isModuleActiveInCurrentProfile(item.id, activeProfileId);
     });
-  }, [navPrincipal, activeProfileId]);
+  }, [activeProfileId]);
 
   const filteredNavTecnico = useMemo(() => {
-    return customizedNavTecnico.filter(item => {
+    return NAV_TECNICO.filter(item => {
+      if (item.id === 'avaliacao_imoveis' || item.id === 'recupera' || item.id === 'estatistica') return true;
       return isModuleActiveInCurrentProfile(item.id, activeProfileId);
     });
-  }, [customizedNavTecnico, activeProfileId]);
+  }, [activeProfileId]);
 
-  const handleNavClick = (tabId: string, subTabId?: string, externalUrl?: string) => {
+  const handleNavClick = useCallback((tabId: string, subTabId?: string, externalUrl?: string) => {
     if (externalUrl) {
       window.open(externalUrl, '_blank', 'noopener,noreferrer');
       setIsMobileMenuOpen(false);
       return;
     }
+    if (tabId === 'pericia_rural' && subTabId === 'avaliacao_imovel') {
+      setActiveTab('avaliacao_imoveis');
+      if (setActiveSubTab) {
+        setActiveSubTab('dashboard');
+      }
+      setExpandedMenus(prev => ({
+        ...prev,
+        avaliacao_imoveis: true,
+      }));
+      setIsMobileMenuOpen(false);
+      return;
+    }
+    if (tabId === 'sobre') {
+      setActiveTab('configuracoes');
+      if (setActiveSubTab) {
+        setActiveSubTab(subTabId || 'sobre');
+      }
+      setExpandedMenus(prev => ({
+        ...prev,
+        configuracoes: true,
+      }));
+      setIsMobileMenuOpen(false);
+      return;
+    }
     if (tabId === 'configuracoes') {
       if (subTabId && ['agricultor', 'pecuarista', 'administrador', 'pericia', 'todos'].includes(subTabId)) {
-        setActiveProfileId(subTabId as any);
+        setActiveProfileId(subTabId as UserProfileId);
       }
       setActiveTab('configuracoes');
       if (subTabId && setActiveSubTab) {
@@ -957,10 +1210,22 @@ export const Navbar: React.FC<NavbarProps> = ({
       setIsMobileMenuOpen(false);
       return;
     }
+    if (tabId === 'nema_ia' && subTabId === 'ia_estatistica') {
+      setActiveTab('estatistica');
+      if (setActiveSubTab) {
+        setActiveSubTab('ia_estatistica');
+      }
+      setExpandedMenus(prev => ({
+        ...prev,
+        estatistica: true,
+      }));
+      setIsMobileMenuOpen(false);
+      return;
+    }
     if (tabId === 'nema_ia' && (subTabId === 'nema_ia' || subTabId === 'nema_ia_chat' || subTabId === 'nema_ia_score')) {
       setActiveTab('nema_ia');
       if (setActiveSubTab) {
-        setActiveSubTab(subTabId === 'nema_ia' ? 'nema_ia_chat' : subTabId as any);
+        setActiveSubTab(subTabId === 'nema_ia' ? 'nema_ia_chat' : subTabId);
       }
       setIsMobileMenuOpen(false);
       return;
@@ -969,27 +1234,23 @@ export const Navbar: React.FC<NavbarProps> = ({
     if (subTabId && setActiveSubTab) {
       setActiveSubTab(subTabId);
     }
-    // Auto-expand this item
     setExpandedMenus(prev => ({
       ...prev,
       [tabId]: true,
     }));
     setIsMobileMenuOpen(false);
-  };
+  }, [setActiveTab, setActiveSubTab, setIsMobileMenuOpen]);
 
-  const handleParentItemClick = (item: NavItem) => {
+  const handleParentItemClick = useCallback((item: NavItem) => {
     if (item.externalUrl) {
       window.open(item.externalUrl, '_blank', 'noopener,noreferrer');
       setIsMobileMenuOpen(false);
       return;
     }
-    const isCurrentlyExpanded = !!expandedMenus[item.id];
-    
-    // If clicking on the active tab, toggle expansion
+
     if (activeTab === item.id) {
       toggleExpand(item.id);
     } else {
-      // Switch to this module and expand it
       setActiveTab(item.id);
       if (item.subItems && item.subItems.length > 0 && item.subItems[0]?.id && setActiveSubTab) {
         setActiveSubTab(item.subItems[0].id);
@@ -998,192 +1259,25 @@ export const Navbar: React.FC<NavbarProps> = ({
         ...prev,
         [item.id]: true,
       }));
-      // On mobile, if it has no sub-items, close drawer
       if (!item.subItems || item.subItems.length === 0) {
         setIsMobileMenuOpen(false);
       }
     }
-  };
-
-  const NavItemRow: React.FC<{
-    item: NavItem;
-    isActive: boolean;
-    isExpanded: boolean;
-    activeSubTab: string;
-    onParentClick: (item: NavItem) => void;
-    onToggleExpand: (itemId: string, e?: React.MouseEvent) => void;
-    onSubClick: (tabId: string, subId?: string, externalUrl?: string) => void;
-  }> = ({
-    item,
-    isActive,
-    isExpanded,
-    activeSubTab,
-    onParentClick,
-    onToggleExpand,
-    onSubClick,
-  }) => {
-    const Icon = item.icon;
-    const hasSubItems = item.subItems && item.subItems.length > 0;
-    const iconTriggerRef = React.useRef<HTMLDivElement>(null);
-    const [isTooltipOpen, setIsTooltipOpen] = React.useState(false);
-    const hoverTimeoutRef = React.useRef<any>(null);
-
-    const handleIconMouseEnter = () => {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = setTimeout(() => {
-        setIsTooltipOpen(true);
-      }, 180);
-    };
-
-    const handleIconMouseLeave = () => {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = setTimeout(() => {
-        setIsTooltipOpen(false);
-      }, 220);
-    };
-
-    const handleTooltipOpen = () => {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-      setIsTooltipOpen(true);
-    };
-
-    const handleTooltipClose = () => {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-      setIsTooltipOpen(false);
-    };
-
-    React.useEffect(() => {
-      return () => {
-        if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-      };
-    }, []);
-
-    return (
-      <div key={item.id} className="space-y-0.5 relative">
-        {/* Main Module Button */}
-        <div
-          className={`group w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs sm:text-sm transition-all text-left cursor-pointer ${
-            isActive
-              ? 'bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 font-bold border-l-3 border-emerald-600 dark:border-emerald-400 shadow-2xs'
-              : 'text-slate-700 dark:text-zinc-300 hover:bg-slate-100/80 dark:hover:bg-zinc-900/80 hover:text-slate-900 dark:hover:text-white'
-          }`}
-          onClick={() => {
-            setIsTooltipOpen(false);
-            onParentClick(item);
-          }}
-        >
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            {/* Module Icon Container with Interactive Tooltip Trigger on Hover */}
-            <div
-              ref={iconTriggerRef}
-              onMouseEnter={handleIconMouseEnter}
-              onMouseLeave={handleIconMouseLeave}
-              className="p-1 -m-1 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-950/80 hover:scale-110 transition-all shrink-0 cursor-help flex items-center justify-center"
-              title={`Guia rápido: ${item.label}`}
-            >
-              <Icon
-                className={`w-4 h-4 shrink-0 transition-colors ${
-                  isActive
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : 'text-slate-500 dark:text-zinc-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400'
-                }`}
-              />
-            </div>
-
-            <span className="truncate">{item.label}</span>
-          </div>
-
-          <div className="flex items-center gap-1 shrink-0">
-            {item.externalUrl && (
-              <ExternalLink className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 group-hover:text-emerald-600 dark:group-hover:text-emerald-400" />
-            )}
-
-            {hasSubItems && !item.externalUrl && (
-              <button
-                type="button"
-                onClick={e => onToggleExpand(item.id, e)}
-                className={`p-1 rounded-md transition-transform duration-200 text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-200 cursor-pointer ${
-                  isExpanded ? 'rotate-90 text-emerald-600 dark:text-emerald-400' : ''
-                }`}
-                aria-label={`Expandir funcionalidades de ${item.label}`}
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Interactive Tooltip Card for Rural Producer */}
-        <ModuleTooltip
-          moduleId={item.id}
-          targetRef={iconTriggerRef}
-          isOpen={isTooltipOpen}
-          onClose={handleTooltipClose}
-          onOpen={handleTooltipOpen}
-          onNavigate={(modId, subId) => {
-            setIsTooltipOpen(false);
-            onParentClick(item);
-            if (subId) {
-              onSubClick(modId, subId);
-            }
-          }}
-          subItems={item.subItems}
-        />
-
-        {/* Sub-menu Items (Expanded Accordion) */}
-        {hasSubItems && isExpanded && (
-          <div className="ml-3.5 pl-3 border-l-2 border-slate-200 dark:border-zinc-800 space-y-0.5 pt-0.5 pb-1">
-            {item.subItems!.map(sub => {
-              const SubIcon = sub.icon || Target;
-              const isSubActive = isActive && activeSubTab === sub.id;
-
-              return (
-                <button
-                  key={sub.id}
-                  id={`nav-sub-${item.id}-${sub.id}`}
-                  onClick={() => onSubClick(item.id, sub.id, sub.externalUrl)}
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors text-left cursor-pointer ${
-                    isSubActive
-                      ? 'bg-emerald-600 text-white font-bold shadow-xs'
-                      : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-900 hover:text-slate-900 dark:hover:text-zinc-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <SubIcon className={`w-3.5 h-3.5 shrink-0 ${isSubActive ? 'text-white' : 'text-slate-400 dark:text-zinc-500'}`} />
-                    <span className="truncate">{sub.label}</span>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {sub.externalUrl && (
-                      <ExternalLink className="w-3 h-3 text-slate-400 dark:text-zinc-500" />
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  };
+  }, [activeTab, toggleExpand, setActiveTab, setActiveSubTab, setIsMobileMenuOpen]);
 
   const renderNavGroup = (items: NavItem[]) => {
-    return items.map(item => {
-      const isActive = activeTab === item.id;
-      const isExpanded = !!expandedMenus[item.id];
-
-      return (
-        <NavItemRow
-          key={item.id}
-          item={item}
-          isActive={isActive}
-          isExpanded={isExpanded}
-          activeSubTab={activeSubTab}
-          onParentClick={handleParentItemClick}
-          onToggleExpand={toggleExpand}
-          onSubClick={handleNavClick}
-        />
-      );
-    });
+    return items.map(item => (
+      <NavItemRow
+        key={item.id}
+        item={item}
+        isActive={activeTab === item.id}
+        isExpanded={!!expandedMenus[item.id]}
+        activeSubTab={activeSubTab}
+        onParentClick={handleParentItemClick}
+        onToggleExpand={toggleExpand}
+        onSubClick={handleNavClick}
+      />
+    ));
   };
 
   return (
@@ -1193,7 +1287,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         style={{
           paddingTop: 'max(0.625rem, calc(env(safe-area-inset-top, 0px) + 0.375rem))',
         }}
-        className="lg:hidden bg-white dark:bg-black border-b border-slate-200 dark:border-zinc-800 px-3 sm:px-4 pb-2.5 sm:pb-3 flex items-center justify-between sticky top-0 z-[100] transition-colors"
+        className="lg:hidden bg-white dark:bg-black border-b border-slate-200 dark:border-zinc-800 px-3 sm:px-4 pb-2.5 sm:pb-3 flex items-center justify-between sticky top-0 z-[1200] transition-colors"
       >
         {/* Left Section: Hamburger Menu Trigger + Brand & Logo */}
         <div className="flex items-center gap-2 sm:gap-3">
@@ -1238,7 +1332,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   GeaAgro CRM
                 </h1>
                 <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                  4.2.3.7
+                  4.2.3.8
                 </span>
               </div>
               <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-medium">Inteligência Agronômica</p>
@@ -1347,7 +1441,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     GeaAgro CRM
                   </h1>
                   <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                    4.2.3.7
+                    4.2.3.8
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400 dark:text-zinc-400 font-medium mt-0.5">
@@ -1454,7 +1548,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             onClick={() => handleNavClick('sobre')}
-            title="Sobre o GeaAgro 4.2.3.7"
+            title="Sobre o GeaAgro 4.2.3.8"
             className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
               activeTab === 'sobre'
                 ? 'bg-emerald-600 text-white shadow-xs hover:scale-105'
@@ -1488,21 +1582,15 @@ export const Navbar: React.FC<NavbarProps> = ({
         />
       )}
 
-      {/* Menu Customization Modal */}
-      <MenuCustomizationModal
-        isOpen={isMenuCustomizationOpen}
-        onClose={() => setIsMenuCustomizationOpen(false)}
-        defaultItems={navTecnico}
-        currentPreferences={menuPreferences}
-        onSavePreferences={handleSaveMenuPreferences}
-      />
-
       {/* Perfil de Uso Customization Modal */}
-      <UserProfileCustomizationModal
-        isOpen={isProfileCustomizationOpen}
-        onClose={() => setIsProfileCustomizationOpen(false)}
-      />
-
+      {isProfileCustomizationOpen && (
+        <Suspense fallback={null}>
+          <UserProfileCustomizationModal
+            isOpen={isProfileCustomizationOpen}
+            onClose={() => setIsProfileCustomizationOpen(false)}
+          />
+        </Suspense>
+      )}
     </>
   );
 };

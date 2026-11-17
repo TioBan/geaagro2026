@@ -11,7 +11,7 @@
  * with universal LocalStorage bridging, zero data-loss durability, and resilient fallback.
  */
 
-export const OPFS_DB_VERSION = '4.2.3.7';
+export const OPFS_DB_VERSION = '4.2.3.8';
 export const OPFS_ROOT_DIR = 'geaagro_opfs_v1';
 
 export const REQUIRED_OPFS_STORES = [
@@ -67,6 +67,17 @@ export const REQUIRED_OPFS_STORES = [
   // Inteligência Artificial & Catálogos
   'diagnoses',
   'pesticide_products',
+
+  // GeaAgro Estatística (Módulo Científico Integrado)
+  'estatistica_projetos',
+  'estatistica_experimentos',
+  'estatistica_dados',
+  'estatistica_variaveis',
+  'estatistica_analises',
+  'estatistica_resultados',
+  'estatistica_graficos',
+  'estatistica_historico',
+  'estatistica_backups_metadata',
 ] as const;
 
 export type OpfsStoreName = typeof REQUIRED_OPFS_STORES[number];
@@ -245,17 +256,27 @@ class WasmAcceleratedProcessor {
   }
 }
 
+export interface OpfsArtifactRecord {
+  key: string;
+  mimeType: string;
+  sizeBytes: number;
+  checksum: number;
+  updatedAt: number;
+  dataBase64: string;
+}
+
 export class OpfsWasmDatabaseEngine {
   private wasm = new WasmAcceleratedProcessor();
   private inMemoryStores: Map<string, Map<string, any>> = new Map();
   private inMemoryKv: Map<string, any> = new Map();
+  private inMemoryFiles: Map<string, OpfsArtifactRecord> = new Map();
   private initialized = false;
   private isBridgeActive = false;
   private initPromise: Promise<void> | null = null;
   private opfsRootDirHandle: any = null;
   private opfsAppDirHandle: any = null;
   private kvFlushTimer: any = null;
-  private manifest: OpfsManifest = {
+  private manifest: OpfsManifest & { files?: Record<string, { checksum: number; sizeBytes: number; mimeType: string; updatedAt: number }> } = {
     version: OPFS_DB_VERSION,
     engine: 'OPFS+WASM',
     initializedAt: Date.now(),
@@ -265,6 +286,7 @@ export class OpfsWasmDatabaseEngine {
     migratedStoresCount: 0,
     migratedKvCount: 0,
     stores: {},
+    files: {},
   };
 
   constructor() {
@@ -331,6 +353,7 @@ export class OpfsWasmDatabaseEngine {
       });
       await this.opfsAppDirHandle.getDirectoryHandle('tables', { create: true });
       await this.opfsAppDirHandle.getDirectoryHandle('kv_store', { create: true });
+      await this.opfsAppDirHandle.getDirectoryHandle('files', { create: true });
       return true;
     } catch {
       this.opfsRootDirHandle = null;
@@ -400,6 +423,26 @@ export class OpfsWasmDatabaseEngine {
           Object.entries(kvData).forEach(([k, v]) => {
             this.inMemoryKv.set(k, v);
           });
+        }
+      } catch {}
+
+      try {
+        const filesDir = await this.opfsAppDirHandle.getDirectoryHandle('files', { create: true });
+        if (filesDir && typeof filesDir.values === 'function') {
+          for await (const entry of filesDir.values()) {
+            if (entry.kind === 'file' && entry.name.endsWith('.json')) {
+              try {
+                const file = await entry.getFile();
+                const txt = await file.text();
+                if (txt) {
+                  const rec: OpfsArtifactRecord = JSON.parse(txt);
+                  if (rec && rec.key) {
+                    this.inMemoryFiles.set(rec.key, rec);
+                  }
+                }
+              } catch {}
+            }
+          }
         }
       } catch {}
     } catch (err) {
@@ -1131,10 +1174,141 @@ export class OpfsWasmDatabaseEngine {
     };
   }
 
+  // ==========================================
+  // ARQUIVOS & ARTEFATOS EM OPFS + WASM CHECKSUM
+  // ==========================================
+
+  private sanitizeArtifactFilename(key: string): string {
+    return key.replace(/[^a-zA-Z0-9._-]/g, '_') + '.json';
+  }
+
+  private bytesToBase64Safe(bytes: Uint8Array): string {
+    if (typeof Buffer !== 'undefined') {
+      return Buffer.from(bytes).toString('base64');
+    }
+    let binary = '';
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    }
+    return btoa(binary);
+  }
+
+  private base64ToBytesSafe(b64: string): Uint8Array {
+    if (typeof Buffer !== 'undefined') {
+      return new Uint8Array(Buffer.from(b64, 'base64'));
+    }
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+
+  public async saveArtifactFile(
+    key: string,
+    content: Uint8Array | string,
+    mimeType: string = 'application/octet-stream'
+  ): Promise<OpfsArtifactRecord> {
+    await this.initialize();
+    const bytes = typeof content === 'string' ? new TextEncoder().encode(content) : content;
+    const dataBase64 = this.bytesToBase64Safe(bytes);
+    const checksum = this.wasm.calculateChecksum(dataBase64);
+    const record: OpfsArtifactRecord = {
+      key,
+      mimeType,
+      sizeBytes: bytes.byteLength,
+      checksum,
+      updatedAt: Date.now(),
+      dataBase64,
+    };
+
+    this.inMemoryFiles.set(key, record);
+    if (!this.manifest.files) this.manifest.files = {};
+    this.manifest.files[key] = {
+      checksum,
+      sizeBytes: bytes.byteLength,
+      mimeType,
+      updatedAt: record.updatedAt,
+    };
+
+    if (this.opfsAppDirHandle) {
+      try {
+        const filesDir = await this.opfsAppDirHandle.getDirectoryHandle('files', { create: true });
+        const fh = await filesDir.getFileHandle(this.sanitizeArtifactFilename(key), { create: true });
+        const writable = await fh.createWritable({ keepExistingData: false });
+        await writable.write(JSON.stringify(record));
+        await writable.close();
+        await this.saveManifestToOpfs();
+      } catch (err) {
+        console.warn(`[OpfsWasmDB] Erro ao persistir artefato '${key}' no OPFS:`, err);
+      }
+    }
+
+    return record;
+  }
+
+  public async readArtifactFile(key: string): Promise<{
+    bytes: Uint8Array;
+    text: string;
+    record: OpfsArtifactRecord;
+    checksumValid: boolean;
+  } | null> {
+    await this.initialize();
+    const rec = this.inMemoryFiles.get(key);
+    if (!rec) return null;
+    const computedChecksum = this.wasm.calculateChecksum(rec.dataBase64);
+    const checksumValid = computedChecksum === rec.checksum;
+    const bytes = this.base64ToBytesSafe(rec.dataBase64);
+    let text = '';
+    try {
+      text = new TextDecoder().decode(bytes);
+    } catch {}
+    return { bytes, text, record: rec, checksumValid };
+  }
+
+  public async deleteArtifactFile(key: string): Promise<void> {
+    await this.initialize();
+    this.inMemoryFiles.delete(key);
+    if (this.manifest.files) {
+      delete this.manifest.files[key];
+    }
+    if (this.opfsAppDirHandle) {
+      try {
+        const filesDir = await this.opfsAppDirHandle.getDirectoryHandle('files', { create: true });
+        await filesDir.removeEntry(this.sanitizeArtifactFilename(key));
+        await this.saveManifestToOpfs();
+      } catch {}
+    }
+  }
+
+  public async listArtifactFiles(prefix?: string): Promise<Omit<OpfsArtifactRecord, 'dataBase64'>[]> {
+    await this.initialize();
+    const items: Omit<OpfsArtifactRecord, 'dataBase64'>[] = [];
+    this.inMemoryFiles.forEach((rec) => {
+      if (!prefix || rec.key.startsWith(prefix)) {
+        items.push({
+          key: rec.key,
+          mimeType: rec.mimeType,
+          sizeBytes: rec.sizeBytes,
+          checksum: rec.checksum,
+          updatedAt: rec.updatedAt,
+        });
+      }
+    });
+    return items;
+  }
+
+  public calculateWasmChecksum(input: string): number {
+    return this.wasm.calculateChecksum(input);
+  }
+
   public async exportOpfsDump(): Promise<{
     manifest: OpfsManifest;
     tables: Record<string, any[]>;
     kv: Record<string, any>;
+    files: Record<string, OpfsArtifactRecord>;
     exportedAt: number;
   }> {
     await this.initialize();
@@ -1146,10 +1320,15 @@ export class OpfsWasmDatabaseEngine {
     for (const [k, v] of this.inMemoryKv.entries()) {
       kvDump[k] = v;
     }
+    const filesDump: Record<string, OpfsArtifactRecord> = {};
+    for (const [k, rec] of this.inMemoryFiles.entries()) {
+      filesDump[k] = rec;
+    }
     return {
       manifest: this.manifest,
       tables: tablesDump,
       kv: kvDump,
+      files: filesDump,
       exportedAt: Date.now(),
     };
   }
@@ -1157,6 +1336,7 @@ export class OpfsWasmDatabaseEngine {
   public async importOpfsDump(dump: {
     tables?: Record<string, any[]>;
     kv?: Record<string, any>;
+    files?: Record<string, OpfsArtifactRecord>;
   }): Promise<void> {
     await this.initialize();
     if (dump.tables) {
@@ -1169,6 +1349,14 @@ export class OpfsWasmDatabaseEngine {
     if (dump.kv) {
       for (const [k, v] of Object.entries(dump.kv)) {
         this.setKv(k, v);
+      }
+    }
+    if (dump.files) {
+      for (const [key, rec] of Object.entries(dump.files)) {
+        if (rec && rec.dataBase64) {
+          const bytes = this.base64ToBytesSafe(rec.dataBase64);
+          await this.saveArtifactFile(key, bytes, rec.mimeType || 'application/octet-stream');
+        }
       }
     }
   }

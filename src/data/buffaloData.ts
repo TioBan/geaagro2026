@@ -976,22 +976,18 @@ export const INITIAL_BUFFALO_FACILITIES: BuffaloFacility[] = [];
 
 export const INITIAL_THERMAL_WELFARE: BuffaloThermalWelfareIndex = {
   date: new Date().toISOString().split('T')[0],
-  ambientTemperatureC: 28.5,
-  relativeHumidityPct: 68,
-  blackGlobeTemperatureC: 31.2,
-  windSpeedKmH: 8.5,
-  thiCalculated: 77.4,
-  bgthiCalculated: 81.2,
+  ambientTemperatureC: 26.0,
+  relativeHumidityPct: 65,
+  blackGlobeTemperatureC: 27.0,
+  windSpeedKmH: 10.0,
+  thiCalculated: 74.0,
+  bgthiCalculated: 75.0,
   stressLevel: 'Normal / Conforto Pleno',
-  waterBathAvailabilityHours: 4.5,
-  shadeAvailabilityM2PerHead: 7.8,
-  herdRuminationPct: 82,
-  herdPantingPct: 4,
-  recommendations: [
-    'Manter portão do Açude 01 aberto para banho livre entre 11h e 14h30.',
-    'Acionar nebulizadores da sala de espera da ordenha 10 minutos antes da entrada do Lote A.',
-    'Verificar nível de água fresca nos bebedouros de alta vazão.'
-  ]
+  waterBathAvailabilityHours: 0,
+  shadeAvailabilityM2PerHead: 0,
+  herdRuminationPct: 0,
+  herdPantingPct: 0,
+  recommendations: []
 };
 
 // Funções de Cálculo Especializadas para Búfalos
@@ -1002,17 +998,17 @@ export const INITIAL_THERMAL_WELFARE: BuffaloThermalWelfareIndex = {
 export function calculateIEB(animals: BuffaloAnimal[], paddocks: BuffaloPaddock[], thermalIndex: BuffaloThermalWelfareIndex): BuffaloIEBCalculation {
   if (!animals || animals.length === 0) {
     return {
-      overallScore: 75,
-      classification: 'Satisfatório',
-      reproductiveEfficiencyScore: 75,
-      productiveEfficiencyScore: 75,
-      healthBiosecurityScore: 80,
-      thermalWelfareScore: 85,
-      foragePastureManagementScore: 70,
-      economicCostScore: 75,
-      strengths: ['Rebanho com bom potencial genético'],
-      opportunities: ['Cadastrar mais pesagens e controles leiteiros'],
-      actionPlan: ['Realizar pesagem mensal e monitoramento de CCS']
+      overallScore: 0,
+      classification: 'Sem Dados',
+      reproductiveEfficiencyScore: 0,
+      productiveEfficiencyScore: 0,
+      healthBiosecurityScore: 0,
+      thermalWelfareScore: 0,
+      foragePastureManagementScore: 0,
+      economicCostScore: 0,
+      strengths: ['Módulo de Bubalinocultura pronto para cadastros'],
+      opportunities: ['Cadastrar animais no Registro Individual para cálculo do IEB'],
+      actionPlan: ['Cadastrar as matrizes e reprodutores do plantel']
     };
   }
 

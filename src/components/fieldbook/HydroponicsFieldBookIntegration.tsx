@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Droplets,
   Plus,
@@ -8,11 +8,7 @@ import {
   Thermometer,
   ShieldCheck,
   CheckCircle2,
-  AlertTriangle,
-  Info,
-  Clock,
   Sparkles,
-  ArrowRight,
   Filter,
   Search,
   BookOpen,
@@ -23,7 +19,6 @@ import {
   Zap,
   Leaf,
   Scale,
-  Building2,
   Share2,
 } from 'lucide-react';
 import {
@@ -35,7 +30,6 @@ import {
   getHydroponicBenches,
   getHydroponicReservoirs,
   getHydroponicAnnotations,
-  saveHydroponicBenches,
   saveHydroponicReservoirs,
   addHydroponicAnnotationAndSync,
   ensureInitialHydroponicSync,
@@ -56,7 +50,7 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
   const [benches, setBenches] = useState<HydroponicBench[]>([]);
   const [reservoirs, setReservoirs] = useState<NutrientSolutionReservoir[]>([]);
   const [annotations, setAnnotations] = useState<HydroponicAnnotation[]>([]);
-  const [activeTab, setActiveTab] = useState<'anotacoes' | 'bancadas' | 'reservatorios' | 'fitossanidade' | 'calculadora'>('anotacoes');
+  const [activeTab, setActiveTab] = useState<'anotacoes' | 'bancadas' | 'reservatorios' | 'calculadora'>('anotacoes');
   
   // Search & Filter state for annotations
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,9 +60,9 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
   const [isNewAnnotationModalOpen, setIsNewAnnotationModalOpen] = useState(false);
   const [annTitle, setAnnTitle] = useState('');
   const [annCategory, setAnnCategory] = useState<HydroponicAnnotation['category']>('manejo_solucao');
-  const [annAuthor, setAnnAuthor] = useState('Eng. Agrônomo Marcelo Torres');
-  const [annDate, setAnnDate] = useState(new Date().toISOString().split('T')[0]);
-  const [annTime, setAnnTime] = useState(new Date().toTimeString().slice(0, 5));
+  const [annAuthor, setAnnAuthor] = useState('');
+  const [annDate, setAnnDate] = useState('');
+  const [annTime, setAnnTime] = useState('');
   const [annNotes, setAnnNotes] = useState('');
   const [annBenchId, setAnnBenchId] = useState('');
   const [annReservoirId, setAnnReservoirId] = useState('');
@@ -76,9 +70,9 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
   const [annEC, setAnnEC] = useState('');
   const [annWaterRefill, setAnnWaterRefill] = useState('');
   const [annFertilizers, setAnnFertilizers] = useState('');
-  const [annPestObs, setAnnPestObs] = useState('');
   const [annTemp, setAnnTemp] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Quick Nutrient Calculator state
   const [calcCropId, setCalcCropId] = useState('recipe-alface-crespa');
@@ -86,7 +80,8 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToastMessage(null), 4000);
   };
 
   // Load initial data and setup listeners
@@ -107,6 +102,7 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
     return () => {
       window.removeEventListener('geaagro-hydroponics-updated', handleUpdate);
       window.removeEventListener('geaagro-hydroponics-annotations-updated', handleUpdate);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
   }, [farmId]);
 
@@ -168,7 +164,7 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
     const selectedBench = benches.find(b => b.id === annBenchId);
     const selectedReservoir = reservoirs.find(r => r.id === annReservoirId);
 
-    const { annotation } = addHydroponicAnnotationAndSync(
+    addHydroponicAnnotationAndSync(
       {
         date: annDate,
         time: annTime,
@@ -184,7 +180,6 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
         ecValue: annEC ? parseFloat(annEC) : undefined,
         waterRefilledLiters: annWaterRefill ? parseFloat(annWaterRefill) : undefined,
         fertilizersAddedSummary: annFertilizers.trim() || undefined,
-        pestOrDiseaseObserved: annPestObs.trim() || undefined,
         temperatureC: annTemp ? parseFloat(annTemp) : undefined,
       },
       farmId
@@ -217,7 +212,6 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
     setAnnEC('');
     setAnnWaterRefill('');
     setAnnFertilizers('');
-    setAnnPestObs('');
     setAnnTemp('');
     setAnnBenchId('');
     setAnnReservoirId('');
@@ -247,11 +241,11 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
   const totalActivePlants = useMemo(() => benches.reduce((sum, b) => sum + b.currentPlantsCount, 0), [benches]);
   const readyForHarvestCount = useMemo(() => benches.filter(b => b.status === 'pronto_colheita').length, [benches]);
   const avgReservoirPH = useMemo(() => {
-    if (reservoirs.length === 0) return '6.0';
+    if (reservoirs.length === 0) return '--';
     return (reservoirs.reduce((s, r) => s + r.currentPH, 0) / reservoirs.length).toFixed(2);
   }, [reservoirs]);
   const avgReservoirEC = useMemo(() => {
-    if (reservoirs.length === 0) return '1.5';
+    if (reservoirs.length === 0) return '--';
     return (reservoirs.reduce((s, r) => s + r.currentEC, 0) / reservoirs.length).toFixed(2);
   }, [reservoirs]);
 
@@ -354,7 +348,9 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
             </span>
             <span className="text-[11px] font-bold text-slate-500">Faixa Ideal (5.8 - 6.5)</span>
           </div>
-          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">✓ Estável nos tanques</p>
+          <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-1">
+            {reservoirs.length > 0 ? '✓ Estável nos tanques' : 'Sem medições registradas'}
+          </p>
         </div>
 
         <div className="bg-white dark:bg-zinc-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm">
@@ -616,7 +612,16 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {benches.length === 0 ? (
+            <div className="bg-white dark:bg-zinc-900 p-10 text-center rounded-2xl border border-slate-200 dark:border-zinc-800 space-y-2">
+              <Layers className="w-8 h-8 text-slate-400 mx-auto" />
+              <h4 className="text-sm font-bold text-slate-700 dark:text-zinc-300">Nenhuma bancada cadastrada</h4>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Cadastre suas bancadas no módulo dedicado de Hidroponia para acompanhar lotação, idade e colheitas aqui.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {benches.map(bench => {
               const res = reservoirs.find(r => r.id === bench.reservoirId);
               return (
@@ -706,7 +711,8 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
                 </div>
               );
             })}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -721,7 +727,16 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
             <span className="text-xs text-slate-500">Leituras em tempo real</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {reservoirs.length === 0 ? (
+            <div className="bg-white dark:bg-zinc-900 p-10 text-center rounded-2xl border border-slate-200 dark:border-zinc-800 space-y-2">
+              <FlaskConical className="w-8 h-8 text-slate-400 mx-auto" />
+              <h4 className="text-sm font-bold text-slate-700 dark:text-zinc-300">Nenhum reservatório cadastrado</h4>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Cadastre reservatórios de solução nutritiva para monitorar pH, condutividade elétrica (CE) e oxigenação.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {reservoirs.map(res => (
               <div
                 key={res.id}
@@ -796,7 +811,8 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
                 </button>
               </div>
             ))}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1031,6 +1047,7 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
                     type="text"
                     value={annAuthor}
                     onChange={e => setAnnAuthor(e.target.value)}
+                    placeholder="Ex: Nome do responsável técnico"
                     className="w-full p-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500"
                   />
                 </div>

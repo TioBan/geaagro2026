@@ -405,19 +405,19 @@ export const ReportExportModal: React.FC<ReportExportModalProps> = ({
     } catch {}
     return {
       id: 'agro-default',
-      name: 'Dr. Lucas Mendes Siqueira',
-      profession: 'Engenheiro Agrônomo & Especialista em Geoprocessamento',
-      crea: '5069248810',
-      creaState: 'SP',
-      rnp: '2608491735',
-      cpf: '382.910.458-12',
-      email: 'lucas.mendes@agronutri.com.br',
-      phone: '(19) 99872-4411',
-      specialty: 'Nutrição de Plantas, Fertilidade dos Solos & Sensoriamento Remoto',
+      name: 'Responsável Técnico não informado',
+      profession: 'Engenheiro Agrônomo',
+      crea: '',
+      creaState: 'UF',
+      rnp: '',
+      cpf: '',
+      email: '',
+      phone: '',
+      specialty: 'Agronomia & Sensoriamento Remoto',
       companyId: 'comp-default',
-      hasDigitalSignature: true,
-      legalSignatureHash: 'DIGITAL-SIG-ART-SP-2026-981204',
-      createdAt: '2026-01-01',
+      hasDigitalSignature: false,
+      legalSignatureHash: '',
+      createdAt: '',
     };
   };
 
@@ -432,17 +432,17 @@ export const ReportExportModal: React.FC<ReportExportModalProps> = ({
     } catch {}
     return {
       id: 'prod-default',
-      name: 'João Silveira Matos & Família',
-      document: '023.845.998-89',
+      name: 'Produtor não informado',
+      document: '',
       documentType: 'CPF',
-      stateRegistration: 'Isento',
-      email: 'joao.matos@fazendastahelena.com.br',
-      phone: '(19) 99763-1200',
-      address: 'Estrada Vicinal Santa Helena, Gleba 04',
-      city: 'Mogi Mirim',
-      state: 'SP',
+      stateRegistration: '',
+      email: '',
+      phone: '',
+      address: '',
+      city: '',
+      state: '',
       companyId: 'comp-default',
-      createdAt: '2026-01-01',
+      createdAt: '',
     };
   };
 
@@ -460,16 +460,16 @@ export const ReportExportModal: React.FC<ReportExportModalProps> = ({
       producerId: 'prod-default',
       agronomistId: 'agro-default',
       companyId: 'comp-default',
-      name: plot.farmName || 'Fazenda Santa Helena HF & Grãos',
-      city: 'Mogi Mirim',
-      state: 'SP',
-      totalAreaHa: 148.5,
-      cultivatedAreaHa: 120.0,
-      carRegister: 'SP-3531803-89AC4521E98F4120',
-      soilGeneralType: 'Latossolo Vermelho Distroférrico',
-      cropHistory: ['Soja', 'Milho Safrinha', 'Tomate'],
+      name: plot.farmName || 'Propriedade Rural',
+      city: '',
+      state: '',
+      totalAreaHa: plot.areaHa || 0,
+      cultivatedAreaHa: plot.areaHa || 0,
+      carRegister: '',
+      soilGeneralType: '',
+      cropHistory: [],
       plots: [],
-      createdAt: '2026-01-01',
+      createdAt: '',
     };
   };
 
@@ -751,7 +751,7 @@ export const ReportExportModal: React.FC<ReportExportModalProps> = ({
         // Page 1 Footer
         doc.setFontSize(7.5);
         doc.setTextColor(148, 163, 184);
-        doc.text(`Página 1 de 4 • GeaAgro Suite v4.2.3.7 • Relatório Técnico de Geoprocessamento • ${plot.code}`, 14, 287);
+        doc.text(`Página 1 de 4 • GeaAgro Suite v4.2.3.8 • Relatório Técnico de Geoprocessamento • ${plot.code}`, 14, 287);
         doc.text(`Código de Autenticidade: ${reportCode}`, 128, 287);
 
         // =========================================================================
@@ -930,7 +930,7 @@ export const ReportExportModal: React.FC<ReportExportModalProps> = ({
         // Page 2 Footer
         doc.setFontSize(7.5);
         doc.setTextColor(148, 163, 184);
-        doc.text(`Página 2 de 4 • GeaAgro Suite v4.2.3.7 • Relatório Técnico de Geoprocessamento • ${plot.code}`, 14, 287);
+        doc.text(`Página 2 de 4 • GeaAgro Suite v4.2.3.8 • Relatório Técnico de Geoprocessamento • ${plot.code}`, 14, 287);
         doc.text(`Código de Autenticidade: ${reportCode}`, 128, 287);
 
         // =========================================================================
@@ -1075,7 +1075,7 @@ export const ReportExportModal: React.FC<ReportExportModalProps> = ({
         // Page 3 Footer
         doc.setFontSize(7.5);
         doc.setTextColor(148, 163, 184);
-        doc.text(`Página 3 de 4 • GeaAgro Suite v4.2.3.7 • Relatório Técnico de Geoprocessamento • ${plot.code}`, 14, 287);
+        doc.text(`Página 3 de 4 • GeaAgro Suite v4.2.3.8 • Relatório Técnico de Geoprocessamento • ${plot.code}`, 14, 287);
         doc.text(`Código de Autenticidade: ${reportCode}`, 128, 287);
 
         // =========================================================================
@@ -1280,7 +1280,7 @@ export const ReportExportModal: React.FC<ReportExportModalProps> = ({
         // Page 4 Footer
         doc.setFontSize(7.5);
         doc.setTextColor(148, 163, 184);
-        doc.text(`Página 4 de 4 • GeaAgro Suite v4.2.3.7 • Relatório Técnico de Geoprocessamento • ${plot.code}`, 14, 287);
+        doc.text(`Página 4 de 4 • GeaAgro Suite v4.2.3.8 • Relatório Técnico de Geoprocessamento • ${plot.code}`, 14, 287);
         doc.text(`Código de Autenticidade: ${reportCode}`, 128, 287);
 
         // Save PDF file

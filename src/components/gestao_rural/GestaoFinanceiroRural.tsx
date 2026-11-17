@@ -1,35 +1,24 @@
 import React, { useState } from 'react';
 import {
   DollarSign,
-  TrendingUp,
-  BarChart3,
-  Calendar,
   Plus,
-  ArrowUpRight,
-  ArrowDownRight,
-  CheckCircle2,
-  AlertTriangle,
-  FileSpreadsheet,
-  PieChart as PieIcon,
-  Search,
 } from 'lucide-react';
 import { ContaFinanceiraRecord, SafraAgragricola } from '../../types/gestaoRural';
 
 interface GestaoFinanceiroRuralProps {
   financeiro: ContaFinanceiraRecord[];
-  safras: SafraAgragricola[];
+  safras?: SafraAgragricola[];
   onAddConta: (conta: ContaFinanceiraRecord) => void;
   onUpdateStatusConta: (id: string, status: 'pago' | 'recebido' | 'pendente') => void;
 }
 
 export const GestaoFinanceiroRural: React.FC<GestaoFinanceiroRuralProps> = ({
   financeiro,
-  safras,
   onAddConta,
   onUpdateStatusConta,
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dre' | 'fluxo' | 'pagar' | 'receber'>('dre');
+  const [activeTab, setActiveTab] = useState<'dre' | 'pagar' | 'receber'>('dre');
 
   const [form, setForm] = useState<Partial<ContaFinanceiraRecord>>({
     tipo: 'despesa',
@@ -50,6 +39,19 @@ export const GestaoFinanceiroRural: React.FC<GestaoFinanceiroRuralProps> = ({
   const lucroLiquido = totalReceita - totalDespesa;
   const margemLucroPct = totalReceita > 0 ? (lucroLiquido / totalReceita) * 100 : 0;
   const roiPct = totalDespesa > 0 ? (lucroLiquido / totalDespesa) * 100 : 0;
+  const totalPagarPendente = despesas
+    .filter(d => d.status === 'pendente')
+    .reduce((acc, d) => acc + d.valorR$, 0);
+  const totalReceberPendente = receitas
+    .filter(r => r.status === 'pendente')
+    .reduce((acc, r) => acc + r.valorR$, 0);
+
+  const displayedRecords =
+    activeTab === 'pagar'
+      ? despesas.filter(d => d.status === 'pendente')
+      : activeTab === 'receber'
+      ? receitas.filter(r => r.status === 'pendente')
+      : financeiro;
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,12 +157,14 @@ export const GestaoFinanceiroRural: React.FC<GestaoFinanceiroRuralProps> = ({
 
         <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 space-y-1 shadow-2xs">
           <span className="text-[10px] font-bold uppercase text-slate-400 block">
-            Custo por Saca
+            Contas Pendentes (P / R)
           </span>
-          <span className="text-lg font-black text-amber-600 dark:text-amber-400 block">
-            R$ 44,79 / sc
+          <span className="text-sm font-black text-amber-600 dark:text-amber-400 block">
+            Pagar: R$ {totalPagarPendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </span>
-          <span className="text-[10px] text-slate-500">Preço Venda: R$ 138.50</span>
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+            Receber: R$ {totalReceberPendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </span>
         </div>
       </div>
 
@@ -214,7 +218,7 @@ export const GestaoFinanceiroRural: React.FC<GestaoFinanceiroRuralProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-zinc-800">
-              {financeiro.map(f => (
+              {displayedRecords.map(f => (
                 <tr key={f.id} className="hover:bg-slate-50 dark:hover:bg-zinc-800/50">
                   <td className="p-3 font-bold">
                     <span
@@ -280,10 +284,10 @@ export const GestaoFinanceiroRural: React.FC<GestaoFinanceiroRuralProps> = ({
                   </td>
                 </tr>
               ))}
-              {financeiro.length === 0 && (
+              {displayedRecords.length === 0 && (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-slate-400">
-                    Nenhum lançamento financeiro registrado nesta categoria. Clique em &ldquo;Novo Lançamento&rdquo; para adicionar.
+                    Nenhum lançamento financeiro registrado nesta categoria. Clique em &ldquo;Lançar Receita / Despesa&rdquo; para adicionar.
                   </td>
                 </tr>
               )}

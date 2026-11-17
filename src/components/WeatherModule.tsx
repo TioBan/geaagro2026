@@ -235,8 +235,19 @@ export const WeatherModule: React.FC<WeatherModuleProps> = ({
     return alertsList;
   }, [activeFarm, matchedCropThresholds, dailyData, station]);
 
-  // Realtime controls & locations
-  const [selectedLocation, setSelectedLocation] = useState<WeatherLocation>(PRESET_AGRICULTURAL_LOCATIONS[0]);
+  // Realtime controls & locations - Não força Sorriso-MT por padrão
+  const [selectedLocation, setSelectedLocation] = useState<WeatherLocation | null>(() => {
+    if (activeFarm && (activeFarm.city || activeFarm.latitude)) {
+      return {
+        id: `farm-${activeFarm.id || 'current'}`,
+        name: activeFarm.name,
+        state: activeFarm.state || 'UF',
+        latitude: activeFarm.latitude || -15.7801,
+        longitude: activeFarm.longitude || -47.9292,
+      };
+    }
+    return null;
+  });
   const [isLiveLoading, setIsLiveLoading] = useState<boolean>(false);
   const [lastLiveUpdatedTime, setLastLiveUpdatedTime] = useState<string>('');
 
@@ -244,7 +255,7 @@ export const WeatherModule: React.FC<WeatherModuleProps> = ({
   useEffect(() => {
     let isSubscribed = true;
     async function syncFarmLocation() {
-      if (activeFarm) {
+      if (activeFarm && (activeFarm.city || activeFarm.latitude)) {
         try {
           const resolved = await resolveFarmCoordinates(activeFarm);
           if (isSubscribed) {
@@ -297,8 +308,9 @@ export const WeatherModule: React.FC<WeatherModuleProps> = ({
     }
   };
 
-  // Initial load & automatic timer refresh (60 seconds)
+  // Initial load & automatic timer refresh (60 seconds) - Apenas se houver local selecionado
   useEffect(() => {
+    if (!selectedLocation) return;
     handleFetchRealtimeData(selectedLocation.latitude, selectedLocation.longitude, `${selectedLocation.name} - ${selectedLocation.state}`);
     const interval = setInterval(() => {
       handleFetchRealtimeData(selectedLocation.latitude, selectedLocation.longitude, `${selectedLocation.name} - ${selectedLocation.state}`);
@@ -392,9 +404,13 @@ export const WeatherModule: React.FC<WeatherModuleProps> = ({
           <div className="bg-sky-950/90 border border-sky-400/30 p-2 rounded-xl flex items-center gap-2 max-w-full sm:max-w-md">
             <MapPin className="w-4 h-4 text-sky-400 shrink-0" />
             <select
-              value={selectedLocation.id}
+              value={selectedLocation?.id || ''}
               onChange={async (e) => {
                 const val = e.target.value;
+                if (!val) {
+                  setSelectedLocation(null);
+                  return;
+                }
                 if (val.startsWith('farm-') && activeFarm) {
                   const resolved = await resolveFarmCoordinates(activeFarm);
                   setSelectedLocation({
@@ -411,6 +427,9 @@ export const WeatherModule: React.FC<WeatherModuleProps> = ({
               }}
               className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer pr-1 flex-1 truncate"
             >
+              <option value="" className="bg-slate-900 text-slate-400">
+                📍 Selecione um município ou fazenda...
+              </option>
               {activeFarm && (
                 <option value={`farm-${activeFarm.id || 'current'}`} className="bg-emerald-950 font-bold text-emerald-300">
                   🏡 {activeFarm.name} ({activeFarm.city || 'Sede'} - {activeFarm.state || 'UF'})
@@ -421,7 +440,7 @@ export const WeatherModule: React.FC<WeatherModuleProps> = ({
                   {loc.name} - {loc.state}
                 </option>
               ))}
-              {selectedLocation.id === 'gps-local' && (
+              {selectedLocation?.id === 'gps-local' && (
                 <option value="gps-local" className="bg-slate-900 text-white">
                   📍 Minha Localização GPS
                 </option>
@@ -437,8 +456,12 @@ export const WeatherModule: React.FC<WeatherModuleProps> = ({
             </button>
 
             <button
-              onClick={() => handleFetchRealtimeData(selectedLocation.latitude, selectedLocation.longitude, `${selectedLocation.name} - ${selectedLocation.state}`)}
-              disabled={isLiveLoading}
+              onClick={() => {
+                if (selectedLocation) {
+                  handleFetchRealtimeData(selectedLocation.latitude, selectedLocation.longitude, `${selectedLocation.name} - ${selectedLocation.state}`);
+                }
+              }}
+              disabled={!selectedLocation || isLiveLoading}
               title="Atualizar dados climáticos em tempo real"
               className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1 shrink-0"
             >
@@ -451,13 +474,15 @@ export const WeatherModule: React.FC<WeatherModuleProps> = ({
             <div>
               <span className="text-[10px] text-sky-300 font-bold block uppercase leading-none">Temperatura em Tempo Real</span>
               <span className="text-[10px] text-sky-300/80 block mt-0.5">
-                {lastLiveUpdatedTime ? `Atualizado às ${lastLiveUpdatedTime}` : station.lastTelemetryTimestamp}
+                {selectedLocation
+                  ? (lastLiveUpdatedTime ? `Atualizado às ${lastLiveUpdatedTime}` : station.lastTelemetryTimestamp)
+                  : 'Nenhum local selecionado'}
               </span>
             </div>
             <div className="text-right pl-3 border-l border-sky-800/70">
               <span className="text-base font-black text-emerald-400 flex items-center gap-1 justify-end">
                 <Thermometer className="w-4 h-4" />
-                {station.currentAirTempC}°C
+                {selectedLocation && station.currentAirTempC !== 0 ? `${station.currentAirTempC}°C` : '--'}
               </span>
             </div>
           </div>
@@ -608,6 +633,19 @@ export const WeatherModule: React.FC<WeatherModuleProps> = ({
             </div>
           )}
 
+          {/* Aviso se nenhuma localização foi selecionada */}
+          {!selectedLocation && (
+            <div className="bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 rounded-2xl p-4 flex items-center gap-3 text-sky-800 dark:text-sky-200 text-xs">
+              <MapPin className="w-5 h-5 text-sky-600 dark:text-sky-400 shrink-0" />
+              <div>
+                <p className="font-bold">Nenhuma localização selecionada</p>
+                <p className="text-[11px] opacity-80">
+                  Selecione sua fazenda cadastrada, escolha um município no menu acima ou clique no botão GPS para carregar a telemetria agroclimática em tempo real.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Main Weather Metric Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <div className="bg-white dark:bg-black border border-slate-200 dark:border-zinc-800 p-4 rounded-xl shadow-2xs">
@@ -616,20 +654,24 @@ export const WeatherModule: React.FC<WeatherModuleProps> = ({
                   Temperatura em Tempo Real
                 </span>
                 <span className="p-1.5 bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 rounded-lg flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  {selectedLocation && <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />}
                   <Thermometer className="w-4 h-4" />
                 </span>
               </div>
               <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mt-2 flex items-baseline gap-2">
-                <span>{station.currentAirTempC}°C</span>
-                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">
-                  Ao Vivo
-                </span>
+                <span>{selectedLocation && station.currentAirTempC !== 0 ? `${station.currentAirTempC}°C` : '--'}</span>
+                {selectedLocation && (
+                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">
+                    Ao Vivo
+                  </span>
+                )}
               </div>
               <div className="text-[11px] text-slate-500 dark:text-zinc-400 font-semibold mt-1 flex items-center justify-between">
-                <span>Mín: {dailyData[0]?.tempMinC ?? 17.5}°C</span>
-                <span>Máx: {dailyData[0]?.tempMaxC ?? 31.2}°C</span>
-                <span>Orvalho: {(station.currentAirTempC - (100 - station.currentHumidityPercent) / 5).toFixed(1)}°C</span>
+                <span>Mín: {selectedLocation && dailyData[0] ? `${dailyData[0].tempMinC}°C` : '--'}</span>
+                <span>Máx: {selectedLocation && dailyData[0] ? `${dailyData[0].tempMaxC}°C` : '--'}</span>
+                <span>
+                  Orvalho: {selectedLocation && station.currentAirTempC !== 0 ? `${(station.currentAirTempC - (100 - station.currentHumidityPercent) / 5).toFixed(1)}°C` : '--'}
+                </span>
               </div>
             </div>
 
@@ -643,10 +685,18 @@ export const WeatherModule: React.FC<WeatherModuleProps> = ({
                 </span>
               </div>
               <div className="text-2xl sm:text-3xl font-extrabold text-sky-600 dark:text-sky-400 mt-2">
-                {station.currentWindSpeedKmh} <span className="text-xs font-bold">km/h</span>
+                {selectedLocation ? (
+                  <>
+                    {station.currentWindSpeedKmh} <span className="text-xs font-bold">km/h</span>
+                  </>
+                ) : (
+                  <span>--</span>
+                )}
               </div>
-              <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
-                Direção: Sudeste (SE) • Rajadas: {station.currentWindGustKmh} km/h
+              <div className="text-[11px] text-slate-500 dark:text-zinc-400 font-semibold mt-1">
+                {selectedLocation
+                  ? `Rajadas: ${station.currentWindGustKmh} km/h`
+                  : 'Aguardando seleção de local'}
               </div>
             </div>
 
@@ -660,10 +710,12 @@ export const WeatherModule: React.FC<WeatherModuleProps> = ({
                 </span>
               </div>
               <div className="text-2xl sm:text-3xl font-extrabold text-blue-600 dark:text-blue-400 mt-2">
-                {station.currentHumidityPercent}%
+                {selectedLocation ? `${station.currentHumidityPercent}%` : '--'}
               </div>
               <div className="text-[11px] text-slate-500 dark:text-zinc-400 font-semibold mt-1">
-                Pressão: {station.currentAtmosphericPressureHpa} hPa (Estável)
+                {selectedLocation
+                  ? `Pressão: ${station.currentAtmosphericPressureHpa} hPa`
+                  : 'Aguardando seleção de local'}
               </div>
             </div>
 
@@ -677,10 +729,18 @@ export const WeatherModule: React.FC<WeatherModuleProps> = ({
                 </span>
               </div>
               <div className="text-2xl sm:text-3xl font-extrabold text-indigo-600 dark:text-indigo-400 mt-2">
-                {station.rainAccumulatedTodayMm} <span className="text-xs font-bold">mm (hoje)</span>
+                {selectedLocation ? (
+                  <>
+                    {station.rainAccumulatedTodayMm} <span className="text-xs font-bold">mm (hoje)</span>
+                  </>
+                ) : (
+                  <span>--</span>
+                )}
               </div>
               <div className="text-[11px] text-slate-500 dark:text-zinc-400 font-semibold mt-1">
-                Mês: {station.rainAccumulatedMonthMm} mm (7 dias sem chuva)
+                {selectedLocation
+                  ? `Mês: ${station.rainAccumulatedMonthMm} mm`
+                  : 'Aguardando seleção de local'}
               </div>
             </div>
           </div>

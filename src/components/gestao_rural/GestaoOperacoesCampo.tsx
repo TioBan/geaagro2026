@@ -2,14 +2,6 @@ import React, { useState } from 'react';
 import {
   Tractor,
   Plus,
-  Calendar,
-  Clock,
-  MapPin,
-  CloudSun,
-  Droplets,
-  DollarSign,
-  Camera,
-  CheckCircle2,
   FileText,
   Search,
 } from 'lucide-react';
@@ -80,6 +72,23 @@ export const GestaoOperacoesCampo: React.FC<GestaoOperacoesCampoProps> = ({
 
     onAddOperacao(created);
     setShowAddModal(false);
+    setForm({
+      tipoOperacao: 'Pulverização',
+      talhaoId: talhoes[0]?.id || '',
+      safraId: safras[0]?.id || '',
+      operadorNome: '',
+      maquinaNome: '',
+      produtoUtilizado: '',
+      dosePorHa: 0,
+      unidadeDose: 'L/ha',
+      areaAplicadaHa: 0,
+      temperaturaC: 25,
+      umidadeArPct: 60,
+      velocidadeVentoKmH: 5,
+      consumoCombustivelLiters: 0,
+      custoTotalOperacaoR$: 0,
+      observacoes: '',
+    });
   };
 
   const filteredOps = operacoes.filter(
@@ -192,7 +201,7 @@ export const GestaoOperacoesCampo: React.FC<GestaoOperacoesCampoProps> = ({
           ))}
           {filteredOps.length === 0 && (
             <div className="p-8 text-center bg-slate-50 dark:bg-zinc-800/20 rounded-2xl border border-dashed border-slate-300 dark:border-zinc-700 text-slate-500 dark:text-zinc-400">
-              Nenhuma operação de campo encontrada. Clique em &ldquo;Nova Operação&rdquo; acima para lançar uma atividade.
+              Nenhuma operação de campo encontrada. Clique em &ldquo;Lançar Operação de Campo&rdquo; acima para lançar uma atividade.
             </div>
           )}
         </div>

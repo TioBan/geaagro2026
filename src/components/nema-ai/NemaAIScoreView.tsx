@@ -43,17 +43,17 @@ export const NemaAIScoreView: React.FC<NemaAIScoreViewProps> = ({
     : null;
 
   return (
-    <div className="space-y-6">
-      {/* Nema Score Specialized Banner */}
-      <div className="bg-gradient-to-r from-stone-900 via-stone-800 to-amber-955 text-white rounded-2xl p-5 sm:p-6 shadow-sm border border-stone-700/50 space-y-2">
-        <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full tracking-wider flex items-center gap-1 w-fit">
-          <Activity className="w-3.5 h-3.5 text-amber-400" />
-          Métricas Fitossanitárias
-        </span>
-        <h2 className="text-xl sm:text-2xl font-black text-white">
+    <div className="space-y-5">
+      {/* Nema Score Header */}
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-slate-200 dark:border-zinc-800 space-y-1.5">
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+          <Activity className="w-3.5 h-3.5" />
+          <span>Métricas Fitossanitárias</span>
+        </div>
+        <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight">
           Nema Score — Gêmeo Digital Integrado
         </h2>
-        <p className="text-xs sm:text-sm text-stone-300 max-w-3xl leading-relaxed">
+        <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-3xl leading-relaxed">
           Monitore os índices de risco populacional, reprodutivo e vulnerabilidade de solo do seu talhão de forma offline ou sincronizada com IA online.
         </p>
       </div>

@@ -84,7 +84,7 @@ export const TechnicalReportModule: React.FC<TechnicalReportModuleProps> = ({
   crop,
   targetYield,
   leafSample,
-  limingPrnt = 85,
+  limingPrnt = 100,
   incorporationDepth = 20,
 }) => {
   const [notifSent, setNotifSent] = useState<boolean>(false);
@@ -286,7 +286,7 @@ ${agronomist?.name || 'Engenheiro Agrônomo'} - Eng. Agrônomo (CREA-${agronomis
   const generatePdfBlob = async (): Promise<{ pdf: any; blob: Blob; filename: string }> => {
     const [{ jsPDF }, html2canvas] = await Promise.all([
       import('jspdf'),
-      import('html2canvas').then((m) => m.default),
+      import('html2canvas-pro').then((m) => m.default),
     ]);
 
     const pdf = new jsPDF({

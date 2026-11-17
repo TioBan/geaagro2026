@@ -449,6 +449,56 @@ export function getBulletinCalibratedCropParameters(
   };
 }
 
+const EMPTY_SOIL_FALLBACK: SoilAnalysisExtended = {
+  id: '',
+  sampleCode: 'Nenhuma amostra',
+  laboratoryName: '',
+  analysisDate: '',
+  depth: '0-20',
+  plotId: '',
+  plotName: 'Nenhum talhão cadastrado',
+  cropName: '',
+  cultivar: '',
+  expectedYield: 0,
+  yieldUnit: 'sc/ha',
+  phCacl2: 5.5,
+  phH2o: 6.0,
+  phSmp: 5.8,
+  organicMatterGKg: 0,
+  organicCarbonGKg: 0,
+  pMehlich1: 0,
+  pResina: 0,
+  pRemanescente: 0,
+  kCmolc: 0,
+  kMgDm3: 0,
+  caCmolc: 0,
+  mgCmolc: 0,
+  naCmolc: 0,
+  alCmolc: 0,
+  hAlCmolc: 0,
+  sSulfurMgDm3: 0,
+  bBoroMgDm3: 0,
+  cuCobreMgDm3: 0,
+  feFerroMgDm3: 0,
+  mnManganesMgDm3: 0,
+  znZincoMgDm3: 0,
+  clayPercent: 0,
+  siltPercent: 0,
+  sandPercent: 0,
+  texturalClass: 'Não definida',
+  soilDensityGcm3: 1.2,
+  sumOfBases: 0,
+  effectiveCtc: 0,
+  potentialCtc: 0,
+  baseSaturationPercent: 0,
+  aluminumSaturationPercent: 0,
+  caMgRatio: 0,
+  caKRatio: 0,
+  mgKRatio: 0,
+  caMgKRatio: 0,
+  igfScore: 0,
+};
+
 export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
   soilSamples: parentSoilSamples,
   selectedFarm,
@@ -544,28 +594,14 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
         for (let i = 0; i < pages.length; i++) {
           const pageEl = pages[i] as HTMLElement;
 
-          let canvas: HTMLCanvasElement;
-          try {
-            canvas = await html2canvas(pageEl, {
-              scale: 2.2, // High resolution crisp rendering
-              useCORS: true,
-              logging: false,
-              backgroundColor: '#ffffff',
-              windowWidth: 794,
-              windowHeight: 1123,
-            });
-          } catch (errPro) {
-            console.warn('html2canvas-pro failed, falling back to standard html2canvas:', errPro);
-            const standardHtml2Canvas = (await import('html2canvas')).default;
-            canvas = await standardHtml2Canvas(pageEl, {
-              scale: 2.2,
-              useCORS: true,
-              logging: false,
-              backgroundColor: '#ffffff',
-              windowWidth: 794,
-              windowHeight: 1123,
-            });
-          }
+          const canvas = await html2canvas(pageEl, {
+            scale: 2.2, // High resolution crisp rendering
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+            windowWidth: 794,
+            windowHeight: 1123,
+          });
 
           const imgData = canvas.toDataURL('image/jpeg', 1.0);
           if (i > 0) {
@@ -878,7 +914,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
 
   // Active Soil Sample
   const currentSoil = useMemo(() => {
-    return soilAnalyses.find(s => s.id === selectedSoilId) || soilAnalyses[0];
+    return soilAnalyses.find(s => s.id === selectedSoilId) || soilAnalyses[0] || EMPTY_SOIL_FALLBACK;
   }, [soilAnalyses, selectedSoilId]);
 
   // Active Regional Bulletin (merged with DEFAULT_BULLETIN_REFERENCE_PARAMS for safety)
@@ -1255,21 +1291,39 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
   }, [allBulletins, bulletinCategoryFilter, bulletinSearchTerm]);
 
   // Calagem State Parameters
+  const [limingNotNeeded, setLimingNotNeeded] = useState<boolean>(false);
   const [limingMethod, setLimingMethod] = useState<'v_percent' | 'smp' | 'al_neutralization' | 'ca_elevation' | 'mg_elevation'>('v_percent');
   const [limingTargetCa, setLimingTargetCa] = useState<number | ''>(3.0);
   const [limingTargetMg, setLimingTargetMg] = useState<number | ''>(1.0);
-  const [limingPrnt, setLimingPrnt] = useState<number | ''>(85);
+  const [limingPrnt, setLimingPrnt] = useState<number | ''>(100);
   const [limingTargetV, setLimingTargetV] = useState<number | ''>(70);
   const [limingDepthCm, setLimingDepthCm] = useState<number | ''>(20);
   const [limingMoisture, setLimingMoisture] = useState<number | ''>(5);
   const [limingObservation, setLimingObservation] = useState<string>('');
   
   // Gessagem Multi-Method State
-  const [selectedGypsumMethod, setSelectedGypsumMethod] = useState<'fator_argila' | 'demate' | 'caires_guimaraes' | 'boletim_100' | 'classe_textural'>('fator_argila');
+  const [selectedGypsumMethod, setSelectedGypsumMethod] = useState<'fator_argila' | 'demate' | 'caires_guimaraes' | 'boletim_100' | 'classe_textural' | 'nao_necessario'>('fator_argila');
   const [gypsumClayFactor, setGypsumClayFactor] = useState<number>(50);
   const [demateTargetV, setDemateTargetV] = useState<number>(50);
   const [cairesTargetCa, setCairesTargetCa] = useState<number>(60);
   const [gypsumObservation, setGypsumObservation] = useState<string>('');
+
+  // Área editável para adubação e cálculos operacionais (nunca força 50 ha)
+  const [fertilizationAreaHa, setFertilizationAreaHa] = useState<number | ''>(() =>
+    currentSoil?.areaHa && currentSoil.areaHa > 0 ? currentSoil.areaHa : 1
+  );
+
+  useEffect(() => {
+    setFertilizationAreaHa(currentSoil?.areaHa && currentSoil.areaHa > 0 ? currentSoil.areaHa : 1);
+  }, [currentSoil?.id, currentSoil?.areaHa]);
+
+  const activeAreaHa = useMemo(() => {
+    if (fertilizationAreaHa !== '') {
+      const val = Number(fertilizationAreaHa);
+      return Number.isFinite(val) && val > 0 ? val : 0;
+    }
+    return currentSoil?.areaHa && currentSoil.areaHa > 0 ? currentSoil.areaHa : 0;
+  }, [fertilizationAreaHa, currentSoil?.areaHa]);
 
   // Adubação Orgânica State
   const [selectedOrganicId, setSelectedOrganicId] = useState<string>('org-cama-frango');
@@ -1325,7 +1379,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
 
   // Spacing & Population State
   const [rowSpacingM, setRowSpacingM] = useState<number | ''>(0.45);
-  const [plantSpacingMode, setPlantSpacingMode] = useState<'per_meter' | 'plant_distance'>('per_meter');
+  const [plantSpacingMode, setPlantSpacingMode] = useState<'per_meter' | 'plant_distance'>('plant_distance');
   const [plantsPerMeter, setPlantsPerMeter] = useState<number | ''>(12);
   const [plantSpacingM, setPlantSpacingM] = useState<number | ''>(0.18);
   const [customPopulationHa, setCustomPopulationHa] = useState<number | ''>('');
@@ -1337,19 +1391,19 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
 
   // Custom Fertilizer State
   const [isCustomFertilizer, setIsCustomFertilizer] = useState<boolean>(false);
-  const [customFertName, setCustomFertName] = useState<string>('Meu NPK Bunge 03-24-12 + 2% S + 0,1% B');
-  const [customFertN, setCustomFertN] = useState<number | ''>(3);
-  const [customFertP2O5, setCustomFertP2O5] = useState<number | ''>(24);
-  const [customFertK2O, setCustomFertK2O] = useState<number | ''>(12);
-  const [customFertS, setCustomFertS] = useState<number | ''>(2);
-  const [customFertCa, setCustomFertCa] = useState<number | ''>(0);
-  const [customFertMg, setCustomFertMg] = useState<number | ''>(0);
-  const [customFertB, setCustomFertB] = useState<number | ''>(0.2);
-  const [customFertZn, setCustomFertZn] = useState<number | ''>(0.5);
+  const [customFertName, setCustomFertName] = useState<string>('');
+  const [customFertN, setCustomFertN] = useState<number | ''>('');
+  const [customFertP2O5, setCustomFertP2O5] = useState<number | ''>('');
+  const [customFertK2O, setCustomFertK2O] = useState<number | ''>('');
+  const [customFertS, setCustomFertS] = useState<number | ''>('');
+  const [customFertCa, setCustomFertCa] = useState<number | ''>('');
+  const [customFertMg, setCustomFertMg] = useState<number | ''>('');
+  const [customFertB, setCustomFertB] = useState<number | ''>('');
+  const [customFertZn, setCustomFertZn] = useState<number | ''>('');
 
   // Planting Dosage View / Unit & Field Notes State
   const [plantingDoseUnit, setPlantingDoseUnit] = useState<'kg_ha' | 'area_total' | 'g_planta' | 'g_sulco'>('kg_ha');
-  const [plantingObservation, setPlantingObservation] = useState<string>('Aplicar a 5 cm ao lado e 5 cm abaixo da semente no sulco de plantio para evitar fitotoxidez e promover enraizamento profundo.');
+  const [plantingObservation, setPlantingObservation] = useState<string>('Aplicar no sulco de plantio conforme recomendação técnica.');
 
   // Reminders & Notifications State
   const [reminders, setReminders] = useState<any[]>(() => {
@@ -1363,9 +1417,9 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
 
   const [reminderType, setReminderType] = useState<'plantio' | 'cobertura'>('plantio');
   const [reminderParcelaIndex, setReminderParcelaIndex] = useState<number>(0);
-  const [reminderRecipientName, setReminderRecipientName] = useState<string>('Produtor Lucas Mendes');
-  const [reminderRecipientPhone, setReminderRecipientPhone] = useState<string>('5511999999999');
-  const [reminderRecipientEmail, setReminderRecipientEmail] = useState<string>('mendeslucas42cs@gmail.com');
+  const [reminderRecipientName, setReminderRecipientName] = useState<string>('');
+  const [reminderRecipientPhone, setReminderRecipientPhone] = useState<string>('');
+  const [reminderRecipientEmail, setReminderRecipientEmail] = useState<string>('');
   const [reminderDate, setReminderDate] = useState<string>(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1); // Amanhã por padrão
@@ -1397,7 +1451,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
     let crop = '';
     let fert = '';
     let doseStr = '';
-    let areaVal = currentSoil?.areaHa || 50;
+    let areaVal = activeAreaHa;
     let total = 0;
     let pNum: number | undefined = undefined;
 
@@ -1808,9 +1862,9 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
 
   // Total Field Population
   const totalFieldPopulation = useMemo(() => {
-    const area = currentSoil?.areaHa || 50;
+    const area = activeAreaHa;
     return Math.round(calculatedPopulationHa * area);
-  }, [calculatedPopulationHa, currentSoil?.areaHa]);
+  }, [calculatedPopulationHa, activeAreaHa]);
 
   // Detailed Seed & Stand Metrics for Plant Population Calculator
   const seedStandMetrics = useMemo(() => {
@@ -1818,7 +1872,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
     const emerg = emergenceRatePct === '' ? 92 : Number(emergenceRatePct);
     const pmv = thousandSeedWeightG === '' ? 160 : Number(thousandSeedWeightG);
     const bagSeeds = seedsPerBag === '' ? 60000 : Number(seedsPerBag);
-    const area = currentSoil?.areaHa || 50;
+    const area = activeAreaHa;
 
     const germFactor = (germ / 100) * (emerg / 100);
     const seedsPerHa = germFactor > 0 ? Math.round(calculatedPopulationHa / germFactor) : calculatedPopulationHa;
@@ -1844,7 +1898,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
       kgSeedsPerHa,
       totalKgSeedsField,
     };
-  }, [germinationRatePct, emergenceRatePct, thousandSeedWeightG, seedsPerBag, calculatedPopulationHa, furrowMetersHa, currentSoil?.areaHa]);
+  }, [germinationRatePct, emergenceRatePct, thousandSeedWeightG, seedsPerBag, calculatedPopulationHa, furrowMetersHa, activeAreaHa]);
 
   // Detection of Fruit / Perennial Crop for Macro + Micro display
   const isFruitOrPerennialCrop = useMemo(() => {
@@ -1989,7 +2043,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
   // Nutrients Supplied by Planting Dose (kg/ha and g/ha)
   const plantingNutrientsSupplied = useMemo(() => {
     const doseKgHa = plantingDoseKgHa === '' ? 0 : Number(plantingDoseKgHa);
-    const area = currentSoil?.areaHa || 50;
+    const area = activeAreaHa;
     const gPerPlant = calculatedPopulationHa > 0 ? (doseKgHa * 1000) / calculatedPopulationHa : 0;
     const gPerM = furrowMetersHa > 0 ? (doseKgHa * 1000) / furrowMetersHa : 0;
     const totalKg = doseKgHa * area;
@@ -2008,20 +2062,20 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
       suppliedB: (doseKgHa * activeFertilizerGuarantees.b) / 100 * 1000, // g/ha
       suppliedZn: (doseKgHa * activeFertilizerGuarantees.zn) / 100 * 1000, // g/ha
     };
-  }, [plantingDoseKgHa, currentSoil?.areaHa, calculatedPopulationHa, furrowMetersHa, activeFertilizerGuarantees]);
+  }, [plantingDoseKgHa, activeAreaHa, calculatedPopulationHa, furrowMetersHa, activeFertilizerGuarantees]);
 
   // Dosage Input Display Value Converter
   const currentPlantingDoseDisplayVal = useMemo(() => {
     if (plantingDoseKgHa === '') return '';
     const kgHa = Number(plantingDoseKgHa);
-    const area = currentSoil?.areaHa || 50;
+    const area = activeAreaHa;
 
     if (plantingDoseUnit === 'kg_ha') return kgHa;
     if (plantingDoseUnit === 'area_total') return Number((kgHa * area).toFixed(1));
     if (plantingDoseUnit === 'g_planta') return Number(((kgHa * 1000) / (calculatedPopulationHa || 1)).toFixed(2));
     if (plantingDoseUnit === 'g_sulco') return Number(((kgHa * 1000) / (furrowMetersHa || 1)).toFixed(2));
     return kgHa;
-  }, [plantingDoseKgHa, plantingDoseUnit, currentSoil?.areaHa, calculatedPopulationHa, furrowMetersHa]);
+  }, [plantingDoseKgHa, plantingDoseUnit, activeAreaHa, calculatedPopulationHa, furrowMetersHa]);
 
   const handlePlantingDoseValueChange = (val: number | '') => {
     if (val === '') {
@@ -2029,7 +2083,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
       return;
     }
     const num = Number(val);
-    const area = currentSoil?.areaHa || 50;
+    const area = activeAreaHa;
 
     if (plantingDoseUnit === 'kg_ha') {
       setPlantingDoseKgHa(num);
@@ -2342,7 +2396,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
 
   // Comprehensive Total Calculations for Parcelas (Macro & Micro)
   const parcelasNutrientsTotal = useMemo(() => {
-    const area = currentSoil?.areaHa || 50;
+    const area = activeAreaHa;
     const pop = calculatedPopulationHa || 1;
     const furrow = furrowMetersHa || 1;
 
@@ -2425,7 +2479,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
       bPerPlantMg: pop > 0 ? (totalB * 1000 * 1000) / pop : 0,
       znPerPlantMg: pop > 0 ? (totalZn * 1000 * 1000) / pop : 0,
     };
-  }, [parcelaList, currentSoil?.areaHa, calculatedPopulationHa, furrowMetersHa]);
+  }, [parcelaList, activeAreaHa, calculatedPopulationHa, furrowMetersHa]);
 
   // Official Bulletin Topdressing Recommendation per Crop
   const bulletinTopdressingRecommendation = useMemo(() => {
@@ -2754,7 +2808,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
     }
 
     // Equivalent Commercial Fertilizers calculations
-    const area = currentSoil?.areaHa || 50;
+    const area = activeAreaHa;
     const pop = calculatedPopulationHa || 1;
     const furrow = furrowMetersHa || 1;
 
@@ -2826,7 +2880,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
       equivalentFertilizers,
       agronomicGuideline
     };
-  }, [selectedPlantingCropRec, selectedPlantingCropId, currentSoil, currentBulletin, activeCropDemands, isFruitOrPerennialCrop, isCoffeeCrop, coffeeType, coffeePhase, coffeeYieldTargetSc, coffeePruningType, calculatedPopulationHa, furrowMetersHa]);
+  }, [selectedPlantingCropRec, selectedPlantingCropId, currentSoil, currentBulletin, activeCropDemands, isFruitOrPerennialCrop, isCoffeeCrop, coffeeType, coffeePhase, coffeeYieldTargetSc, coffeePruningType, calculatedPopulationHa, furrowMetersHa, activeAreaHa]);
 
   // Handler to apply official bulletin recommendation directly to interactive topdressing parcelas
   const handleApplyBulletinTopdressingRecommendation = () => {
@@ -2851,7 +2905,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
 
   const topdressingNutrientsSupplied = useMemo(() => {
     const doseKgHa = topdressingDoseKgHa === '' ? 0 : Number(topdressingDoseKgHa);
-    const area = currentSoil?.areaHa || 50;
+    const area = activeAreaHa;
     const gPerPlant = calculatedPopulationHa > 0 ? (doseKgHa * 1000) / calculatedPopulationHa : 0;
     const gPerM = furrowMetersHa > 0 ? (doseKgHa * 1000) / furrowMetersHa : 0;
     const totalKg = doseKgHa * area;
@@ -2866,19 +2920,19 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
       suppliedK2O: (doseKgHa * activeTopdressingData.k2o) / 100,
       suppliedS: (doseKgHa * activeTopdressingData.s) / 100,
     };
-  }, [topdressingDoseKgHa, activeTopdressingData, currentSoil?.areaHa, calculatedPopulationHa, furrowMetersHa]);
+  }, [topdressingDoseKgHa, activeTopdressingData, activeAreaHa, calculatedPopulationHa, furrowMetersHa]);
 
   const currentTopdressingDoseDisplayVal = useMemo(() => {
     if (topdressingDoseKgHa === '') return '';
     const kgHa = Number(topdressingDoseKgHa);
-    const area = currentSoil?.areaHa || 50;
+    const area = activeAreaHa;
 
     if (topdressingDoseUnit === 'kg_ha') return kgHa;
     if (topdressingDoseUnit === 'area_total') return Number((kgHa * area).toFixed(1));
     if (topdressingDoseUnit === 'g_planta') return Number(((kgHa * 1000) / (calculatedPopulationHa || 1)).toFixed(2));
     if (topdressingDoseUnit === 'g_sulco') return Number(((kgHa * 1000) / (furrowMetersHa || 1)).toFixed(2));
     return kgHa;
-  }, [topdressingDoseKgHa, topdressingDoseUnit, currentSoil?.areaHa, calculatedPopulationHa, furrowMetersHa]);
+  }, [topdressingDoseKgHa, topdressingDoseUnit, activeAreaHa, calculatedPopulationHa, furrowMetersHa]);
 
   const handleTopdressingDoseValueChange = (val: number | '') => {
     if (val === '') {
@@ -2886,7 +2940,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
       return;
     }
     const num = Number(val);
-    const area = currentSoil?.areaHa || 50;
+    const area = activeAreaHa;
 
     if (topdressingDoseUnit === 'kg_ha') {
       setTopdressingDoseKgHa(num);
@@ -2916,12 +2970,12 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
       }
       if (rec.defaultSpacing) {
         setRowSpacingM(rec.defaultSpacing.rowSpacingM);
-        if (rec.defaultSpacing.plantsPerMeter) {
-          setPlantSpacingMode('per_meter');
-          setPlantsPerMeter(rec.defaultSpacing.plantsPerMeter);
-        } else if (rec.defaultSpacing.plantSpacingM) {
-          setPlantSpacingMode('plant_distance');
+        if (rec.defaultSpacing.plantSpacingM) {
           setPlantSpacingM(rec.defaultSpacing.plantSpacingM);
+          setPlantsPerMeter(Number((1 / rec.defaultSpacing.plantSpacingM).toFixed(2)));
+        } else if (rec.defaultSpacing.plantsPerMeter) {
+          setPlantsPerMeter(rec.defaultSpacing.plantsPerMeter);
+          setPlantSpacingM(Number((1 / rec.defaultSpacing.plantsPerMeter).toFixed(3)));
         }
       }
       setIsCropSelectorModalOpen(false);
@@ -2955,12 +3009,12 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
     setPlantingDoseKgHa(rec.defaultPlantingDoseKgHa);
     if (rec.defaultSpacing) {
       setRowSpacingM(rec.defaultSpacing.rowSpacingM);
-      if (rec.defaultSpacing.plantsPerMeter) {
-        setPlantSpacingMode('per_meter');
-        setPlantsPerMeter(rec.defaultSpacing.plantsPerMeter);
-      } else if (rec.defaultSpacing.plantSpacingM) {
-        setPlantSpacingMode('plant_distance');
+      if (rec.defaultSpacing.plantSpacingM) {
         setPlantSpacingM(rec.defaultSpacing.plantSpacingM);
+        setPlantsPerMeter(Number((1 / rec.defaultSpacing.plantSpacingM).toFixed(2)));
+      } else if (rec.defaultSpacing.plantsPerMeter) {
+        setPlantsPerMeter(rec.defaultSpacing.plantsPerMeter);
+        setPlantSpacingM(Number((1 / rec.defaultSpacing.plantsPerMeter).toFixed(3)));
       }
     }
     showNotification(`Recomendação para ${rec.cropName} aplicada: ${rec.defaultPlantingDoseKgHa} kg/ha!`);
@@ -3414,10 +3468,25 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
     };
   }, [currentSoil, currentBulletin, textureClassKey]);
 
-  // Calculations: Calagem (Adapted by Regional Method)
+  // Calculations: Calagem (Adapted by Regional Method - Base PRNT 100%)
   const calagemResult = useMemo(() => {
+    const prntVal = limingPrnt === '' ? 100 : Number(limingPrnt) || 100;
+    const f = 100 / (prntVal > 0 ? prntVal : 100);
+
+    if (limingNotNeeded) {
+      return {
+        ncTonHa: 0,
+        gramsPerLinearMeter: 0,
+        gramsPerHole: 0,
+        limestoneType: 'Não necessário',
+        fFactor: f,
+        isNotNeeded: true,
+        recommendedSeason: 'Não é necessário fazer calagem nesta área/safra.',
+        methodLabel: 'Não é necessário fazer calagem',
+      };
+    }
+
     let ncTonHa = 0;
-    const prntVal = limingPrnt === '' ? 85 : Number(limingPrnt) || 85;
     const targetVVal = limingTargetV === '' ? 70 : Number(limingTargetV);
     const targetCaVal = limingTargetCa === '' ? 3.0 : Number(limingTargetCa);
     const targetMgVal = limingTargetMg === '' ? 1.0 : Number(limingTargetMg);
@@ -3426,31 +3495,26 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
     const rowSpacingVal = rowSpacingM === '' ? 0.45 : Number(rowSpacingM);
     const plantSpacingVal = plantSpacingM === '' ? 0.15 : Number(plantSpacingM);
 
-    const f = 85 / (prntVal > 0 ? prntVal : 85);
     const depthFactor = (depthVal > 0 ? depthVal : 20) / 20;
     const moistureFactor = 100 / Math.max(1, (100 - moistureVal));
     
     if (limingMethod === 'v_percent') {
-      // Método de Saturação por Bases
+      // Método de Saturação por Bases: NC(t/ha) = ((V2 - V1) * CTC / 100) * (100 / PRNT) * depthFactor * moistureFactor
       const deltaV = Math.max(0, targetVVal - currentSoil.baseSaturationPercent);
-      // Nc(t/ha) = ((deltaV * CTC) / 850) * f * depthFactor * moistureFactor
-      ncTonHa = Math.round((((deltaV * currentSoil.potentialCtc) / 850) * f * depthFactor * moistureFactor) * 100) / 100;
+      ncTonHa = Math.round((((deltaV * currentSoil.potentialCtc) / 100) * f * depthFactor * moistureFactor) * 100) / 100;
     } else if (limingMethod === 'smp') {
       // Método do Índice SMP (SBCS RS/SC)
       const phSmp = currentSoil.phSmp || 5.8;
       const smpDose = Math.max(0, (6.8 - phSmp) * 4.2);
-      const baseDose85 = smpDose * (100 / 85);
-      ncTonHa = Math.round((baseDose85 * f * depthFactor) * 100) / 100;
+      ncTonHa = Math.round((smpDose * f * depthFactor) * 100) / 100;
     } else if (limingMethod === 'ca_elevation') {
       // Método de Elevação de Cálcio
       const deltaCa = Math.max(0, targetCaVal - currentSoil.caCmolc);
-      const baseDose85 = deltaCa * (100 / 85);
-      ncTonHa = Math.round((baseDose85 * f * depthFactor * moistureFactor) * 100) / 100;
+      ncTonHa = Math.round((deltaCa * f * depthFactor * moistureFactor) * 100) / 100;
     } else if (limingMethod === 'mg_elevation') {
       // Método de Elevação de Magnésio
       const deltaMg = Math.max(0, targetMgVal - currentSoil.mgCmolc);
-      const baseDose85 = deltaMg * (100 / 85);
-      ncTonHa = Math.round((baseDose85 * f * depthFactor * moistureFactor) * 100) / 100;
+      ncTonHa = Math.round((deltaMg * f * depthFactor * moistureFactor) * 100) / 100;
     } else {
       // Método de Neutralização de Al + Elevação de Ca+Mg (5ª Aproximação CFSEMG)
       const yFactor = currentSoil.clayPercent > 40 ? 2.0 : currentSoil.clayPercent > 20 ? 1.5 : 1.0;
@@ -3459,8 +3523,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
       const currentCaMg = currentSoil.caCmolc + currentSoil.mgCmolc;
       const caMgElevation = Math.max(0, targetCaMg - currentCaMg);
       const ncBase = alNeutralization + caMgElevation;
-      const baseDose85 = ncBase * (100 / 85);
-      ncTonHa = Math.round((baseDose85 * f * depthFactor) * 100) / 100;
+      ncTonHa = Math.round((ncBase * f * depthFactor) * 100) / 100;
     }
     
     // Quantity per linear meter of row and per plant hole
@@ -3482,6 +3545,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
       gramsPerHole,
       limestoneType,
       fFactor: f,
+      isNotNeeded: false,
       recommendedSeason: '60 a 90 dias antes do plantio com solo úmido',
       methodLabel:
         limingMethod === 'v_percent'
@@ -3494,7 +3558,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
           ? 'Elevação de Magnésio'
           : 'Neutralização de Al + Ca/Mg (CFSEMG)',
     };
-  }, [currentSoil, limingTargetV, limingTargetCa, limingTargetMg, limingPrnt, limingDepthCm, limingMoisture, rowSpacingM, plantSpacingM, limingMethod]);
+  }, [currentSoil, limingNotNeeded, limingTargetV, limingTargetCa, limingTargetMg, limingPrnt, limingDepthCm, limingMoisture, rowSpacingM, plantSpacingM, limingMethod]);
 
   // Calculations: Gessagem (Multi-Method: Argila, Dematê, Caires & Guimarães, Boletim 100, Classe Textural)
   const gessagemResult = useMemo(() => {
@@ -3564,20 +3628,27 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
       ngKgHa = ngKg_classeTextural;
       ngTonHa = ngTon_classeTextural;
       methodLabel = `Classe Textural (${textClassLabel})`;
+    } else if (selectedGypsumMethod === 'nao_necessario') {
+      ngKgHa = 0;
+      ngTonHa = 0;
+      methodLabel = 'Não é necessário fazer gessagem';
     }
 
     const criteriaTriggered: string[] = [];
-    if (subsoilCa < 1.5) criteriaTriggered.push(`Cálcio em subsuperfície baixo (${subsoilCa.toFixed(2)} cmol_c/dm³ < 1,5)`);
-    if (subsoilAl > 20) criteriaTriggered.push(`Saturação por Alumínio (m%) em subsuperfície elevada (${subsoilAl.toFixed(1)}% > 20%)`);
-    if (subsoilAlCmolc > 0.5) criteriaTriggered.push(`Alumínio tóxico trocável elevado (${subsoilAlCmolc.toFixed(2)} cmol_c/dm³ > 0,5)`);
-    if (sSO4 < 5.0) criteriaTriggered.push(`Enxofre-sulfato deficiente em subsuperfície (${sSO4.toFixed(1)} mg/dm³ < 5,0)`);
+    if (selectedGypsumMethod !== 'nao_necessario') {
+      if (subsoilCa < 1.5) criteriaTriggered.push(`Cálcio em subsuperfície baixo (${subsoilCa.toFixed(2)} cmol_c/dm³ < 1,5)`);
+      if (subsoilAl > 20) criteriaTriggered.push(`Saturação por Alumínio (m%) em subsuperfície elevada (${subsoilAl.toFixed(1)}% > 20%)`);
+      if (subsoilAlCmolc > 0.5) criteriaTriggered.push(`Alumínio tóxico trocável elevado (${subsoilAlCmolc.toFixed(2)} cmol_c/dm³ > 0,5)`);
+      if (sSO4 < 5.0) criteriaTriggered.push(`Enxofre-sulfato deficiente em subsuperfície (${sSO4.toFixed(1)} mg/dm³ < 5,0)`);
+    }
 
-    const needsGypsum = criteriaTriggered.length > 0;
+    const needsGypsum = selectedGypsumMethod !== 'nao_necessario' && criteriaTriggered.length > 0;
 
     return {
       ngTonHa,
       ngKgHa,
       needsGypsum,
+      isNotNeeded: selectedGypsumMethod === 'nao_necessario',
       methodLabel,
       activeMethod: selectedGypsumMethod,
       subsoilClay,
@@ -3596,8 +3667,14 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
         boletim100: { id: 'boletim_100', name: 'Boletim 100 (IAC)', kg: ngKg_b100, ton: ngTon_b100, desc: `IAC 60 × ${subsoilClay}% Argila` },
         classeTextural: { id: 'classe_textural', name: 'Classe Textural', kg: ngKg_classeTextural, ton: ngTon_classeTextural, desc: `Faixa fixa: ${textClassLabel}` },
       },
-      applicationMethod: 'Aplicação a lanço em área total sem necessidade de incorporação mecânica',
-      effectiveDepth: 'Camada de 20 a 40 cm e 40 a 60 cm (condicionador de subsolo)',
+      applicationMethod:
+        selectedGypsumMethod === 'nao_necessario'
+          ? 'Gessagem dispensada nesta safra/área'
+          : 'Aplicação a lanço em área total sem necessidade de incorporação mecânica',
+      effectiveDepth:
+        selectedGypsumMethod === 'nao_necessario'
+          ? 'Não se aplica'
+          : 'Camada de 20 a 40 cm e 40 a 60 cm (condicionador de subsolo)',
       bulletinRule: `${currentBulletin.code}: Método ${methodLabel}`,
     };
   }, [currentSoil, currentBulletin, selectedGypsumMethod, gypsumClayFactor, demateTargetV, cairesTargetCa]);
@@ -3691,14 +3768,20 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
 
           <div className="bg-emerald-900/40 p-2.5 rounded-xl border border-emerald-700/40">
             <span className="text-[10px] text-emerald-300/80 block">Calagem Recomendada</span>
-            <strong className="text-base text-amber-300 font-black">{calagemResult.ncTonHa} t/ha</strong>
+            <strong className="text-base text-amber-300 font-black">
+              {calagemResult.isNotNeeded ? 'Dispensada' : `${calagemResult.ncTonHa} t/ha`}
+            </strong>
             <span className="text-[10px] text-emerald-200 block">{calagemResult.limestoneType}</span>
           </div>
 
           <div className="bg-emerald-900/40 p-2.5 rounded-xl border border-emerald-700/40">
             <span className="text-[10px] text-emerald-300/80 block">Gessagem Agrícola</span>
-            <strong className="text-base text-teal-300 font-black">{gessagemResult.ngTonHa} t/ha</strong>
-            <span className="text-[10px] text-emerald-200 block">Subsolo (20-40 cm)</span>
+            <strong className="text-base text-teal-300 font-black">
+              {gessagemResult.isNotNeeded ? 'Dispensada' : `${gessagemResult.ngTonHa} t/ha`}
+            </strong>
+            <span className="text-[10px] text-emerald-200 block">
+              {gessagemResult.isNotNeeded ? 'Não necessária' : 'Subsolo (20-40 cm)'}
+            </span>
           </div>
 
           <div className="bg-emerald-900/40 p-2.5 rounded-xl border border-emerald-700/40">
@@ -3942,7 +4025,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
               <div className="p-2.5 bg-slate-50 dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800">
                 <span className="text-[10px] text-slate-500 block uppercase font-bold">Calagem Necessária</span>
                 <strong className="text-sm font-black text-amber-600 dark:text-amber-400">
-                  {calagemResult.ncTonHa} t/ha
+                  {calagemResult.isNotNeeded ? 'Dispensada (0 t/ha)' : `${calagemResult.ncTonHa} t/ha`}
                 </strong>
                 <span className="text-[10px] text-slate-600 dark:text-zinc-400 block truncate">
                   {calagemResult.limestoneType}
@@ -3952,10 +4035,10 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
               <div className="p-2.5 bg-slate-50 dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800">
                 <span className="text-[10px] text-slate-500 block uppercase font-bold">Gessagem Agrícola</span>
                 <strong className="text-sm font-black text-teal-600 dark:text-teal-400">
-                  {gessagemResult.ngTonHa} t/ha
+                  {gessagemResult.isNotNeeded ? 'Dispensada (0 t/ha)' : `${gessagemResult.ngTonHa} t/ha`}
                 </strong>
                 <span className="text-[10px] text-slate-600 dark:text-zinc-400 block truncate">
-                  Subsolo (20-40 cm)
+                  {gessagemResult.isNotNeeded ? 'Não é necessário fazer gessagem' : 'Subsolo (20-40 cm)'}
                 </span>
               </div>
 
@@ -5703,86 +5786,119 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                 </p>
               </div>
 
-              <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 px-3 py-1 rounded-xl text-xs">
-                <Globe className="w-3.5 h-3.5 text-amber-600" />
-                <span className="font-bold text-amber-950 dark:text-amber-200">Boletim: {currentBulletin.name}</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div className="space-y-1">
-                <label className="font-bold">Método de Calagem:</label>
-                <select
-                  value={limingMethod}
-                  onChange={e => setLimingMethod(e.target.value as any)}
-                  className="w-full p-2 bg-slate-50 dark:bg-zinc-900 border rounded-lg font-bold"
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setLimingNotNeeded(!limingNotNeeded)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                    limingNotNeeded
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                      : 'bg-slate-50 dark:bg-zinc-900 text-slate-700 dark:text-zinc-200 border-slate-300 dark:border-zinc-700 hover:border-emerald-500'
+                  }`}
                 >
-                  <option value="v_percent">Saturação por Bases (V%)</option>
-                  <option value="smp">Solução Tampão SMP (RS/SC)</option>
-                  <option value="al_neutralization">Neutralização de Al + Ca/Mg (CFSEMG)</option>
-                  <option value="ca_elevation">Elevação de Cálcio</option>
-                  <option value="mg_elevation">Elevação de Magnésio</option>
-                </select>
-              </div>
-
-              {limingMethod === 'v_percent' && (
-                <div className="space-y-1">
-                  <label className="font-bold">V% Meta da Cultura (%):</label>
-                  <input
-                    type="number"
-                    value={limingTargetV}
-                    onChange={e => setLimingTargetV(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full p-2 bg-slate-50 dark:bg-zinc-900 border rounded-lg font-bold"
-                  />
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Não é necessário fazer calagem</span>
+                </button>
+                <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 px-3 py-1 rounded-xl text-xs">
+                  <Globe className="w-3.5 h-3.5 text-amber-600" />
+                  <span className="font-bold text-amber-950 dark:text-amber-200">Boletim: {currentBulletin.name}</span>
                 </div>
-              )}
-
-              {limingMethod === 'ca_elevation' && (
-                <div className="space-y-1">
-                  <label className="font-bold">Ca Alvo (cmol_c/dm³):</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={limingTargetCa}
-                    onChange={e => setLimingTargetCa(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full p-2 bg-slate-50 dark:bg-zinc-900 border rounded-lg font-bold"
-                  />
-                </div>
-              )}
-
-              {limingMethod === 'mg_elevation' && (
-                <div className="space-y-1">
-                  <label className="font-bold">Mg Alvo (cmol_c/dm³):</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={limingTargetMg}
-                    onChange={e => setLimingTargetMg(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full p-2 bg-slate-50 dark:bg-zinc-900 border rounded-lg font-bold"
-                  />
-                </div>
-              )}
-
-              <div className="space-y-1">
-                <label className="font-bold">PRNT do Calcário (%):</label>
-                <input
-                  type="number"
-                  value={limingPrnt}
-                  onChange={e => setLimingPrnt(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full p-2 bg-slate-50 dark:bg-zinc-900 border rounded-lg font-bold"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold">Profundidade (cm):</label>
-                <input
-                  type="number"
-                  value={limingDepthCm}
-                  onChange={e => setLimingDepthCm(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full p-2 bg-slate-50 dark:bg-zinc-900 border rounded-lg font-bold"
-                />
               </div>
             </div>
+
+            {!limingNotNeeded ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="space-y-1">
+                  <label className="font-bold">Método de Calagem:</label>
+                  <select
+                    value={limingMethod}
+                    onChange={e => setLimingMethod(e.target.value as any)}
+                    className="w-full p-2 bg-slate-50 dark:bg-zinc-900 border rounded-lg font-bold"
+                  >
+                    <option value="v_percent">Saturação por Bases (V%)</option>
+                    <option value="smp">Solução Tampão SMP (RS/SC)</option>
+                    <option value="al_neutralization">Neutralização de Al + Ca/Mg (CFSEMG)</option>
+                    <option value="ca_elevation">Elevação de Cálcio</option>
+                    <option value="mg_elevation">Elevação de Magnésio</option>
+                  </select>
+                </div>
+
+                {limingMethod === 'v_percent' && (
+                  <div className="space-y-1">
+                    <label className="font-bold">V% Meta da Cultura (%):</label>
+                    <input
+                      type="number"
+                      value={limingTargetV}
+                      onChange={e => setLimingTargetV(e.target.value === '' ? '' : Number(e.target.value))}
+                      className="w-full p-2 bg-slate-50 dark:bg-zinc-900 border rounded-lg font-bold"
+                    />
+                  </div>
+                )}
+
+                {limingMethod === 'ca_elevation' && (
+                  <div className="space-y-1">
+                    <label className="font-bold">Ca Alvo (cmol_c/dm³):</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={limingTargetCa}
+                      onChange={e => setLimingTargetCa(e.target.value === '' ? '' : Number(e.target.value))}
+                      className="w-full p-2 bg-slate-50 dark:bg-zinc-900 border rounded-lg font-bold"
+                    />
+                  </div>
+                )}
+
+                {limingMethod === 'mg_elevation' && (
+                  <div className="space-y-1">
+                    <label className="font-bold">Mg Alvo (cmol_c/dm³):</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={limingTargetMg}
+                      onChange={e => setLimingTargetMg(e.target.value === '' ? '' : Number(e.target.value))}
+                      className="w-full p-2 bg-slate-50 dark:bg-zinc-900 border rounded-lg font-bold"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <label className="font-bold">PRNT do Calcário (%):</label>
+                  <input
+                    type="number"
+                    value={limingPrnt}
+                    onChange={e => setLimingPrnt(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full p-2 bg-slate-50 dark:bg-zinc-900 border rounded-lg font-bold"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold">Profundidade (cm):</label>
+                  <input
+                    type="number"
+                    value={limingDepthCm}
+                    onChange={e => setLimingDepthCm(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full p-2 bg-slate-50 dark:bg-zinc-900 border rounded-lg font-bold"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5 text-emerald-900 dark:text-emerald-200">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <div>
+                    <strong className="font-black block">Calagem Dispensada para este Talhão</strong>
+                    <span className="text-[11px]">Opção ativa: <strong>Não é necessário fazer calagem</strong>. A dose foi zerada nos relatórios e balanços.</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLimingNotNeeded(false)}
+                  className="px-3 py-1.5 bg-white dark:bg-zinc-900 border border-emerald-300 dark:border-emerald-700 rounded-lg font-bold text-emerald-800 dark:text-emerald-300 cursor-pointer shrink-0"
+                >
+                  Reativar Cálculo
+                </button>
+              </div>
+            )}
 
             {/* Results */}
             <div className="p-5 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-2xl space-y-4 text-xs">
@@ -5802,7 +5918,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                   <span className="text-[10px] text-slate-400 block font-bold">Fator de Correção f</span>
                   <strong className="text-lg text-amber-700 dark:text-amber-400 font-black">f = {calagemResult.fFactor.toFixed(3)}</strong>
                   <span className="text-[9px] text-slate-500 dark:text-slate-400 block font-medium">
-                    {calagemResult.fFactor === 1 ? '100% Eficiência (PRNT 85%)' : `f = 85 / ${limingPrnt || 85}`}
+                    {calagemResult.fFactor === 1 ? '100% Eficiência (PRNT 100%)' : `f = 100 / ${limingPrnt || 100}`}
                   </span>
                 </div>
                 <div className="p-3 bg-white dark:bg-black rounded-xl border">
@@ -5859,7 +5975,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
               <label className="font-bold text-xs text-slate-800 dark:text-slate-200 block">
                 Selecione o Método de Cálculo de Gessagem:
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
                 <button
                   type="button"
                   onClick={() => setSelectedGypsumMethod('fator_argila')}
@@ -5914,11 +6030,31 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                     Tabela por Faixa Textural
                   </span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedGypsumMethod('nao_necessario')}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${selectedGypsumMethod === 'nao_necessario' ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'bg-slate-50 dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-zinc-800'}`}
+                >
+                  <span className="font-black text-xs block">6. Não necessário</span>
+                  <span className={`text-[10px] block mt-0.5 ${selectedGypsumMethod === 'nao_necessario' ? 'text-emerald-100' : 'text-slate-500'}`}>
+                    Não é necessário fazer gessagem
+                  </span>
+                </button>
               </div>
             </div>
 
             {/* Painel de Parâmetros e Ajuste Fino do Método Ativo */}
             <div className="p-4 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl space-y-3">
+              {selectedGypsumMethod === 'nao_necessario' && (
+                <div className="flex items-center gap-2.5 text-emerald-800 dark:text-emerald-300">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <div>
+                    <strong className="text-xs font-bold block">Não é necessário fazer gessagem</strong>
+                    <span className="text-[11px]">Gessagem agrícola dispensada para este talhão nesta safra. A dose recomendada foi definida como 0 t/ha.</span>
+                  </div>
+                </div>
+              )}
               {selectedGypsumMethod === 'fator_argila' && (
                 <div className="space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-2 border-slate-200 dark:border-zinc-800">
@@ -6139,23 +6275,29 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                 </div>
               </div>
 
-              {/* Justificativa / Gatilhos TÉCNICOS */}
-              <div className="space-y-1.5 text-xs">
-                <span className="font-bold text-teal-900 dark:text-teal-200 block">
-                  💡 Diagnóstico Agronômico do Subsolo ({gessagemResult.subsoilClay}% Argila):
-                </span>
-                {(gessagemResult?.criteriaTriggered || []).length > 0 ? (
-                  <ul className="list-disc list-inside space-y-0.5 text-teal-800 dark:text-teal-300 text-[11px] font-medium pl-1">
-                    {gessagemResult.criteriaTriggered.map((crit, idx) => (
-                      <li key={idx}>{crit}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-emerald-700 dark:text-emerald-400 text-[11px] font-medium">
-                    O subsolo apresenta níveis adequados de Cálcio e Enxofre, sem barreira química de Alumínio tóxico.
-                  </p>
-                )}
-              </div>
+              {gessagemResult.isNotNeeded ? (
+                <div className="p-3 bg-white dark:bg-black rounded-xl border border-emerald-200 dark:border-emerald-800 flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-bold text-xs">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>Não é necessário fazer gessagem agrícola para esta recomendação.</span>
+                </div>
+              ) : (
+                <div className="space-y-1.5 text-xs">
+                  <span className="font-bold text-teal-900 dark:text-teal-200 block">
+                    💡 Diagnóstico Agronômico do Subsolo ({gessagemResult.subsoilClay}% Argila):
+                  </span>
+                  {(gessagemResult?.criteriaTriggered || []).length > 0 ? (
+                    <ul className="list-disc list-inside space-y-0.5 text-teal-800 dark:text-teal-300 text-[11px] font-medium pl-1">
+                      {gessagemResult.criteriaTriggered.map((crit, idx) => (
+                        <li key={idx}>{crit}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-emerald-700 dark:text-emerald-400 text-[11px] font-medium">
+                      O subsolo apresenta níveis adequados de Cálcio e Enxofre, sem barreira química de Alumínio tóxico.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Observações Técnicas */}
               <div className="mt-3 pt-3 border-t border-teal-200/50 dark:border-teal-900/30">
@@ -6335,7 +6477,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <div className="p-3 bg-emerald-50/70 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800/80 flex flex-col justify-between">
                 <div>
                   <span className="text-[10px] text-emerald-800 dark:text-emerald-300 block font-bold uppercase tracking-wider">Cultura Ativa</span>
@@ -6343,8 +6485,26 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                     {selectedPlantingCropRec?.cropName || currentSoil?.cropName || 'Soja'} {selectedPlantingCropRec?.scientificName ? `(${selectedPlantingCropRec.scientificName})` : ''}
                   </strong>
                   <span className="text-[10px] text-slate-500 dark:text-zinc-400 block mt-0.5">
-                    Talhão: <strong>{currentSoil?.fieldPlot || 'Geral'}</strong> ({currentSoil?.areaHa || 50} ha)
+                    Talhão: <strong>{currentSoil?.fieldPlot || currentSoil?.plotName || 'Geral'}</strong>
                   </span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/30 rounded-xl border border-emerald-300 dark:border-emerald-800">
+                <label className="text-[10px] text-emerald-800 dark:text-emerald-300 block font-bold uppercase tracking-wider mb-1">
+                  Área a Adubar (ha):
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    placeholder="Ex: 12.5"
+                    value={fertilizationAreaHa}
+                    onChange={e => setFertilizationAreaHa(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-emerald-300 dark:border-emerald-700 rounded-lg font-black text-sm text-slate-900 dark:text-white"
+                  />
+                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 shrink-0">ha</span>
                 </div>
               </div>
 
@@ -6377,7 +6537,9 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                 <span>📏</span> Espaçamento e População de Plantas
               </strong>
               <span className="text-xs text-emerald-700 dark:text-emerald-400 font-black px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/60 rounded-full border border-emerald-200 dark:border-emerald-800">
-                Estande Calculado
+                {plantSpacingMode === 'plant_distance'
+                  ? `10.000 / (${rowSpacingM || 0.45} × ${plantSpacingM || 0.18})`
+                  : 'Estande Calculado (Plantas/m)'}
               </span>
             </div>
 
@@ -6395,21 +6557,21 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
 
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center text-xs">
-                  <label className="font-bold text-slate-800 dark:text-slate-200">Arranjo de Plantas:</label>
+                  <label className="font-bold text-slate-800 dark:text-slate-200">Espaçamento de plantas:</label>
                   <div className="flex gap-1 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => setPlantSpacingMode('plant_distance')}
+                      className={`px-2 py-0.5 rounded font-bold cursor-pointer transition-colors ${plantSpacingMode === 'plant_distance' ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-slate-300'}`}
+                    >
+                      Espaçamento (m)
+                    </button>
                     <button
                       type="button"
                       onClick={() => setPlantSpacingMode('per_meter')}
                       className={`px-2 py-0.5 rounded font-bold cursor-pointer transition-colors ${plantSpacingMode === 'per_meter' ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-slate-300'}`}
                     >
                       Plantas/m
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPlantSpacingMode('plant_distance')}
-                      className={`px-2 py-0.5 rounded font-bold cursor-pointer transition-colors ${plantSpacingMode === 'plant_distance' ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-slate-300'}`}
-                    >
-                      Distância (m)
                     </button>
                   </div>
                 </div>
@@ -6445,7 +6607,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                 </strong>
               </div>
               <div className="p-3 bg-slate-50 dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800">
-                <span className="text-[10px] text-slate-500 block font-bold uppercase tracking-wider">População Total ({currentSoil?.areaHa || 50} ha)</span>
+                <span className="text-[10px] text-slate-500 block font-bold uppercase tracking-wider">População Total ({activeAreaHa} ha)</span>
                 <strong className="text-sm text-teal-700 dark:text-teal-400 font-black">
                   {totalFieldPopulation.toLocaleString('pt-BR')} plantas
                 </strong>
@@ -7580,7 +7742,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                         </strong>
                       </div>
                       <div className="p-2 bg-emerald-50/70 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                        <span className="text-[8px] text-emerald-800 dark:text-emerald-400 block font-bold">🚜 Área Total ({currentSoil?.areaHa || 50} ha)</span>
+                        <span className="text-[8px] text-emerald-800 dark:text-emerald-400 block font-bold">🚜 Área Total ({activeAreaHa} ha)</span>
                         <strong className="text-xs text-emerald-900 dark:text-emerald-300 font-black">
                           {plantingNutrientsSupplied.totalKg.toLocaleString('pt-BR')} kg
                         </strong>
@@ -7924,7 +8086,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                               <span className="text-[10px] text-slate-500">({f.nutrientRole})</span>
                             </div>
                             <div className="flex items-center justify-between text-[10px] text-slate-600 dark:text-zinc-400 border-t pt-1 border-slate-100 dark:border-zinc-700">
-                              <span>Total Área ({currentSoil?.areaHa || 50} ha): <strong>{f.totalFarmKg.toLocaleString()} kg</strong></span>
+                              <span>Total Área ({activeAreaHa} ha): <strong>{f.totalFarmKg.toLocaleString()} kg</strong></span>
                               {f.gPerPlant > 0 && (
                                 <span className="text-amber-800 dark:text-amber-300 font-bold"><strong>{f.gPerPlant}</strong> g/planta</span>
                               )}
@@ -8140,7 +8302,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                             const srcObj = TOPDRESSING_SOURCES_CATALOG.find(s => s.id === fert.sourceId) || TOPDRESSING_SOURCES_CATALOG[0];
                             const doseKgHa = Number(fert.doseKgHa) || 0;
                             const doseGPlant = calculatedPopulationHa > 0 ? (doseKgHa * 1000) / calculatedPopulationHa : 0;
-                            const totalKgArea = doseKgHa * (currentSoil?.areaHa || 50);
+                            const totalKgArea = doseKgHa * activeAreaHa;
 
                             return (
                               <div
@@ -8394,7 +8556,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                       </strong>
                     </div>
                     <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800">
-                      <span className="text-[9px] text-emerald-800 dark:text-emerald-400 block font-bold uppercase">Volume Total Área ({currentSoil?.areaHa || 50} ha)</span>
+                      <span className="text-[9px] text-emerald-800 dark:text-emerald-400 block font-bold uppercase">Volume Total Área ({activeAreaHa} ha)</span>
                       <strong className="text-sm text-emerald-950 dark:text-emerald-200 font-black">
                         {parcelasNutrientsTotal.totalFarmKg.toLocaleString('pt-BR')} kg
                       </strong>
@@ -8620,7 +8782,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                   </div>
                   <div>
                     <span className="text-slate-500">Área:</span>{' '}
-                    <strong className="text-slate-900 dark:text-white font-bold">{currentSoil?.areaHa || 50} ha</strong>
+                    <strong className="text-slate-900 dark:text-white font-bold">{activeAreaHa} ha</strong>
                   </div>
                 </div>
 
@@ -8934,9 +9096,20 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                   <div>
                     <div className="flex justify-between items-center mb-1">
                       <label className="font-bold text-xs text-slate-800 dark:text-slate-200">
-                        Modo de Arranjo na Linha:
+                        Espaçamento de plantas:
                       </label>
                       <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setPlantSpacingMode('plant_distance')}
+                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md cursor-pointer ${
+                            plantSpacingMode === 'plant_distance'
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          Espaçamento entre Plantas (m)
+                        </button>
                         <button
                           type="button"
                           onClick={() => setPlantSpacingMode('per_meter')}
@@ -8947,17 +9120,6 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                           }`}
                         >
                           Plantas por Metro
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPlantSpacingMode('plant_distance')}
-                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md cursor-pointer ${
-                            plantSpacingMode === 'plant_distance'
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-slate-300'
-                          }`}
-                        >
-                          Distância entre Plantas
                         </button>
                       </div>
                     </div>
@@ -9191,7 +9353,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
               <div className="lg:col-span-2 p-5 bg-slate-50 dark:bg-zinc-900/80 rounded-2xl border border-slate-200 dark:border-zinc-800 space-y-3">
                 <div className="flex justify-between items-center">
                   <h4 className="font-bold text-xs text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                    📑 Balanço Geral de Sementes para a Área Total do Talhão ({currentSoil?.areaHa || 50} ha)
+                    📑 Balanço Geral de Sementes para a Área Total do Talhão ({activeAreaHa} ha)
                   </h4>
                   <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded-md">
                     Talhão: {currentSoil?.fieldName || 'Talhão 01'}
@@ -9204,7 +9366,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                       <tr className="border-b border-slate-200 dark:border-zinc-800 text-slate-500 font-bold">
                         <th className="py-2">Métrica Agronômica</th>
                         <th className="py-2 text-right">Por Hectare (1 ha)</th>
-                        <th className="py-2 text-right">Área Total ({currentSoil?.areaHa || 50} ha)</th>
+                        <th className="py-2 text-right">Área Total ({activeAreaHa} ha)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-zinc-800 font-medium">
@@ -9231,7 +9393,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                       <tr>
                         <td className="py-2 text-slate-700 dark:text-slate-300">Metros de Sulco de Plantio</td>
                         <td className="py-2 text-right font-bold text-amber-600">{furrowMetersHa.toLocaleString('pt-BR')} m</td>
-                        <td className="py-2 text-right font-black text-amber-700 dark:text-amber-400">{(furrowMetersHa * (currentSoil?.areaHa || 50)).toLocaleString('pt-BR')} m</td>
+                        <td className="py-2 text-right font-black text-amber-700 dark:text-amber-400">{(furrowMetersHa * activeAreaHa).toLocaleString('pt-BR')} m</td>
                       </tr>
                     </tbody>
                   </table>
@@ -9799,7 +9961,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                       <span className="text-[8.5px] text-slate-400 block uppercase font-black">Cultura & Estande</span>
                       <strong className="text-slate-900 text-[10.5px] font-black block truncate">{currentSoil.cropName} ({currentSoil.cultivar})</strong>
                       <span className="text-[8.5px] text-emerald-700 block font-bold">
-                        {calculatedPopulationHa.toLocaleString('pt-BR')} pl/ha • Área: {currentSoil?.areaHa || 50} ha
+                        {calculatedPopulationHa.toLocaleString('pt-BR')} pl/ha • Área: {activeAreaHa} ha
                       </span>
                       <span className="text-[8px] text-slate-500 block truncate">
                         Total: {totalFieldPopulation.toLocaleString('pt-BR')} plantas na área
@@ -9901,21 +10063,28 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                         <div className="flex justify-between items-center bg-amber-50/80 p-2 rounded-lg border border-amber-200/80">
                           <div>
                             <span className="text-[8.5px] text-slate-500 block">Dose por Hectare</span>
-                            <strong className="text-sm font-black text-amber-900">{calagemResult.ncTonHa} t/ha</strong>
-                            <span className="text-[8.5px] text-slate-500 block font-semibold">PRNT: {limingPrnt}%</span>
+                            <strong className="text-sm font-black text-amber-900">
+                              {calagemResult.isNotNeeded ? 'Dispensada (0 t/ha)' : `${calagemResult.ncTonHa} t/ha`}
+                            </strong>
+                            <span className="text-[8.5px] text-slate-500 block font-semibold">
+                              {calagemResult.isNotNeeded ? 'Não necessária' : `PRNT: ${limingPrnt || 100}%`}
+                            </span>
                           </div>
                           <div className="text-right">
-                            <span className="text-[8.5px] text-amber-700 font-extrabold uppercase block">Área Total ({currentSoil?.areaHa || 50} ha)</span>
+                            <span className="text-[8.5px] text-amber-700 font-extrabold uppercase block">Área Total ({activeAreaHa} ha)</span>
                             <strong className="text-sm font-black text-amber-950">
-                              {(calagemResult.ncTonHa * (currentSoil?.areaHa || 50)).toFixed(1)} t
+                              {(calagemResult.ncTonHa * activeAreaHa).toFixed(1)} t
                             </strong>
                             <span className="text-[7.5px] text-amber-800 block font-bold uppercase mt-0.5">
-                              {currentBulletin.defaultLimingMethod === 'v_percent' ? 'Saturação por Bases' : 'Neutralização do Al'}
+                              {calagemResult.methodLabel}
                             </span>
                           </div>
                         </div>
                         <p className="text-[8.5px] text-slate-600 leading-snug">
-                          <strong>Recomendação:</strong> {calagemResult.limestoneType}. Incorporar a 0-20 cm com antecedência mínima de 60 dias para elevação plena do V%.
+                          <strong>Recomendação:</strong>{' '}
+                          {calagemResult.isNotNeeded
+                            ? 'Não é necessário fazer calagem nesta safra/área.'
+                            : `${calagemResult.limestoneType}. Incorporar a 0-20 cm com antecedência mínima de 60 dias para elevação plena do V%.`}
                           {limingObservation && <><br /><strong className="text-slate-700">Obs:</strong> {limingObservation}</>}
                         </p>
                       </div>
@@ -9925,19 +10094,28 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                         <div className="flex justify-between items-center bg-teal-50/80 p-2 rounded-lg border border-teal-200/80">
                           <div>
                             <span className="text-[8.5px] text-slate-500 block">Dose por Hectare</span>
-                            <strong className="text-sm font-black text-teal-900">{gessagemResult.ngTonHa} t/ha</strong>
-                            <span className="text-[8.5px] text-slate-500 block font-semibold">Subsuperfície (20-40cm)</span>
+                            <strong className="text-sm font-black text-teal-900">
+                              {gessagemResult.isNotNeeded ? 'Dispensada (0 t/ha)' : `${gessagemResult.ngTonHa} t/ha`}
+                            </strong>
+                            <span className="text-[8.5px] text-slate-500 block font-semibold">
+                              {gessagemResult.isNotNeeded ? 'Não necessária' : 'Subsuperfície (20-40cm)'}
+                            </span>
                           </div>
                           <div className="text-right">
-                            <span className="text-[8.5px] text-teal-700 font-extrabold uppercase block">Área Total ({currentSoil?.areaHa || 50} ha)</span>
+                            <span className="text-[8.5px] text-teal-700 font-extrabold uppercase block">Área Total ({activeAreaHa} ha)</span>
                             <strong className="text-sm font-black text-teal-950">
-                              {(gessagemResult.ngTonHa * (currentSoil?.areaHa || 50)).toFixed(1)} t
+                              {(gessagemResult.ngTonHa * activeAreaHa).toFixed(1)} t
                             </strong>
-                            <span className="text-[7.5px] text-teal-800 block font-bold uppercase mt-0.5">Gesso Agrícola</span>
+                            <span className="text-[7.5px] text-teal-800 block font-bold uppercase mt-0.5">
+                              {gessagemResult.isNotNeeded ? 'Dispensado' : 'Gesso Agrícola'}
+                            </span>
                           </div>
                         </div>
                         <p className="text-[8.5px] text-slate-600 leading-snug">
-                          <strong>Recomendação:</strong> Gesso agrícola de alta pureza. Aplicar a lanço em área total sem incorporação profunda.
+                          <strong>Recomendação:</strong>{' '}
+                          {gessagemResult.isNotNeeded
+                            ? 'Não é necessário fazer gessagem agrícola nesta safra/área.'
+                            : 'Gesso agrícola de alta pureza. Aplicar a lanço em área total sem incorporação profunda.'}
                           {gypsumObservation && <><br /><strong className="text-slate-700">Obs:</strong> {gypsumObservation}</>}
                         </p>
                       </div>
@@ -10008,9 +10186,9 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                             <strong className="font-black text-blue-800">{(plantingDoseKgHa / 1000).toFixed(3)} t/ha</strong>
                           </div>
                           <div className="flex justify-between items-center pt-0.5 border-t border-blue-200/50">
-                            <span className="text-[8px] text-blue-700 font-black uppercase">Área Total ({currentSoil?.areaHa || 50} ha):</span>
+                            <span className="text-[8px] text-blue-700 font-black uppercase">Área Total ({activeAreaHa} ha):</span>
                             <strong className="text-[11px] font-black text-blue-900">
-                              {((plantingDoseKgHa * (currentSoil?.areaHa || 50)) / 1000).toFixed(2)} t
+                              {((Number(plantingDoseKgHa || 0) * activeAreaHa) / 1000).toFixed(2)} t
                             </strong>
                           </div>
                         </div>
@@ -10026,7 +10204,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                           <div className="flex justify-between items-center border-b border-emerald-200/50 pb-0.5">
                             <span className="text-[8.5px] text-slate-500 font-bold">Dose g/planta:</span>
                             <strong className="text-xs font-black text-emerald-900">
-                              {calculatedPopulationHa > 0 ? (topdressingDoseKgHa * 1000 / calculatedPopulationHa).toFixed(1) : '0'} g/planta
+                              {calculatedPopulationHa > 0 ? (Number(topdressingDoseKgHa || 0) * 1000 / calculatedPopulationHa).toFixed(1) : '0'} g/planta
                             </strong>
                           </div>
                           <div className="flex justify-between items-center text-[8.5px]">
@@ -10035,12 +10213,12 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                           </div>
                           <div className="flex justify-between items-center text-[8.5px]">
                             <span className="text-slate-500 font-bold">Dose t/ha:</span>
-                            <strong className="font-black text-emerald-800">{(topdressingDoseKgHa / 1000).toFixed(3)} t/ha</strong>
+                            <strong className="font-black text-emerald-800">{(Number(topdressingDoseKgHa || 0) / 1000).toFixed(3)} t/ha</strong>
                           </div>
                           <div className="flex justify-between items-center pt-0.5 border-t border-emerald-200/50">
-                            <span className="text-[8px] text-emerald-700 font-black uppercase">Área Total ({currentSoil?.areaHa || 50} ha):</span>
+                            <span className="text-[8px] text-emerald-700 font-black uppercase">Área Total ({activeAreaHa} ha):</span>
                             <strong className="text-[11px] font-black text-emerald-900">
-                              {((topdressingDoseKgHa * (currentSoil?.areaHa || 50)) / 1000).toFixed(2)} t
+                              {((Number(topdressingDoseKgHa || 0) * activeAreaHa) / 1000).toFixed(2)} t
                             </strong>
                           </div>
                         </div>
@@ -10056,7 +10234,7 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
                           <span className="text-[8.5px] text-slate-500 block">Dose Orgânica</span>
                           <strong className={`text-xs font-black ${selectedOrganicId === 'org-nenhum' ? 'text-slate-700' : 'text-purple-900'}`}>{organicDoseTonHa} t/ha</strong>
                           <span className="text-[8px] text-purple-800 block font-bold">
-                            Área Total ({currentSoil?.areaHa || 50} ha): {(organicDoseTonHa * (currentSoil?.areaHa || 50)).toFixed(1)} t
+                            Área Total ({activeAreaHa} ha): {(Number(organicDoseTonHa || 0) * activeAreaHa).toFixed(1)} t
                           </span>
                           <span className={`text-[8px] ${selectedOrganicId === 'org-nenhum' ? 'text-slate-600' : 'text-purple-700'} block font-semibold truncate mt-0.5`}>{selectedOrganic.name}</span>
                         </div>
@@ -10742,15 +10920,12 @@ export const RecommendationModule: React.FC<RecommendationModuleProps> = ({
               <SoilSamplingMapView
                 selectedFarm={
                   selectedFarm || {
-                    id: 'farm-1',
-                    name: 'Fazenda Santa Helena',
-                    city: 'Sorriso',
-                    state: 'MT',
-                    areaHa: 1200,
-                    plots: [
-                      { id: 'plot-1', name: 'Talhão 01 - Pivô Central', areaHa: 120, clayPercentage: 45, currentCrop: 'Soja' },
-                      { id: 'plot-2', name: 'Talhão 02 - Sede', areaHa: 85, clayPercentage: 38, currentCrop: 'Milho' },
-                    ],
+                    id: '',
+                    name: 'Propriedade não informada',
+                    city: '',
+                    state: '',
+                    areaHa: 0,
+                    plots: [],
                   }
                 }
                 soilSamples={parentSoilSamples || []}

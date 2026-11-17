@@ -4,26 +4,15 @@ import {
   Plus,
   Trash2,
   AlertTriangle,
-  CheckCircle2,
-  HelpCircle,
-  Zap,
-  Info,
   Layers,
-  FileText,
   RotateCcw,
   Bookmark,
-  Share2,
-  ChevronRight,
-  Droplets,
   Tractor,
-  Sliders,
 } from 'lucide-react';
 import {
   TankMixProduct,
   TankSelectedProduct,
   WaterQualityParameters,
-  CompatibilityRule,
-  CompatibilityRating,
 } from '../../types/tankMix';
 import {
   TANKMIX_PRODUCTS_DATABASE,
@@ -37,7 +26,6 @@ interface Props {
   selectedProducts: TankSelectedProduct[];
   setSelectedProducts: React.Dispatch<React.SetStateAction<TankSelectedProduct[]>>;
   waterQuality?: WaterQualityParameters;
-  setWaterQuality?: React.Dispatch<React.SetStateAction<WaterQualityParameters>>;
   tankVolumeL?: number;
   setTankVolumeL?: (vol: number) => void;
   sprayVolumeLHa?: number;
@@ -45,8 +33,6 @@ interface Props {
   onSaveRecipe?: (name: string, description: string) => void;
   onOpenTraceabilityModal?: () => void;
   onNavigateToWaterQuality?: () => void;
-  onRecordApplication?: (record: any) => void;
-  farmName?: string;
 }
 
 export const TankMixVirtualLabView: React.FC<Props> = ({
@@ -142,7 +128,7 @@ export const TankMixVirtualLabView: React.FC<Props> = ({
   else if (hasMancozebe) fluidColorClass = 'bg-amber-100/90 border-amber-300';
   else if (hasEc) fluidColorClass = 'bg-emerald-50/90 border-emerald-200';
 
-  const jarTest = getJarTestProtocol(evaluation.loadedProducts, tankVolumeL, sprayVolumeLHa);
+  const jarTest = getJarTestProtocol(evaluation.loadedProducts, sprayVolumeLHa);
 
   return (
     <div className="space-y-6">

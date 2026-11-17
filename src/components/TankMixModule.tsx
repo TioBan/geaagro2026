@@ -1,5 +1,4 @@
-// @ts-nocheck
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import {
   FlaskConical,
   Zap,
@@ -24,30 +23,59 @@ import {
   DEFAULT_SPRAYERS,
   calculateTankMixEvaluation,
 } from '../data/tankMixData';
-
-import { TankMixVirtualLabView } from './tankmix/TankMixVirtualLabView';
-import { TankMixCompatibilityMatrixView } from './tankmix/TankMixCompatibilityMatrixView';
-import { TankMixWaterQualityView } from './tankmix/TankMixWaterQualityView';
-import { TankMixFormulationsLibraryView } from './tankmix/TankMixFormulationsLibraryView';
-import { TankMixProductsCatalogView } from './tankmix/TankMixProductsCatalogView';
-import { TankMixWeatherApplicationView } from './tankmix/TankMixWeatherApplicationView';
-import { TankMixSprayersView } from './tankmix/TankMixSprayersView';
-import { TankMixTraceabilityView } from './tankmix/TankMixTraceabilityView';
-import { TankMixReportsView } from './tankmix/TankMixReportsView';
 import { addTankMixApplicationToFieldBook } from '../utils/tankmixFieldBookSync';
+import { lazyWithRetry } from '../utils/lazyWithRetry';
+
+const TankMixVirtualLabView = lazyWithRetry(() =>
+  import('./tankmix/TankMixVirtualLabView').then(m => ({ default: m.TankMixVirtualLabView }))
+);
+const TankMixCompatibilityMatrixView = lazyWithRetry(() =>
+  import('./tankmix/TankMixCompatibilityMatrixView').then(m => ({ default: m.TankMixCompatibilityMatrixView }))
+);
+const TankMixWaterQualityView = lazyWithRetry(() =>
+  import('./tankmix/TankMixWaterQualityView').then(m => ({ default: m.TankMixWaterQualityView }))
+);
+const TankMixFormulationsLibraryView = lazyWithRetry(() =>
+  import('./tankmix/TankMixFormulationsLibraryView').then(m => ({ default: m.TankMixFormulationsLibraryView }))
+);
+const TankMixProductsCatalogView = lazyWithRetry(() =>
+  import('./tankmix/TankMixProductsCatalogView').then(m => ({ default: m.TankMixProductsCatalogView }))
+);
+const TankMixWeatherApplicationView = lazyWithRetry(() =>
+  import('./tankmix/TankMixWeatherApplicationView').then(m => ({ default: m.TankMixWeatherApplicationView }))
+);
+const TankMixSprayersView = lazyWithRetry(() =>
+  import('./tankmix/TankMixSprayersView').then(m => ({ default: m.TankMixSprayersView }))
+);
+const TankMixTraceabilityView = lazyWithRetry(() =>
+  import('./tankmix/TankMixTraceabilityView').then(m => ({ default: m.TankMixTraceabilityView }))
+);
+const TankMixReportsView = lazyWithRetry(() =>
+  import('./tankmix/TankMixReportsView').then(m => ({ default: m.TankMixReportsView }))
+);
 
 interface TankMixModuleProps {
   activeSubTab?: string;
   setActiveSubTab?: (subTab: string) => void;
   farmName?: string;
-  activeFarm?: any;
+  activeFarm?: unknown;
 }
+
+const SUB_TABS = [
+  { id: 'compatibility_matrix', label: 'Matriz de Compatibilidade', icon: Zap },
+  { id: 'water_quality', label: 'Qualidade da Água', icon: Droplets },
+  { id: 'formulations_library', label: 'Biblioteca de Formulações', icon: BookOpen },
+  { id: 'products_catalog', label: 'Banco de Defensivos', icon: Boxes },
+  { id: 'weather_app', label: 'Clima & Delta T', icon: CloudSun },
+  { id: 'sprayers', label: 'Pulverizadores', icon: Tractor },
+  { id: 'traceability', label: 'Rastreabilidade', icon: ShieldCheck },
+  { id: 'reports', label: 'Laudo & Receitas', icon: FileText },
+] as const;
 
 export const TankMixModule: React.FC<TankMixModuleProps> = ({
   activeSubTab = 'virtual_lab',
   setActiveSubTab,
   farmName = 'Fazenda Modelo',
-  activeFarm,
 }) => {
   const currentSubTab = !activeSubTab || activeSubTab === 'dashboard' ? 'compatibility_matrix' : activeSubTab;
 
@@ -66,7 +94,7 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
     return TANKMIX_PRODUCTS_DATABASE;
   });
 
-  // Selected products currently in virtual spray tank (starts clean and professional without mock items)
+  // Selected products currently in virtual spray tank
   const [selectedProducts, setSelectedProducts] = useState<TankSelectedProduct[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('geaagro_tankmix_current_tank');
@@ -76,7 +104,10 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
           const isLegacyDemo =
             Array.isArray(parsed) &&
             parsed.length === 3 &&
-            parsed.some((p: any) => p?.productId === 'roundup_transorb' || p?.product?.id === 'roundup_transorb');
+            parsed.some(
+              (p: TankSelectedProduct) =>
+                p?.productId === 'roundup_transorb' || p?.product?.id === 'roundup_transorb'
+            );
           if (!isLegacyDemo && Array.isArray(parsed)) {
             return parsed;
           }
@@ -111,22 +142,20 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
       ironMgL: 0.1,
       manganeseMgL: 0.05,
       bicarbonatesMgL: 40,
-      classification: 'água mole',
+      classification: 'Mole',
     };
   });
 
   // Weather state
-  const [weather, setWeather] = useState<WeatherCondition>(() => {
-    return {
-      temperatureC: 24,
-      relativeHumidityPct: 68,
-      windSpeedKmH: 7,
-      deltaT: 3.8,
-      applicationWindowStatus: 'ideal',
-      rainForecastHours: 12,
-      windowNotes: 'Condições excelentes. Delta T na faixa ótima e vento favorável.',
-    };
-  });
+  const [weather, setWeather] = useState<WeatherCondition>(() => ({
+    temperatureC: 24,
+    relativeHumidityPct: 68,
+    windSpeedKmH: 7,
+    deltaT: 3.8,
+    applicationWindowStatus: 'ideal',
+    rainForecastHours: 12,
+    windowNotes: 'Condições excelentes. Delta T na faixa ótima e vento favorável.',
+  }));
 
   // Sprayers state
   const [sprayers, setSprayers] = useState<SprayerEquipment[]>(() => {
@@ -188,7 +217,6 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
     localStorage.setItem('geaagro_tankmix_spray_volume_lha', String(sprayVolumeLHa));
   }, [sprayVolumeLHa]);
 
-  // Auto-persist changes
   useEffect(() => {
     localStorage.setItem('geaagro_tankmix_products', JSON.stringify(products));
   }, [products]);
@@ -209,8 +237,11 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
     localStorage.setItem('geaagro_tankmix_applications', JSON.stringify(applications));
   }, [applications]);
 
-  // Recalculate evaluation dynamically whenever products or water change
-  const currentEvaluation = calculateTankMixEvaluation(selectedProducts, waterQuality);
+  // Recalculate evaluation dynamically when products, water, or tank parameters change
+  const currentEvaluation = useMemo(
+    () => calculateTankMixEvaluation(selectedProducts, waterQuality, tankVolumeL, sprayVolumeLHa),
+    [selectedProducts, waterQuality, tankVolumeL, sprayVolumeLHa]
+  );
 
   const handleSubTabChange = (tabId: string) => {
     if (setActiveSubTab) {
@@ -223,12 +254,13 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
   };
 
   const handleSelectProductForLab = (product: TankMixProduct) => {
-    const alreadyIn = selectedProducts.find(p => p.product.id === product.id);
+    const alreadyIn = selectedProducts.find(p => (p.productId || p.product?.id) === product.id);
     if (!alreadyIn) {
-      const nextOrder = (selectedProducts || []).length + 1;
+      const nextOrder = selectedProducts.length + 1;
       setSelectedProducts(prev => [
         ...prev,
         {
+          productId: product.id,
           product,
           dose: product.defaultDose,
           doseUnit: product.doseUnit,
@@ -240,6 +272,8 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
   };
 
   const handleSelectSprayerForLab = (sprayer: SprayerEquipment) => {
+    if (sprayer.tankCapacityLiters) setTankVolumeL(sprayer.tankCapacityLiters);
+    if (sprayer.applicationRateLHa) setSprayVolumeLHa(sprayer.applicationRateLHa);
     handleSubTabChange('virtual_lab');
   };
 
@@ -256,9 +290,9 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
         sprayOrderCode: record.id?.replace('app_', 'ORD-') || `ORD-${Math.floor(Math.random() * 9000 + 1000)}`,
         carrierVolumeHa: record.totalSprayVolumeLHa || 100,
         totalVolumeLiters: (record.totalSprayVolumeLHa || 100) * (record.areaHa || 50),
-        waterPh: record.waterQuality?.ph || 5.8,
-        waterHardnessPpm: record.waterQuality?.hardnessMgL || 60,
-        sprayTip: 'Leque Amplo Antideriva (AIXI)',
+        waterPh: record.waterPh || waterQuality.ph || 5.8,
+        waterHardnessPpm: record.waterHardnessMgL || waterQuality.hardnessMgL || 60,
+        sprayTip: record.nozzleModel || 'Leque Amplo Antideriva (AIXI)',
         driftRiskLevel: 'baixo',
         products: (record.productsUsed || []).map((p, idx) => ({
           productName: p.productName || 'Defensivo Agrícola',
@@ -281,20 +315,73 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
     setApplications(prev => prev.filter(a => a.id !== id));
   };
 
-  const subTabs = [
-    { id: 'compatibility_matrix', label: 'Matriz de Compatibilidade', icon: Zap },
-    { id: 'water_quality', label: 'Qualidade da Água', icon: Droplets },
-    { id: 'formulations_library', label: 'Biblioteca de Formulações', icon: BookOpen },
-    { id: 'products_catalog', label: 'Banco de Defensivos', icon: Boxes },
-    { id: 'weather_app', label: 'Clima & Delta T', icon: CloudSun },
-    { id: 'sprayers', label: 'Pulverizadores', icon: Tractor },
-    { id: 'traceability', label: 'Rastreabilidade', icon: ShieldCheck },
-    { id: 'reports', label: 'Laudo & Receitas', icon: FileText },
-  ];
+  const handleRegisterCurrentTankApplication = () => {
+    if (selectedProducts.length === 0) {
+      handleSubTabChange('traceability');
+      return;
+    }
+    const today = new Date();
+    const maxSafetyDays = Math.max(
+      ...currentEvaluation.loadedProducts.map(lp => lp.product.safetyIntervalDays || 14),
+      14
+    );
+    const harvestDate = new Date(today.getTime() + maxSafetyDays * 86400000).toISOString().split('T')[0];
+    const reentryDate = new Date(today.getTime() + 86400000).toISOString().split('T')[0];
+    const defaultSprayer = sprayers[0];
+    const areaHa = currentEvaluation.totalHectaresPerTank || 20;
+
+    handleAddApplicationRecord({
+      id: `app_${Date.now()}`,
+      farmId: 'farm_1',
+      farmName,
+      plotId: 'plot_1',
+      plotName: 'Talhão 01',
+      crop: 'Soja',
+      cultivar: 'Padrão',
+      areaHa,
+      growthStage: 'V4 / R1',
+      date: today.toISOString().split('T')[0],
+      startTime: '07:00',
+      endTime: '10:30',
+      operatorName: 'Operador Responsável',
+      equipmentId: defaultSprayer?.id || 'sprayer_1',
+      equipmentName: defaultSprayer?.name || 'Pulverizador Autopropelido',
+      nozzleModel: defaultSprayer?.nozzleType || 'Leque com Indução de Ar 110-02',
+      totalSprayVolumeLHa: sprayVolumeLHa,
+      totalTankVolumeL: tankVolumeL,
+      tankLoadsCount: 1,
+      productsUsed: currentEvaluation.loadedProducts.map(lp => ({
+        productId: lp.product.id,
+        productName: lp.product.commercialName,
+        formulation: lp.product.formulation,
+        class: lp.product.agrochemicalClass,
+        dosePerHa: lp.dose,
+        doseUnit: lp.doseUnit,
+        totalAmountUsed: Number((lp.dose * areaHa).toFixed(2)),
+        amountUnit: lp.doseUnit.includes('kg') || lp.doseUnit.includes('g') ? 'kg' : 'L',
+      })),
+      waterPh: waterQuality.ph,
+      waterHardnessMgL: waterQuality.hardnessMgL,
+      weather,
+      icgScore: currentEvaluation.icgScore,
+      icgRating: currentEvaluation.worstRating,
+      detectedAlerts: currentEvaluation.activeAlerts,
+      mixingOrderFollowed: true,
+      jarTestConducted: currentEvaluation.jarTestRequired,
+      safetyIntervalDays: maxSafetyDays,
+      reentryDate,
+      harvestSafetyDate: harvestDate,
+      epiChecklistOk: true,
+      tripleRinseDone: true,
+      notes: 'Aplicação registrada via Simulador de Tanque TankMix.',
+      photos: [],
+      createdAt: today.toISOString(),
+    });
+  };
 
   return (
     <div className="space-y-6">
-      {/* Top Banner: Disclaimer & Title without badges */}
+      {/* Top Banner */}
       <div className="bg-gradient-to-r from-teal-900 to-emerald-900 text-white rounded-2xl p-6 shadow-md border border-emerald-700/50 flex items-start gap-4">
         <div className="p-3 bg-emerald-500/20 rounded-xl border border-emerald-400/30 shrink-0">
           <FlaskConical className="w-8 h-8 text-emerald-300" />
@@ -310,7 +397,7 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
       {/* Subtabs Navigation Bar */}
       <div className="bg-white p-2 rounded-2xl border border-gray-200 shadow-sm overflow-x-auto">
         <div className="flex items-center gap-1.5 min-w-max">
-          {subTabs.map(tab => {
+          {SUB_TABS.map(tab => {
             const Icon = tab.icon;
             const isActive = currentSubTab === tab.id;
             return (
@@ -331,77 +418,78 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
         </div>
       </div>
 
-      {/* Subtab Contents */}
+      {/* Subtab Contents (Lazy Loaded) */}
+      <Suspense
+        fallback={
+          <div className="bg-white rounded-2xl border border-gray-200 p-10 flex items-center justify-center text-xs font-semibold text-gray-500">
+            Carregando módulo TankMix...
+          </div>
+        }
+      >
+        {currentSubTab === 'virtual_lab' && (
+          <TankMixVirtualLabView
+            allProducts={products}
+            selectedProducts={selectedProducts}
+            setSelectedProducts={setSelectedProducts}
+            waterQuality={waterQuality}
+            tankVolumeL={tankVolumeL}
+            setTankVolumeL={setTankVolumeL}
+            sprayVolumeLHa={sprayVolumeLHa}
+            setSprayVolumeLHa={setSprayVolumeLHa}
+            onSaveRecipe={(name, description) => {
+              console.log(`Receita salva: ${name} - ${description}`);
+            }}
+            onOpenTraceabilityModal={handleRegisterCurrentTankApplication}
+            onNavigateToWaterQuality={() => handleSubTabChange('water_quality')}
+          />
+        )}
 
-      {currentSubTab === 'virtual_lab' && (
-        <TankMixVirtualLabView
-          allProducts={products}
-          selectedProducts={selectedProducts}
-          setSelectedProducts={setSelectedProducts}
-          waterQuality={waterQuality}
-          setWaterQuality={setWaterQuality}
-          tankVolumeL={tankVolumeL}
-          setTankVolumeL={setTankVolumeL}
-          sprayVolumeLHa={sprayVolumeLHa}
-          setSprayVolumeLHa={setSprayVolumeLHa}
-          onSaveRecipe={(name, description) => {
-            console.log(`Receita salva: ${name} - ${description}`);
-          }}
-          onOpenTraceabilityModal={() => handleSubTabChange('traceability')}
-          onNavigateToWaterQuality={() => handleSubTabChange('water_quality')}
-          onRecordApplication={handleAddApplicationRecord}
-          farmName={farmName}
-        />
-      )}
+        {currentSubTab === 'compatibility_matrix' && <TankMixCompatibilityMatrixView />}
 
-      {currentSubTab === 'compatibility_matrix' && <TankMixCompatibilityMatrixView />}
+        {currentSubTab === 'water_quality' && (
+          <TankMixWaterQualityView waterQuality={waterQuality} setWaterQuality={setWaterQuality} />
+        )}
 
-      {currentSubTab === 'water_quality' && (
-        <TankMixWaterQualityView waterQuality={waterQuality} setWaterQuality={setWaterQuality} />
-      )}
+        {currentSubTab === 'formulations_library' && <TankMixFormulationsLibraryView />}
 
-      {currentSubTab === 'formulations_library' && <TankMixFormulationsLibraryView />}
+        {currentSubTab === 'products_catalog' && (
+          <TankMixProductsCatalogView
+            products={products}
+            onAddCustomProduct={handleAddCustomProduct}
+            onSelectProductForLab={handleSelectProductForLab}
+          />
+        )}
 
-      {currentSubTab === 'products_catalog' && (
-        <TankMixProductsCatalogView
-          products={products}
-          onAddCustomProduct={handleAddCustomProduct}
-          onSelectProductForLab={handleSelectProductForLab}
-        />
-      )}
+        {currentSubTab === 'weather_app' && (
+          <TankMixWeatherApplicationView weather={weather} setWeather={setWeather} />
+        )}
 
-      {currentSubTab === 'weather_app' && (
-        <TankMixWeatherApplicationView weather={weather} setWeather={setWeather} />
-      )}
+        {currentSubTab === 'sprayers' && (
+          <TankMixSprayersView
+            sprayers={sprayers}
+            setSprayers={setSprayers}
+            onSelectSprayerForLab={handleSelectSprayerForLab}
+          />
+        )}
 
-      {currentSubTab === 'sprayers' && (
-        <TankMixSprayersView
-          sprayers={sprayers}
-          setSprayers={setSprayers}
-          onSelectSprayerForLab={handleSelectSprayerForLab}
-        />
-      )}
+        {currentSubTab === 'traceability' && (
+          <TankMixTraceabilityView
+            applications={applications}
+            onDeleteApplication={handleDeleteApplication}
+          />
+        )}
 
-      {currentSubTab === 'traceability' && (
-        <TankMixTraceabilityView
-          applications={applications}
-          onAddApplication={handleAddApplicationRecord}
-          onDeleteApplication={handleDeleteApplication}
-          farms={[{ id: 'farm_1', name: farmName }]}
-          currentFarmId="farm_1"
-        />
-      )}
-
-      {currentSubTab === 'reports' && (
-        <TankMixReportsView
-          selectedProducts={selectedProducts}
-          evaluation={currentEvaluation}
-          waterQuality={waterQuality}
-          weather={weather}
-          farmName={farmName}
-          plotName="Talhão Principal"
-        />
-      )}
+        {currentSubTab === 'reports' && (
+          <TankMixReportsView
+            selectedProducts={selectedProducts}
+            evaluation={currentEvaluation}
+            waterQuality={waterQuality}
+            weather={weather}
+            farmName={farmName}
+            plotName="Talhão Principal"
+          />
+        )}
+      </Suspense>
 
       {/* Botão "Abrir Laboratório Virtual" na parte inferior */}
       {currentSubTab !== 'virtual_lab' ? (

@@ -1,28 +1,24 @@
 import React, { useState } from 'react';
 import {
   Building2,
-  MapPin,
   Plus,
   Trash2,
   Edit2,
   Check,
-  Compass,
   Layers,
-  FileText,
-  Camera,
-  Info,
-  ChevronDown,
-  ChevronUp,
   ShieldCheck,
   ArrowUpRight,
-  UserCheck,
-  RefreshCw,
+  Sliders,
+  Wheat,
 } from 'lucide-react';
-import { PropriedadeRural, TalhaoRural } from '../../types/gestaoRural';
+import { PropriedadeRural, TalhaoRural, ConfigCulturaIntegrada } from '../../types/gestaoRural';
+import { getCropEmoji } from '../../utils/gestaoRuralStorage';
 
 interface GestaoAdministracaoPropriedadeProps {
   propriedade: PropriedadeRural;
   talhoes: TalhaoRural[];
+  configCultura?: ConfigCulturaIntegrada;
+  onOpenConfigCultura?: () => void;
   onUpdatePropriedade: (updated: PropriedadeRural) => void;
   onAddTalhao: (newTalhao: TalhaoRural) => void;
   onDeleteTalhao: (id: string) => void;
@@ -33,15 +29,35 @@ interface GestaoAdministracaoPropriedadeProps {
 export const GestaoAdministracaoPropriedade: React.FC<GestaoAdministracaoPropriedadeProps> = ({
   propriedade,
   talhoes,
+  configCultura,
+  onOpenConfigCultura,
   onUpdatePropriedade,
   onAddTalhao,
   onDeleteTalhao,
   onNavigateToRegister,
-  onNavigate,
 }) => {
   const [isEditingPropriedade, setIsEditingPropriedade] = useState(false);
   const [propForm, setPropForm] = useState<PropriedadeRural>(propriedade);
   const [showAddTalhaoModal, setShowAddTalhaoModal] = useState(false);
+
+  const syncCentralFarmsStorage = (transformFarm: (farm: Record<string, any>) => Record<string, any>) => {
+    try {
+      const centralFarmsStr = localStorage.getItem('geaagro_farms');
+      if (!centralFarmsStr) return;
+      const centralFarms = JSON.parse(centralFarmsStr);
+      if (!Array.isArray(centralFarms) || centralFarms.length === 0) return;
+
+      const updatedFarms = centralFarms.map((f: Record<string, any>) => {
+        if (f.id === propriedade.id || f.name === propriedade.nome || centralFarms.length === 1) {
+          return transformFarm(f);
+        }
+        return f;
+      });
+      localStorage.setItem('geaagro_farms', JSON.stringify(updatedFarms));
+    } catch (err) {
+      console.warn('Sync to central farms storage failed:', err);
+    }
+  };
 
   const [newTalhao, setNewTalhao] = useState<Partial<TalhaoRural>>({
     codigo: `TL-0${talhoes.length + 1}`,
@@ -66,35 +82,18 @@ export const GestaoAdministracaoPropriedade: React.FC<GestaoAdministracaoProprie
     onUpdatePropriedade(updated);
     setIsEditingPropriedade(false);
 
-    // Sync to Central Registration localStorage
-    try {
-      const centralFarmsStr = localStorage.getItem('geaagro_farms');
-      if (centralFarmsStr) {
-        const centralFarms = JSON.parse(centralFarmsStr);
-        if (Array.isArray(centralFarms) && centralFarms.length > 0) {
-          const updatedFarms = centralFarms.map((f: any) => {
-            if (f.id === updated.id || f.name === updated.nome || centralFarms.length === 1) {
-              return {
-                ...f,
-                name: updated.nome,
-                owner: updated.proprietario,
-                document: updated.documento,
-                stateRegistration: updated.inscricaoEstadual,
-                city: updated.municipio,
-                state: updated.estado,
-                totalAreaHa: updated.areaTotalHa,
-                arableAreaHa: updated.areaAgricolaHa,
-                irrigatedAreaHa: updated.areaIrrigadaHa,
-              };
-            }
-            return f;
-          });
-          localStorage.setItem('geaagro_farms', JSON.stringify(updatedFarms));
-        }
-      }
-    } catch (err) {
-      console.warn('Sync to central farms storage failed:', err);
-    }
+    syncCentralFarmsStorage(f => ({
+      ...f,
+      name: updated.nome,
+      owner: updated.proprietario,
+      document: updated.documento,
+      stateRegistration: updated.inscricaoEstadual,
+      city: updated.municipio,
+      state: updated.estado,
+      totalAreaHa: updated.areaTotalHa,
+      arableAreaHa: updated.areaAgricolaHa,
+      irrigatedAreaHa: updated.areaIrrigadaHa,
+    }));
   };
 
   const handleSaveNewTalhao = (e: React.FormEvent) => {
@@ -129,37 +128,19 @@ export const GestaoAdministracaoPropriedade: React.FC<GestaoAdministracaoProprie
 
     onAddTalhao(created);
 
-    // Sync new plot to Central Registration localStorage 'geaagro_farms'
-    try {
-      const centralFarmsStr = localStorage.getItem('geaagro_farms');
-      if (centralFarmsStr) {
-        const centralFarms = JSON.parse(centralFarmsStr);
-        if (Array.isArray(centralFarms) && centralFarms.length > 0) {
-          const newCentralPlot = {
-            id: created.id,
-            name: created.nome,
-            areaHa: created.areaHa,
-            crop: created.culturaAtual,
-            soilTexture: created.texturaSolo === 'argiloso' ? 'ARGILOSO' : created.texturaSolo === 'arenoso' ? 'ARENOSO' : 'MEDIO',
-            clayPercentage: created.teorArgilaPct,
-            irrigation: created.irrigado,
-          };
-          const updatedFarms = centralFarms.map((f: any) => {
-            if (f.id === propriedade.id || f.name === propriedade.nome || centralFarms.length === 1) {
-              const currentPlots = Array.isArray(f.plots) ? f.plots : [];
-              return {
-                ...f,
-                plots: [newCentralPlot, ...currentPlots],
-              };
-            }
-            return f;
-          });
-          localStorage.setItem('geaagro_farms', JSON.stringify(updatedFarms));
-        }
-      }
-    } catch (err) {
-      console.warn('Sync plot to central farms storage failed:', err);
-    }
+    const newCentralPlot = {
+      id: created.id,
+      name: created.nome,
+      areaHa: created.areaHa,
+      crop: created.culturaAtual,
+      soilTexture: created.texturaSolo === 'argiloso' ? 'ARGILOSO' : created.texturaSolo === 'arenoso' ? 'ARENOSO' : 'MEDIO',
+      clayPercentage: created.teorArgilaPct,
+      irrigation: created.irrigado,
+    };
+    syncCentralFarmsStorage(f => ({
+      ...f,
+      plots: [newCentralPlot, ...(Array.isArray(f.plots) ? f.plots : [])],
+    }));
 
     setShowAddTalhaoModal(false);
     setNewTalhao({
@@ -182,27 +163,10 @@ export const GestaoAdministracaoPropriedade: React.FC<GestaoAdministracaoProprie
 
   const handleDeleteTalhaoWithSync = (id: string) => {
     onDeleteTalhao(id);
-    try {
-      const centralFarmsStr = localStorage.getItem('geaagro_farms');
-      if (centralFarmsStr) {
-        const centralFarms = JSON.parse(centralFarmsStr);
-        if (Array.isArray(centralFarms) && centralFarms.length > 0) {
-          const updatedFarms = centralFarms.map((f: any) => {
-            if (f.id === propriedade.id || f.name === propriedade.nome || centralFarms.length === 1) {
-              const currentPlots = Array.isArray(f.plots) ? f.plots : [];
-              return {
-                ...f,
-                plots: currentPlots.filter((p: any) => p.id !== id && p.name !== id),
-              };
-            }
-            return f;
-          });
-          localStorage.setItem('geaagro_farms', JSON.stringify(updatedFarms));
-        }
-      }
-    } catch (err) {
-      console.warn('Sync plot delete to central farms storage failed:', err);
-    }
+    syncCentralFarmsStorage(f => ({
+      ...f,
+      plots: (Array.isArray(f.plots) ? f.plots : []).filter((p: any) => p.id !== id && p.name !== id),
+    }));
   };
 
   return (
@@ -223,7 +187,12 @@ export const GestaoAdministracaoPropriedade: React.FC<GestaoAdministracaoProprie
         </div>
 
         <button
-          onClick={() => setIsEditingPropriedade(!isEditingPropriedade)}
+          onClick={() => {
+            if (!isEditingPropriedade) {
+              setPropForm(propriedade);
+            }
+            setIsEditingPropriedade(!isEditingPropriedade);
+          }}
           className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 shrink-0"
         >
           <Edit2 className="w-4 h-4" />
@@ -267,6 +236,75 @@ export const GestaoAdministracaoPropriedade: React.FC<GestaoAdministracaoProprie
               <ArrowUpRight className="w-4 h-4" />
             </button>
           )}
+        </div>
+      </div>
+
+      {/* CULTURA INTEGRADA & UNIDADES COMERCIAIS CARD */}
+      <div className="bg-gradient-to-br from-amber-500/10 via-white to-emerald-500/10 dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-850 border border-amber-500/30 rounded-3xl p-6 shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-zinc-800 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-emerald-600 text-white flex items-center justify-center text-2xl shadow-sm shrink-0">
+              {getCropEmoji(configCultura?.cultura)}
+            </div>
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-300 font-extrabold text-[10px] uppercase tracking-wider mb-1">
+                <Wheat className="w-3 h-3 text-amber-600" />
+                <span>Cultura Agrícola Integrada</span>
+              </div>
+              <h3 className="text-base font-black text-slate-900 dark:text-white">
+                Cultura Ativa: {configCultura?.cultura || 'Banana'} {configCultura?.variedade ? `• ${configCultura.variedade}` : ''}
+              </h3>
+              <p className="text-xs text-slate-500">
+                Ajuste como a cultura é comercializada no app (ex: <strong>caixa (cx), saca (sc), kg, tonelada (ton)</strong>).
+              </p>
+            </div>
+          </div>
+
+          {onOpenConfigCultura && (
+            <button
+              onClick={onOpenConfigCultura}
+              className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold rounded-xl transition-all shadow-md cursor-pointer flex items-center gap-2 shrink-0"
+            >
+              <Sliders className="w-4 h-4 text-white" />
+              <span>Ajustar Cultura &amp; Unidades</span>
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl border border-slate-100 dark:border-zinc-700 space-y-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase block">Unidade Principal</span>
+            <span className="text-base font-black text-emerald-600 dark:text-emerald-400 block">
+              {configCultura?.unidadeComercializacaoPrincipal || 'cx'}
+            </span>
+            <span className="text-[10px] text-slate-500">
+              {configCultura?.pesoPorUnidadeKg || 20} kg por {configCultura?.unidadeComercializacaoPrincipal || 'cx'}
+            </span>
+          </div>
+
+          <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl border border-slate-100 dark:border-zinc-700 space-y-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase block">Unidades Habilitadas</span>
+            <span className="text-sm font-black text-slate-900 dark:text-white block truncate">
+              {configCultura?.unidadesHabilitadas?.join(', ') || 'cx, sc, kg, ton'}
+            </span>
+            <span className="text-[10px] text-slate-500">Opções nas vendas</span>
+          </div>
+
+          <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl border border-slate-100 dark:border-zinc-700 space-y-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase block">Preço de Referência</span>
+            <span className="text-base font-black text-amber-600 dark:text-amber-400 block">
+              R$ {configCultura?.precoReferenciaUnitarioR$?.toFixed(2) || '68.00'}
+            </span>
+            <span className="text-[10px] text-slate-500">por {configCultura?.unidadeComercializacaoPrincipal || 'cx'}</span>
+          </div>
+
+          <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl border border-slate-100 dark:border-zinc-700 space-y-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase block">Meta Produtividade</span>
+            <span className="text-base font-black text-purple-600 dark:text-purple-400 block">
+              {configCultura?.metaProdutividadePadraoHa || 1500} {configCultura?.unidadeComercializacaoPrincipal || 'cx'}/ha
+            </span>
+            <span className="text-[10px] text-slate-500">Planejamento de safra</span>
+          </div>
         </div>
       </div>
 
@@ -561,7 +599,7 @@ export const GestaoAdministracaoPropriedade: React.FC<GestaoAdministracaoProprie
           ))}
           {talhoes.length === 0 && (
             <div className="col-span-full p-8 text-center bg-slate-50 dark:bg-zinc-800/20 rounded-2xl border border-dashed border-slate-300 dark:border-zinc-700 text-slate-500 dark:text-zinc-400">
-              Nenhum talhão cadastrado. Clique no botão &ldquo;Novo Talhão&rdquo; acima para cadastrar os talhões da sua propriedade.
+              Nenhum talhão cadastrado. Clique no botão &ldquo;Adicionar Novo Talhão&rdquo; acima para cadastrar os talhões da sua propriedade.
             </div>
           )}
         </div>

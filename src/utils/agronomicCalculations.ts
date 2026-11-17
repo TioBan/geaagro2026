@@ -173,7 +173,7 @@ export function calculateLiming(
   soil: SoilSample,
   plot: FieldPlot,
   crop: CropNutritionalTarget,
-  prntPercent: number = 80,
+  prntPercent: number = 100,
   incorporationDepthCm: number = 20,
   surfaceCoverPercent: number = 100,
   preferredMethod: 'base_saturation' | 'aluminum_neutralization' | 'ca_elevation' | 'mg_elevation' = 'base_saturation'
@@ -182,10 +182,10 @@ export function calculateLiming(
   const currentV = calculatedSoil.vPercent || 0;
   const targetV = crop.targetVPercent;
   const ctcT = calculatedSoil.ctcTotal || 1;
-  const prnt = prntPercent > 0 ? prntPercent : 80;
+  const prnt = prntPercent > 0 ? prntPercent : 100;
   const depthFactor = (incorporationDepthCm || 20) / 20;
   const areaFactor = (surfaceCoverPercent || 100) / 100;
-  const f = 85 / prnt;
+  const f = 100 / prnt;
 
   let doseTonsPerHa = 0;
   let justification = '';
@@ -195,27 +195,25 @@ export function calculateLiming(
       doseTonsPerHa = 0;
       justification = `A Saturação por Bases atual (V% = ${currentV.toFixed(1)}%) já atinge ou supera o valor ideal para ${crop.name} (V% = ${targetV}%). Não há necessidade de calagem no momento.`;
     } else {
-      // Fórmula NC (t/ha) = [(V2 - V1) * T / PRNT] * (Profundidade / 20) * (SC / 100)
-      doseTonsPerHa = ((targetV - currentV) * ctcT / prnt) * depthFactor * areaFactor;
+      // Fórmula NC (t/ha) = [(V2 - V1) * T / 100] * (100 / PRNT) * (Profundidade / 20) * (SC / 100)
+      doseTonsPerHa = (((targetV - currentV) * ctcT) / 100) * f * depthFactor * areaFactor;
       doseTonsPerHa = Math.max(0, doseTonsPerHa);
-      justification = `Elevação da Saturação por Bases de ${currentV.toFixed(1)}% para a meta de ${targetV}%, considerando CTC(T) = ${ctcT.toFixed(2)} cmolc/dm³ e calcário com PRNT de ${prnt}%.`;
+      justification = `Elevação da Saturação por Bases de ${currentV.toFixed(1)}% para a meta de ${targetV}%, considerando CTC(T) = ${ctcT.toFixed(2)} cmolc/dm³ e calcário com PRNT de ${prnt}% (f = ${f.toFixed(3)}, Base PRNT 100%).`;
     }
   } else if (preferredMethod === 'ca_elevation') {
     const caAtual = soil.caCmolcDm3 || 0;
     const caAlvo = 3.0;
     const deltaCa = Math.max(0, caAlvo - caAtual);
-    const baseDose85 = deltaCa * (100 / 85);
-    doseTonsPerHa = baseDose85 * f * depthFactor * areaFactor;
+    doseTonsPerHa = deltaCa * f * depthFactor * areaFactor;
     doseTonsPerHa = Math.max(0, doseTonsPerHa);
-    justification = `Elevação de Cálcio de ${caAtual.toFixed(2)} cmolc/dm³ para a meta de ${caAlvo.toFixed(1)} cmolc/dm³, aplicando o fator de correção f = ${f.toFixed(3)} (Base PRNT 85%).`;
+    justification = `Elevação de Cálcio de ${caAtual.toFixed(2)} cmolc/dm³ para a meta de ${caAlvo.toFixed(1)} cmolc/dm³, aplicando o fator de correção f = ${f.toFixed(3)} (Base PRNT 100%).`;
   } else if (preferredMethod === 'mg_elevation') {
     const mgAtual = soil.mgCmolcDm3 || 0;
     const mgAlvo = 1.0;
     const deltaMg = Math.max(0, mgAlvo - mgAtual);
-    const baseDose85 = deltaMg * (100 / 85);
-    doseTonsPerHa = baseDose85 * f * depthFactor * areaFactor;
+    doseTonsPerHa = deltaMg * f * depthFactor * areaFactor;
     doseTonsPerHa = Math.max(0, doseTonsPerHa);
-    justification = `Elevação de Magnésio de ${mgAtual.toFixed(2)} cmolc/dm³ para a meta de ${mgAlvo.toFixed(1)} cmolc/dm³, aplicando o fator de correção f = ${f.toFixed(3)} (Base PRNT 85%).`;
+    justification = `Elevação de Magnésio de ${mgAtual.toFixed(2)} cmolc/dm³ para a meta de ${mgAlvo.toFixed(1)} cmolc/dm³, aplicando o fator de correção f = ${f.toFixed(3)} (Base PRNT 100%).`;
   } else {
     // Método Neutralização de Al e Elevação de Ca+Mg (IAC / CFSEMG)
     // NC = [Y * Al + (X - (Ca + Mg))] * 100 / PRNT

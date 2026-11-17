@@ -75,7 +75,7 @@ export const MODULE_DESCRIPTIONS: Record<string, ModuleDescription> = {
     producerBenefit: 'Acesso às notas de atualização, novidades do sistema e suporte direto com a equipe técnica.',
     producerTip: 'Verifique se há atualizações para aproveitar novas tabelas de adubação e bulas do MAPA.',
     category: 'Gestão & Geral',
-    highlights: ['Versão 4.2.3.7 Pro', 'Termos de uso e privacidade', 'Suporte agronômico'],
+    highlights: ['Versão 4.2.3.8 Pro', 'Termos de uso e privacidade', 'Suporte agronômico'],
   },
   pericia_rural: {
     id: 'pericia_rural',
@@ -410,6 +410,16 @@ export const MODULE_DESCRIPTIONS: Record<string, ModuleDescription> = {
     category: 'Campo & Proteção',
     badge: 'ICG & WALES',
     highlights: ['Ordem oficial de mistura (WALES)', 'Teste de compatibilidade em copo', 'Rastreabilidade total da pulverização'],
+  },
+  estatistica: {
+    id: 'estatistica',
+    title: 'GeaAgro Estatística (Experimentação Científica)',
+    shortDescription: 'Plataforma completa de estatística experimental 100% offline com suporte a DIC, DBC, DQL, Fatorial, Split-Plot, Regressão, Multivariada e Gráficos Científicos.',
+    producerBenefit: 'Avalie ensaios de campo, variedades, adubação e protocolos zootécnicos com rigor acadêmico, sem depender de internet ou softwares pagos.',
+    producerTip: 'Verifique sempre a normalidade (Shapiro-Wilk) e a homogeneidade de variâncias (Levene) antes de interpretar testes paramétricos de médias.',
+    category: 'Pesquisa & Ciência',
+    badge: 'PWA Científico',
+    highlights: ['ANOVA DIC/DBC/DQL/Fatorial/Split-Plot', 'Tukey, Scott-Knott, Dunnett e Regressão', 'Armazenamento OPFS + WASM e Laudos'],
   },
   backup: {
     id: 'backup',

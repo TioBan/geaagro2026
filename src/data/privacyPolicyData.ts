@@ -7,7 +7,7 @@ export interface PolicySection {
   subsections?: { title: string; text: string }[];
 }
 
-export const PRIVACY_POLICY_VERSION = '4.2.3.7';
+export const PRIVACY_POLICY_VERSION = '4.2.3.8';
 export const PRIVACY_POLICY_LAST_UPDATED = '14 de setembro de 2026';
 export const DPO_CONTACT_EMAIL = 'geaagrobrasil@gmail.com';
 
@@ -34,7 +34,7 @@ export const PRIVACY_POLICY_DATA: {
   controller: {
     system: 'GeaAgro CRM — Plataforma de Inteligência Agronômica',
     version: PRIVACY_POLICY_VERSION,
-    developers: 'Fatima Leão & Lucas Mendes',
+    developers: 'Fatima Leão',
     dpoEmail: DPO_CONTACT_EMAIL,
   },
   summaryPoints: [

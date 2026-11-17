@@ -733,57 +733,8 @@ export const SOIL_SYMPTOMS_BANK: SymptomItem[] = [
   { id: 'sym-18', name: 'Tombamento pré e pós-emergência (Damping-off)', organ: 'Plântula', description: 'Morte de sementes no solo ou tombamento de plântulas recém-emergidas.', associatedDiseaseIds: ['dis-rhizoctonia-solani', 'dis-fusarium-solani', 'dis-phytophthora-sojae', 'dis-pythium-ultimum'] },
 ];
 
-export const INITIAL_PROPERTIES: SoilProperty[] = [
-  {
-    id: 'prop-01',
-    farmName: 'Fazenda Santa Maria - GeaAgro',
-    owner: 'Grupo Agrícola Terra Viva',
-    technicalResponsible: 'Eng. Agr. Lucas Mendes',
-    crea: 'CREA-PR 189230/D',
-    municipality: 'Cascavel',
-    state: 'PR',
-    gpsLatitude: -24.9555,
-    gpsLongitude: -53.4552,
-    totalAreaHa: 850,
-    cultivatedAreaHa: 720,
-    notes: 'Propriedade modelo com monitoramento fitossanitário integrado e Sistema Plantio Direto consolidado há 18 anos.',
-    createdAt: '2026-01-15T08:00:00Z',
-  },
-];
+export const INITIAL_PROPERTIES: SoilProperty[] = [];
 
-export const INITIAL_FIELDS: SoilField[] = [
-  {
-    id: 'fld-01',
-    propertyId: 'prop-01',
-    code: 'T-01',
-    name: 'Talhão Sede - Soja',
-    areaHa: 120,
-    currentCrop: 'Soja',
-    cultivar: 'TMG 7063 IPRO',
-    season: 'Safra 2025/2026',
-    croppingSystem: 'Plantio Direto',
-    soilType: 'Latossolo Vermelho Distrófico',
-    texturalClass: 'Argilosa',
-    latitude: -24.9560,
-    longitude: -53.4560,
-    cropHistory: ['Soja (2025)', 'Milho Safrinha (2025)', 'Soja (2024)', 'Trigo (2024)'],
-  },
-  {
-    id: 'fld-02',
-    propertyId: 'prop-01',
-    code: 'T-02',
-    name: 'Talhão Pivô 01 - Tomate / Hortaliças',
-    areaHa: 65,
-    currentCrop: 'Tomate',
-    cultivar: 'Heinz 9553',
-    season: 'Inverno 2026',
-    croppingSystem: 'Cultivo Convencional',
-    soilType: 'Nitossolo Vermelho',
-    texturalClass: 'Areno-argilosa',
-    latitude: -24.9580,
-    longitude: -53.4520,
-    cropHistory: ['Tomate (2025)', 'Feijão (2025)', 'Milho Irrigado (2024)'],
-  },
-];
+export const INITIAL_FIELDS: SoilField[] = [];
 
 export const INITIAL_OCCURRENCES: SoilDiseaseOccurrence[] = [];

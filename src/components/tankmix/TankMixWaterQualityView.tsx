@@ -1,12 +1,7 @@
 import React from 'react';
 import {
-  Droplets,
-  FlaskConical,
-  AlertTriangle,
-  CheckCircle2,
   Sliders,
   Info,
-  Layers,
   Sparkles,
   Zap,
 } from 'lucide-react';

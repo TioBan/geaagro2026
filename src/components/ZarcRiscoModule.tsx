@@ -1,5 +1,4 @@
-// @ts-nocheck
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { jsPDF } from 'jspdf';
 import {
   LayoutGrid,
@@ -31,8 +30,18 @@ import {
   Map,
   X,
   PlusCircle,
-  HelpCircle
+  HelpCircle,
+  Crosshair,
 } from 'lucide-react';
+import {
+  AgroOpenStreetMap,
+  MapPolygonItem,
+  MapMarkerItem,
+} from './common/AgroOpenStreetMap';
+import {
+  reverseGeocodeNominatim,
+  findCityCoordinates,
+} from '../data/brazilianAgroCities';
 import {
   ResponsiveContainer,
   BarChart,
@@ -316,6 +325,175 @@ export const ZarcRiscoModule: React.FC<any> = ({
     alertas: true,
     riscoClimatico: false
   });
+
+  // OpenStreetMap States for Properties and Fields
+  const [selectedPropId, setSelectedPropId] = useState<string | null>(null);
+  const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
+  const [isCapturingPropGps, setIsCapturingPropGps] = useState(false);
+  const [zarcToastMsg, setZarcToastMsg] = useState<string | null>(null);
+
+  const showZarcToast = (msg: string) => {
+    setZarcToastMsg(msg);
+    setTimeout(() => setZarcToastMsg(null), 4000);
+  };
+
+  // Live GPS capture with auto reverse geocoding to city for ZARC property form
+  const handleCapturePropGps = () => {
+    if (!navigator.geolocation) {
+      showZarcToast('Geolocalização não suportada no seu aparelho.');
+      return;
+    }
+    setIsCapturingPropGps(true);
+    showZarcToast('Buscando sinal GPS da fazenda...');
+    navigator.geolocation.getCurrentPosition(
+      async position => {
+        setIsCapturingPropGps(false);
+        const { latitude, longitude, altitude, accuracy } = position.coords;
+        const roundedLat = Number(latitude.toFixed(6));
+        const roundedLng = Number(longitude.toFixed(6));
+        const coordsStr = `${roundedLat}, ${roundedLng}`;
+
+        setNewProp(prev => ({
+          ...prev,
+          coordenadas: coordsStr,
+          altitude: altitude ? String(Math.round(altitude)) : prev.altitude,
+        }));
+
+        const geo = await reverseGeocodeNominatim(roundedLat, roundedLng);
+        if (geo && geo.city) {
+          setNewProp(prev => ({
+            ...prev,
+            municipio: geo.city,
+            estado: geo.uf,
+            coordenadas: coordsStr,
+          }));
+          showZarcToast(`📍 GPS detectado: ${geo.city} - ${geo.uf} (±${Math.round(accuracy)}m). Município atualizado automaticamente!`);
+        } else {
+          showZarcToast(`Coordenadas GPS obtidas: ${coordsStr}`);
+        }
+      },
+      err => {
+        setIsCapturingPropGps(false);
+        showZarcToast(`Erro ao obter GPS: ${err.message}`);
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
+  };
+
+  // Memoized OpenStreetMap Polygons for Properties and Talhões
+  const zarcOsmPolygons = useMemo(() => {
+    const list = [];
+
+    const propsToRender = propriedadesData.length > 0 ? propriedadesData : [
+      { id: 'prop-demo-1', nome: 'Fazenda Modelo ZARC', proprietario: 'GeaAgro Produtores', municipio: selectedMunicipio || 'Rio Verde', estado: selectedUf || 'GO', area: 350, coordenadas: '-17.7922, -50.9192' }
+    ];
+
+    const fieldsToRender = talhoesData.length > 0 ? talhoesData : [
+      { id: 'tal-demo-1', propriedadeId: propsToRender[0]?.id, nome: 'Talhão Norte (Soja)', codigo: 'T-01', area: 180, solo: 'Tipo 3 (Argiloso)', capacidadeAgua: '65mm' },
+      { id: 'tal-demo-2', propriedadeId: propsToRender[0]?.id, nome: 'Talhão Sul (Milho)', codigo: 'T-02', area: 170, solo: 'Tipo 2 (Médio)', capacidadeAgua: '50mm' }
+    ];
+
+    propsToRender.forEach((prop, pIdx) => {
+      let lat = -17.7922 + pIdx * 0.04;
+      let lng = -50.9192 + pIdx * 0.04;
+      if (prop.coordenadas && prop.coordenadas.includes(',')) {
+        const parts = prop.coordenadas.split(',').map(s => parseFloat(s.trim()));
+        if (!isNaN(parts[0]) && !isNaN(parts[1])) {
+          lat = parts[0];
+          lng = parts[1];
+        }
+      }
+
+      const isPropSelected = selectedPropId === prop.id;
+      const delta = 0.012;
+      const propPoints = [
+        [lat - delta * 0.8, lng - delta],
+        [lat + delta * 0.7, lng - delta * 0.9],
+        [lat + delta, lng + delta * 0.8],
+        [lat - delta * 0.7, lng + delta],
+      ];
+
+      if (mapLayers.limites) {
+        list.push({
+          id: `prop-poly-${prop.id}`,
+          name: `Propriedade: ${prop.nome}`,
+          subtitle: `${prop.proprietario} • ${prop.municipio}/${prop.estado} • ${prop.area} ha`,
+          areaHa: Number(prop.area) || 0,
+          points: propPoints,
+          color: isPropSelected ? '#10b981' : '#059669',
+          fillColor: '#10b981',
+          fillOpacity: isPropSelected ? 0.25 : 0.1,
+          data: { type: 'propriedade', propId: prop.id, dashed: true },
+        });
+      }
+
+      if (mapLayers.talhoes) {
+        const propFields = fieldsToRender.filter(t => !t.propriedadeId || t.propriedadeId === prop.id);
+        propFields.forEach((field, fIdx) => {
+          const isFieldSelected = selectedFieldId === field.id;
+          const fOffset = (fIdx + 1) * 0.0035;
+          const fSize = 0.003;
+          const fieldPoints = [
+            [lat - delta * 0.4 + fOffset, lng - delta * 0.5 + fOffset],
+            [lat - delta * 0.4 + fOffset + fSize, lng - delta * 0.5 + fOffset],
+            [lat - delta * 0.4 + fOffset + fSize, lng - delta * 0.5 + fOffset + fSize],
+            [lat - delta * 0.4 + fOffset, lng - delta * 0.5 + fOffset + fSize],
+          ];
+
+          const isArgiloso = field.solo?.includes('Tipo 3');
+          const isMedio = field.solo?.includes('Tipo 2');
+          const fieldColor = isFieldSelected ? '#3b82f6' : isArgiloso ? '#9333ea' : isMedio ? '#ea580c' : '#f59e0b';
+
+          list.push({
+            id: `field-poly-${field.id}`,
+            name: `${field.nome} (${field.codigo || 'Talhão'})`,
+            subtitle: `Solo ZARC: ${field.solo} • CAD: ${field.capacidadeAgua || '60mm'} • Área: ${field.area} ha`,
+            areaHa: Number(field.area) || 0,
+            points: fieldPoints,
+            color: fieldColor,
+            fillColor: fieldColor,
+            fillOpacity: isFieldSelected ? 0.5 : 0.35,
+            data: { type: 'talhao', fieldId: field.id },
+          });
+        });
+      }
+    });
+
+    return list;
+  }, [propriedadesData, talhoesData, selectedPropId, selectedFieldId, mapLayers.limites, mapLayers.talhoes, selectedMunicipio, selectedUf]);
+
+  const zarcOsmMarkers = useMemo(() => {
+    const list = [];
+
+    const propsToRender = propriedadesData.length > 0 ? propriedadesData : [
+      { id: 'prop-demo-1', nome: 'Fazenda Modelo ZARC', proprietario: 'GeaAgro Produtores', municipio: selectedMunicipio || 'Rio Verde', estado: selectedUf || 'GO', area: 350, coordenadas: '-17.7922, -50.9192' }
+    ];
+
+    propsToRender.forEach((prop, pIdx) => {
+      let lat = -17.7922 + pIdx * 0.04;
+      let lng = -50.9192 + pIdx * 0.04;
+      if (prop.coordenadas && prop.coordenadas.includes(',')) {
+        const parts = prop.coordenadas.split(',').map(s => parseFloat(s.trim()));
+        if (!isNaN(parts[0]) && !isNaN(parts[1])) {
+          lat = parts[0];
+          lng = parts[1];
+        }
+      }
+
+      list.push({
+        id: `prop-mark-${prop.id}`,
+        label: prop.nome,
+        lat,
+        lng,
+        type: 'sede',
+        details: `Sede da Fazenda • ${prop.municipio}/${prop.estado} • ${prop.area} ha`,
+        altitude: Number(prop.altitude) || 850,
+        onClick: () => setSelectedPropId(prop.id),
+      });
+    });
+
+    return list;
+  }, [propriedadesData, selectedMunicipio, selectedUf]);
 
   // --- SIMULATION STATES ---
   const [simCultura, setSimCultura] = useState('soja');
@@ -974,7 +1152,19 @@ export const ZarcRiscoModule: React.FC<any> = ({
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="block font-bold">Coordenadas</label>
+                      <div className="flex items-center justify-between">
+                        <label className="block font-bold">Coordenadas</label>
+                        <button
+                          type="button"
+                          onClick={handleCapturePropGps}
+                          disabled={isCapturingPropGps}
+                          className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                          title="Capturar GPS e preencher município automaticamente"
+                        >
+                          <Crosshair className="w-3 h-3" />
+                          <span>{isCapturingPropGps ? 'Buscando...' : 'GPS Atual'}</span>
+                        </button>
+                      </div>
                       <input type="text" placeholder="-15.555, -45.555" value={newProp.coordenadas} onChange={e => setNewProp({...newProp, coordenadas: e.target.value})} className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg p-2 font-medium" />
                     </div>
                     <div className="space-y-1">
@@ -1086,29 +1276,31 @@ export const ZarcRiscoModule: React.FC<any> = ({
             </div>
           </div>
 
-          {/* INTERACTIVE OFFLINE MAP WITH LAYERS */}
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-2xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* INTERACTIVE OPENSTREETMAP WITH PROPERTIES & TALHÕES */}
+          <div className="space-y-3">
+            {/* Layer Toggles & Status Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 shadow-2xs">
               <div>
-                <h3 className="text-sm font-black text-slate-800 dark:text-white">Mapa da Propriedade - ZARC Layer Control</h3>
-                <p className="text-[11px] text-slate-400">Visualização de camadas integrada sem dependências externas (Offline-First Map Engine)</p>
+                <h3 className="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2">
+                  <Map className="w-4 h-4 text-emerald-600" />
+                  <span>OpenStreetMap — Propriedades &amp; Talhões ZARC</span>
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Visualização geoespacial com limites de propriedades, talhões, tipos de solo ZARC, busca de cidades e GPS ao vivo
+                </p>
               </div>
 
               {/* Layer Toggles */}
               <div className="flex flex-wrap gap-1.5">
                 {[
-                  { key: 'limites', label: 'Limite Propriedade' },
-                  { key: 'talhoes', label: 'Talhões' },
-                  { key: 'cultura', label: 'Culturas' },
-                  { key: 'solos', label: 'Solo ZARC' },
-                  { key: 'irrigacao', label: 'Áreas Irrigadas' },
-                  { key: 'riscoClimatico', label: 'Risco Climático' },
-                  { key: 'alertas', label: 'Alertas Ativos' }
+                  { key: 'limites', label: 'Limite Propriedades' },
+                  { key: 'talhoes', label: 'Talhões & Solos' },
                 ].map(l => (
                   <button
                     key={l.key}
+                    type="button"
                     onClick={() => setMapLayers(prev => ({ ...prev, [l.key]: !prev[l.key] }))}
-                    className={`px-2 py-1.5 rounded-lg text-[10px] font-black transition-all border cursor-pointer ${
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-black transition-all border cursor-pointer ${
                       mapLayers[l.key]
                         ? 'bg-emerald-600 border-emerald-600 text-white'
                         : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300 dark:bg-zinc-950 dark:border-zinc-800'
@@ -1120,103 +1312,62 @@ export const ZarcRiscoModule: React.FC<any> = ({
               </div>
             </div>
 
-            {/* Simulated Interactive Map Display Panel */}
-            <div className="h-96 relative border border-slate-200 dark:border-zinc-800 rounded-2xl bg-slate-950 overflow-hidden flex items-center justify-center">
-              {/* SVG Map Graphics */}
-              <svg viewBox="0 0 800 400" className="w-full h-full p-4">
-                <defs>
-                  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#222" strokeWidth="0.5" />
-                  </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill="url(#grid)" />
-
-                {/* Property Limits Layer */}
-                {mapLayers.limites && (
-                  <polygon
-                    points="100,50 700,40 750,320 150,350"
-                    fill="rgba(16, 185, 129, 0.05)"
-                    stroke="#10b981"
-                    strokeWidth="2"
-                    strokeDasharray="5,5"
-                  />
-                )}
-
-                {/* Talhões & Culturas / Solos Layers */}
-                {mapLayers.talhoes && (
-                  <>
-                    {/* Talhão 1 */}
-                    <polygon
-                      points="150,80 400,70 380,310 180,320"
-                      fill={
-                        mapLayers.solos
-                          ? 'rgba(168, 85, 247, 0.15)' // Purple for Soil Type 3
-                          : mapLayers.riscoClimatico
-                          ? 'rgba(16, 185, 129, 0.2)'  // Green for Low Risk
-                          : 'rgba(59, 130, 246, 0.15)' // Blue for Soja
-                      }
-                      stroke={mapLayers.solos ? '#a855f7' : mapLayers.riscoClimatico ? '#10b981' : '#3b82f6'}
-                      strokeWidth="1.5"
-                    />
-                    <text x="250" y="180" fill="#fff" fontSize="11" fontWeight="bold" textAnchor="middle">
-                      Talhão Norte (Soja)
-                    </text>
-                    {mapLayers.solos && <text x="250" y="195" fill="#a855f7" fontSize="9" fontWeight="extrabold" textAnchor="middle">Tipo 3 (Argiloso)</text>}
-                    {mapLayers.riscoClimatico && <text x="250" y="195" fill="#10b981" fontSize="9" fontWeight="extrabold" textAnchor="middle">Risco ZARC: 10% 🟢</text>}
-
-                    {/* Talhão 2 */}
-                    <polygon
-                      points="420,70 680,60 630,300 390,310"
-                      fill={
-                        mapLayers.solos
-                          ? 'rgba(245, 158, 11, 0.15)' // Orange/Yellow for Soil Type 2
-                          : mapLayers.riscoClimatico
-                          ? 'rgba(245, 158, 11, 0.2)'  // Yellow for Attention
-                          : 'rgba(245, 158, 11, 0.15)' // Yellow for Milho
-                      }
-                      stroke={mapLayers.solos ? '#f59e0b' : mapLayers.riscoClimatico ? '#f59e0b' : '#f59e0b'}
-                      strokeWidth="1.5"
-                    />
-                    <text x="530" y="180" fill="#fff" fontSize="11" fontWeight="bold" textAnchor="middle">
-                      Talhão Sul (Milho)
-                    </text>
-                    {mapLayers.solos && <text x="530" y="195" fill="#f59e0b" fontSize="9" fontWeight="extrabold" textAnchor="middle">Tipo 2 (Médio)</text>}
-                    {mapLayers.riscoClimatico && <text x="530" y="195" fill="#f59e0b" fontSize="9" fontWeight="extrabold" textAnchor="middle">Risco ZARC: 28% 🟡</text>}
-                  </>
-                )}
-
-                {/* Irrigated Area Layer overlay */}
-                {mapLayers.irrigacao && (
-                  <circle cx="530" cy="180" r="75" fill="rgba(59, 130, 246, 0.2)" stroke="#3b82f6" strokeWidth="1" strokeDasharray="3,3" />
-                )}
-
-                {/* Alerts Pins layer */}
-                {mapLayers.alertas && (
-                  <g transform="translate(250, 140)">
-                    <circle r="6" fill="#ef4444" className="animate-ping" />
-                    <circle r="4" fill="#ef4444" />
-                    <text x="8" y="4" fill="#ef4444" fontSize="9" fontWeight="bold">Alerta: Fim da Janela</text>
-                  </g>
-                )}
-              </svg>
-
-              {/* Map floating indicators */}
-              <div className="absolute bottom-4 left-4 bg-black/75 backdrop-blur-md px-3 py-2 rounded-xl text-[10px] space-y-1.5 border border-zinc-800 text-zinc-300">
-                <span className="block font-bold">Legendas Ativas:</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 bg-blue-500 rounded" />
-                  <span>Soja</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 bg-amber-500 rounded" />
-                  <span>Milho</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 bg-purple-500 rounded" />
-                  <span>Solo Tipo 3 (Argiloso)</span>
-                </div>
-              </div>
-            </div>
+            <AgroOpenStreetMap
+              heightClassName="h-[480px]"
+              title="OpenStreetMap — Zoneamento Agrícola & Propriedades"
+              subtitle="Integração por cidade informada, busca manual e GPS automático"
+              currentCity={newProp.municipio || (propriedadesData.find(p => p.id === selectedPropId)?.municipio) || selectedMunicipio}
+              currentUf={newProp.estado || (propriedadesData.find(p => p.id === selectedPropId)?.estado) || selectedUf}
+              polygons={zarcOsmPolygons}
+              markers={zarcOsmMarkers}
+              selectedPolygonId={selectedFieldId ? `field-poly-${selectedFieldId}` : selectedPropId ? `prop-poly-${selectedPropId}` : null}
+              onPolygonClick={poly => {
+                if (poly.data?.type === 'propriedade') {
+                  setSelectedPropId(poly.data.propId);
+                  showZarcToast(`Propriedade selecionada: ${poly.name}`);
+                } else if (poly.data?.type === 'talhao') {
+                  setSelectedFieldId(poly.data.fieldId);
+                  showZarcToast(`Talhão selecionado: ${poly.name}`);
+                }
+              }}
+              onMarkerClick={marker => {
+                showZarcToast(`Ponto de referência: ${marker.label}`);
+              }}
+              onCitySelected={city => {
+                setNewProp(prev => ({
+                  ...prev,
+                  municipio: city.name,
+                  estado: city.state,
+                  coordenadas: `${city.lat}, ${city.lng}`,
+                }));
+                setSelectedMunicipio(city.name);
+                setSelectedUf(city.state);
+                showZarcToast(`Cidade selecionada no OpenStreetMap: ${city.name}/${city.state}`);
+              }}
+              onGpsLocated={loc => {
+                setNewProp(prev => ({
+                  ...prev,
+                  municipio: loc.city,
+                  estado: loc.uf,
+                  coordenadas: `${loc.lat}, ${loc.lng}`,
+                }));
+                setSelectedMunicipio(loc.city);
+                setSelectedUf(loc.uf);
+                showZarcToast(`📍 GPS detectado: ${loc.city} - ${loc.uf} (±${loc.accuracy}m)! Cidade atualizada automaticamente!`);
+              }}
+              onMapClick={coords => {
+                const str = `${coords.lat}, ${coords.lng}`;
+                if (showFieldForm) {
+                  setNewField(prev => ({ ...prev, coordenadas: str }));
+                  showZarcToast(`Coordenadas capturadas para o Talhão: ${str}`);
+                } else {
+                  setNewProp(prev => ({ ...prev, coordenadas: str }));
+                  showZarcToast(`Coordenadas capturadas para a Propriedade: ${str}`);
+                }
+              }}
+              allowClickToAddPoint={showPropForm || showFieldForm}
+              clickInstruction={showFieldForm ? 'Clique no OpenStreetMap para preencher as coordenadas do Talhão.' : 'Clique no OpenStreetMap para posicionar as coordenadas da Propriedade.'}
+            />
           </div>
 
           {/* HISTORICAL DECISIONS DATABASE TABLE */}

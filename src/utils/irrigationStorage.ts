@@ -371,25 +371,30 @@ export const calculateIGEH = (
   const totalEnergyKwh = logs.reduce((acc, l) => acc + (l.energyConsumedKwh || 0), 0);
   const totalCostBrl = logs.reduce((acc, l) => acc + (l.energyCostBrl || 0), 0);
 
-  const avgEa = systems.length > 0
-    ? systems.reduce((acc, s) => acc + (s.applicationEfficiencyPct || 85), 0) / systems.length
-    : 85;
+  const systemsWithEa = systems.filter(s => typeof s.applicationEfficiencyPct === 'number' && s.applicationEfficiencyPct > 0);
+  const avgEa = systemsWithEa.length > 0
+    ? systemsWithEa.reduce((acc, s) => acc + s.applicationEfficiencyPct, 0) / systemsWithEa.length
+    : 0;
 
-  const avgCuc = systems.length > 0
-    ? systems.reduce((acc, s) => acc + (s.cucPercent || 90), 0) / systems.length
-    : 90;
+  const systemsWithCuc = systems.filter(s => typeof s.cucPercent === 'number' && s.cucPercent > 0);
+  const avgCuc = systemsWithCuc.length > 0
+    ? systemsWithCuc.reduce((acc, s) => acc + s.cucPercent, 0) / systemsWithCuc.length
+    : 0;
 
   const avgEt0 = climate.length > 0
-    ? climate.reduce((acc, c) => acc + (c.et0MmDay || 5.0), 0) / climate.length
-    : 5.4;
+    ? climate.reduce((acc, c) => acc + (c.et0MmDay || 0), 0) / climate.length
+    : 0;
 
   const totalRainfall = climate.reduce((acc, c) => acc + (c.rainfallMm || 0), 0);
 
   // Score IGEH formula based on Uniformity, Efficiency, and Energy Management
-  const igehRaw = (avgEa * 0.4) + (avgCuc * 0.4) + 15; // Base 0 - 100
-  const igehScore = Math.min(100, Math.max(30, Math.round(igehRaw)));
+  let igehScore = 0;
+  if (systems.length > 0 && (avgEa > 0 || avgCuc > 0)) {
+    const igehRaw = (avgEa * 0.45) + (avgCuc * 0.45) + (logs.length > 0 ? 10 : 0);
+    igehScore = Math.min(100, Math.max(0, Math.round(igehRaw)));
+  }
 
-  const waterSavedM3 = Math.round(totalWaterM3 * 0.18); // 18% economia estimada pelo manejo de precisão
+  const waterSavedM3 = totalWaterM3 > 0 ? Math.round(totalWaterM3 * 0.18) : 0;
 
   return {
     totalIrrigatedAreaHa: totalArea,
@@ -397,16 +402,16 @@ export const calculateIGEH = (
     totalWaterVolumeSeasonM3: totalWaterM3,
     totalEnergyConsumedKwh: totalEnergyKwh,
     totalEnergyCostBrl: totalCostBrl,
-    avgWaterUseEfficiency: 4.8, // mm/saca ou m³/ha
+    avgWaterUseEfficiency: totalWaterM3 > 0 && totalArea > 0 ? Math.round((totalWaterM3 / totalArea) * 10) / 10 : 0,
     avgSystemEfficiencyPct: Math.round(avgEa),
-    currentSoilMoisturePct: 78, // % da CAD
+    currentSoilMoisturePct: 0,
     averageEt0MmDay: Math.round(avgEt0 * 10) / 10,
     accumulatedRainfallMm: totalRainfall,
     igehScore,
     waterSavedM3,
-    recommendedNextIrrigationDate: 'Amanhã (21:00h)',
-    recommendedGrossDepthMm: 14.5,
-    waterStressIndex: 'Sem Estresse (Ótimo)',
+    recommendedNextIrrigationDate: '',
+    recommendedGrossDepthMm: 0,
+    waterStressIndex: systems.length > 0 ? 'Sem Estresse (Ótimo)' : 'Não monitorado',
   };
 };
 

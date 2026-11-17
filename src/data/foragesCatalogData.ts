@@ -43,10 +43,6 @@ export const FORAGE_CATEGORIES_INFO: Record<ForageCategory, { label: string; des
   },
 };
 
-export function getForageById(id: string): ForageItem | undefined {
-  return FORAGES_CATALOG.find(f => f.id === id);
-}
-
 export function searchForages(query: string): ForageItem[] {
   if (!query || query.trim() === '') return FORAGES_CATALOG;
   const q = query.toLowerCase().trim();

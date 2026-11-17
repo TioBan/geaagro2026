@@ -1,18 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FileText,
   Download,
   Bot,
-  Sparkles,
   Send,
   Printer,
-  CheckCircle2,
-  FileSpreadsheet,
-  AlertTriangle,
-  Building2,
-  Wheat,
 } from 'lucide-react';
-import { jsPDF } from 'jspdf';
 import {
   PropriedadeRural,
   TalhaoRural,
@@ -36,19 +29,60 @@ export const GestaoRelatoriosIA: React.FC<GestaoRelatoriosIAProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'relatorios' | 'ia'>('relatorios');
   const [mensagemInput, setMensagemInput] = useState('');
-  const [mensagensChat, setMensagensChat] = useState<MensagemAssistenteIARural[]>([
+  const replyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const metrics = useMemo(() => {
+    const receitaTotal = financeiro
+      .filter(f => f.tipo === 'receita')
+      .reduce((acc, f) => acc + f.valorR$, 0);
+    const despesaTotal = financeiro
+      .filter(f => f.tipo === 'despesa')
+      .reduce((acc, f) => acc + f.valorR$, 0);
+    const lucroLiquido = receitaTotal - despesaTotal;
+    const margemPct = receitaTotal > 0 ? (lucroLiquido / receitaTotal) * 100 : 0;
+    const areaPlantada = safras.reduce((acc, s) => acc + (s.areaHa || 0), 0);
+    const areaReferencia = areaPlantada > 0 ? areaPlantada : propriedade.areaAgricolaHa || 0;
+    const custoPorHa = areaReferencia > 0 ? despesaTotal / areaReferencia : 0;
+    const safrasColhidas = safras.filter(s => s.status === 'colhida' && (s.produtividadeRealizadaSacasHa || 0) > 0);
+    const prodMedia =
+      safrasColhidas.length > 0
+        ? safrasColhidas.reduce((acc, s) => acc + (s.produtividadeRealizadaSacasHa || 0), 0) / safrasColhidas.length
+        : 0;
+    const roiPct = despesaTotal > 0 ? (lucroLiquido / despesaTotal) * 100 : 0;
+
+    return {
+      receitaTotal,
+      despesaTotal,
+      lucroLiquido,
+      margemPct,
+      custoPorHa,
+      prodMedia,
+      roiPct,
+      areaReferencia,
+    };
+  }, [financeiro, safras, propriedade.areaAgricolaHa]);
+
+  const [mensagensChat, setMensagensChat] = useState<MensagemAssistenteIARural[]>(() => [
     {
       id: 'm-01',
       remetente: 'ia',
-      texto: `Olá! Sou o Assistente Técnico GeaAgro de Gestão Rural 360°. Analisei os dados da fazenda **${propriedade.nome}**.\n\nSua receita líquida acumulada na safra é de **R$ 1.407.468,00**, com custo médio por hectare de **R$ 3.870,00** e margem de lucro de **72.8%**.\n\nComo posso ajudar você hoje no planejamento ou na auditoria dos relatórios?`,
+      texto: `Olá! Sou o Assistente Técnico GeaAgro de Gestão Rural 360°. Analisei os dados reais da fazenda **${propriedade.nome}**.\n\nReceita acumulada: **R$ ${metrics.receitaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}** | Despesas: **R$ ${metrics.despesaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}** | Lucro líquido: **R$ ${metrics.lucroLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}** (margem de **${metrics.margemPct.toFixed(1)}%**).\n\nComo posso ajudar você hoje no planejamento ou na auditoria dos relatórios?`,
       timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       sugestoesAcao: [
         'Resumir composição de custos da safra',
-        'Explicar margem de lucro do Talhão Pivô Sul 01',
-        'Gerar relatório de auditoria para banco',
+        'Explicar margem de lucro e ROI atual',
+        'Verificar status de auditoria e talhões',
       ],
     },
   ]);
+
+  useEffect(() => {
+    return () => {
+      if (replyTimerRef.current) {
+        clearTimeout(replyTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleEnviarMensagem = (textoEnvio?: string) => {
     const texto = textoEnvio || mensagemInput;
@@ -57,24 +91,27 @@ export const GestaoRelatoriosIA: React.FC<GestaoRelatoriosIAProps> = ({
     const novaMensagemUsuario: MensagemAssistenteIARural = {
       id: `usr-${Date.now()}`,
       remetente: 'usuario',
-      texto: texto,
+      texto,
       timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
     };
 
     setMensagensChat(prev => [...prev, novaMensagemUsuario]);
     if (!textoEnvio) setMensagemInput('');
 
-    // Offline AI Rule Engine (does NOT invent data, strictly bases response on offline records)
-    setTimeout(() => {
+    if (replyTimerRef.current) {
+      clearTimeout(replyTimerRef.current);
+    }
+
+    replyTimerRef.current = setTimeout(() => {
       let respostaIA = '';
       const tLower = texto.toLowerCase();
 
       if (tLower.includes('custo') || tLower.includes('composição')) {
-        respostaIA = `Análise de Custos da Fazenda ${propriedade.nome}:\n- Adubação / Fertilizantes: 48% do orçamento total.\n- Defensivos Agrícolas: 24%.\n- Sementes & Biológicos: 12%.\n- Combustível e Operações de Máquinas: 16%.\n\nCusto total apurado: **R$ 3.870,00 / ha** no plantio direto.`;
-      } else if (tLower.includes('lucro') || tLower.includes('margem') || tLower.includes('pivô')) {
-        respostaIA = `O Talhão Pivô Sul 01 (120 ha) apresentou receita bruta de **R$ 1.435.968,00** (86.4 sc/ha a R$ 138,50/sc) e custo de **R$ 464.400,00**, gerando um lucro líquido por hectare de **R$ 8.108,00 / ha** e ROI de **203%**.`;
+        respostaIA = `Análise de Custos da Fazenda ${propriedade.nome}:\n- Despesas totais lançadas: **R$ ${metrics.despesaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**\n- Área de referência: **${metrics.areaReferencia} ha**\n- Custo médio por hectare: **R$ ${metrics.custoPorHa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / ha**\n- Lançamentos financeiros avaliados: **${financeiro.length}**.`;
+      } else if (tLower.includes('lucro') || tLower.includes('margem') || tLower.includes('roi')) {
+        respostaIA = `Resumo de Rentabilidade (${propriedade.nome}):\n- Receita bruta: **R$ ${metrics.receitaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**\n- Lucro líquido: **R$ ${metrics.lucroLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**\n- Margem de lucro: **${metrics.margemPct.toFixed(1)}%** | ROI: **${metrics.roiPct.toFixed(1)}%**.`;
       } else {
-        respostaIA = `Com base no cadastro de ${talhoes.length} talhões e ${safras.length} safras ativas, a propriedade ${propriedade.nome} está operando com 100% de conformidade técnica e rastreabilidade offline.`;
+        respostaIA = `Com base no cadastro atual de **${talhoes.length} talhão(ões)** e **${safras.length} safra(s)**, a propriedade **${propriedade.nome}** opera com rastreabilidade offline local.`;
       }
 
       const novaRespostaIA: MensagemAssistenteIARural = {
@@ -85,15 +122,16 @@ export const GestaoRelatoriosIA: React.FC<GestaoRelatoriosIAProps> = ({
       };
 
       setMensagensChat(prev => [...prev, novaRespostaIA]);
-    }, 600);
+      replyTimerRef.current = null;
+    }, 350);
   };
 
-  const gerarPDFRelatorioOficial = (tipo: string) => {
+  const gerarPDFRelatorioOficial = async (tipo: string) => {
     try {
+      const { jsPDF } = await import('jspdf');
       const doc = new jsPDF();
       const primaryColor = [16, 124, 65];
 
-      // Header Banner
       doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
       doc.rect(0, 0, 210, 35, 'F');
 
@@ -106,17 +144,15 @@ export const GestaoRelatoriosIA: React.FC<GestaoRelatoriosIAProps> = ({
       doc.setFont('helvetica', 'normal');
       doc.text(`RELATÓRIO OFICIAL: ${tipo.toUpperCase()}`, 14, 27);
 
-      // Metadata
       doc.setTextColor(60, 60, 60);
       doc.setFontSize(9);
-      doc.text(`Propriedade: ${propriedade.nome}`, 14, 45);
-      doc.text(`Proprietário: ${propriedade.proprietario}`, 14, 52);
-      doc.text(`Município: ${propriedade.municipio} - ${propriedade.estado}`, 14, 59);
-      doc.text(`Responsável Técnico: ${propriedade.responsavelTecnico}`, 14, 66);
+      doc.text(`Propriedade: ${propriedade.nome || 'Não informada'}`, 14, 45);
+      doc.text(`Proprietário: ${propriedade.proprietario || 'Não informado'}`, 14, 52);
+      doc.text(`Município: ${propriedade.municipio || '-'} - ${propriedade.estado || '-'}`, 14, 59);
+      doc.text(`Responsável Técnico: ${propriedade.responsavelTecnico || 'Não informado'}`, 14, 66);
       doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`, 140, 45);
-      doc.text(`Status: Auditoria Offline Aprovada`, 140, 52);
+      doc.text('Status: Auditoria Offline Aprovada', 140, 52);
 
-      // Content Box
       doc.setDrawColor(220, 220, 220);
       doc.setFillColor(248, 250, 248);
       doc.rect(14, 75, 182, 120, 'FD');
@@ -131,12 +167,11 @@ export const GestaoRelatoriosIA: React.FC<GestaoRelatoriosIAProps> = ({
       doc.text(`• Área Agrícola Mapeada: ${propriedade.areaAgricolaHa} ha`, 20, 100);
       doc.text(`• Área Irrigada (Pivôs / Gotejo): ${propriedade.areaIrrigadaHa} ha`, 20, 108);
       doc.text(`• Total de Talhões Ativos: ${talhoes.length} Talhões`, 20, 116);
-      doc.text(`• Faturamento Bruto da Safra: R$ 1.435.968,00`, 20, 124);
-      doc.text(`• Custo Total da Safra: R$ 464.400,00`, 20, 132);
-      doc.text(`• Lucro Líquido Apurado: R$ 971.568,00`, 20, 140);
-      doc.text(`• Produtividade Média Realizada: 86.4 sacas/ha`, 20, 148);
+      doc.text(`• Faturamento Bruto da Safra: R$ ${metrics.receitaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 20, 124);
+      doc.text(`• Custo Total da Safra: R$ ${metrics.despesaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 20, 132);
+      doc.text(`• Lucro Líquido Apurado: R$ ${metrics.lucroLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 20, 140);
+      doc.text(`• Produtividade Média Realizada: ${metrics.prodMedia > 0 ? `${metrics.prodMedia.toFixed(1)} un/ha` : 'Sem colheita apurada'}`, 20, 148);
 
-      // Signatures
       doc.line(20, 230, 90, 230);
       doc.line(120, 230, 190, 230);
       doc.text('Engenheiro Agrônomo RT', 30, 236);
@@ -210,10 +245,10 @@ export const GestaoRelatoriosIA: React.FC<GestaoRelatoriosIAProps> = ({
               >
                 <div>
                   <h4 className="font-bold text-slate-900 dark:text-white text-xs">{tipo}</h4>
-                  <span className="text-[10px] text-slate-400 block">Formato PDF & Excel</span>
+                  <span className="text-[10px] text-slate-400 block">Formato PDF</span>
                 </div>
                 <button
-                  onClick={() => gerarPDFRelatorioOficial(tipo)}
+                  onClick={() => void gerarPDFRelatorioOficial(tipo)}
                   className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-[10px] cursor-pointer flex items-center gap-1 shrink-0"
                 >
                   <Download className="w-3.5 h-3.5" />

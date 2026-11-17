@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { ForageItem } from '../../types/forage';
 import { getForagePhotoData } from '../../data/foragePhotosDatabase';
-import { ForageSideBySideCompareModal } from './ForageSideBySideCompareModal';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import {
   X,
   Printer,
-  Sparkles,
   Leaf,
   FlaskConical,
   Scale,
@@ -14,21 +13,20 @@ import {
   ShieldCheck,
   CheckCircle2,
   XCircle,
-  HelpCircle,
   Award,
   BookOpen,
-  Droplets,
-  Tractor,
   Layers,
   Thermometer,
-  Zap,
   Camera,
   ZoomIn,
   MapPin,
-  Maximize2,
   Sprout,
   ArrowLeftRight,
 } from 'lucide-react';
+
+const ForageSideBySideCompareModal = lazyWithRetry(() =>
+  import('./ForageSideBySideCompareModal').then(m => ({ default: m.ForageSideBySideCompareModal }))
+);
 
 interface ForageDetailModalProps {
   forage: ForageItem | null;
@@ -925,7 +923,7 @@ export const ForageDetailModal: React.FC<ForageDetailModalProps> = ({ forage, on
               </div>
 
               <div className="pt-4 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-between text-[11px] text-slate-500">
-                <span>Consulta realizada no módulo de Análise Técnica &bull; GeaAgro 4.2.3.7</span>
+                <span>Consulta realizada no módulo de Análise Técnica &bull; GeaAgro 4.2.3.8</span>
                 <button
                   type="button"
                   onClick={handlePrint}
@@ -942,11 +940,13 @@ export const ForageDetailModal: React.FC<ForageDetailModalProps> = ({ forage, on
 
     {/* Side-by-side comparison modal */}
     {showSideBySideCompare && (
-      <ForageSideBySideCompareModal
-        primaryForage={forage}
-        onClose={() => setShowSideBySideCompare(false)}
-        onSelectForageToView={onSelectAnotherForage}
-      />
+      <Suspense fallback={null}>
+        <ForageSideBySideCompareModal
+          primaryForage={forage}
+          onClose={() => setShowSideBySideCompare(false)}
+          onSelectForageToView={onSelectAnotherForage}
+        />
+      </Suspense>
     )}
   </>
   );

@@ -28,14 +28,14 @@ export const BuffaloDairyProductionView: React.FC<BuffaloDairyProductionViewProp
   // Cálculos Gerais
   const totalDailyMilk = lactatingCows.reduce((acc, a) => acc + (a.averageDailyMilkLiters || 0), 0);
   const avgMilkPerCow = lactatingCows.length > 0 ? totalDailyMilk / lactatingCows.length : 0;
-  const avgFat = lactatingCows.length > 0 ? lactatingCows.reduce((acc, a) => acc + (a.averageFatPct || 7.8), 0) / lactatingCows.length : 7.8;
-  const avgProtein = lactatingCows.length > 0 ? lactatingCows.reduce((acc, a) => acc + (a.averageProteinPct || 4.4), 0) / lactatingCows.length : 4.4;
+  const avgFat = lactatingCows.length > 0 ? lactatingCows.reduce((acc, a) => acc + (a.averageFatPct || 0), 0) / lactatingCows.length : 0;
+  const avgProtein = lactatingCows.length > 0 ? lactatingCows.reduce((acc, a) => acc + (a.averageProteinPct || 0), 0) / lactatingCows.length : 0;
   
-  const mozzarellaLitersPerKg = calculateMozzarellaYieldLitersPerKg(avgFat, avgProtein);
+  const mozzarellaLitersPerKg = (avgFat > 0 && avgProtein > 0) ? calculateMozzarellaYieldLitersPerKg(avgFat, avgProtein) : 0;
   const dailyMozzarellaKg = mozzarellaLitersPerKg > 0 ? totalDailyMilk / mozzarellaLitersPerKg : 0;
   
   // Rendimento Queijo do Marajó Tipo Creme / Manteiga
-  const marajoLitersPerKg = Number((mozzarellaLitersPerKg * 1.12).toFixed(2));
+  const marajoLitersPerKg = mozzarellaLitersPerKg > 0 ? Number((mozzarellaLitersPerKg * 1.12).toFixed(2)) : 0;
   const dailyMarajoKg = marajoLitersPerKg > 0 ? totalDailyMilk / marajoLitersPerKg : 0;
 
   // Preços Médios de Mercado BRL
@@ -184,31 +184,39 @@ export const BuffaloDairyProductionView: React.FC<BuffaloDairyProductionViewProp
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
-              {lactatingCows.map((cow) => {
-                const yieldKg = calculateMozzarellaYieldLitersPerKg(cow.averageFatPct || 7.8, cow.averageProteinPct || 4.4);
-                return (
-                  <tr key={cow.id} className="hover:bg-slate-50 dark:hover:bg-zinc-800/50">
-                    <td className="p-3">
-                      <div className="font-bold text-slate-900 dark:text-white">{cow.identificationNumber}</div>
-                      <span className="text-[11px] text-slate-500">{cow.name}</span>
-                    </td>
-                    <td className="p-3 font-semibold">{cow.breed}</td>
-                    <td className="p-3 font-black text-blue-600">{cow.averageDailyMilkLiters} L</td>
-                    <td className="p-3 font-bold">{cow.averageFatPct}%</td>
-                    <td className="p-3 font-bold">{cow.averageProteinPct}%</td>
-                    <td className="p-3 font-black text-emerald-600">{yieldKg} L/kg</td>
-                    <td className="p-3 text-slate-600 dark:text-zinc-300">{cow.batchName}</td>
-                    <td className="p-3">
-                      <button
-                        onClick={() => onOpenDigitalTwin(cow.id)}
-                        className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white font-bold text-[11px] rounded-lg cursor-pointer"
-                      >
-                        Controle Detalhado
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {lactatingCows.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-slate-500 text-xs">
+                    Nenhuma matriz em lactação cadastrada no momento.
+                  </td>
+                </tr>
+              ) : (
+                lactatingCows.map((cow) => {
+                  const yieldKg = calculateMozzarellaYieldLitersPerKg(cow.averageFatPct || 7.8, cow.averageProteinPct || 4.4);
+                  return (
+                    <tr key={cow.id} className="hover:bg-slate-50 dark:hover:bg-zinc-800/50">
+                      <td className="p-3">
+                        <div className="font-bold text-slate-900 dark:text-white">{cow.identificationNumber}</div>
+                        <span className="text-[11px] text-slate-500">{cow.name}</span>
+                      </td>
+                      <td className="p-3 font-semibold">{cow.breed}</td>
+                      <td className="p-3 font-black text-blue-600">{cow.averageDailyMilkLiters} L</td>
+                      <td className="p-3 font-bold">{cow.averageFatPct}%</td>
+                      <td className="p-3 font-bold">{cow.averageProteinPct}%</td>
+                      <td className="p-3 font-black text-emerald-600">{yieldKg} L/kg</td>
+                      <td className="p-3 text-slate-600 dark:text-zinc-300">{cow.batchName}</td>
+                      <td className="p-3">
+                        <button
+                          onClick={() => onOpenDigitalTwin(cow.id)}
+                          className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white font-bold text-[11px] rounded-lg cursor-pointer"
+                        >
+                          Controle Detalhado
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

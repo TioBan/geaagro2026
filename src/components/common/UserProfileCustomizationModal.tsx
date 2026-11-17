@@ -12,14 +12,12 @@ import {
   Building2,
   Scale,
   Layers,
-  Sparkles,
   Info,
 } from 'lucide-react';
 import {
   UserProfileId,
   USER_PROFILES,
   SYSTEM_MODULES,
-  SystemModuleMetadata,
   getActiveProfileId,
   setActiveProfileId,
   getProfileEnabledModules,
@@ -138,7 +136,6 @@ export const UserProfileCustomizationModal: React.FC<UserProfileCustomizationMod
   if (!isOpen) return null;
 
   const currentProfileInfo = USER_PROFILES[selectedProfileId] || USER_PROFILES.todos;
-  const ProfileIcon = PROFILE_ICONS[currentProfileInfo.iconName] || Layers;
 
   return (
     <div className="fixed inset-0 z-[1200] bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fade-in">

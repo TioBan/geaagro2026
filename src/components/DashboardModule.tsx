@@ -15,8 +15,8 @@ export interface DashboardModuleProps {
   farms: Farm[];
   producer: RuralProducer;
   producers: RuralProducer[];
-  agronomist: Agronomist;
-  company: Company;
+  agronomist?: Agronomist;
+  company?: Company;
   soilSamples: SoilSample[];
   leafSamples: LeafSample[];
   setActiveTab: (tab: string) => void;

@@ -112,7 +112,6 @@ export default defineConfig(() => {
         'react-dom/client',
         'react/jsx-runtime',
         'react/jsx-dev-runtime',
-        'motion/react',
         'lucide-react',
       ],
     },
@@ -136,9 +135,6 @@ export default defineConfig(() => {
               }
               if (id.includes('recharts')) {
                 return 'vendor-charts';
-              }
-              if (id.includes('tesseract.js')) {
-                return 'vendor-ocr';
               }
               if (id.includes('lucide-react')) {
                 return 'vendor-icons';

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   BookOpen,
@@ -6,7 +5,6 @@ import {
   Calculator,
   Plus,
   Trash2,
-  Edit3,
   CheckCircle2,
   AlertTriangle,
   FileText,
@@ -16,21 +14,16 @@ import {
   Package,
   Droplets,
   Sprout,
-  Bug,
   Clock,
-  ExternalLink,
   Copy,
   RefreshCw,
   Building2,
   Award,
   Layers,
   ShieldCheck,
-  ChevronRight,
   Info,
   X,
-  Check,
   Printer,
-  Download,
   MapPin,
   User,
   PenTool,
@@ -54,19 +47,12 @@ import {
   DosageUnit,
 } from '../types/pesticideLeaflet';
 
-import { INITIAL_PESTICIDES_CATALOG, CATALOG_INTEGRITY_REPORT, CATALOG_CROP_COVERAGE_REPORT, STANDARD_CROPS } from '../data/pesticidesData';
 import {
-  analyzePesticideDuplicates,
-  deduplicatePesticideCatalog,
   checkPesticideCollision,
-  DuplicateReport,
   analyzeCropAndDosageCoverage,
-  CropCoverageReport,
   STANDARD_AGRICULTURAL_CROPS,
 } from '../utils/pesticideDeduplication';
 import { usePesticideSearch } from '../hooks/usePesticideSearch';
-import { pesticideSearchEngine } from '../services/pesticideSearchIndex';
-import { pesticideIndexedDB } from '../services/pesticideIndexedDB';
 import { VirtualizedPesticideCatalog } from './VirtualizedPesticideCatalog';
 import { Company, Agronomist, RuralProducer, Farm } from '../types/agronomy';
 
@@ -120,11 +106,9 @@ export const PesticideBularioModule: React.FC<PesticideBularioModuleProps> = ({
   // Hook connecting IndexedDB and Instant Inverted Search Index
   const {
     products,
-    setProducts,
     filteredProducts,
     searchResult,
     isDbReady,
-    isIndexing,
     indexStats,
     storageDiagnostics,
     duplicateReport,
@@ -133,7 +117,6 @@ export const PesticideBularioModule: React.FC<PesticideBularioModuleProps> = ({
     deleteProductById,
     upsertProduct,
     runDeduplication,
-    refreshDiagnostics,
   } = usePesticideSearch(searchTerm, searchFilters);
 
   // Active module tab (controlled or local fallback)
@@ -174,177 +157,141 @@ export const PesticideBularioModule: React.FC<PesticideBularioModuleProps> = ({
   const [matrixSearchTerm, setMatrixSearchTerm] = useState<string>('');
   const [matrixVisibleCount, setMatrixVisibleCount] = useState<number>(40);
 
-  // Progressive loading (infinite scroll / virtual pagination) state to keep DOM extremely light and fast
-  const [visibleCount, setVisibleCount] = useState(30);
-
-  // Reset pagination when filters change to keep catalog searches super fast
-  useEffect(() => {
-    setVisibleCount(30);
-  }, [searchTerm, selectedClassFilter, selectedCropFilter, selectedBrandFilter]);
-
   useEffect(() => {
     setMatrixVisibleCount(40);
   }, [selectedMatrixCrop, selectedMatrixClass, matrixSearchTerm]);
 
-  // Total counts for priority manufacturers requested by user and market leaders
-  const tecnomylProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('tecnomyl') || p.productName.toLowerCase().includes('tecnomyl')).length;
-  }, [products]);
-
-  const cropchemProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('cropchem') || p.productName.toLowerCase().includes('cropchem')).length;
-  }, [products]);
-
-  const adamaProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('adama') || p.productName.toLowerCase().includes('adama')).length;
-  }, [products]);
-
-  const agrobiologicaProductsCount = useMemo(() => {
-    return products.filter(p => 
-      p.manufacturer.toLowerCase().includes('agrobiológica') || 
-      p.manufacturer.toLowerCase().includes('agrobiologica') || 
-      p.productName.toLowerCase().includes('agrobiológica') ||
-      p.productName.toLowerCase().includes('agrobiologica')
-    ).length;
-  }, [products]);
-
-  const fmcProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('fmc') || p.productName.toLowerCase().includes('fmc')).length;
-  }, [products]);
-
-  const iharaProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('ihara') || p.productName.toLowerCase().includes('ihara')).length;
-  }, [products]);
-
-  const pilarquimProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('pilarquim') || p.productName.toLowerCase().includes('pilarquim')).length;
-  }, [products]);
-
-  const ccabProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('ccab') || p.productName.toLowerCase().includes('ccab')).length;
-  }, [products]);
-
-  const vittiaProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('vittia') || p.productName.toLowerCase().includes('vittia')).length;
-  }, [products]);
-
-  const sumitomoProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('sumitomo') || p.productName.toLowerCase().includes('sumitomo')).length;
-  }, [products]);
-
-  const sipcamProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('sipcam') || p.manufacturer.toLowerCase().includes('nichino') || p.productName.toLowerCase().includes('sipcam')).length;
-  }, [products]);
-
-  const nortoxProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('nortox') || p.productName.toLowerCase().includes('nortox')).length;
-  }, [products]);
-
-  const alamosProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('alamos') || p.productName.toLowerCase().includes('alamos')).length;
-  }, [products]);
-
-  const solusProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('solus') || p.productName.toLowerCase().includes('solus')).length;
-  }, [products]);
-
-  const ameribrasProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('ameribrás') || p.manufacturer.toLowerCase().includes('ameribras') || p.productName.toLowerCase().includes('ameribrás') || p.productName.toLowerCase().includes('ameribras')).length;
-  }, [products]);
-
-  const prentissProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('prentiss') || p.productName.toLowerCase().includes('prentiss')).length;
-  }, [products]);
-
-  const oxonProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('oxon') || p.productName.toLowerCase().includes('oxon')).length;
-  }, [products]);
-
-  const rotamProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('rotam') || p.productName.toLowerCase().includes('rotam')).length;
-  }, [products]);
-
-  const allierProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('allier') || p.productName.toLowerCase().includes('allier')).length;
-  }, [products]);
-
-  const saberoProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('sabero') || p.productName.toLowerCase().includes('sabero')).length;
-  }, [products]);
-
-  const biosphereProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('biosphere') || p.productName.toLowerCase().includes('biosphere')).length;
-  }, [products]);
-
-  const iskProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('isk')).length;
-  }, [products]);
-
-  const biocontroleProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('bio controle') || p.productName.toLowerCase().includes('bio controle')).length;
-  }, [products]);
-
-  const mfbProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('mfb') || p.productName.toLowerCase().includes('mfb')).length;
-  }, [products]);
-
-  const agroimportProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('agroimport') || p.productName.toLowerCase().includes('agroimport')).length;
-  }, [products]);
-
-  const ctvaProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('ctva') || p.productName.toLowerCase().includes('ctva')).length;
-  }, [products]);
-
-  const dupontProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('dupont') || p.manufacturer.toLowerCase().includes('du pont') || p.productName.toLowerCase().includes('dupont')).length;
-  }, [products]);
-
-  const altaProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('alta') || p.productName.toLowerCase().includes('alta')).length;
-  }, [products]);
-
-  const dowProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('dow') || p.productName.toLowerCase().includes('dow')).length;
-  }, [products]);
-
-  const tideProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('tide') || p.productName.toLowerCase().includes('tide')).length;
-  }, [products]);
-
-  const nichinoProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('nichino') || p.productName.toLowerCase().includes('nichino')).length;
-  }, [products]);
-
-  const rainbowProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('rainbow') || p.productName.toLowerCase().includes('rainbow')).length;
-  }, [products]);
-
-  const bayerProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('bayer')).length;
-  }, [products]);
-
-  const basfProductsCount = useMemo(() => {
-    return products.filter(p => p.manufacturer.toLowerCase().includes('basf')).length;
-  }, [products]);
-
-  // Dynamic sorted list of all manufacturers present in products for dropdown filter (Strict A-Z Alphabetical Order)
-  const availableManufacturersList = useMemo(() => {
+  // Single-pass manufacturer & brand counts + sorted manufacturers list
+  const {
+    tecnomylProductsCount,
+    cropchemProductsCount,
+    adamaProductsCount,
+    agrobiologicaProductsCount,
+    fmcProductsCount,
+    iharaProductsCount,
+    pilarquimProductsCount,
+    ccabProductsCount,
+    vittiaProductsCount,
+    sumitomoProductsCount,
+    sipcamProductsCount,
+    nortoxProductsCount,
+    alamosProductsCount,
+    solusProductsCount,
+    ameribrasProductsCount,
+    prentissProductsCount,
+    oxonProductsCount,
+    rotamProductsCount,
+    allierProductsCount,
+    saberoProductsCount,
+    biosphereProductsCount,
+    iskProductsCount,
+    biocontroleProductsCount,
+    mfbProductsCount,
+    agroimportProductsCount,
+    ctvaProductsCount,
+    dupontProductsCount,
+    altaProductsCount,
+    dowProductsCount,
+    tideProductsCount,
+    nichinoProductsCount,
+    rainbowProductsCount,
+    bayerProductsCount,
+    basfProductsCount,
+    availableManufacturersList,
+  } = useMemo(() => {
+    let tecnomyl = 0, cropchem = 0, adama = 0, agrobiologica = 0, fmc = 0, ihara = 0;
+    let pilarquim = 0, ccab = 0, vittia = 0, sumitomo = 0, sipcam = 0, nortox = 0;
+    let alamos = 0, solus = 0, ameribras = 0, prentiss = 0, oxon = 0, rotam = 0;
+    let allier = 0, sabero = 0, biosphere = 0, isk = 0, biocontrole = 0, mfb = 0;
+    let agroimport = 0, ctva = 0, dupont = 0, alta = 0, dow = 0, tide = 0;
+    let nichino = 0, rainbow = 0, bayer = 0, basf = 0;
     const countsMap = new Map<string, number>();
-    products.forEach(p => {
-      const mfg = p.manufacturer ? p.manufacturer.trim() : '';
-      if (mfg) {
-        countsMap.set(mfg, (countsMap.get(mfg) || 0) + 1);
+
+    for (const p of products) {
+      const mfgRaw = p.manufacturer ? p.manufacturer.trim() : '';
+      if (mfgRaw) {
+        countsMap.set(mfgRaw, (countsMap.get(mfgRaw) || 0) + 1);
       }
-    });
-    return Array.from(countsMap.entries())
+      const m = mfgRaw.toLowerCase();
+      const n = (p.productName || '').toLowerCase();
+
+      if (m.includes('tecnomyl') || n.includes('tecnomyl')) tecnomyl++;
+      if (m.includes('cropchem') || n.includes('cropchem')) cropchem++;
+      if (m.includes('adama') || n.includes('adama')) adama++;
+      if (m.includes('agrobiológica') || m.includes('agrobiologica') || n.includes('agrobiológica') || n.includes('agrobiologica')) agrobiologica++;
+      if (m.includes('fmc') || n.includes('fmc')) fmc++;
+      if (m.includes('ihara') || n.includes('ihara')) ihara++;
+      if (m.includes('pilarquim') || n.includes('pilarquim')) pilarquim++;
+      if (m.includes('ccab') || n.includes('ccab')) ccab++;
+      if (m.includes('vittia') || n.includes('vittia')) vittia++;
+      if (m.includes('sumitomo') || n.includes('sumitomo')) sumitomo++;
+      if (m.includes('sipcam') || m.includes('nichino') || n.includes('sipcam')) sipcam++;
+      if (m.includes('nortox') || n.includes('nortox')) nortox++;
+      if (m.includes('alamos') || n.includes('alamos')) alamos++;
+      if (m.includes('solus') || n.includes('solus')) solus++;
+      if (m.includes('ameribrás') || m.includes('ameribras') || n.includes('ameribrás') || n.includes('ameribras')) ameribras++;
+      if (m.includes('prentiss') || n.includes('prentiss')) prentiss++;
+      if (m.includes('oxon') || n.includes('oxon')) oxon++;
+      if (m.includes('rotam') || n.includes('rotam')) rotam++;
+      if (m.includes('allier') || n.includes('allier')) allier++;
+      if (m.includes('sabero') || n.includes('sabero')) sabero++;
+      if (m.includes('biosphere') || n.includes('biosphere')) biosphere++;
+      if (m.includes('isk')) isk++;
+      if (m.includes('bio controle') || n.includes('bio controle')) biocontrole++;
+      if (m.includes('mfb') || n.includes('mfb')) mfb++;
+      if (m.includes('agroimport') || n.includes('agroimport')) agroimport++;
+      if (m.includes('ctva') || n.includes('ctva')) ctva++;
+      if (m.includes('dupont') || m.includes('du pont') || n.includes('dupont')) dupont++;
+      if (m.includes('alta') || n.includes('alta')) alta++;
+      if (m.includes('dow') || n.includes('dow')) dow++;
+      if (m.includes('tide') || n.includes('tide')) tide++;
+      if (m.includes('nichino') || n.includes('nichino')) nichino++;
+      if (m.includes('rainbow') || n.includes('rainbow')) rainbow++;
+      if (m.includes('bayer')) bayer++;
+      if (m.includes('basf')) basf++;
+    }
+
+    const sortedList = Array.from(countsMap.entries())
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
-  }, [products]);
 
-  // Crop and Dosage Coverage Audit Report
-  const cropCoverageReport = useMemo(() => {
-    return analyzeCropAndDosageCoverage(products, STANDARD_CROPS);
+    return {
+      tecnomylProductsCount: tecnomyl,
+      cropchemProductsCount: cropchem,
+      adamaProductsCount: adama,
+      agrobiologicaProductsCount: agrobiologica,
+      fmcProductsCount: fmc,
+      iharaProductsCount: ihara,
+      pilarquimProductsCount: pilarquim,
+      ccabProductsCount: ccab,
+      vittiaProductsCount: vittia,
+      sumitomoProductsCount: sumitomo,
+      sipcamProductsCount: sipcam,
+      nortoxProductsCount: nortox,
+      alamosProductsCount: alamos,
+      solusProductsCount: solus,
+      ameribrasProductsCount: ameribras,
+      prentissProductsCount: prentiss,
+      oxonProductsCount: oxon,
+      rotamProductsCount: rotam,
+      allierProductsCount: allier,
+      saberoProductsCount: sabero,
+      biosphereProductsCount: biosphere,
+      iskProductsCount: isk,
+      biocontroleProductsCount: biocontrole,
+      mfbProductsCount: mfb,
+      agroimportProductsCount: agroimport,
+      ctvaProductsCount: ctva,
+      dupontProductsCount: dupont,
+      altaProductsCount: alta,
+      dowProductsCount: dow,
+      tideProductsCount: tide,
+      nichinoProductsCount: nichino,
+      rainbowProductsCount: rainbow,
+      bayerProductsCount: bayer,
+      basfProductsCount: basf,
+      availableManufacturersList: sortedList,
+    };
   }, [products]);
 
   const [showDuplicateAuditModal, setShowDuplicateAuditModal] = useState(false);
@@ -390,6 +337,11 @@ export const PesticideBularioModule: React.FC<PesticideBularioModuleProps> = ({
     }
   };
 
+  // Crop and Dosage Coverage Audit Report
+  const cropCoverageReport = useMemo(() => {
+    return analyzeCropAndDosageCoverage(products, STANDARD_AGRICULTURAL_CROPS);
+  }, [products]);
+
   // Unique list of crops available across all products for filter dropdowns
   const availableCropsList = useMemo(() => {
     const cropSet = new Set<string>();
@@ -398,39 +350,6 @@ export const PesticideBularioModule: React.FC<PesticideBularioModuleProps> = ({
     });
     return Array.from(cropSet).sort();
   }, [products]);
-
-  const [recPrefillSearchTerm, setRecPrefillSearchTerm] = useState('');
-  const [recPrefillCategory, setRecPrefillCategory] = useState<'all' | 'rainbow' | 'bayer' | 'basf' | 'Herbicida' | 'Fungicida' | 'Inseticida' | 'Biológico'>('all');
-
-  // Sorted and filtered products for quick prefill in Receituário
-  const sortedProductsForPrefill = useMemo(() => {
-    let list = [...products];
-
-    if (recPrefillCategory === 'rainbow') {
-      list = list.filter(p => p.manufacturer.toLowerCase().includes('rainbow') || p.productName.toLowerCase().includes('rainbow'));
-    } else if (recPrefillCategory === 'bayer') {
-      list = list.filter(p => p.manufacturer.toLowerCase().includes('bayer'));
-    } else if (recPrefillCategory === 'basf') {
-      list = list.filter(p => p.manufacturer.toLowerCase().includes('basf'));
-    } else if (recPrefillCategory !== 'all') {
-      list = list.filter(p => p.agrochemicalClass === recPrefillCategory);
-    }
-
-    if (recPrefillSearchTerm.trim()) {
-      const searchLower = recPrefillSearchTerm.toLowerCase();
-      list = list.filter(p =>
-        p.productName.toLowerCase().includes(searchLower) ||
-        p.manufacturer.toLowerCase().includes(searchLower) ||
-        (p.activeIngredient && p.activeIngredient.toLowerCase().includes(searchLower)) ||
-        (p.chemicalGroup && p.chemicalGroup.toLowerCase().includes(searchLower)) ||
-        (p.agrochemicalClass && p.agrochemicalClass.toLowerCase().includes(searchLower)) ||
-        (p.registrationNumber && p.registrationNumber.includes(searchLower)) ||
-        p.indications.some(ind => ind.cropName.toLowerCase().includes(searchLower) || ind.targetOrganism.toLowerCase().includes(searchLower))
-      );
-    }
-
-    return list.sort((a, b) => a.productName.localeCompare(b.productName, 'pt-BR')).slice(0, 60);
-  }, [products, recPrefillSearchTerm, recPrefillCategory]);
 
   // =========================================================================
   // RECEITUÁRIO AGRONÔMICO STATE & LOGIC
@@ -829,7 +748,6 @@ export const PesticideBularioModule: React.FC<PesticideBularioModuleProps> = ({
   const [calcCropName, setCalcCropName] = useState<string>('');
   const [calcAreaHa, setCalcAreaHa] = useState<number | ''>(50);
   const [calcTankVolumeL, setCalcTankVolumeL] = useState<number | ''>(2000);
-  const [customSprayVolumeLha, setCustomSprayVolumeLha] = useState<number | ''>('');
 
   // Auto-sync selected crop when selected product changes in calculator
   const selectedCalcProduct = useMemo(() => {
@@ -890,8 +808,7 @@ export const PesticideBularioModule: React.FC<PesticideBularioModuleProps> = ({
     const area = Number(calcAreaHa);
     const dosage = selectedIndication.recommendedDosage;
     const unit = selectedIndication.dosageUnit;
-    const defaultSprayVol = selectedIndication.recommendedSprayVolumeLha || 100;
-    const sprayVolumeLha = customSprayVolumeLha !== '' && Number(customSprayVolumeLha) > 0 ? Number(customSprayVolumeLha) : defaultSprayVol;
+    const sprayVolumeLha = selectedIndication.recommendedSprayVolumeLha || 100;
     const tankVol = calcTankVolumeL !== '' && Number(calcTankVolumeL) > 0 ? Number(calcTankVolumeL) : 2000;
 
     // 2. Dosage math based on unit
@@ -1001,7 +918,7 @@ export const PesticideBularioModule: React.FC<PesticideBularioModuleProps> = ({
       reentryIntervalHours: selectedCalcProduct.reentryIntervalHours,
       warnings,
     };
-  }, [selectedCalcProduct, calcCropName, calcAreaHa, calcTankVolumeL, customSprayVolumeLha]);
+  }, [selectedCalcProduct, calcCropName, calcAreaHa, calcTankVolumeL]);
 
   // Copy recommendation summary to clipboard
   const handleCopySummary = () => {
@@ -1112,8 +1029,8 @@ _Gerado via GeaAgro - Módulo de Bulário e Receituário_`;
       return;
     }
 
-    if (newProductCollision && newProductCollision.isCollision) {
-      const reasonLabel = newProductCollision.collisionReason === 'registration_number'
+    if (newProductCollision && newProductCollision.hasCollision) {
+      const reasonLabel = newProductCollision.reason?.includes('Registro')
         ? `o mesmo número de registro MAPA (${newProductCollision.conflictingProduct?.registrationNumber})`
         : `o mesmo nome (${newProductCollision.conflictingProduct?.productName})`;
       if (!window.confirm(`⚠️ Atenção: Já existe um produto cadastrado com ${reasonLabel} da empresa ${newProductCollision.conflictingProduct?.manufacturer}. Deseja prosseguir e cadastrar como duplicata?`)) {
@@ -2657,7 +2574,7 @@ _Gerado via GeaAgro - Módulo de Bulário e Receituário_`;
             </div>
 
             {/* Real-time duplicate / collision alert */}
-            {newProductCollision && newProductCollision.isCollision && (
+            {newProductCollision && newProductCollision.hasCollision && (
               <div className="p-4 bg-amber-50 dark:bg-amber-950/50 border-2 border-amber-400 dark:border-amber-700 rounded-2xl flex items-start gap-3 text-amber-900 dark:text-amber-200 animate-fade-in">
                 <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                 <div className="space-y-1">

@@ -23,8 +23,8 @@ export const BuffaloBeefProductionView: React.FC<BuffaloBeefProductionViewProps>
 }) => {
   const beefAnimals = animals.filter(a => a.purpose === 'Corte' || a.category.includes('Engorda') || a.category.includes('Terminação') || a.category.includes('Recria'));
   
-  const avgWeight = beefAnimals.length > 0 ? Math.round(beefAnimals.reduce((acc, a) => acc + a.currentWeightKg, 0) / beefAnimals.length) : 480;
-  const avgGmd = 0.78; // kg/dia médio
+  const avgWeight = beefAnimals.length > 0 ? Math.round(beefAnimals.reduce((acc, a) => acc + a.currentWeightKg, 0) / beefAnimals.length) : 0;
+  const avgGmd = beefAnimals.length > 0 ? 0.78 : 0; // kg/dia médio
   const carcassYieldPct = 51.5; // % rendimento de carcaça
   const priceArrobaBRL = 310.0; // R$ / @
 
@@ -95,36 +95,42 @@ export const BuffaloBeefProductionView: React.FC<BuffaloBeefProductionViewProps>
         </h4>
 
         <div className="divide-y divide-slate-100 dark:divide-zinc-800">
-          {beefAnimals.map((animal) => {
-            const arrobas = Number((animal.currentWeightKg * (carcassYieldPct / 100) / 15).toFixed(1));
-            const estimatedValueBRL = Number((arrobas * priceArrobaBRL).toFixed(2));
-            return (
-              <div key={animal.id} className="py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-black text-sm text-slate-900 dark:text-white">{animal.identificationNumber}</span>
-                    <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">{animal.name}</span>
-                    <span className="px-2 py-0.5 bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 font-bold text-[10px] rounded">
-                      {animal.category}
+          {beefAnimals.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 text-xs">
+              Nenhum búfalo cadastrado com aptidão para corte ou em engorda/terminação.
+            </div>
+          ) : (
+            beefAnimals.map((animal) => {
+              const arrobas = Number((animal.currentWeightKg * (carcassYieldPct / 100) / 15).toFixed(1));
+              const estimatedValueBRL = Number((arrobas * priceArrobaBRL).toFixed(2));
+              return (
+                <div key={animal.id} className="py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-black text-sm text-slate-900 dark:text-white">{animal.identificationNumber}</span>
+                      <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">{animal.name}</span>
+                      <span className="px-2 py-0.5 bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 font-bold text-[10px] rounded">
+                        {animal.category}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Peso Vivo: <strong>{animal.currentWeightKg} kg</strong> (ECC {animal.bodyConditionScore}) • Equivalente: <strong>{arrobas} @</strong>
+                    </p>
+                    <span className="text-[11px] text-teal-600 font-semibold block">
+                      Valor Estimado de Carcaça: R$ {estimatedValueBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500">
-                    Peso Vivo: <strong>{animal.currentWeightKg} kg</strong> (ECC {animal.bodyConditionScore}) • Equivalente: <strong>{arrobas} @</strong>
-                  </p>
-                  <span className="text-[11px] text-teal-600 font-semibold block">
-                    Valor Estimado de Carcaça: R$ {estimatedValueBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
 
-                <button
-                  onClick={() => onOpenDigitalTwin(animal.id)}
-                  className="px-4 py-2 bg-slate-100 dark:bg-zinc-800 hover:bg-rose-50 dark:hover:bg-rose-950 text-slate-700 dark:text-zinc-300 hover:text-rose-600 rounded-xl text-xs font-bold cursor-pointer transition-all"
-                >
-                  Ver Curva de Ganho
-                </button>
-              </div>
-            );
-          })}
+                  <button
+                    onClick={() => onOpenDigitalTwin(animal.id)}
+                    className="px-4 py-2 bg-slate-100 dark:bg-zinc-800 hover:bg-rose-50 dark:hover:bg-rose-950 text-slate-700 dark:text-zinc-300 hover:text-rose-600 rounded-xl text-xs font-bold cursor-pointer transition-all"
+                  >
+                    Ver Curva de Ganho
+                  </button>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>

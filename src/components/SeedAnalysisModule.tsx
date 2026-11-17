@@ -110,11 +110,12 @@ export const SeedAnalysisModule: React.FC<SeedAnalysisModuleProps> = ({ activeSu
   };
 
   const dynamicRules = useMemo(() => {
-    const lotMoisture = currentLot?.moisture?.moisturePct ?? 11.4;
-    const lotGermination = currentLot?.germination?.finalGerminationPct ?? 94.0;
-    const lotVigor = currentLot?.vigor?.tetrazoliumVigorPct ?? 92.0;
-    const lotPurity = currentLot?.physicalQuality?.purityPct ?? 99.4;
-    const lotMechanicalDamage = currentLot?.physicalQuality?.mechanicalDamageHypochloritePct ?? 2.1;
+    if (!currentLot) return [];
+    const lotMoisture = currentLot?.moisture?.moisturePct ?? 0;
+    const lotGermination = currentLot?.germination?.finalGerminationPct ?? 0;
+    const lotVigor = currentLot?.vigor?.tetrazoliumVigorPct ?? 0;
+    const lotPurity = currentLot?.physicalQuality?.purityPct ?? 0;
+    const lotMechanicalDamage = currentLot?.physicalQuality?.mechanicalDamageHypochloritePct ?? 0;
 
     return [
       {
@@ -245,17 +246,22 @@ export const SeedAnalysisModule: React.FC<SeedAnalysisModuleProps> = ({ activeSu
           <select
             value={selectedLotId}
             onChange={e => setSelectedLotId(e.target.value)}
-            className="bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 font-bold text-slate-900 dark:text-white"
+            disabled={seedLots.length === 0}
+            className="bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 font-bold text-slate-900 dark:text-white disabled:opacity-60"
           >
-            {seedLots.map(l => (
-              <option key={l.id} value={l.id}>{l.lotNumber} - {l.speciesName} ({l.cultivar})</option>
-            ))}
+            {seedLots.length === 0 ? (
+              <option value="">Nenhum lote cadastrado</option>
+            ) : (
+              seedLots.map(l => (
+                <option key={l.id} value={l.id}>{l.lotNumber} - {l.speciesName} ({l.cultivar})</option>
+              ))
+            )}
           </select>
         </div>
         <div className="flex items-center gap-3 text-slate-600 dark:text-zinc-400 text-[11px]">
-          <span>Safra: <strong>{currentLot?.cropSeason || '2024/2025'}</strong></span>
+          <span>Safra: <strong>{currentLot?.cropSeason || '--'}</strong></span>
           <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-2 py-0.5 rounded font-black text-[10px]">
-            IQS Atual: {currentLot?.iqsScore ?? 94}/100
+            IQS Atual: {currentLot ? `${currentLot.iqsScore}/100` : '--'}
           </span>
         </div>
       </div>
@@ -581,8 +587,8 @@ export const SeedAnalysisModule: React.FC<SeedAnalysisModuleProps> = ({ activeSu
                     </div>
                     <div className="text-[10px] pt-1 border-t flex justify-between text-slate-500">
                        <span>No Lote:</span>
-                       <strong className={(currentLot?.moisture?.moisturePct ?? 11.4) > profileThresholds.moistureLimit ? "text-red-500" : "text-emerald-600"}>
-                          {currentLot?.moisture?.moisturePct ?? 11.4}%
+                       <strong className={currentLot ? ((currentLot?.moisture?.moisturePct ?? 0) > profileThresholds.moistureLimit ? "text-red-500" : "text-emerald-600") : "text-slate-400"}>
+                          {currentLot ? `${currentLot?.moisture?.moisturePct ?? 0}%` : '--'}
                        </strong>
                     </div>
                  </div>
@@ -601,8 +607,8 @@ export const SeedAnalysisModule: React.FC<SeedAnalysisModuleProps> = ({ activeSu
                     </div>
                     <div className="text-[10px] pt-1 border-t flex justify-between text-slate-500">
                        <span>No Lote:</span>
-                       <strong className={(currentLot?.germination?.finalGerminationPct ?? 94) < profileThresholds.minGermination ? "text-red-500" : "text-emerald-600"}>
-                          {currentLot?.germination?.finalGerminationPct ?? 94}%
+                       <strong className={currentLot ? ((currentLot?.germination?.finalGerminationPct ?? 0) < profileThresholds.minGermination ? "text-red-500" : "text-emerald-600") : "text-slate-400"}>
+                          {currentLot ? `${currentLot?.germination?.finalGerminationPct ?? 0}%` : '--'}
                        </strong>
                     </div>
                  </div>
@@ -621,8 +627,8 @@ export const SeedAnalysisModule: React.FC<SeedAnalysisModuleProps> = ({ activeSu
                     </div>
                     <div className="text-[10px] pt-1 border-t flex justify-between text-slate-500">
                        <span>No Lote:</span>
-                       <strong className={(currentLot?.vigor?.tetrazoliumVigorPct ?? 92) < profileThresholds.minVigor ? "text-amber-500" : "text-emerald-600"}>
-                          {currentLot?.vigor?.tetrazoliumVigorPct ?? 92}%
+                       <strong className={currentLot ? ((currentLot?.vigor?.tetrazoliumVigorPct ?? 0) < profileThresholds.minVigor ? "text-amber-500" : "text-emerald-600") : "text-slate-400"}>
+                          {currentLot ? `${currentLot?.vigor?.tetrazoliumVigorPct ?? 0}%` : '--'}
                        </strong>
                     </div>
                  </div>
@@ -642,8 +648,8 @@ export const SeedAnalysisModule: React.FC<SeedAnalysisModuleProps> = ({ activeSu
                     </div>
                     <div className="text-[10px] pt-1 border-t flex justify-between text-slate-500">
                        <span>No Lote:</span>
-                       <strong className={(currentLot?.physicalQuality?.mechanicalDamageHypochloritePct ?? 2.1) > profileThresholds.maxMechanicalDamage ? "text-amber-500" : "text-emerald-600"}>
-                          {currentLot?.physicalQuality?.mechanicalDamageHypochloritePct ?? 2.1}%
+                       <strong className={currentLot ? ((currentLot?.physicalQuality?.mechanicalDamageHypochloritePct ?? 0) > profileThresholds.maxMechanicalDamage ? "text-amber-500" : "text-emerald-600") : "text-slate-400"}>
+                          {currentLot ? `${currentLot?.physicalQuality?.mechanicalDamageHypochloritePct ?? 0}%` : '--'}
                        </strong>
                     </div>
                  </div>
@@ -663,8 +669,8 @@ export const SeedAnalysisModule: React.FC<SeedAnalysisModuleProps> = ({ activeSu
                     </div>
                     <div className="text-[10px] pt-1 border-t flex justify-between text-slate-500">
                        <span>No Lote:</span>
-                       <strong className={(currentLot?.physicalQuality?.purityPct ?? 99.4) < profileThresholds.minPurity ? "text-red-500" : "text-emerald-600"}>
-                          {currentLot?.physicalQuality?.purityPct ?? 99.4}%
+                       <strong className={currentLot ? ((currentLot?.physicalQuality?.purityPct ?? 0) < profileThresholds.minPurity ? "text-red-500" : "text-emerald-600") : "text-slate-400"}>
+                          {currentLot ? `${currentLot?.physicalQuality?.purityPct ?? 0}%` : '--'}
                        </strong>
                     </div>
                  </div>

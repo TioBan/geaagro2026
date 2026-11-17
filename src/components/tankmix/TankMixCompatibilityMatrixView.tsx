@@ -1,27 +1,17 @@
 import React, { useState } from 'react';
 import {
   Zap,
-  Search,
-  Filter,
   AlertTriangle,
-  CheckCircle2,
-  HelpCircle,
-  FlaskConical,
-  Layers,
-  Info,
-  ShieldCheck,
 } from 'lucide-react';
 import {
   TANKMIX_PRODUCTS_DATABASE,
   COMPATIBILITY_RULES_DATABASE,
 } from '../../data/tankMixData';
-import { TankMixProduct, CompatibilityRule, CompatibilityRating } from '../../types/tankMix';
+import { CompatibilityRule, CompatibilityRating } from '../../types/tankMix';
 
 export const TankMixCompatibilityMatrixView: React.FC = () => {
   const [selectedProductA, setSelectedProductA] = useState<string>(TANKMIX_PRODUCTS_DATABASE[0]?.id || '');
   const [selectedProductB, setSelectedProductB] = useState<string>(TANKMIX_PRODUCTS_DATABASE[2]?.id || '');
-  const [matrixFilterClass, setMatrixFilterClass] = useState<string>('todos');
-  const [searchMatrix, setSearchMatrix] = useState<string>('');
 
   // Selected products for dual pair test
   const prodA = (TANKMIX_PRODUCTS_DATABASE || []).find(p => p?.id === selectedProductA);
@@ -212,7 +202,7 @@ export const TankMixCompatibilityMatrixView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {matrixProducts.map((rowProd, rIdx) => (
+              {matrixProducts.map(rowProd => (
                 <tr key={rowProd.id} className="hover:bg-gray-50/60 transition-colors">
                   <td className="p-2.5 font-bold text-gray-900 sticky left-0 bg-white z-10 border-r border-gray-100">
                     <div className="truncate max-w-[140px]" title={rowProd.commercialName}>
@@ -223,7 +213,7 @@ export const TankMixCompatibilityMatrixView: React.FC = () => {
                     </span>
                   </td>
 
-                  {matrixProducts.map((colProd, cIdx) => {
+                  {matrixProducts.map(colProd => {
                     const { rating, rule } = getCellRating(rowProd.id, colProd.id);
 
                     let bgClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';

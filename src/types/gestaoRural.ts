@@ -1,3 +1,17 @@
+export type UnidadeComercializacao = 'cx' | 'sc' | 'kg' | 'ton' | '@' | 'un' | 'bandeja' | 'cacho' | 'litros';
+
+export interface ConfigCulturaIntegrada {
+  cultura: string; // Ex: 'Banana', 'Soja', 'Milho', 'Café', 'Citros', etc.
+  variedade?: string; // Ex: 'Prata', 'Nanica', 'BRS...'
+  unidadeComercializacaoPrincipal: UnidadeComercializacao; // 'cx', 'sc', 'kg', 'ton', etc.
+  unidadesHabilitadas: UnidadeComercializacao[]; // Ex: ['cx', 'sc', 'kg', 'ton']
+  pesoPorUnidadeKg: number; // Ex: 20 para cx de banana, 60 para sc de soja
+  apelidoUnidade?: string; // Ex: 'Caixa (20 kg)' ou 'Saca (60 kg)'
+  precoReferenciaUnitarioR$: number; // R$ por unidade principal
+  metaProdutividadePadraoHa: number; // Ex: 1500 cx/ha ou 65 sc/ha
+  descricaoComercializacao?: string; // Ex: 'Comercializada em caixas de 20kg no CEASA ou granel'
+}
+
 export interface PropriedadeRural {
   id: string;
   nome: string;
@@ -23,6 +37,7 @@ export interface PropriedadeRural {
   creaNumero: string;
   observacoes: string;
   updatedAt: string;
+  configCultura?: ConfigCulturaIntegrada;
 }
 
 export interface TalhaoRural {
@@ -201,7 +216,7 @@ export interface VendaComercializacaoRecord {
   safraId: string;
   safraNome: string;
   quantidadeSacasOuKg: number;
-  unidade: 'sc' | 'kg' | 'ton';
+  unidade: UnidadeComercializacao | string;
   precoUnitarioR$: number;
   valorBrutoTotalR$: number;
   umidadePct: number;
@@ -301,23 +316,6 @@ export interface LeituraEstacaoMeteorologica {
   et0DiariaMm: number;
   etcCalculadaMm: number;
   condicaoGeral: 'Ensolarado' | 'Parcialmente Nublado' | 'Chuvoso' | 'Tempestade' | 'Veranico';
-}
-
-export interface IndicadorBIRuralData {
-  safraId: string;
-  safraNome: string;
-  produtividadeMediaSacasHa: number;
-  custoTotalPorHaR$: number;
-  receitaTotalPorHaR$: number;
-  lucroLiquidoPorHaR$: number;
-  margemLucroPct: number;
-  roiPct: number;
-  fertilizanteUtilizadoKgHa: number;
-  defensivoUtilizadoLitersHa: number;
-  consumoCombustivelLitersHa: number;
-  consumoAguaM3Ha: number;
-  horasMaquinaHa: number;
-  eficienciaOperacionalPct: number;
 }
 
 export interface MensagemAssistenteIARural {

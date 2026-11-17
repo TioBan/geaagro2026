@@ -2166,39 +2166,11 @@ export function calculateTankMixEvaluation(
   };
 }
 
-export const POPULAR_TANK_RECIPES = [
-  {
-    id: 'rec_dessecacao_soja',
-    title: 'Dessecação Pré-Plantio Soja (Amargoso + Buva)',
-    crop: 'Soja / Milho',
-    products: ['Glifosato 480 SL', 'Cletodim 240 EC', 'Óleo Mineral / Adjuvante'],
-    rating: 'compativel' as CompatibilityRating,
-    icgScore: 92,
-  },
-  {
-    id: 'rec_fungicida_foliar',
-    title: 'Manejo de Ferrugem Asiática + DFCs',
-    crop: 'Soja',
-    products: ['Trifloxistrobina + Protioconazol SC', 'Mancozebe 750 WG', 'Óleo Metilado'],
-    rating: 'compativel' as CompatibilityRating,
-    icgScore: 94,
-  },
-  {
-    id: 'rec_lagarta_percevejo_moderno',
-    title: 'Manejo de Lagartas e Percevejos de Alta Tecnologia (ZC + CS)',
-    crop: 'Soja / Milho',
-    products: ['Ampligo ZC', 'Engeo Pleno S ZC', 'Karate Zeon 50 CS'],
-    rating: 'compativel' as CompatibilityRating,
-    icgScore: 96,
-  },
-];
-
 /**
  * Gera os passos detalhados para o Teste de Jarra (Jar Test) em escala de 1 Litro
  */
 export function getJarTestProtocol(
   products: { product: TankMixProduct; dose: number; doseUnit: string }[],
-  tankVolumeL: number,
   sprayVolumeLHa: number
 ) {
   // Proporção para frasco de 1.000 mL (1 L)

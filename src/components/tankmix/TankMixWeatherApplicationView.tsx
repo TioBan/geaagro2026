@@ -1,21 +1,15 @@
-// @ts-nocheck
-import React, { useState } from 'react';
+import React from 'react';
 import {
-  CloudSun,
   Wind,
   Droplets,
   Thermometer,
   AlertTriangle,
   CheckCircle2,
   Sliders,
-  Compass,
-  Zap,
-  Info,
-  ShieldCheck,
   CloudRain,
 } from 'lucide-react';
 import { WeatherCondition } from '../../types/tankMix';
-import { evaluateApplicationWindow, calculateDeltaT } from '../../data/tankMixData';
+import { evaluateApplicationWindow } from '../../data/tankMixData';
 
 interface Props {
   weather: WeatherCondition;

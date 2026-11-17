@@ -1,4 +1,4 @@
-import { PesticideProduct, CropIndication } from '../types/pesticideLeaflet';
+import { PesticideProduct } from '../types/pesticideLeaflet';
 
 /**
  * Normalizes a product name for exact collision detection (lowercase, trim, collapse whitespace, strip accents)

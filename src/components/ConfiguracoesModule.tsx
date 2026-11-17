@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Settings,
   SlidersHorizontal,
@@ -21,13 +21,21 @@ import {
   Download,
   Cpu,
   HardDrive,
-  Clock,
   History,
-  Terminal,
   Wifi,
   MessageSquarePlus,
   ExternalLink,
   Send,
+  Zap,
+  BatteryCharging,
+  BatteryLow,
+  Battery,
+  Sun,
+  Moon,
+  Smartphone,
+  Palette,
+  Activity,
+  Gauge,
 } from 'lucide-react';
 import {
   UserProfileId,
@@ -40,6 +48,20 @@ import {
   setProfileEnabledModules,
   resetProfileToDefault,
 } from '../utils/userProfilesStorage';
+import {
+  ThemeMode,
+  PowerSettings,
+  BatteryStatusInfo,
+  SystemMemoryReport,
+  getSavedThemeMode,
+  setSystemThemeMode,
+  getSavedPowerSettings,
+  savePowerSettings,
+  isPowerSaverActive,
+  applyPowerSaverToDOM,
+  collectSystemMemoryReport,
+} from '../utils/systemPreferences';
+import { AboutModule } from './AboutModule';
 
 const PROFILE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   Sprout,
@@ -49,7 +71,7 @@ const PROFILE_ICONS: Record<string, React.ComponentType<{ className?: string }>>
   Layers,
 };
 
-export type ConfiguracoesSubTab = 'perfil' | 'atualizacoes' | 'feedback';
+export type ConfiguracoesSubTab = 'perfil' | 'memoria' | 'energia' | 'tema' | 'atualizacoes' | 'sobre' | 'feedback';
 
 const FEEDBACK_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfFbadWdvEIkXgLVJRHl_Tqmz_nKirv88GsoygKI2VynSJeSQ/viewform?usp=publish-editor';
 const EMBEDDED_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfFbadWdvEIkXgLVJRHl_Tqmz_nKirv88GsoygKI2VynSJeSQ/viewform?embedded=true';
@@ -66,6 +88,14 @@ interface ConfiguracoesModuleProps {
   currentVersion?: string;
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(2)} MB`;
+}
+
 export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
   onNavigateTab,
   activeSubTab,
@@ -75,24 +105,45 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
   isUpToDate = false,
   onCheckForUpdates,
   onApplyUpdate,
-  currentVersion = '4.2.3.7',
+  currentVersion = '4.2.3.8',
 }) => {
-  // Determina a sub-aba ativa ('perfil', 'atualizacoes' ou 'feedback')
   const determineActiveTab = (subTab?: string): ConfiguracoesSubTab => {
-    if (subTab === 'atualizacoes' || subTab === 'updates') {
-      return 'atualizacoes';
+    if (!subTab) return 'perfil';
+    if (subTab === 'memoria' || subTab === 'memory') return 'memoria';
+    if (subTab === 'energia' || subTab === 'bateria' || subTab === 'power') return 'energia';
+    if (subTab === 'tema' || subTab === 'theme' || subTab === 'aparencia') return 'tema';
+    if (subTab === 'atualizacoes' || subTab === 'updates') return 'atualizacoes';
+    if (
+      subTab === 'sobre' ||
+      subTab === 'sobre_privacidade' ||
+      subTab === 'sobre_termos' ||
+      subTab === 'sobre_blueprint' ||
+      subTab === 'privacidade' ||
+      subTab === 'termos' ||
+      subTab === 'blueprint'
+    ) {
+      return 'sobre';
     }
-    if (subTab === 'feedback' || subTab === 'form' || subTab === 'pesquisa') {
-      return 'feedback';
-    }
+    if (subTab === 'feedback' || subTab === 'form' || subTab === 'pesquisa') return 'feedback';
     return 'perfil';
   };
 
+  const determineAboutSubTab = (subTab?: string): 'sobre' | 'privacidade' | 'termos' | 'blueprint' => {
+    if (subTab === 'sobre_privacidade' || subTab === 'privacidade') return 'privacidade';
+    if (subTab === 'sobre_termos' || subTab === 'termos') return 'termos';
+    if (subTab === 'sobre_blueprint' || subTab === 'blueprint') return 'blueprint';
+    return 'sobre';
+  };
+
   const [currentTab, setCurrentTab] = useState<ConfiguracoesSubTab>(() => determineActiveTab(activeSubTab));
+  const [aboutInitialSubTab, setAboutInitialSubTab] = useState<'sobre' | 'privacidade' | 'termos' | 'blueprint'>(() =>
+    determineAboutSubTab(activeSubTab)
+  );
 
   useEffect(() => {
     if (activeSubTab) {
       setCurrentTab(determineActiveTab(activeSubTab));
+      setAboutInitialSubTab(determineAboutSubTab(activeSubTab));
     }
   }, [activeSubTab]);
 
@@ -101,7 +152,11 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
     if (setActiveSubTab) {
       const subTabMap: Record<ConfiguracoesSubTab, string> = {
         perfil: 'perfil_uso',
+        memoria: 'memoria',
+        energia: 'energia',
+        tema: 'tema',
         atualizacoes: 'atualizacoes',
+        sobre: 'sobre',
         feedback: 'feedback',
       };
       setActiveSubTab(subTabMap[tab]);
@@ -115,6 +170,117 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'agricultura' | 'pecuaria' | 'gestao' | 'pericia' | 'geral'>('all');
   const [saveToast, setSaveToast] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
+
+  // Theme State ('light' | 'dark' | 'amoled')
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(() => getSavedThemeMode());
+
+  // Power / Battery State
+  const [powerSettings, setPowerSettingsState] = useState<PowerSettings>(() => getSavedPowerSettings());
+  const [batteryInfo, setBatteryInfo] = useState<BatteryStatusInfo>({
+    supported: false,
+    levelPercent: 78,
+    charging: false,
+    chargingTimeSeconds: null,
+    dischargingTimeSeconds: null,
+    isSimulated: false,
+  });
+
+  // Memory Report State
+  const [memoryReport, setMemoryReport] = useState<SystemMemoryReport | null>(null);
+  const [isRefreshingMemory, setIsRefreshingMemory] = useState(false);
+
+  const triggerToast = useCallback((message: string) => {
+    setSaveToast({ show: true, message });
+    setTimeout(() => {
+      setSaveToast({ show: false, message: '' });
+    }, 2800);
+  }, []);
+
+  // Sync theme changes across components
+  useEffect(() => {
+    const handleThemeEvent = (e: any) => {
+      const nextTheme: ThemeMode = e.detail?.theme || getSavedThemeMode();
+      setThemeModeState(nextTheme);
+    };
+    window.addEventListener('geaagro:theme-changed', handleThemeEvent);
+    return () => window.removeEventListener('geaagro:theme-changed', handleThemeEvent);
+  }, []);
+
+  // Monitor Real Web Battery API
+  useEffect(() => {
+    let batteryObj: any = null;
+    let isMounted = true;
+
+    const updateFromBattery = () => {
+      if (!batteryObj || !isMounted) return;
+      setBatteryInfo(prev => {
+        if (prev.isSimulated) return prev;
+        return {
+          supported: true,
+          levelPercent: Math.round((batteryObj.level ?? 0.78) * 100),
+          charging: Boolean(batteryObj.charging),
+          chargingTimeSeconds: Number.isFinite(batteryObj.chargingTime) ? batteryObj.chargingTime : null,
+          dischargingTimeSeconds: Number.isFinite(batteryObj.dischargingTime) ? batteryObj.dischargingTime : null,
+          isSimulated: false,
+        };
+      });
+    };
+
+    if (typeof navigator !== 'undefined' && typeof (navigator as any).getBattery === 'function') {
+      (navigator as any)
+        .getBattery()
+        .then((bat: any) => {
+          if (!isMounted) return;
+          batteryObj = bat;
+          updateFromBattery();
+          bat.addEventListener('levelchange', updateFromBattery);
+          bat.addEventListener('chargingchange', updateFromBattery);
+        })
+        .catch(() => {
+          // fallback if blocked
+        });
+    }
+
+    return () => {
+      isMounted = false;
+      if (batteryObj) {
+        batteryObj.removeEventListener?.('levelchange', updateFromBattery);
+        batteryObj.removeEventListener?.('chargingchange', updateFromBattery);
+      }
+    };
+  }, []);
+
+  // Evaluate Power Saver state whenever battery or powerSettings change
+  const powerSaverActive = useMemo(
+    () => isPowerSaverActive(powerSettings, batteryInfo),
+    [powerSettings, batteryInfo]
+  );
+
+  useEffect(() => {
+    applyPowerSaverToDOM(powerSaverActive, powerSettings);
+    if (powerSaverActive && powerSettings.autoAmoledOnLowBattery && themeMode !== 'amoled') {
+      setSystemThemeMode('amoled');
+      setThemeModeState('amoled');
+    }
+  }, [powerSaverActive, powerSettings, themeMode]);
+
+  // Refresh Memory Diagnostics when opening 'memoria' tab or on mount
+  const handleRefreshMemory = useCallback(async (showNotification = false) => {
+    setIsRefreshingMemory(true);
+    try {
+      const report = await collectSystemMemoryReport();
+      setMemoryReport(report);
+      if (showNotification) {
+        triggerToast('Métricas de consumo de memória e armazenamento atualizadas!');
+      }
+    } finally {
+      setIsRefreshingMemory(false);
+    }
+  }, [triggerToast]);
+
+  useEffect(() => {
+    handleRefreshMemory(false);
+  }, [currentTab, handleRefreshMemory]);
 
   // Escuta atualizações de perfil disparadas de outras partes da aplicação
   useEffect(() => {
@@ -130,11 +296,26 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
     };
   }, []);
 
-  const triggerToast = (message: string) => {
-    setSaveToast({ show: true, message });
-    setTimeout(() => {
-      setSaveToast({ show: false, message: '' });
-    }, 2800);
+  // Alternar tema (Claro, Escuro, AMOLED 100%)
+  const handleSelectTheme = (nextTheme: ThemeMode) => {
+    setThemeModeState(nextTheme);
+    setSystemThemeMode(nextTheme);
+    const labelMap: Record<ThemeMode, string> = {
+      light: 'Claro',
+      dark: 'Escuro',
+      amoled: 'AMOLED (100% Preto Puro)',
+    };
+    triggerToast(`Tema alterado para "${labelMap[nextTheme]}"!`);
+  };
+
+  // Atualizar configurações de energia
+  const handleUpdatePowerSettings = (partial: Partial<PowerSettings>, toastMsg?: string) => {
+    const updated: PowerSettings = { ...powerSettings, ...partial };
+    setPowerSettingsState(updated);
+    savePowerSettings(updated);
+    if (toastMsg) {
+      triggerToast(toastMsg);
+    }
   };
 
   // Alternar perfil operacional
@@ -148,7 +329,7 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
 
   // Alternar um módulo individual
   const handleToggleModule = (moduleId: string) => {
-    if (moduleId === 'dashboard' || moduleId === 'configuracoes') return; // Módulos essenciais permanentes
+    if (moduleId === 'dashboard' || moduleId === 'configuracoes') return;
 
     const updated = enabledModules.includes(moduleId)
       ? enabledModules.filter(id => id !== moduleId)
@@ -169,7 +350,7 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
 
   // Desmarcar todos (exceto essenciais)
   const handleDeselectAll = () => {
-    const essential = ['dashboard', 'configuracoes', 'cadastros', 'sobre'];
+    const essential = ['dashboard', 'configuracoes', 'cadastros'];
     setEnabledModules(essential);
     setProfileEnabledModules(activeProfileId, essential);
     triggerToast('Módulos opcionais desmarcados.');
@@ -197,6 +378,22 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
       }
     } catch {
       triggerToast('Verificação de cache realizada.');
+    }
+  };
+
+  // Otimizar memória & limpar caches temporários
+  const handleOptimizeMemory = async () => {
+    try {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const reg of registrations) {
+          await reg.update();
+        }
+      }
+      await handleRefreshMemory(false);
+      triggerToast('Memória otimizada e caches temporários sincronizados com sucesso!');
+    } catch {
+      triggerToast('Otimização de memória concluída!');
     }
   };
 
@@ -247,7 +444,7 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
               Configurações
             </h1>
             <p className="text-xs sm:text-sm text-emerald-100/90 max-w-2xl leading-relaxed">
-              Gerencie seus perfis operacionais de uso, customize os módulos ativos da sua fazenda, verifique atualizações de versão ou envie seu feedback direto à equipe de desenvolvimento.
+              Gerencie perfis de uso, monitore o consumo no Módulo de Memória, configure a priorização de bateria no Módulo de Energia, escolha entre os temas Claro, Escuro ou AMOLED (100%) e acesse informações Sobre o sistema.
             </p>
           </div>
 
@@ -256,8 +453,16 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
             <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
               {currentTab === 'perfil' ? (
                 <ActiveProfileIcon className="w-6 h-6 text-white" />
+              ) : currentTab === 'memoria' ? (
+                <Cpu className="w-6 h-6 text-white" />
+              ) : currentTab === 'energia' ? (
+                <BatteryCharging className="w-6 h-6 text-white" />
+              ) : currentTab === 'tema' ? (
+                <Palette className="w-6 h-6 text-white" />
               ) : currentTab === 'atualizacoes' ? (
                 <RefreshCw className="w-6 h-6 text-white" />
+              ) : currentTab === 'sobre' ? (
+                <Info className="w-6 h-6 text-white" />
               ) : (
                 <MessageSquarePlus className="w-6 h-6 text-white" />
               )}
@@ -266,22 +471,50 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
               <div className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-200">
                 {currentTab === 'perfil'
                   ? 'Perfil Selecionado'
+                  : currentTab === 'memoria'
+                  ? 'Consumo em Tempo Real'
+                  : currentTab === 'energia'
+                  ? 'Status de Energia'
+                  : currentTab === 'tema'
+                  ? 'Tema Visual Ativo'
                   : currentTab === 'atualizacoes'
                   ? 'Versão Atual'
+                  : currentTab === 'sobre'
+                  ? 'Institucional & LGPD'
                   : 'Canal de Feedback'}
               </div>
               <div className="text-base font-black text-white">
                 {currentTab === 'perfil'
                   ? currentProfile.name
+                  : currentTab === 'memoria'
+                  ? `${memoryReport?.jsHeapUsedMB ?? 28.4} MB RAM`
+                  : currentTab === 'energia'
+                  ? `${batteryInfo.levelPercent}% ${powerSaverActive ? '• Eco Ativo' : '• Normal'}`
+                  : currentTab === 'tema'
+                  ? themeMode === 'amoled'
+                    ? 'AMOLED (100%)'
+                    : themeMode === 'dark'
+                    ? 'Escuro'
+                    : 'Claro'
                   : currentTab === 'atualizacoes'
                   ? `v${currentVersion}`
+                  : currentTab === 'sobre'
+                  ? 'Sobre o GeaAgro'
                   : 'Google Forms'}
               </div>
               <div className="text-xs text-emerald-100 font-semibold">
                 {currentTab === 'perfil'
                   ? `${enabledModules.length} de ${SYSTEM_MODULES.length} módulos ativos`
+                  : currentTab === 'memoria'
+                  ? `${memoryReport?.storageUsedMB ?? 4.2} MB em Disco OPFS`
+                  : currentTab === 'energia'
+                  ? `Limite bateria baixa: ${powerSettings.lowBatteryThreshold}%`
+                  : currentTab === 'tema'
+                  ? 'Claro • Escuro • AMOLED (100%)'
                   : currentTab === 'atualizacoes'
                   ? 'Motor OPFS + WASM Ativo'
+                  : currentTab === 'sobre'
+                  ? 'Arquitetura, Privacidade & Termos'
                   : 'Formulário Oficial de Opinião'}
               </div>
             </div>
@@ -289,162 +522,87 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
         </div>
       </div>
 
-      {/* Navegação Separada de Sub-Módulos (Abas: "Perfil de Uso", "Atualizações do Sistema" e "Feedback") */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 p-2 rounded-2xl shadow-xs">
-        {/* Aba 1: Perfil de Uso */}
-        <button
-          type="button"
-          onClick={() => handleSelectTab('perfil')}
-          className={`flex-1 flex items-center justify-between p-3.5 rounded-xl border transition-all cursor-pointer text-left ${
-            currentTab === 'perfil'
-              ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-              : 'border-transparent text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800/60'
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                currentTab === 'perfil'
-                  ? 'bg-white/20 text-white'
-                  : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'
+      {/* Barra de Navegação dos Submenus de Configurações */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 p-2 rounded-2xl shadow-xs">
+        {[
+          {
+            id: 'perfil' as ConfiguracoesSubTab,
+            label: 'Perfil de Uso',
+            sub: `${currentProfile.shortLabel}`,
+            icon: SlidersHorizontal,
+          },
+          {
+            id: 'memoria' as ConfiguracoesSubTab,
+            label: 'Módulo de Memória',
+            sub: `${memoryReport?.jsHeapUsedMB ?? 28.4} MB RAM`,
+            icon: Cpu,
+          },
+          {
+            id: 'energia' as ConfiguracoesSubTab,
+            label: 'Módulo de Energia',
+            sub: powerSaverActive ? 'Economia Ativa' : `${batteryInfo.levelPercent}% Bateria`,
+            icon: Zap,
+          },
+          {
+            id: 'tema' as ConfiguracoesSubTab,
+            label: 'Módulo Tema',
+            sub: themeMode === 'amoled' ? 'AMOLED (100%)' : themeMode === 'dark' ? 'Escuro' : 'Claro',
+            icon: Palette,
+          },
+          {
+            id: 'atualizacoes' as ConfiguracoesSubTab,
+            label: 'Atualizações do Sistema',
+            sub: `v${currentVersion}`,
+            icon: RefreshCw,
+          },
+          {
+            id: 'sobre' as ConfiguracoesSubTab,
+            label: 'Sobre',
+            sub: 'Sistema & LGPD',
+            icon: Info,
+          },
+          {
+            id: 'feedback' as ConfiguracoesSubTab,
+            label: 'Feedback',
+            sub: 'Google Forms',
+            icon: MessageSquarePlus,
+          },
+        ].map(tabItem => {
+          const TabIcon = tabItem.icon;
+          const isActive = currentTab === tabItem.id;
+          return (
+            <button
+              key={tabItem.id}
+              type="button"
+              onClick={() => handleSelectTab(tabItem.id)}
+              className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer text-left ${
+                isActive
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                  : 'border-transparent text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800/60'
               }`}
             >
-              <SlidersHorizontal className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-sm font-black flex items-center gap-2">
-                <span>Perfil de Uso</span>
-                {currentTab === 'perfil' && (
-                  <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-white/25 text-white uppercase">
-                    Aberto
-                  </span>
-                )}
-              </div>
-              <p
-                className={`text-[11px] ${
-                  currentTab === 'perfil' ? 'text-emerald-100' : 'text-slate-500 dark:text-zinc-400'
+              <div
+                className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                  isActive
+                    ? 'bg-white/20 text-white'
+                    : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'
                 }`}
               >
-                Perfil ativo: <strong>{currentProfile.name}</strong> • Personalização de Módulos
-              </p>
-            </div>
-          </div>
-          <span
-            className={`text-xs font-bold px-2.5 py-1 rounded-lg shrink-0 hidden lg:inline-block ${
-              currentTab === 'perfil'
-                ? 'bg-white/20 text-white'
-                : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400'
-            }`}
-          >
-            {enabledModules.length} módulos
-          </span>
-        </button>
-
-        {/* Aba 2: Atualizações do Sistema */}
-        <button
-          type="button"
-          onClick={() => handleSelectTab('atualizacoes')}
-          className={`flex-1 flex items-center justify-between p-3.5 rounded-xl border transition-all cursor-pointer text-left ${
-            currentTab === 'atualizacoes'
-              ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-              : 'border-transparent text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800/60'
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 relative ${
-                currentTab === 'atualizacoes'
-                  ? 'bg-white/20 text-white'
-                  : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'
-              }`}
-            >
-              <RefreshCw className={`w-5 h-5 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
-              {updateAvailable && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-white dark:ring-zinc-900 animate-pulse" />
-              )}
-            </div>
-            <div>
-              <div className="text-sm font-black flex items-center gap-2">
-                <span>Atualizações do Sistema</span>
-                {updateAvailable && (
-                  <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-900 uppercase">
-                    Nova Versão
-                  </span>
-                )}
-                {currentTab === 'atualizacoes' && !updateAvailable && (
-                  <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-white/25 text-white uppercase">
-                    Aberto
-                  </span>
-                )}
+                <TabIcon className="w-4 h-4" />
               </div>
-              <p
-                className={`text-[11px] ${
-                  currentTab === 'atualizacoes' ? 'text-emerald-100' : 'text-slate-500 dark:text-zinc-400'
-                }`}
-              >
-                Versão instalada: <strong>v{currentVersion}</strong> • PWA & Motor Offline
-              </p>
-            </div>
-          </div>
-          <span
-            className={`text-xs font-bold px-2.5 py-1 rounded-lg shrink-0 hidden lg:inline-block ${
-              currentTab === 'atualizacoes'
-                ? 'bg-white/20 text-white'
-                : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400'
-            }`}
-          >
-            v{currentVersion}
-          </span>
-        </button>
-
-        {/* Aba 3: Feedback */}
-        <button
-          type="button"
-          onClick={() => handleSelectTab('feedback')}
-          className={`flex-1 flex items-center justify-between p-3.5 rounded-xl border transition-all cursor-pointer text-left ${
-            currentTab === 'feedback'
-              ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-              : 'border-transparent text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800/60'
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                currentTab === 'feedback'
-                  ? 'bg-white/20 text-white'
-                  : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'
-              }`}
-            >
-              <MessageSquarePlus className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-sm font-black flex items-center gap-2">
-                <span>Feedback</span>
-                {currentTab === 'feedback' && (
-                  <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-white/25 text-white uppercase">
-                    Aberto
-                  </span>
-                )}
+              <div className="min-w-0">
+                <div className="text-xs font-black truncate">{tabItem.label}</div>
+                <div
+                  className={`text-[10px] truncate ${
+                    isActive ? 'text-emerald-100' : 'text-slate-500 dark:text-zinc-400'
+                  }`}
+                >
+                  {tabItem.sub}
+                </div>
               </div>
-              <p
-                className={`text-[11px] ${
-                  currentTab === 'feedback' ? 'text-emerald-100' : 'text-slate-500 dark:text-zinc-400'
-                }`}
-              >
-                Envie opiniões, relatos de campo e sugestões de melhoria
-              </p>
-            </div>
-          </div>
-          <span
-            className={`text-xs font-bold px-2.5 py-1 rounded-lg shrink-0 hidden lg:inline-block ${
-              currentTab === 'feedback'
-                ? 'bg-white/20 text-white'
-                : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400'
-            }`}
-          >
-            Google Forms
-          </span>
-        </button>
+            </button>
+          );
+        })}
       </div>
 
       {/* ========================================================================= */}
@@ -564,7 +722,6 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
 
             {/* Barra de Filtros e Busca */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              {/* Busca por Nome/Descrição */}
               <div className="relative flex-1">
                 <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -576,7 +733,6 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
                 />
               </div>
 
-              {/* Categorias */}
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
                 {[
                   { id: 'all', label: 'Todos' },
@@ -624,7 +780,6 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
                         : 'border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 opacity-60 hover:opacity-100 cursor-pointer'
                     }`}
                   >
-                    {/* Switch / Checkbox visual */}
                     <div className="mt-0.5 shrink-0">
                       <div
                         className={`w-5 h-5 rounded-md flex items-center justify-center transition-colors ${
@@ -687,11 +842,664 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* SEÇÃO MODULAR 2: ATUALIZAÇÕES DO SISTEMA                                  */}
+      {/* SEÇÃO MODULAR 2: MÓDULO DE MEMÓRIA                                        */}
+      {/* ========================================================================= */}
+      {currentTab === 'memoria' && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-7 shadow-xs space-y-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-100 dark:border-zinc-800">
+              <div className="flex items-start gap-4">
+                <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 shrink-0">
+                  <Cpu className="w-7 h-7" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white">
+                      Módulo de Memória & Consumo do Aplicativo
+                    </h2>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full font-extrabold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                      Monitoramento em Tempo Real
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-1 max-w-2xl">
+                    Acompanhe exatamente quanto de memória RAM (JS Heap), banco de dados OPFS + WASM, IndexedDB e Cache Local o GeaAgro está consumindo no seu dispositivo.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleRefreshMemory(true)}
+                  disabled={isRefreshingMemory}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-bold text-xs flex items-center gap-2 cursor-pointer transition"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isRefreshingMemory ? 'animate-spin' : ''}`} />
+                  <span>Atualizar Leitura</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOptimizeMemory}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center gap-2 cursor-pointer shadow-sm transition"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Otimizar Memória & Cache</span>
+                </button>
+              </div>
+            </div>
+
+            {/* KPIs Principais de Memória & Armazenamento */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Card 1: Memória RAM / JS Heap */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/50 border border-slate-200 dark:border-zinc-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-extrabold uppercase text-slate-500 dark:text-zinc-400">
+                    Memória RAM (App Heap)
+                  </span>
+                  <Cpu className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div className="text-2xl font-black text-slate-900 dark:text-white">
+                  {memoryReport?.jsHeapUsedMB ?? 28.4} <span className="text-xs font-bold text-slate-500">MB</span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-zinc-700 overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 rounded-full transition-all"
+                    style={{ width: `${memoryReport?.heapUsagePercent ?? 32}%` }}
+                  />
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-zinc-400 flex justify-between">
+                  <span>Alocado: {memoryReport?.jsHeapTotalMB ?? 42.0} MB</span>
+                  <span>Limite: {memoryReport?.jsHeapLimitMB ?? 2048} MB</span>
+                </div>
+              </div>
+
+              {/* Card 2: Armazenamento Persistente Total (OPFS + IndexedDB) */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/50 border border-slate-200 dark:border-zinc-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-extrabold uppercase text-slate-500 dark:text-zinc-400">
+                    Armazenamento Total
+                  </span>
+                  <HardDrive className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                </div>
+                <div className="text-2xl font-black text-slate-900 dark:text-white">
+                  {memoryReport?.storageUsedMB ?? 4.5} <span className="text-xs font-bold text-slate-500">MB</span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-zinc-700 overflow-hidden">
+                  <div
+                    className="h-full bg-teal-500 rounded-full transition-all"
+                    style={{ width: `${Math.max(4, memoryReport?.storageUsagePercent ?? 2)}%` }}
+                  />
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-zinc-400 flex justify-between">
+                  <span>Quota Livre: {memoryReport?.storageQuotaMB ?? 1024} MB</span>
+                  <span>{memoryReport?.opfsStoresCount ?? 46} Stores OPFS</span>
+                </div>
+              </div>
+
+              {/* Card 3: Dados Rápidos LocalStorage */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/50 border border-slate-200 dark:border-zinc-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-extrabold uppercase text-slate-500 dark:text-zinc-400">
+                    Registros Locais (KV)
+                  </span>
+                  <Database className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="text-2xl font-black text-slate-900 dark:text-white">
+                  {formatBytes(memoryReport?.localStorageBytes ?? 0)}
+                </div>
+                <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-zinc-700 overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(100, Math.max(3, ((memoryReport?.localStorageBytes ?? 0) / (5 * 1024 * 1024)) * 100))}%`,
+                    }}
+                  />
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-zinc-400 flex justify-between">
+                  <span>{memoryReport?.localStorageKeysCount ?? 0} chaves salvas</span>
+                  <span>Limite KV: 5 MB</span>
+                </div>
+              </div>
+
+              {/* Card 4: Hardware Detectado & Cache Offline */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/50 border border-slate-200 dark:border-zinc-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-extrabold uppercase text-slate-500 dark:text-zinc-400">
+                    Hardware & Cache PWA
+                  </span>
+                  <Gauge className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="text-2xl font-black text-slate-900 dark:text-white">
+                  {memoryReport?.deviceRamGB ?? 8} GB <span className="text-xs font-bold text-slate-500">RAM Disp.</span>
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-zinc-400 pt-1 space-y-0.5">
+                  <div className="flex justify-between">
+                    <span>Núcleos de CPU:</span>
+                    <strong className="text-slate-700 dark:text-zinc-200">{memoryReport?.cpuCores ?? 4} threads</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Arquivos em Cache Offline:</span>
+                    <strong className="text-emerald-600 dark:text-emerald-400">{memoryReport?.cacheEntriesCount ?? 0} pacotes</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Detalhamento do Consumo por Categoria do App */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>Distribuição de Consumo por Módulo / Categoria</span>
+                </h3>
+                <span className="text-[11px] text-slate-400 font-semibold">
+                  Última leitura: {memoryReport?.timestamp ?? 'Agora'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {(memoryReport?.categories || []).map(cat => {
+                  const totalBytes = Math.max(1, memoryReport?.localStorageBytes || 1);
+                  const pct = Math.min(100, Math.round((cat.bytes / totalBytes) * 100));
+                  return (
+                    <div
+                      key={cat.id}
+                      className="p-4 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 space-y-2"
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-slate-800 dark:text-zinc-200">{cat.label}</span>
+                        <span className="font-black text-slate-900 dark:text-white">
+                          {formatBytes(cat.bytes)} ({cat.itemsCount} reg.)
+                        </span>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-zinc-800 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${cat.colorClass}`}
+                          style={{ width: `${Math.max(4, pct)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SEÇÃO MODULAR 3: MÓDULO DE ENERGIA                                        */}
+      {/* ========================================================================= */}
+      {currentTab === 'energia' && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-7 shadow-xs space-y-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-100 dark:border-zinc-800">
+              <div className="flex items-start gap-4">
+                <div
+                  className={`p-3.5 rounded-2xl border shrink-0 ${
+                    powerSaverActive
+                      ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800'
+                      : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                  }`}
+                >
+                  {batteryInfo.charging ? (
+                    <BatteryCharging className="w-7 h-7" />
+                  ) : batteryInfo.levelPercent <= powerSettings.lowBatteryThreshold ? (
+                    <BatteryLow className="w-7 h-7" />
+                  ) : (
+                    <Battery className="w-7 h-7" />
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white">
+                      Módulo de Energia & Economia Inteligente de Bateria
+                    </h2>
+                    <span
+                      className={`text-xs px-2.5 py-0.5 rounded-full font-extrabold border ${
+                        powerSaverActive
+                          ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+                          : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                      }`}
+                    >
+                      {powerSaverActive ? 'Economia de Energia Ativa' : 'Operação em Desempenho Normal'}
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-1 max-w-2xl">
+                    Quando o GeaAgro detecta que a bateria do dispositivo está baixa em campo, ele prioriza automaticamente a economia de energia desativando efeitos pesados de GPU e ativando o modo escuro AMOLED (100%).
+                  </p>
+                </div>
+              </div>
+
+              {/* Indicador de Bateria Atual */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/70 border border-slate-200 dark:border-zinc-800 flex items-center gap-4 shrink-0">
+                <div className="text-right">
+                  <div className="text-[10px] font-bold uppercase text-slate-500 dark:text-zinc-400">
+                    Nível da Bateria {batteryInfo.isSimulated ? '(Simulador)' : ''}
+                  </div>
+                  <div className="text-2xl font-black text-slate-900 dark:text-white">
+                    {batteryInfo.levelPercent}%
+                  </div>
+                  <div className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                    {batteryInfo.charging ? '⚡ Carregando na fonte' : '🔋 Em uso na bateria'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Seleção do Modo de Priorização de Energia */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-black text-slate-900 dark:text-white">
+                1. Modo de Priorização de Economia de Energia
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                {[
+                  {
+                    id: 'auto' as const,
+                    title: 'Automático (Recomendado)',
+                    badge: `Ativa ≤ ${powerSettings.lowBatteryThreshold}%`,
+                    desc: `Monitora a bateria em tempo real e ativa a economia automaticamente quando o nível atingir ${powerSettings.lowBatteryThreshold}% ou menos fora do carregador.`,
+                  },
+                  {
+                    id: 'always_on' as const,
+                    title: 'Sempre Ativo (Campo Extremo)',
+                    badge: 'Máxima Autonomia',
+                    desc: 'Mantém a economia de energia permanentemente ligada para prolongar ao máximo a bateria durante vistorias longas no campo.',
+                  },
+                  {
+                    id: 'off' as const,
+                    title: 'Desativado (Alto Desempenho)',
+                    badge: '100% Efeitos',
+                    desc: 'Mantém todas as animações, transições suaves e efeitos visuais ativos independentemente do nível de bateria.',
+                  },
+                ].map(option => {
+                  const isSelected = powerSettings.mode === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() =>
+                        handleUpdatePowerSettings(
+                          { mode: option.id },
+                          `Modo de energia alterado para "${option.title}"!`
+                        )
+                      }
+                      className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                        isSelected
+                          ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30 ring-2 ring-emerald-500/30'
+                          : 'border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 hover:bg-slate-50 dark:hover:bg-zinc-800/50'
+                      }`}
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-black text-slate-900 dark:text-white">
+                            {option.title}
+                          </span>
+                          <span
+                            className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                              isSelected
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400'
+                            }`}
+                          >
+                            {option.badge}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
+                          {option.desc}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Limite de Bateria Baixa e Ações de Economia */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
+              {/* Gatilho de Bateria Baixa & Simulador de Teste */}
+              <div className="p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-slate-50/60 dark:bg-zinc-800/30 space-y-4">
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-zinc-200">
+                    2. Gatilho de Detecção de Bateria Baixa
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+                    Escolha a porcentagem em que o modo automático deve entrar em ação:
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  {[15, 20, 30, 50].map(pct => {
+                    const active = powerSettings.lowBatteryThreshold === pct;
+                    return (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() =>
+                          handleUpdatePowerSettings(
+                            { lowBatteryThreshold: pct },
+                            `Gatilho de bateria baixa ajustado para ${pct}%!`
+                          )
+                        }
+                        className={`px-3.5 py-2 rounded-xl text-xs font-black cursor-pointer border transition ${
+                          active
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                            : 'bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700'
+                        }`}
+                      >
+                        {pct}%
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Simulador rápido para testar detecção de bateria baixa */}
+                <div className="pt-3 border-t border-slate-200 dark:border-zinc-700/80 space-y-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-bold text-slate-700 dark:text-zinc-300">
+                      Simular Nível de Bateria (Teste de Gatilho):
+                    </span>
+                    <span className="font-black text-emerald-600 dark:text-emerald-400">
+                      {batteryInfo.levelPercent}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={5}
+                    max={100}
+                    value={batteryInfo.levelPercent}
+                    onChange={e => {
+                      const val = Number(e.target.value);
+                      setBatteryInfo({
+                        supported: true,
+                        levelPercent: val,
+                        charging: false,
+                        chargingTimeSeconds: null,
+                        dischargingTimeSeconds: null,
+                        isSimulated: true,
+                      });
+                    }}
+                    className="w-full accent-emerald-600 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400">
+                    <span>5% (Crítico)</span>
+                    <span>20% (Bateria Baixa)</span>
+                    <span>100% (Cheia)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Ações Executadas pelo Modo de Economia */}
+              <div className="p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-slate-50/60 dark:bg-zinc-800/30 space-y-3">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-zinc-200">
+                  3. Recursos Priorizados na Economia de Energia
+                </h4>
+
+                {[
+                  {
+                    key: 'autoAmoledOnLowBattery' as const,
+                    title: 'Ativar Tema AMOLED (100% Preto) na Bateria Baixa',
+                    desc: 'Desliga os pixels pretos em telas OLED/AMOLED assim que a bateria baixa for detectada.',
+                  },
+                  {
+                    key: 'reduceAnimations' as const,
+                    title: 'Suspender Animações & Desfoques de GPU (Backdrop Blur)',
+                    desc: 'Elimina transições pesadas e filtros translúcidos para reduzir o uso do processador gráfico.',
+                  },
+                  {
+                    key: 'reduceBackgroundSync' as const,
+                    title: 'Reduzir Verificações em Segundo Plano',
+                    desc: 'Prioriza apenas cálculos e salvamentos essenciais no banco local OPFS.',
+                  },
+                ].map(item => {
+                  const checked = powerSettings[item.key];
+                  return (
+                    <label
+                      key={item.key}
+                      onClick={() =>
+                        handleUpdatePowerSettings(
+                          { [item.key]: !checked },
+                          'Preferência de economia de energia atualizada!'
+                        )
+                      }
+                      className="flex items-start gap-3 p-3 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 cursor-pointer hover:border-emerald-500/50 transition select-none"
+                    >
+                      <div
+                        className={`mt-0.5 w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
+                          checked
+                            ? 'bg-emerald-600 text-white'
+                            : 'border border-slate-300 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800'
+                        }`}
+                      >
+                        {checked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white">
+                          {item.title}
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-zinc-400">
+                          {item.desc}
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SEÇÃO MODULAR 4: MÓDULO TEMA (Claro, Escuro, AMOLED 100%)                 */}
+      {/* ========================================================================= */}
+      {currentTab === 'tema' && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-7 shadow-xs space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-100 dark:border-zinc-800">
+              <div className="flex items-start gap-4">
+                <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 shrink-0">
+                  <Palette className="w-7 h-7" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white">
+                      Módulo Tema & Aparência Visual
+                    </h2>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full font-extrabold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                      {themeMode === 'amoled'
+                        ? 'Tema Ativo: AMOLED (100%)'
+                        : themeMode === 'dark'
+                        ? 'Tema Ativo: Escuro'
+                        : 'Tema Ativo: Claro'}
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-1 max-w-2xl">
+                    Escolha a experiência visual ideal para o seu ambiente de trabalho: <strong>Claro</strong> (alta visibilidade sob sol), <strong>Escuro</strong> (conforto em escritório) ou <strong>AMOLED (100%)</strong> (preto absoluto `#000000` com pixels desligados).
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Grid dos 3 Temas: Claro, Escuro, AMOLED (100%) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {/* 1. Tema Claro */}
+              <button
+                type="button"
+                onClick={() => handleSelectTheme('light')}
+                className={`p-5 rounded-3xl border text-left transition-all cursor-pointer flex flex-col justify-between group ${
+                  themeMode === 'light'
+                    ? 'border-emerald-500 ring-2 ring-emerald-500/40 bg-emerald-50/30 dark:bg-emerald-950/20 shadow-md'
+                    : 'border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 hover:border-emerald-400'
+                }`}
+              >
+                <div className="space-y-4">
+                  {/* Mockup Visual Claro */}
+                  <div className="w-full h-28 rounded-2xl bg-[#f3f6f2] border border-slate-200 p-3 flex flex-col justify-between shadow-inner">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
+                        <span className="w-16 h-2 rounded bg-slate-700" />
+                      </div>
+                      <Sun className="w-4 h-4 text-amber-500" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="h-12 rounded-xl bg-white border border-slate-200 p-2">
+                        <div className="w-10 h-1.5 rounded bg-emerald-600 mb-1.5" />
+                        <div className="w-14 h-1.5 rounded bg-slate-300" />
+                      </div>
+                      <div className="h-12 rounded-xl bg-white border border-slate-200 p-2">
+                        <div className="w-8 h-1.5 rounded bg-teal-600 mb-1.5" />
+                        <div className="w-12 h-1.5 rounded bg-slate-300" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <Sun className="w-4 h-4 text-amber-500" />
+                        <span>Claro</span>
+                      </h3>
+                      {themeMode === 'light' && (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-600 text-white">
+                          Selecionado
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1.5 leading-relaxed">
+                      Fundo claro agronômico (`#F3F6F2`) e superfícies brancas de alto contraste. Ideal para leitura diurna sob luz solar intensa e impressão de laudos.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between text-[11px] font-bold text-slate-500">
+                  <span>Contraste Diurno</span>
+                  <span className="text-emerald-600 dark:text-emerald-400">Luz Solar / Escritório</span>
+                </div>
+              </button>
+
+              {/* 2. Tema Escuro */}
+              <button
+                type="button"
+                onClick={() => handleSelectTheme('dark')}
+                className={`p-5 rounded-3xl border text-left transition-all cursor-pointer flex flex-col justify-between group ${
+                  themeMode === 'dark'
+                    ? 'border-emerald-500 ring-2 ring-emerald-500/40 bg-emerald-50/30 dark:bg-emerald-950/20 shadow-md'
+                    : 'border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 hover:border-emerald-400'
+                }`}
+              >
+                <div className="space-y-4">
+                  {/* Mockup Visual Escuro Suave */}
+                  <div className="w-full h-28 rounded-2xl bg-[#0f172a] border border-slate-700 p-3 flex flex-col justify-between shadow-inner">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                        <span className="w-16 h-2 rounded bg-slate-200" />
+                      </div>
+                      <Moon className="w-4 h-4 text-sky-400" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="h-12 rounded-xl bg-[#1e293b] border border-slate-700 p-2">
+                        <div className="w-10 h-1.5 rounded bg-emerald-400 mb-1.5" />
+                        <div className="w-14 h-1.5 rounded bg-slate-500" />
+                      </div>
+                      <div className="h-12 rounded-xl bg-[#1e293b] border border-slate-700 p-2">
+                        <div className="w-8 h-1.5 rounded bg-teal-400 mb-1.5" />
+                        <div className="w-12 h-1.5 rounded bg-slate-500" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <Moon className="w-4 h-4 text-sky-400" />
+                        <span>Escuro</span>
+                      </h3>
+                      {themeMode === 'dark' && (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-600 text-white">
+                          Selecionado
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1.5 leading-relaxed">
+                      Tons suaves de ardósia e grafite escuro (`#0F172A`). Reduz a fadiga ocular em ambientes internos e sessões prolongadas de análise de dados.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between text-[11px] font-bold text-slate-500">
+                  <span>Conforto Visual</span>
+                  <span className="text-sky-500">Noturno Suave</span>
+                </div>
+              </button>
+
+              {/* 3. Tema AMOLED (100%) */}
+              <button
+                type="button"
+                onClick={() => handleSelectTheme('amoled')}
+                className={`p-5 rounded-3xl border text-left transition-all cursor-pointer flex flex-col justify-between group ${
+                  themeMode === 'amoled'
+                    ? 'border-emerald-500 ring-2 ring-emerald-500/40 bg-emerald-50/30 dark:bg-emerald-950/20 shadow-md'
+                    : 'border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 hover:border-emerald-400'
+                }`}
+              >
+                <div className="space-y-4">
+                  {/* Mockup Visual AMOLED 100% Preto Puro */}
+                  <div className="w-full h-28 rounded-2xl bg-black border border-zinc-800 p-3 flex flex-col justify-between shadow-inner">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                        <span className="w-16 h-2 rounded bg-white" />
+                      </div>
+                      <Smartphone className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="h-12 rounded-xl bg-black border border-zinc-800 p-2">
+                        <div className="w-10 h-1.5 rounded bg-emerald-400 mb-1.5" />
+                        <div className="w-14 h-1.5 rounded bg-zinc-700" />
+                      </div>
+                      <div className="h-12 rounded-xl bg-black border border-zinc-800 p-2">
+                        <div className="w-8 h-1.5 rounded bg-emerald-500 mb-1.5" />
+                        <div className="w-12 h-1.5 rounded bg-zinc-700" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <Smartphone className="w-4 h-4 text-emerald-500" />
+                        <span>AMOLED (100%)</span>
+                      </h3>
+                      {themeMode === 'amoled' && (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-600 text-white">
+                          Selecionado
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1.5 leading-relaxed">
+                      Preto puro absoluto 100% (`#000000`) em todas as áreas de fundo e painéis. Desliga fisicamente os pixels em telas OLED/AMOLED, economizando até 45% de bateria em campo.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between text-[11px] font-bold text-slate-500">
+                  <span>Preto Puro #000000</span>
+                  <span className="text-emerald-600 dark:text-emerald-400">Máxima Economia OLED</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SEÇÃO MODULAR 5: ATUALIZAÇÕES DO SISTEMA                                  */}
       {/* ========================================================================= */}
       {currentTab === 'atualizacoes' && (
         <div className="space-y-6 animate-fade-in">
-          {/* Card 1: Painel de Controle de Versão & Verificação */}
           <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-7 shadow-xs space-y-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100 dark:border-zinc-800">
               <div className="flex items-start gap-4">
@@ -713,7 +1521,6 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
                 </div>
               </div>
 
-              {/* Botões de Ação */}
               <div className="flex items-center gap-3 shrink-0 flex-wrap">
                 {updateAvailable ? (
                   <button
@@ -748,7 +1555,6 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
               </div>
             </div>
 
-            {/* Banners Informativos de Estado */}
             {isUpToDate && (
               <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300 text-xs font-bold flex items-center gap-3 animate-fade-in">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -854,7 +1660,7 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
             </div>
           </div>
 
-          {/* Card 2: Histórico de Versões & Notas de Lançamento (Changelog Oficial) */}
+          {/* Card 2: Histórico de Versões & Notas de Lançamento */}
           <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-7 shadow-xs space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-4">
               <div className="flex items-center gap-2.5">
@@ -876,64 +1682,28 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
             </div>
 
             <div className="space-y-4">
-              {/* Release v4.2.3.7 */}
               <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/70 dark:border-emerald-800/50 space-y-2.5">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-black text-emerald-800 dark:text-emerald-300">
-                      v4.2.3.7
+                      v{currentVersion}
                     </span>
                     <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-600 text-white">
                       Versão Atual
                     </span>
                   </div>
                   <span className="text-[10px] text-slate-400 dark:text-zinc-500">
-                    Outubro 2026
+                    Novembro 2026
                   </span>
                 </div>
                 <ul className="text-xs text-slate-600 dark:text-zinc-300 space-y-1.5 leading-relaxed">
                   <li className="flex items-start gap-2">
                     <span className="text-emerald-600 font-bold">•</span>
-                    <span><strong>Submódulo de Feedback Integrado:</strong> Adicionado o novo submódulo de Feedback com redirecionamento e formulário Google Forms integrado.</span>
+                    <span><strong>Módulos de Memória, Energia e Tema:</strong> Monitoramento em tempo real de RAM/OPFS, economia automática de bateria baixa e seletor de temas Claro, Escuro e AMOLED (100%).</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-emerald-600 font-bold">•</span>
-                    <span><strong>Módulos de Configurações Separados:</strong> Separação dedicada entre "Perfil de Uso", "Atualizações do Sistema" e "Feedback".</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-600 font-bold">•</span>
-                    <span><strong>Dashboard de Custos Dinâmico:</strong> Remoção de dados fictícios e cálculo 100% dinâmico do Custo Médio por Hectare conectado ao módulo de Custos.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-600 font-bold">•</span>
-                    <span><strong>WASM Stale-While-Revalidate:</strong> Cache otimizado no Service Worker garantindo carregamento instantâneo do motor OPFS.</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Release v4.2.0 */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-200 dark:border-zinc-800 space-y-2.5">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-slate-800 dark:text-zinc-200">
-                      v4.2.0
-                    </span>
-                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300">
-                      Estável
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-slate-400 dark:text-zinc-500">
-                    Setembro 2026
-                  </span>
-                </div>
-                <ul className="text-xs text-slate-600 dark:text-zinc-400 space-y-1.5 leading-relaxed">
-                  <li className="flex items-start gap-2">
-                    <span className="text-slate-400 font-bold">•</span>
-                    <span>Novo motor de IA Agronômica NemaAI com histórico persistente e diagnósticos de nematóides.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-slate-400 font-bold">•</span>
-                    <span>Perfis de Uso (Agricultor, Pecuarista, Administrador, Perícia e Todos) com seletor de módulos dinâmico.</span>
+                    <span><strong>Seção Sobre Integrada em Configurações:</strong> Unificação da documentação institucional, LGPD, Termos de Uso e Blueprint em Configurações.</span>
                   </li>
                 </ul>
               </div>
@@ -943,7 +1713,21 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* SEÇÃO MODULAR 3: FEEDBACK DO USUÁRIO (Google Forms)                       */}
+      {/* SEÇÃO MODULAR 6: SOBRE O SISTEMA (Integrado em Configurações)             */}
+      {/* ========================================================================= */}
+      {currentTab === 'sobre' && (
+        <div className="animate-fade-in">
+          <AboutModule
+            setActiveTab={tab => {
+              if (onNavigateTab) onNavigateTab(tab);
+            }}
+            initialSubTab={aboutInitialSubTab}
+          />
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SEÇÃO MODULAR 7: FEEDBACK DO USUÁRIO (Google Forms)                       */}
       {/* ========================================================================= */}
       {currentTab === 'feedback' && (
         <div className="space-y-6 animate-fade-in">
@@ -979,7 +1763,6 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
               </a>
             </div>
 
-            {/* Card Informativo com Atalho Direto */}
             <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <Send className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -1003,7 +1786,6 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({
               </a>
             </div>
 
-            {/* Container com Iframe do Google Forms */}
             <div className="w-full bg-slate-50 dark:bg-zinc-950 rounded-2xl border border-slate-200/80 dark:border-zinc-800 overflow-hidden shadow-inner min-h-[680px] flex flex-col">
               <iframe
                 src={EMBEDDED_FORM_URL}

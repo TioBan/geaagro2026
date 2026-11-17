@@ -132,6 +132,19 @@ export const IrrigationModule: React.FC<IrrigationModuleProps> = ({
     saveIrrigationData({ fertigation: updated });
   };
 
+  const handleDeleteFertigation = (id: string) => {
+    const updated = fertigation.filter(item => item.id !== id);
+    setFertigation(updated);
+    saveIrrigationData({ fertigation: updated });
+  };
+
+  const handleClearFertigation = () => {
+    if (window.confirm('Deseja realmente limpar todos os registros de fertirrigação?')) {
+      setFertigation([]);
+      saveIrrigationData({ fertigation: [] });
+    }
+  };
+
   const handleAddDiary = (entry: IrrigationDiaryEntry) => {
     const updated = [entry, ...diary];
     setDiary(updated);
@@ -162,11 +175,11 @@ export const IrrigationModule: React.FC<IrrigationModuleProps> = ({
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <div className="flex items-center gap-2 text-xs bg-cyan-950/60 px-3 py-1.5 rounded-xl border border-cyan-800/60">
                 <Calendar className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Próxima Irrigação: <strong>{kpis.recommendedNextIrrigationDate}</strong></span>
+                <span>Próxima Irrigação: <strong>{kpis.recommendedNextIrrigationDate || 'Nenhuma programada'}</strong></span>
               </div>
               <div className="flex items-center gap-2 text-xs bg-cyan-950/60 px-3 py-1.5 rounded-xl border border-cyan-800/60">
                 <Droplets className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Lâmina Recomendada: <strong>{kpis.recommendedGrossDepthMm} mm</strong></span>
+                <span>Lâmina Recomendada: <strong>{kpis.recommendedGrossDepthMm > 0 ? `${kpis.recommendedGrossDepthMm} mm` : '--'}</strong></span>
               </div>
             </div>
           </div>
@@ -177,19 +190,33 @@ export const IrrigationModule: React.FC<IrrigationModuleProps> = ({
               Índice IGEH
             </span>
             <div className="text-4xl font-black text-white flex items-baseline gap-1">
-              <span>{kpis.igehScore}</span>
+              <span>{kpis.igehScore > 0 ? kpis.igehScore : '--'}</span>
               <span className="text-xs font-semibold text-cyan-300">/100</span>
             </div>
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-800/40">
-                Alta Eficiência Hídrica
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                kpis.igehScore >= 80
+                  ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800/40'
+                  : kpis.igehScore >= 60
+                  ? 'text-cyan-300 bg-cyan-950/60 border-cyan-800/40'
+                  : kpis.igehScore > 0
+                  ? 'text-amber-400 bg-amber-950/60 border-amber-800/40'
+                  : 'text-slate-400 bg-cyan-950/60 border-cyan-800/40'
+              }`}>
+                {kpis.igehScore >= 80
+                  ? 'Alta Eficiência Hídrica'
+                  : kpis.igehScore >= 60
+                  ? 'Boa Eficiência'
+                  : kpis.igehScore > 0
+                  ? 'Eficiência Regular'
+                  : 'Aguardando Avaliação'}
               </span>
               <div className="px-2 py-0.5 rounded-md bg-cyan-900/60 text-cyan-300 border border-cyan-700/40 text-[10px] font-bold">
-                Ea {kpis.avgSystemEfficiencyPct}%
+                Ea {kpis.avgSystemEfficiencyPct > 0 ? `${kpis.avgSystemEfficiencyPct}%` : '--'}
               </div>
             </div>
             <span className="text-[10px] text-cyan-200/70 mt-2">
-              💧 {kpis.waterSavedM3.toLocaleString('pt-BR')} m³ economizados
+              💧 {kpis.waterSavedM3 > 0 ? `${kpis.waterSavedM3.toLocaleString('pt-BR')} m³ economizados` : 'Sem histórico de economia'}
             </span>
           </div>
         </div>
@@ -246,6 +273,8 @@ export const IrrigationModule: React.FC<IrrigationModuleProps> = ({
             systems={systems}
             fertigation={fertigation}
             onAddFertigation={handleAddFertigation}
+            onDeleteFertigation={handleDeleteFertigation}
+            onClearFertigation={handleClearFertigation}
           />
         )}
 

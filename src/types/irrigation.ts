@@ -182,7 +182,7 @@ export interface IrrigationKPIs {
   waterSavedM3: number;
   recommendedNextIrrigationDate: string;
   recommendedGrossDepthMm: number;
-  waterStressIndex: 'Sem Estresse (Ótimo)' | 'Leve' | 'Moderado' | 'Crítico';
+  waterStressIndex: 'Sem Estresse (Ótimo)' | 'Leve' | 'Moderado' | 'Crítico' | 'Não monitorado';
 }
 
 export interface ScenarioSimulationInput {

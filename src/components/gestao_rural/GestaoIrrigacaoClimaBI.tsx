@@ -4,44 +4,28 @@ import {
   CloudSun,
   BarChart3,
   Sparkles,
-  Zap,
-  TrendingUp,
   Thermometer,
   CloudRain,
-  Wind,
-  CheckCircle2,
-  Calendar,
 } from 'lucide-react';
 import {
   SistemaIrrigacaoFertirrigacao,
   LeituraEstacaoMeteorologica,
-  IndicadorBIRuralData,
   SafraAgragricola,
 } from '../../types/gestaoRural';
 
 interface GestaoIrrigacaoClimaBIProps {
   irrigacao: SistemaIrrigacaoFertirrigacao[];
   clima: LeituraEstacaoMeteorologica[];
-  safras: SafraAgragricola[];
+  safras?: SafraAgragricola[];
 }
 
 export const GestaoIrrigacaoClimaBI: React.FC<GestaoIrrigacaoClimaBIProps> = ({
   irrigacao,
   clima,
-  safras,
 }) => {
   const [activeTab, setActiveTab] = useState<'irrigacao' | 'clima' | 'bi'>('bi');
 
-  const leituraHoje = clima[0] || {
-    chuvaMm: 14.5,
-    temperaturaMaxC: 31.2,
-    temperaturaMinC: 19.8,
-    umidadeRelativaPct: 68,
-    velocidadeVentoKmH: 8.4,
-    et0DiariaMm: 4.8,
-    etcCalculadaMm: 5.5,
-    condicaoGeral: 'Parcialmente Nublado',
-  };
+  const leituraHoje = clima[0];
 
   return (
     <div className="space-y-6 animate-fade-in text-xs">
@@ -96,9 +80,11 @@ export const GestaoIrrigacaoClimaBI: React.FC<GestaoIrrigacaoClimaBIProps> = ({
             <CloudRain className="w-4 h-4 text-blue-500" />
           </div>
           <span className="text-lg font-black text-slate-900 dark:text-white block">
-            {leituraHoje.chuvaMm} mm
+            {leituraHoje ? `${leituraHoje.chuvaMm} mm` : '--'}
           </span>
-          <span className="text-[10px] text-emerald-600 font-bold">Últimas 24 horas</span>
+          <span className="text-[10px] text-emerald-600 font-bold">
+            {leituraHoje ? 'Últimas 24 horas' : 'Sem leitura local'}
+          </span>
         </div>
 
         <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 space-y-1 shadow-2xs">
@@ -107,9 +93,13 @@ export const GestaoIrrigacaoClimaBI: React.FC<GestaoIrrigacaoClimaBIProps> = ({
             <Thermometer className="w-4 h-4 text-amber-500" />
           </div>
           <span className="text-lg font-black text-slate-900 dark:text-white block">
-            {leituraHoje.temperaturaMinC}°C a {leituraHoje.temperaturaMaxC}°C
+            {leituraHoje ? `${leituraHoje.temperaturaMinC}°C a ${leituraHoje.temperaturaMaxC}°C` : '--'}
           </span>
-          <span className="text-[10px] text-slate-500">Média 25.5°C</span>
+          <span className="text-[10px] text-slate-500">
+            {leituraHoje
+              ? `Média ${((leituraHoje.temperaturaMinC + leituraHoje.temperaturaMaxC) / 2).toFixed(1)}°C`
+              : 'Aguardando estação'}
+          </span>
         </div>
 
         <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 space-y-1 shadow-2xs">
@@ -118,9 +108,11 @@ export const GestaoIrrigacaoClimaBI: React.FC<GestaoIrrigacaoClimaBIProps> = ({
             <Droplets className="w-4 h-4 text-purple-500" />
           </div>
           <span className="text-lg font-black text-slate-900 dark:text-white block">
-            ET0: {leituraHoje.et0DiariaMm} mm
+            {leituraHoje ? `ET0: ${leituraHoje.et0DiariaMm} mm` : '--'}
           </span>
-          <span className="text-[10px] text-purple-600 font-bold">ETc Cultura: {leituraHoje.etcCalculadaMm} mm</span>
+          <span className="text-[10px] text-purple-600 font-bold">
+            {leituraHoje ? `ETc Cultura: ${leituraHoje.etcCalculadaMm} mm` : 'ETc não calculada'}
+          </span>
         </div>
 
         <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 space-y-1 shadow-2xs">
@@ -129,9 +121,11 @@ export const GestaoIrrigacaoClimaBI: React.FC<GestaoIrrigacaoClimaBIProps> = ({
             <CloudSun className="w-4 h-4 text-emerald-500" />
           </div>
           <span className="text-lg font-black text-slate-900 dark:text-white block">
-            {leituraHoje.umidadeRelativaPct}%
+            {leituraHoje ? `${leituraHoje.umidadeRelativaPct}%` : '--'}
           </span>
-          <span className="text-[10px] text-slate-500">Vento: {leituraHoje.velocidadeVentoKmH} km/h</span>
+          <span className="text-[10px] text-slate-500">
+            {leituraHoje ? `Vento: ${leituraHoje.velocidadeVentoKmH} km/h` : 'Vento: --'}
+          </span>
         </div>
 
         <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 space-y-1 shadow-2xs">
@@ -140,9 +134,11 @@ export const GestaoIrrigacaoClimaBI: React.FC<GestaoIrrigacaoClimaBIProps> = ({
             <Sparkles className="w-4 h-4 text-blue-500" />
           </div>
           <span className="text-sm font-black text-slate-900 dark:text-white block">
-            {leituraHoje.condicaoGeral}
+            {leituraHoje ? leituraHoje.condicaoGeral : 'Sem leituras'}
           </span>
-          <span className="text-[10px] text-emerald-600 font-bold">Sem risco de geada</span>
+          <span className="text-[10px] text-emerald-600 font-bold">
+            {leituraHoje ? 'Estação monitorada' : 'Nenhum sensor conectado'}
+          </span>
         </div>
       </div>
 
@@ -220,6 +216,41 @@ export const GestaoIrrigacaoClimaBI: React.FC<GestaoIrrigacaoClimaBIProps> = ({
               </div>
             </div>
           ))}
+          {irrigacao.length === 0 && (
+            <div className="p-8 text-center bg-slate-50 dark:bg-zinc-800/20 rounded-2xl border border-dashed border-slate-300 dark:border-zinc-700 text-slate-500 dark:text-zinc-400">
+              Nenhum sistema de irrigação ou fertirrigação cadastrado até o momento.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* CLIMA TAB */}
+      {activeTab === 'clima' && (
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-2xs space-y-3">
+          <h3 className="font-black text-sm text-slate-900 dark:text-white flex items-center gap-2 border-b pb-3">
+            <CloudSun className="w-4 h-4 text-amber-500" />
+            Histórico da Estação Meteorológica ({clima.length})
+          </h3>
+          {clima.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {clima.map(c => (
+                <div key={c.id} className="p-3 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-slate-900 dark:text-white block">{c.condicaoGeral}</span>
+                    <span className="text-[10px] text-slate-500">{c.dataHora} • Vento {c.velocidadeVentoKmH} km/h</span>
+                  </div>
+                  <div className="text-right font-mono">
+                    <span className="font-bold text-blue-600 block">{c.chuvaMm} mm</span>
+                    <span className="text-[10px] text-slate-500">{c.temperaturaMinC}°C / {c.temperaturaMaxC}°C</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-8 text-center bg-slate-50 dark:bg-zinc-800/20 rounded-2xl border border-dashed border-slate-300 dark:border-zinc-700 text-slate-500 dark:text-zinc-400">
+              Nenhuma leitura meteorológica registrada localmente até o momento.
+            </div>
+          )}
         </div>
       )}
     </div>

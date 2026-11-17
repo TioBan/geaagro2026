@@ -36,13 +36,7 @@ export const IrrigationDashboardView: React.FC<Props> = ({
   kpis,
   onNavigateToTab,
 }) => {
-  const latestClimate = climate[climate.length - 1] || {
-    tempMaxC: 33.5,
-    tempMinC: 21.2,
-    humidityRelativePct: 62,
-    rainfallMm: 0,
-    et0MmDay: 5.6,
-  };
+  const latestClimate = climate[climate.length - 1] || null;
 
   return (
     <div className="space-y-6">
@@ -71,7 +65,7 @@ export const IrrigationDashboardView: React.FC<Props> = ({
             {kpis.totalWaterVolumeSeasonM3.toLocaleString('pt-BR')} <span className="text-xs font-normal text-slate-500">m³</span>
           </div>
           <div className="text-[11px] text-slate-500 dark:text-zinc-400 flex items-center justify-between">
-            <span>Eficiência Médio Ea: <strong>{kpis.avgSystemEfficiencyPct}%</strong></span>
+            <span>Eficiência Média Ea: <strong>{kpis.avgSystemEfficiencyPct > 0 ? `${kpis.avgSystemEfficiencyPct}%` : '--'}</strong></span>
           </div>
         </div>
 
@@ -81,11 +75,19 @@ export const IrrigationDashboardView: React.FC<Props> = ({
             <Gauge className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           </div>
           <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
-            {kpis.currentSoilMoisturePct}% <span className="text-xs font-normal text-slate-500">da CAD</span>
+            {kpis.currentSoilMoisturePct > 0 ? (
+              <>
+                {kpis.currentSoilMoisturePct}% <span className="text-xs font-normal text-slate-500">da CAD</span>
+              </>
+            ) : (
+              <span className="text-slate-400 text-lg">--</span>
+            )}
           </div>
           <div className="text-[11px] text-slate-500 dark:text-zinc-400 flex items-center justify-between">
             <span>Estresse Hídrico:</span>
-            <span className="text-emerald-600 font-bold">{kpis.waterStressIndex}</span>
+            <span className={`font-bold ${kpis.waterStressIndex === 'Não monitorado' ? 'text-slate-400' : 'text-emerald-600'}`}>
+              {kpis.waterStressIndex}
+            </span>
           </div>
         </div>
 
@@ -99,7 +101,9 @@ export const IrrigationDashboardView: React.FC<Props> = ({
           </div>
           <div className="text-[11px] text-slate-500 dark:text-zinc-400 flex items-center justify-between">
             <span>Total kWh: <strong>{kpis.totalEnergyConsumedKwh.toLocaleString('pt-BR')}</strong></span>
-            <span className="text-amber-600 font-bold">Tarifa Verde</span>
+            <span className="text-amber-600 font-bold">
+              {systems[0]?.energyTariffType ? `Tarifa ${systems[0].energyTariffType}` : 'Sem registros'}
+            </span>
           </div>
         </div>
       </div>
@@ -119,7 +123,9 @@ export const IrrigationDashboardView: React.FC<Props> = ({
           <div className="grid grid-cols-2 gap-3 text-center">
             <div className="bg-slate-50 dark:bg-zinc-800/60 p-3 rounded-xl border border-slate-100 dark:border-zinc-800">
               <span className="text-[10px] text-slate-500 dark:text-zinc-400 block font-semibold">ET₀ Diária</span>
-              <span className="text-lg font-black text-slate-900 dark:text-white">{latestClimate.et0MmDay} mm/dia</span>
+              <span className="text-lg font-black text-slate-900 dark:text-white">
+                {latestClimate?.et0MmDay ? `${latestClimate.et0MmDay} mm/dia` : '--'}
+              </span>
             </div>
             <div className="bg-slate-50 dark:bg-zinc-800/60 p-3 rounded-xl border border-slate-100 dark:border-zinc-800">
               <span className="text-[10px] text-slate-500 dark:text-zinc-400 block font-semibold">Chuva Acumulada</span>
@@ -130,15 +136,21 @@ export const IrrigationDashboardView: React.FC<Props> = ({
           <div className="space-y-2 text-xs text-slate-600 dark:text-zinc-300">
             <div className="flex justify-between py-1 border-b border-slate-100 dark:border-zinc-800">
               <span>Temperatura Máx / Mín:</span>
-              <strong className="text-slate-900 dark:text-white">{latestClimate.tempMaxC}°C / {latestClimate.tempMinC}°C</strong>
+              <strong className="text-slate-900 dark:text-white">
+                {latestClimate ? `${latestClimate.tempMaxC}°C / ${latestClimate.tempMinC}°C` : '--'}
+              </strong>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-100 dark:border-zinc-800">
               <span>Umidade Relativa Ar:</span>
-              <strong className="text-slate-900 dark:text-white">{latestClimate.humidityRelativePct}%</strong>
+              <strong className="text-slate-900 dark:text-white">
+                {latestClimate ? `${latestClimate.humidityRelativePct}%` : '--'}
+              </strong>
             </div>
             <div className="flex justify-between py-1">
               <span>Evapotranspiração da Cultura (ETc):</span>
-              <strong className="text-cyan-600 dark:text-cyan-400">6.4 mm/dia</strong>
+              <strong className="text-cyan-600 dark:text-cyan-400">
+                {latestClimate?.et0MmDay ? `${(latestClimate.et0MmDay * 1.15).toFixed(1)} mm/dia` : '--'}
+              </strong>
             </div>
           </div>
 

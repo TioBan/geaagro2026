@@ -1,20 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import {
-  TrendingUp,
   Coins,
-  BarChart3,
-  Info,
-  Calendar,
   DollarSign,
-  ArrowUpRight,
-  ArrowDownRight,
   Sparkles,
-  Calculator,
-  HelpCircle,
-  Activity,
   Award,
   FileSpreadsheet,
-  PlusCircle
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -28,7 +18,6 @@ import {
   Legend,
 } from 'recharts';
 import { SoilSample, Farm } from '../types/agronomy';
-import { INITIAL_OPERATIONS } from '../data/fieldbookData';
 
 interface FinancialEfficiencyChartProps {
   farm: Farm;
@@ -70,6 +59,17 @@ export const FinancialEfficiencyChart: React.FC<FinancialEfficiencyChartProps> =
 
     const uniqueYears = Array.from(yearsMap.keys()).sort((a, b) => a - b);
 
+    let storedOperations: any[] = [];
+    try {
+      const raw =
+        localStorage.getItem('agronutri_fieldbook_operations') ||
+        localStorage.getItem('geaagro_fieldbook_operations_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) storedOperations = parsed;
+      }
+    } catch {}
+
     return uniqueYears.map((year) => {
       const samplesInYear = yearsMap.get(year) || [];
       
@@ -101,11 +101,11 @@ export const FinancialEfficiencyChart: React.FC<FinancialEfficiencyChartProps> =
       const yieldTon = Number((rawYieldSc * (isCorn ? 0.06 : 0.06)).toFixed(2));
 
       // Buscar operações reais concluídas no caderno de campo para este ano e fazenda
-      const relatedOps = (INITIAL_OPERATIONS || []).filter(
-        (op) => op.farmId === farm?.id && 
-                op.status === 'completed' &&
-                (selectedPlotId === 'all' || op.fieldId === selectedPlotId) &&
-                new Date(op.date).getFullYear() === year
+      const relatedOps = storedOperations.filter(
+        (op) => op?.farmId === farm?.id &&
+                op?.status === 'completed' &&
+                (selectedPlotId === 'all' || op?.fieldId === selectedPlotId) &&
+                new Date(op?.date).getFullYear() === year
       );
 
       const totalOpsCost = relatedOps.reduce((acc, op) => acc + (op.costs?.total || 0), 0);

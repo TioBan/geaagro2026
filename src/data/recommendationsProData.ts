@@ -537,64 +537,8 @@ export const ABSORPTION_CURVES_CATALOG: CropAbsorptionCurve[] = [
   },
 ];
 
-// 4. Sample Extended Soil Analysis Data
-export const SAMPLE_SOIL_EXTENDED: SoilAnalysisExtended[] = [
-  {
-    id: 'soil-01',
-    sampleCode: 'ANA-SOL-2026-001',
-    laboratoryName: 'LabSolos Piracicaba',
-    analysisDate: '2026-08-10',
-    depth: '0-20',
-    plotId: 'plot-03',
-    plotName: 'Talhão 03 - Soja',
-    cropName: 'Soja',
-    cultivar: 'TMG 2381 IPRO',
-    expectedYield: 75,
-    yieldUnit: 'sc/ha',
-
-    // Atributos Químicos
-    phCacl2: 5.2,
-    phH2o: 5.8,
-    phSmp: 5.6,
-    organicMatterGKg: 28.5,
-    organicCarbonGKg: 16.5,
-    pMehlich1: 8.5,
-    pResina: 12.0,
-    pRemanescente: 24.0,
-    kCmolc: 0.18,
-    kMgDm3: 70.0,
-    caCmolc: 2.1,
-    mgCmolc: 0.8,
-    naCmolc: 0.02,
-    alCmolc: 0.25,
-    hAlCmolc: 3.2,
-    sSulfurMgDm3: 6.5,
-    bBoroMgDm3: 0.22,
-    cuCobreMgDm3: 1.1,
-    feFerroMgDm3: 45.0,
-    mnManganesMgDm3: 12.5,
-    znZincoMgDm3: 1.4,
-
-    // Atributos Físicos
-    clayPercent: 42,
-    siltPercent: 18,
-    sandPercent: 40,
-    texturalClass: 'Argiloso',
-    soilDensityGcm3: 1.25,
-
-    // Indicadores Calculados
-    sumOfBases: 3.08, // 2.1 + 0.8 + 0.18
-    effectiveCtc: 3.33, // SB + Al
-    potentialCtc: 6.28, // SB + H+Al
-    baseSaturationPercent: 49.0, // (SB/CTC(T))*100
-    aluminumSaturationPercent: 7.5,
-    caMgRatio: 2.62,
-    caKRatio: 11.6,
-    mgKRatio: 4.44,
-    caMgKRatio: 16.1,
-    igfScore: 58,
-  }
-];
+// 4. Sample Extended Soil Analysis Data (Clean Initial State)
+export const SAMPLE_SOIL_EXTENDED: SoilAnalysisExtended[] = [];
 
 // Calculation Functions
 export function calculateIGF(soil: SoilAnalysisExtended): number {

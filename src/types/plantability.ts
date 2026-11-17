@@ -19,6 +19,10 @@ export interface PropertyField {
   tillageSystem: TillageSystem;
   seedingDate: string;
   notes?: string;
+  municipio?: string;
+  estado?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface PlanterEquipment {

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, UserCheck } from 'lucide-react';
-import { Agronomist, Company, TechnicalProfession } from '../../types/agronomy';
+import { Agronomist, Company } from '../../types/agronomy';
 import { BRAZIL_STATES } from '../../data/brazilStates';
+import { TECHNICAL_PROFESSIONS } from './registrationConstants';
 
 interface EditAgronomistModalProps {
   isOpen: boolean;
@@ -10,21 +11,6 @@ interface EditAgronomistModalProps {
   onSave: (updatedAgronomist: Agronomist) => void;
   onClose: () => void;
 }
-
-const PROFESSIONS_LIST: {
-  role: TechnicalProfession;
-  defaultCouncil: 'CREA' | 'CRMV' | 'CFTA' | 'CFT' | 'CRBio' | 'Outro';
-  short: string;
-}[] = [
-  { role: 'Engenheiro Agrônomo', defaultCouncil: 'CREA', short: 'Eng. Agr.' },
-  { role: 'Médica Veterinária', defaultCouncil: 'CRMV', short: 'Méd. Vet.' },
-  { role: 'Médico Veterinário', defaultCouncil: 'CRMV', short: 'Méd. Vet.' },
-  { role: 'Zootecnista', defaultCouncil: 'CRMV', short: 'Zoot.' },
-  { role: 'Engenheiro Florestal', defaultCouncil: 'CREA', short: 'Eng. Flor.' },
-  { role: 'Engenheiro Ambiental', defaultCouncil: 'CREA', short: 'Eng. Amb.' },
-  { role: 'Técnico Agropecuário', defaultCouncil: 'CFTA', short: 'Téc. Agr.' },
-  { role: 'Outro', defaultCouncil: 'CREA', short: 'RT' },
-];
 
 export const EditAgronomistModal: React.FC<EditAgronomistModalProps> = ({
   isOpen,
@@ -71,7 +57,7 @@ export const EditAgronomistModal: React.FC<EditAgronomistModalProps> = ({
 
   const handleProfessionChange = (newRole: string) => {
     setProfession(newRole);
-    const found = PROFESSIONS_LIST.find((p) => p.role === newRole);
+    const found = TECHNICAL_PROFESSIONS.find((p) => p.role === newRole);
     if (found) {
       setCouncilType(found.defaultCouncil);
     }
@@ -82,7 +68,7 @@ export const EditAgronomistModal: React.FC<EditAgronomistModalProps> = ({
     if (!name.trim() || !crea.trim()) return;
 
     const prefix =
-      PROFESSIONS_LIST.find((p) => p.role === profession)?.short || 'RT';
+      TECHNICAL_PROFESSIONS.find((p) => p.role === profession)?.short || 'RT';
 
     const defaultSignature = `${name.trim()} - ${prefix} ${councilType}-${creaState} ${crea.trim()}`;
 
@@ -170,7 +156,7 @@ export const EditAgronomistModal: React.FC<EditAgronomistModalProps> = ({
                 onChange={(e) => handleProfessionChange(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-black text-slate-900 dark:text-zinc-100"
               >
-                {PROFESSIONS_LIST.map((p) => (
+                {TECHNICAL_PROFESSIONS.map((p) => (
                   <option key={p.role} value={p.role}>
                     {p.role}
                   </option>

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { FORAGES_CATALOG } from '../../data/foragesCatalogData';
 import { ForageDisease, ForageItem } from '../../types/forage';
-import { AlertTriangle, Bug, ShieldCheck, Search, HelpCircle, Eye, ArrowRight } from 'lucide-react';
+import { Bug, Search, ArrowRight } from 'lucide-react';
 
 interface ForageDiseasesGuideProps {
   onSelectForage: (forage: ForageItem) => void;
@@ -11,25 +11,31 @@ export const ForageDiseasesGuide: React.FC<ForageDiseasesGuideProps> = ({ onSele
   const [searchTerm, setSearchTerm] = useState('');
   const [agentFilter, setAgentFilter] = useState<string>('todos');
 
-  // Extract all distinct diseases across the 30 forages
-  const diseaseEntries: { disease: ForageDisease; forage: ForageItem }[] = [];
-  FORAGES_CATALOG.forEach(forage => {
-    forage.diseasesAndPests.forEach(disease => {
-      diseaseEntries.push({ disease, forage });
+  // Extract all distinct diseases across the forages catalog
+  const diseaseEntries = useMemo(() => {
+    const entries: { disease: ForageDisease; forage: ForageItem }[] = [];
+    FORAGES_CATALOG.forEach(forage => {
+      forage.diseasesAndPests.forEach(disease => {
+        entries.push({ disease, forage });
+      });
     });
-  });
+    return entries;
+  }, []);
 
-  const filtered = diseaseEntries.filter(({ disease, forage }) => {
-    const matchesSearch =
-      disease.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      disease.symptoms.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      forage.commonName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (disease.scientificName && disease.scientificName.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filtered = useMemo(() => {
+    const q = searchTerm.toLowerCase();
+    return diseaseEntries.filter(({ disease, forage }) => {
+      const matchesSearch =
+        disease.name.toLowerCase().includes(q) ||
+        disease.symptoms.toLowerCase().includes(q) ||
+        forage.commonName.toLowerCase().includes(q) ||
+        Boolean(disease.scientificName && disease.scientificName.toLowerCase().includes(q));
 
-    const matchesAgent = agentFilter === 'todos' || disease.agentType === agentFilter;
+      const matchesAgent = agentFilter === 'todos' || disease.agentType === agentFilter;
 
-    return matchesSearch && matchesAgent;
-  });
+      return matchesSearch && matchesAgent;
+    });
+  }, [diseaseEntries, searchTerm, agentFilter]);
 
   return (
     <div className="space-y-6">

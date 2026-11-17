@@ -27,6 +27,7 @@ export const EditCompanyModal: React.FC<EditCompanyModalProps> = ({
   const [city, setCity] = useState('');
   const [state, setState] = useState('MT');
   const [logoUrl, setLogoUrl] = useState('');
+  const [logoError, setLogoError] = useState<string | null>(null);
   const [hasDigitalSignature, setHasDigitalSignature] = useState(false);
 
   useEffect(() => {
@@ -42,6 +43,7 @@ export const EditCompanyModal: React.FC<EditCompanyModalProps> = ({
       setCity(company.city || '');
       setState(company.state || 'MT');
       setLogoUrl(company.logoUrl || '');
+      setLogoError(null);
       setHasDigitalSignature(!!company.hasDigitalSignature);
     }
   }, [company]);
@@ -281,9 +283,11 @@ export const EditCompanyModal: React.FC<EditCompanyModalProps> = ({
                       const file = e.target.files?.[0];
                       if (file) {
                         if (file.size > 4 * 1024 * 1024) {
-                          alert('Selecione uma imagem menor que 4MB.');
+                          setLogoError('Por favor, selecione uma imagem menor que 4MB.');
+                          e.target.value = '';
                           return;
                         }
+                        setLogoError(null);
                         const reader = new FileReader();
                         reader.onload = (event) => {
                           if (typeof event.target?.result === 'string') {
@@ -292,16 +296,25 @@ export const EditCompanyModal: React.FC<EditCompanyModalProps> = ({
                         };
                         reader.readAsDataURL(file);
                       }
+                      e.target.value = '';
                     }}
                   />
                 </label>
+                {logoError && (
+                  <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 mt-1.5">
+                    {logoError}
+                  </p>
+                )}
                 <div className="mt-2 flex items-center gap-2">
                   <span className="text-[10px] text-slate-400 uppercase font-semibold">Ou URL:</span>
                   <input
                     type="url"
                     placeholder="https://exemplo.com/logo.png"
                     value={logoUrl}
-                    onChange={(e) => setLogoUrl(e.target.value)}
+                    onChange={(e) => {
+                      setLogoError(null);
+                      setLogoUrl(e.target.value);
+                    }}
                     className="flex-1 px-2.5 py-1 text-[11px] border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-slate-900 dark:text-zinc-100"
                   />
                 </div>

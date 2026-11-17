@@ -84,13 +84,17 @@ export const PestMonitoringModule: React.FC<PestMonitoringModuleProps> = ({ acti
               onChange={e => setSelectedFieldId(e.target.value)}
               className="bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 font-bold text-slate-900 dark:text-white"
             >
-              {fields.map(f => (
-                <option key={f.id} value={f.id}>{f.farmName} - {f.fieldName}</option>
-              ))}
+              {fields.length === 0 ? (
+                <option value="">Nenhum talhão monitorado cadastrado</option>
+              ) : (
+                fields.map(f => (
+                  <option key={f.id} value={f.id}>{f.farmName} - {f.fieldName}</option>
+                ))
+              )}
             </select>
           </div>
           <div className="flex items-center gap-3 text-slate-600 dark:text-zinc-400 text-[11px]">
-            <span>Estágio Fenológico: <strong className="text-indigo-600 dark:text-indigo-400">{currentField?.currentPhenologicalStage || 'R3 (Início Formação Vagens)'}</strong></span>
+            <span>Estágio Fenológico: <strong className="text-indigo-600 dark:text-indigo-400">{currentField?.currentPhenologicalStage || 'Aguardando cadastro de talhão'}</strong></span>
           </div>
         </div>
       )}
@@ -109,80 +113,90 @@ export const PestMonitoringModule: React.FC<PestMonitoringModuleProps> = ({ acti
               </p>
            </div>
 
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-             
-             {/* Painel de Espécies e Tendências */}
-             <div className="md:col-span-2 space-y-4">
-                <div className="flex justify-between items-center">
-                  <h4 className="font-bold text-sm">Espécies Monitoradas (Alerta de Tendência)</h4>
-                </div>
-                
-                <div className="space-y-3">
-                  <div className="p-4 bg-slate-50 dark:bg-zinc-900 rounded-xl border flex justify-between items-center">
-                     <div className="flex items-center gap-3">
-                       <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center border border-orange-300">
-                          <Bug className="w-5 h-5 text-orange-600" />
-                       </div>
-                       <div>
-                         <strong className="text-sm block dark:text-white">Euschistus heros</strong>
-                         <span className="text-[10px] text-slate-500">Percevejo-marrom</span>
-                       </div>
-                     </div>
-                     <div className="text-right">
-                       <span className={`text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1 ${
-                         trendEuschistus === 'Decrescente' ? 'text-emerald-700 bg-emerald-100' : 'text-red-700 bg-red-100'
-                       }`}>
-                         {trendEuschistus === 'Decrescente' ? <TrendingDown className="w-3 h-3"/> : <TrendingUp className="w-3 h-3"/>}
-                         População {trendEuschistus}
-                       </span>
-                     </div>
-                  </div>
-
-                  <div className="p-4 bg-slate-50 dark:bg-zinc-900 rounded-xl border flex justify-between items-center opacity-60">
-                     <div className="flex items-center gap-3">
-                       <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-zinc-800 flex items-center justify-center">
-                          <Bug className="w-5 h-5 text-slate-500" />
-                       </div>
-                       <div>
-                         <strong className="text-sm block dark:text-white">Spodoptera frugiperda</strong>
-                         <span className="text-[10px] text-slate-500">Lagarta-do-cartucho</span>
-                       </div>
-                     </div>
-                     <div className="text-right">
-                       <span className="text-xs font-bold px-2 py-1 rounded-md text-slate-600 bg-slate-200 flex items-center gap-1">
-                         Sem registros (30d)
-                       </span>
-                     </div>
-                  </div>
-                </div>
+           {!currentField ? (
+             <div className="py-8 text-center text-slate-400 dark:text-zinc-500 text-xs">
+               <Bug className="w-8 h-8 text-slate-300 dark:text-zinc-600 mx-auto mb-2" />
+               <p className="font-bold">Nenhum talhão monitorado cadastrado no momento.</p>
+               <p className="text-[11px] mt-0.5">Cadastre talhões e registre inspeções com pano de batida para ativar as análises do radar fitossanitário.</p>
              </div>
+           ) : (
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+               
+               {/* Painel de Espécies e Tendências */}
+               <div className="md:col-span-2 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-bold text-sm">Espécies Monitoradas (Alerta de Tendência)</h4>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div className="p-4 bg-slate-50 dark:bg-zinc-900 rounded-xl border flex justify-between items-center">
+                       <div className="flex items-center gap-3">
+                         <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center border border-orange-300">
+                            <Bug className="w-5 h-5 text-orange-600" />
+                         </div>
+                         <div>
+                           <strong className="text-sm block dark:text-white">Euschistus heros</strong>
+                           <span className="text-[10px] text-slate-500">Percevejo-marrom</span>
+                         </div>
+                       </div>
+                       <div className="text-right">
+                         <span className={`text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1 ${
+                           trendEuschistus === 'Decrescente' ? 'text-emerald-700 bg-emerald-100' : 'text-red-700 bg-red-100'
+                         }`}>
+                           {trendEuschistus === 'Decrescente' ? <TrendingDown className="w-3 h-3"/> : <TrendingUp className="w-3 h-3"/>}
+                           População {trendEuschistus}
+                         </span>
+                       </div>
+                    </div>
 
-             {/* Alertas Cruzados */}
-             <div className="space-y-4">
-                <div className="p-4 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900">
-                  <strong className="text-xs block text-red-800 dark:text-red-400 mb-2 flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3"/> Interação Fenologia x Praga
-                  </strong>
-                  <div className="text-[10px] text-slate-700 dark:text-slate-300 space-y-2">
-                    <p>A cultura encontra-se em <strong>{currentField?.currentPhenologicalStage || 'Estádio não informado'}</strong>.</p>
-                    <p className="font-bold text-red-600 dark:text-red-400">Risco Crítico para Danos de Percevejo!</p>
-                    <p>Na fase de formação de vagens, os percevejos podem causar abortamento e afetar o vigor das sementes. Intensificar monitoramento (pano de batida) para 2x na semana.</p>
+                    <div className="p-4 bg-slate-50 dark:bg-zinc-900 rounded-xl border flex justify-between items-center opacity-60">
+                       <div className="flex items-center gap-3">
+                         <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-zinc-800 flex items-center justify-center">
+                            <Bug className="w-5 h-5 text-slate-500" />
+                         </div>
+                         <div>
+                           <strong className="text-sm block dark:text-white">Spodoptera frugiperda</strong>
+                           <span className="text-[10px] text-slate-500">Lagarta-do-cartucho</span>
+                         </div>
+                       </div>
+                       <div className="text-right">
+                         <span className="text-xs font-bold px-2 py-1 rounded-md text-slate-600 bg-slate-200 flex items-center gap-1">
+                           Sem registros (30d)
+                         </span>
+                       </div>
+                    </div>
                   </div>
-                </div>
-                
-                <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-xl border border-blue-200 dark:border-blue-900">
-                  <strong className="text-xs block text-blue-800 dark:text-blue-400 mb-2 flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3"/> Último Manejo Efetuado
-                  </strong>
-                  <div className="text-[10px] text-slate-700 dark:text-slate-300">
-                    <p className="font-bold">{currentField?.managements?.[0]?.date || '15/11/2025'}</p>
-                    <p>Controle Químico: {currentField?.managements?.[0]?.product || 'Neonicotinoide + Piretroide'}</p>
-                    <p className="text-blue-600 mt-1 font-bold">Avaliação do Motor: Eficaz (População Decrescente na última inspeção).</p>
+               </div>
+
+               {/* Alertas Cruzados */}
+               <div className="space-y-4">
+                  <div className="p-4 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900">
+                    <strong className="text-xs block text-red-800 dark:text-red-400 mb-2 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3"/> Interação Fenologia x Praga
+                    </strong>
+                    <div className="text-[10px] text-slate-700 dark:text-slate-300 space-y-2">
+                      <p>A cultura encontra-se em <strong>{currentField?.currentPhenologicalStage || 'Estádio não informado'}</strong>.</p>
+                      <p className="font-bold text-red-600 dark:text-red-400">Risco Crítico para Danos de Percevejo!</p>
+                      <p>Na fase de formação de vagens, os percevejos podem causar abortamento e afetar o vigor das sementes. Intensificar monitoramento (pano de batida) para 2x na semana.</p>
+                    </div>
                   </div>
-                </div>
+                  
+                  <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-xl border border-blue-200 dark:border-blue-900">
+                    <strong className="text-xs block text-blue-800 dark:text-blue-400 mb-2 flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3"/> Último Manejo Efetuado
+                    </strong>
+                    <div className="text-[10px] text-slate-700 dark:text-slate-300">
+                      <p className="font-bold">{currentField?.managements?.[0]?.date || 'Nenhum registro recente'}</p>
+                      <p>Controle Químico: {currentField?.managements?.[0]?.product || 'Sem aplicação registrada'}</p>
+                      <p className="text-blue-600 mt-1 font-bold">
+                        {currentField?.managements && currentField.managements.length > 0 ? 'Avaliação do Motor: Eficaz (População Decrescente na última inspeção).' : 'Aguardando lançamentos no caderno.'}
+                      </p>
+                    </div>
+                  </div>
+               </div>
+
              </div>
-
-           </div>
+           )}
         </div>
       )}
 
@@ -197,7 +211,11 @@ export const PestMonitoringModule: React.FC<PestMonitoringModuleProps> = ({ acti
            </div>
            <div className="p-4 bg-white dark:bg-black border rounded-xl shadow-2xs">
              <span className="text-[10px] font-bold text-slate-500 uppercase block">Infestação Média Atual</span>
-             <strong className="text-2xl font-black text-orange-600 mt-1">10%</strong>
+             <strong className="text-2xl font-black text-orange-600 mt-1">
+               {currentField && currentField.inspections.length > 0
+                 ? `${Math.round(currentField.inspections.reduce((a, b) => a + (b.infestationPercentage || 0), 0) / currentField.inspections.length)}%`
+                 : '0%'}
+             </strong>
            </div>
            <div className="p-4 bg-white dark:bg-black border rounded-xl shadow-2xs">
              <span className="text-[10px] font-bold text-slate-500 uppercase block">Armadilhas Ativas</span>

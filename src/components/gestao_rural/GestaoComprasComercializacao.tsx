@@ -1,49 +1,55 @@
 import React, { useState } from 'react';
 import {
   DollarSign,
-  Building2,
   Plus,
-  FileSpreadsheet,
-  CheckCircle2,
-  Calendar,
   Wheat,
-  TrendingUp,
-  Tag,
-  Search,
+  Sliders,
 } from 'lucide-react';
-import { VendaComercializacaoRecord, CompraInsumoRecord, FornecedorRural, SafraAgragricola } from '../../types/gestaoRural';
+import {
+  VendaComercializacaoRecord,
+  CompraInsumoRecord,
+  FornecedorRural,
+  SafraAgragricola,
+  ConfigCulturaIntegrada,
+  UnidadeComercializacao,
+} from '../../types/gestaoRural';
+import { getCropEmoji } from '../../utils/gestaoRuralStorage';
 
 interface GestaoComprasComercializacaoProps {
   vendas: VendaComercializacaoRecord[];
-  compras: CompraInsumoRecord[];
-  fornecedores: FornecedorRural[];
+  compras?: CompraInsumoRecord[];
+  fornecedores?: FornecedorRural[];
   safras: SafraAgragricola[];
+  configCultura?: ConfigCulturaIntegrada;
+  onOpenConfigCultura?: () => void;
   onAddVenda: (venda: VendaComercializacaoRecord) => void;
-  onAddCompra: (compra: CompraInsumoRecord) => void;
+  onAddCompra?: (compra: CompraInsumoRecord) => void;
 }
 
 export const GestaoComprasComercializacao: React.FC<GestaoComprasComercializacaoProps> = ({
   vendas,
-  compras,
-  fornecedores,
   safras,
+  configCultura,
+  onOpenConfigCultura,
   onAddVenda,
-  onAddCompra,
 }) => {
-  const [activeTab, setActiveTab] = useState<'vendas' | 'compras' | 'fornecedores'>('vendas');
   const [showAddVendaModal, setShowAddVendaModal] = useState(false);
+
+  const activeCultura = configCultura?.cultura || 'Banana';
+  const activeUnit = (configCultura?.unidadeComercializacaoPrincipal || 'cx') as UnidadeComercializacao;
+  const availableUnits = configCultura?.unidadesHabilitadas || ['cx', 'sc', 'kg', 'ton'];
 
   const [newVenda, setNewVenda] = useState<Partial<VendaComercializacaoRecord>>({
     compradorNome: '',
     compradorDocumento: '',
-    cultura: 'Soja',
+    cultura: activeCultura,
     safraId: safras[0]?.id || '',
     quantidadeSacasOuKg: 0,
-    unidade: 'sc',
-    precoUnitarioR$: 0,
+    unidade: activeUnit,
+    precoUnitarioR$: configCultura?.precoReferenciaUnitarioR$ || 0,
     umidadePct: 13.5,
     impurezaPct: 1.0,
-    classificacaoQualidade: 'Tipo 1 Padrão',
+    classificacaoQualidade: 'Padrão Comercial',
     notaFiscalNumero: '',
     valorFreteR$: 0,
     valorComissaoR$: 0,
@@ -86,10 +92,27 @@ export const GestaoComprasComercializacao: React.FC<GestaoComprasComercializacao
 
     onAddVenda(created);
     setShowAddVendaModal(false);
+    setNewVenda({
+      compradorNome: '',
+      compradorDocumento: '',
+      cultura: activeCultura,
+      safraId: safras[0]?.id || '',
+      quantidadeSacasOuKg: 0,
+      unidade: activeUnit,
+      precoUnitarioR$: configCultura?.precoReferenciaUnitarioR$ || 0,
+      umidadePct: 13.5,
+      impurezaPct: 1.0,
+      classificacaoQualidade: 'Padrão Comercial',
+      notaFiscalNumero: '',
+      valorFreteR$: 0,
+      valorComissaoR$: 0,
+      statusRecebimento: 'recebido',
+    });
   };
 
   const totalComercializadoBruto = vendas.reduce((acc, v) => acc + v.valorBrutoTotalR$, 0);
   const totalComercializadoLiquido = vendas.reduce((acc, v) => acc + v.receitaLiquidaR$, 0);
+  const totalVolumeComercializado = vendas.reduce((acc, v) => acc + v.quantidadeSacasOuKg, 0);
 
   return (
     <div className="space-y-6 animate-fade-in text-xs">
@@ -108,13 +131,51 @@ export const GestaoComprasComercializacao: React.FC<GestaoComprasComercializacao
           </p>
         </div>
 
-        <button
-          onClick={() => setShowAddVendaModal(true)}
-          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl cursor-pointer flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Registrar Venda de Produção</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {onOpenConfigCultura && (
+            <button
+              onClick={onOpenConfigCultura}
+              className="px-3 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold rounded-xl border border-amber-500/30 cursor-pointer flex items-center gap-1.5 transition-colors"
+              title="Ajustar cultura e unidades comerciais (ex: Banana -> cx, sc, kg, ton)"
+            >
+              <Sliders className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <span>Ajustar Unidades ({configCultura?.cultura || 'Banana'})</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setShowAddVendaModal(true)}
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl cursor-pointer flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Registrar Venda ({configCultura?.unidadeComercializacaoPrincipal || 'cx'})</span>
+          </button>
+        </div>
+      </div>
+
+      {/* CROP COMMERCIALIZATION CONFIGURED UNITS BANNER */}
+      <div className="p-3.5 bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-teal-500/10 border border-amber-500/20 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2.5">
+          <span className="text-xl">{getCropEmoji(activeCultura)}</span>
+          <div>
+            <span className="font-black text-slate-800 dark:text-zinc-200">
+              Cultura Integrada para Vendas: {activeCultura}
+            </span>
+            <p className="text-[11px] text-slate-500">
+              Unidades habilitadas: <strong className="text-emerald-700 dark:text-emerald-400">{availableUnits.join(', ')}</strong> | Unidade Principal: <strong>{activeUnit}</strong> ({configCultura?.pesoPorUnidadeKg || 20} kg/{activeUnit})
+            </p>
+          </div>
+        </div>
+
+        {onOpenConfigCultura && (
+          <button
+            onClick={onOpenConfigCultura}
+            className="text-[11px] font-extrabold text-teal-700 dark:text-teal-300 hover:underline flex items-center gap-1 cursor-pointer whitespace-nowrap"
+          >
+            <span>Alterar Cultura / Unidades</span>
+            <span>→</span>
+          </button>
+        )}
       </div>
 
       {/* SUMMARY BANNER */}
@@ -144,9 +205,9 @@ export const GestaoComprasComercializacao: React.FC<GestaoComprasComercializacao
             Volume Comercializado
           </span>
           <span className="text-lg font-black text-purple-600 dark:text-purple-400 block">
-            {vendas.reduce((acc, v) => acc + v.quantidadeSacasOuKg, 0).toLocaleString('pt-BR')} sc
+            {totalVolumeComercializado.toLocaleString('pt-BR')} {activeUnit}
           </span>
-          <span className="text-[10px] text-slate-500">Soja / Milho / HF</span>
+          <span className="text-[10px] text-slate-500">{activeCultura}</span>
         </div>
 
         <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 space-y-1 shadow-2xs">
@@ -154,8 +215,8 @@ export const GestaoComprasComercializacao: React.FC<GestaoComprasComercializacao
             Preço Médio Praticado
           </span>
           <span className="text-lg font-black text-amber-600 dark:text-amber-400 block">
-            {vendas.reduce((acc, v) => acc + v.quantidadeSacasOuKg, 0) > 0 
-              ? `R$ ${(totalComercializadoBruto / vendas.reduce((acc, v) => acc + v.quantidadeSacasOuKg, 0)).toFixed(2)} / sc`
+            {totalVolumeComercializado > 0
+              ? `R$ ${(totalComercializadoBruto / totalVolumeComercializado).toFixed(2)} / ${activeUnit}`
               : 'R$ 0,00'}
           </span>
           <span className="text-[10px] text-slate-500">Média ponderada</span>
@@ -257,26 +318,47 @@ export const GestaoComprasComercializacao: React.FC<GestaoComprasComercializacao
                   type="text"
                   value={newVenda.cultura}
                   onChange={e => setNewVenda({ ...newVenda, cultura: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black font-semibold"
                   required
                 />
               </div>
 
               <div>
-                <label className="block font-bold">Quantidade (sc)</label>
+                <label className="block font-bold">Unidade de Venda</label>
+                <select
+                  value={newVenda.unidade}
+                  onChange={e => setNewVenda({ ...newVenda, unidade: e.target.value as UnidadeComercializacao })}
+                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black font-semibold"
+                >
+                  {availableUnits.map(unit => (
+                    <option key={unit} value={unit}>
+                      {unit === 'cx' ? 'Caixa (cx)' :
+                       unit === 'sc' ? 'Saco / Saca (sc)' :
+                       unit === 'kg' ? 'Quilograma (kg)' :
+                       unit === 'ton' ? 'Tonelada (ton)' :
+                       unit === '@' ? 'Arroba (@)' :
+                       unit === 'un' ? 'Unidade / Fruto (un)' : unit}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold">Quantidade ({newVenda.unidade})</label>
                 <input
                   type="number"
+                  step="0.01"
                   value={newVenda.quantidadeSacasOuKg}
                   onChange={e =>
                     setNewVenda({ ...newVenda, quantidadeSacasOuKg: Number(e.target.value) })
                   }
-                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black font-semibold"
                   required
                 />
               </div>
 
               <div>
-                <label className="block font-bold">Preço Saca (R$)</label>
+                <label className="block font-bold">Preço por {newVenda.unidade} (R$)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -284,9 +366,16 @@ export const GestaoComprasComercializacao: React.FC<GestaoComprasComercializacao
                   onChange={e =>
                     setNewVenda({ ...newVenda, precoUnitarioR$: Number(e.target.value) })
                   }
-                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black font-semibold"
                   required
                 />
+              </div>
+
+              <div className="col-span-2 p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-500/30 flex items-center justify-between text-xs">
+                <span className="text-emerald-800 dark:text-emerald-300 font-bold">Valor Bruto Estimado:</span>
+                <span className="font-black text-emerald-900 dark:text-emerald-100 text-sm">
+                  R$ {((Number(newVenda.quantidadeSacasOuKg) || 0) * (Number(newVenda.precoUnitarioR$) || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
               </div>
 
               <div className="col-span-2 flex justify-end gap-2 border-t pt-3">

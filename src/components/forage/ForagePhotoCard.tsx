@@ -2,17 +2,12 @@ import React, { useState } from 'react';
 import { ForageItem } from '../../types/forage';
 import { getForagePhotoData } from '../../data/foragePhotosDatabase';
 import {
-  Sprout,
-  ShieldCheck,
   AlertTriangle,
-  Eye,
   ArrowUpRight,
   Scale,
-  Droplets,
   Sparkles,
   CheckCircle2,
   Camera,
-  Layers,
   MapPin,
 } from 'lucide-react';
 
@@ -23,7 +18,7 @@ interface ForagePhotoCardProps {
   isCompared?: boolean;
 }
 
-export const ForagePhotoCard: React.FC<ForagePhotoCardProps> = ({
+export const ForagePhotoCard: React.FC<ForagePhotoCardProps> = React.memo(({
   forage,
   onSelect,
   onCompareToggle,
@@ -32,7 +27,6 @@ export const ForagePhotoCard: React.FC<ForagePhotoCardProps> = ({
   const [viewMode, setViewMode] = useState<'photo' | 'botanical'>('photo');
   const photoData = getForagePhotoData(forage.id);
   const isLegume = forage.botanicalFamily.includes('Leguminosa');
-  const isSilage = forage.category === 'corte_silagem';
 
   // SVG Botanical Habitus Fallback / Alternative View
   const renderBotanicalHabitus = () => {
@@ -107,6 +101,8 @@ export const ForagePhotoCard: React.FC<ForagePhotoCardProps> = ({
               <img
                 src={photoData.primaryPhotoUrl}
                 alt={`Foto real de ${forage.commonName}`}
+                loading="lazy"
+                decoding="async"
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
@@ -291,4 +287,4 @@ export const ForagePhotoCard: React.FC<ForagePhotoCardProps> = ({
       </div>
     </div>
   );
-};
+});

@@ -28,14 +28,14 @@ export const AboutHeroSection: React.FC = () => {
           </div>
           <div className="absolute -bottom-2 -right-2 bg-amber-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full shadow-xs border border-white dark:border-black flex items-center gap-1">
             <Sprout className="w-3 h-3" />
-            <span>v4.2.3.7</span>
+            <span>v4.2.3.8</span>
           </div>
         </div>
 
         {/* App Title & Subtitle */}
         <div className="space-y-1 pt-1">
           <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 dark:text-zinc-100 tracking-tight">
-            GeaAgro CRM 4.2.3.7
+            GeaAgro CRM 4.2.3.8
           </h1>
           <p className="text-xs sm:text-sm font-medium text-emerald-800 dark:text-emerald-400 max-w-lg mx-auto">
             Plataforma de Inteligência Agronômica, Agricultura de Precisão e Gestão Rural Integrada
@@ -59,16 +59,6 @@ export const AboutHeroSection: React.FC = () => {
                 title="Instagram: @fatiima.leao"
               >
                 Fátima Leão
-              </a>
-              <span>&amp;</span>
-              <a
-                href="https://www.instagram.com/lucas.agrobr/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:underline hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
-                title="Instagram: @lucas.agrobr"
-              >
-                Lucas Mendes
               </a>
             </p>
             <p className="text-xs text-slate-600 dark:text-zinc-400 mt-1 max-w-md mx-auto leading-relaxed">

@@ -2,18 +2,10 @@ import React, { useState } from 'react';
 import {
   Search,
   Plus,
-  Filter,
   FlaskConical,
-  ShieldCheck,
   FileText,
-  AlertTriangle,
-  Info,
-  CheckCircle2,
-  Bookmark,
-  ChevronDown,
 } from 'lucide-react';
 import { TankMixProduct, AgrochemicalClass, PesticideFormulationCode } from '../../types/tankMix';
-import { TANKMIX_PRODUCTS_DATABASE } from '../../data/tankMixData';
 
 interface Props {
   products: TankMixProduct[];
@@ -34,16 +26,11 @@ export const TankMixProductsCatalogView: React.FC<Props> = ({
   // New Custom Product Form State
   const [newProdName, setNewProdName] = useState('');
   const [newProdAi, setNewProdAi] = useState('');
-  const [newProdConc, setNewProdConc] = useState('');
   const [newProdForm, setNewProdForm] = useState<PesticideFormulationCode>('SC');
   const [newProdClass, setNewProdClass] = useState<AgrochemicalClass>('herbicida');
-  const [newProdGroup, setNewProdGroup] = useState('');
-  const [newProdMechanism, setNewProdMechanism] = useState('');
   const [newProdManufacturer, setNewProdManufacturer] = useState('');
-  const [newProdMapa, setNewProdMapa] = useState('');
   const [newProdDose, setNewProdDose] = useState<number>(1.0);
   const [newProdDoseUnit, setNewProdDoseUnit] = useState<TankMixProduct['doseUnit']>('L/ha');
-  const [newProdGrace, setNewProdGrace] = useState<number>(14);
   const [newProdLeafletNotes, setNewProdLeafletNotes] = useState('');
 
   const filtered = products.filter(p => {
@@ -62,13 +49,13 @@ export const TankMixProductsCatalogView: React.FC<Props> = ({
       id: `custom_${Date.now()}`,
       commercialName: newProdName,
       activeIngredient: newProdAi,
-      concentration: newProdConc || 'N/A',
+      concentration: 'N/A',
       formulation: newProdForm,
       agrochemicalClass: newProdClass,
-      chemicalGroup: newProdGroup || 'Diversos',
-      actionMechanism: newProdMechanism || 'Não especificado',
+      chemicalGroup: 'Diversos',
+      actionMechanism: 'Não especificado',
       manufacturer: newProdManufacturer || 'Genérico',
-      mapaRegistration: newProdMapa || 'Isento/Cadastrado',
+      mapaRegistration: 'Isento/Cadastrado',
       defaultDose: newProdDose,
       doseUnit: newProdDoseUnit,
       targetPests: ['Alvos agronômicos cadastrados'],
@@ -77,7 +64,7 @@ export const TankMixProductsCatalogView: React.FC<Props> = ({
       hydrolysisRiskHighPh: false,
       cationBindingRisk: false,
       mixingOrderStep: newProdForm === 'WP' || newProdForm === 'WG' ? 2 : newProdForm === 'SC' ? 3 : newProdForm === 'SL' ? 5 : 6,
-      safetyIntervalDays: newProdGrace,
+      safetyIntervalDays: 14,
       toxicologicalClass: 'IV - Pouco Tóxico',
       environmentalHazard: 'III - Perigoso',
       leafletNotes: newProdLeafletNotes || 'Produto cadastrado pelo usuário.',
@@ -89,7 +76,8 @@ export const TankMixProductsCatalogView: React.FC<Props> = ({
     // Reset form
     setNewProdName('');
     setNewProdAi('');
-    setNewProdConc('');
+    setNewProdManufacturer('');
+    setNewProdLeafletNotes('');
   };
 
   return (

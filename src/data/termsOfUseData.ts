@@ -7,7 +7,7 @@ export interface TermsSection {
   subsections?: { title: string; text: string }[];
 }
 
-export const TERMS_OF_USE_VERSION = '4.2.3.7';
+export const TERMS_OF_USE_VERSION = '4.2.3.8';
 export const TERMS_OF_USE_LAST_UPDATED = '14 de setembro de 2026';
 
 export const TERMS_OF_USE_DATA: {
@@ -52,7 +52,7 @@ export const TERMS_OF_USE_DATA: {
       number: '1',
       title: 'Aceitação das Condições de Uso',
       content:
-        'Ao acessar, instalar ou utilizar o GeaAgro CRM v4.2.3.7, o usuário expressa concordância plena e irrestrita com todas as disposições deste Termo de Uso. Caso discorde de qualquer cláusula, deverá cessar imediatamente o uso da plataforma.',
+        'Ao acessar, instalar ou utilizar o GeaAgro CRM v4.2.3.8, o usuário expressa concordância plena e irrestrita com todas as disposições deste Termo de Uso. Caso discorde de qualquer cláusula, deverá cessar imediatamente o uso da plataforma.',
     },
     {
       id: 'terms-bulario',
@@ -91,7 +91,7 @@ export const TERMS_OF_USE_DATA: {
       number: '5',
       title: 'Propriedade Intelectual e Licença de Software',
       content:
-        'O código-fonte, algoritmos de cálculo, design de interface e identidade visual são de titularidade de Fatima Leão e Lucas Mendes. É concedida ao usuário licença pessoal, não exclusiva e intransferível para uso em suas atividades agropecuárias.',
+        'O código-fonte, algoritmos de cálculo, design de interface e identidade visual são de titularidade de Fatima Leão. É concedida ao usuário licença pessoal, não exclusiva e intransferível para uso em suas atividades agropecuárias.',
     },
   ],
 };

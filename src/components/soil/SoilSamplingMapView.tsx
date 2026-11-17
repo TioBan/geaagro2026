@@ -1897,7 +1897,7 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
         )}
 
         {/* Conteúdo do Mapa Interativo */}
-        <div className="relative w-full h-[520px] bg-slate-900">
+        <div className="relative isolate z-0 w-full h-[520px] bg-slate-900">
           <div ref={mapContainerRef} className="w-full h-full z-10" />
 
           {/* Legenda Flutuante dos Status de Amostragem */}

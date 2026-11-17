@@ -24,7 +24,6 @@ import {
   RotateCcw,
   Check,
   SlidersHorizontal,
-  Settings2,
 } from 'lucide-react';
 import { ModuleTooltip } from '../common/ModuleTooltip';
 import {
@@ -252,6 +251,16 @@ export const QUICK_ACCESS_ITEMS: QuickAccessItem[] = [
     badge: 'Emissão PDF',
     badgeColor: 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300',
   },
+  {
+    id: 'estatistica',
+    tab: 'estatistica',
+    title: 'GeaAgro Estatística',
+    description: 'Experimentação científica, ANOVA multi-estratos, regressão, PCA e laudos offline',
+    icon: BarChart2,
+    category: 'campo',
+    badge: 'PWA Científico',
+    badgeColor: 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300',
+  },
 ];
 
 interface DashboardQuickAccessSectionProps {
@@ -267,11 +276,11 @@ interface QuickAccessCardProps {
   priorityIndex?: number;
 }
 
-const QuickAccessCard: React.FC<QuickAccessCardProps> = ({ item, onNavigate, priorityIndex }) => {
+const QuickAccessCard: React.FC<QuickAccessCardProps> = React.memo(({ item, onNavigate, priorityIndex }) => {
   const Icon = item.icon;
   const iconRef = React.useRef<HTMLDivElement>(null);
   const [isTooltipOpen, setIsTooltipOpen] = React.useState(false);
-  const hoverTimeoutRef = React.useRef<any>(null);
+  const hoverTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleMouseEnter = () => {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
@@ -349,18 +358,20 @@ const QuickAccessCard: React.FC<QuickAccessCardProps> = ({ item, onNavigate, pri
         <span>→</span>
       </div>
 
-      {/* Interactive Tooltip Card */}
-      <ModuleTooltip
-        moduleId={item.tab}
-        targetRef={iconRef}
-        isOpen={isTooltipOpen}
-        onClose={() => setIsTooltipOpen(false)}
-        onOpen={() => setIsTooltipOpen(true)}
-        onNavigate={(tab, sub) => onNavigate(tab, sub || item.subTab)}
-      />
+      {/* Interactive Tooltip Card (mounted only while hovered/open) */}
+      {isTooltipOpen && (
+        <ModuleTooltip
+          moduleId={item.tab}
+          targetRef={iconRef}
+          isOpen={isTooltipOpen}
+          onClose={() => setIsTooltipOpen(false)}
+          onOpen={() => setIsTooltipOpen(true)}
+          onNavigate={(tab, sub) => onNavigate(tab, sub || item.subTab)}
+        />
+      )}
     </div>
   );
-};
+});
 
 export const DashboardQuickAccessSection: React.FC<DashboardQuickAccessSectionProps> = ({
   onNavigate,
@@ -394,6 +405,13 @@ export const DashboardQuickAccessSection: React.FC<DashboardQuickAccessSectionPr
 
   const touchStartY = useRef<number>(0);
   const touchStartIndex = useRef<number | null>(null);
+  const notifyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (notifyTimeoutRef.current) clearTimeout(notifyTimeoutRef.current);
+    };
+  }, []);
 
   const categories = useMemo(() => [
     { id: 'todos', label: 'Todos os Módulos' },
@@ -450,8 +468,9 @@ export const DashboardQuickAccessSection: React.FC<DashboardQuickAccessSectionPr
   }, [orderedAllItems, selectedCategory, searchQuery]);
 
   const notifyChange = (msg: string) => {
+    if (notifyTimeoutRef.current) clearTimeout(notifyTimeoutRef.current);
     setNotificationMsg(msg);
-    setTimeout(() => {
+    notifyTimeoutRef.current = setTimeout(() => {
       setNotificationMsg(null);
     }, 2500);
   };
@@ -901,10 +920,12 @@ export const DashboardQuickAccessSection: React.FC<DashboardQuickAccessSectionPr
       )}
 
       {/* Modal de Personalização dos Módulos do Perfil */}
-      <UserProfileCustomizationModal
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-      />
+      {isProfileModalOpen && (
+        <UserProfileCustomizationModal
+          isOpen={isProfileModalOpen}
+          onClose={() => setIsProfileModalOpen(false)}
+        />
+      )}
     </div>
   );
 };

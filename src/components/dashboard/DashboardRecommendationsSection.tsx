@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Leaf,
   Layers,
@@ -34,22 +34,18 @@ export const DashboardRecommendationsSection: React.FC<DashboardRecommendationsS
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Exclude any legacy mock items
-          return parsed.filter(
-            (r: any) => r && typeof r === 'object' && r.id && !['rec-1', 'rec-2', 'rec-3', 'rec-4'].includes(r.id)
-          );
+          return parsed.filter((r: any) => r && typeof r === 'object' && typeof r.id === 'string');
         }
       }
     } catch {}
     return [];
   });
 
-  // Persist to localStorage
-  useEffect(() => {
+  const persistRecommendations = (next: PendingRecommendation[]) => {
     try {
-      localStorage.setItem('agronutri_dashboard_recommendations', JSON.stringify(recommendations));
+      localStorage.setItem('agronutri_dashboard_recommendations', JSON.stringify(next));
     } catch {}
-  }, [recommendations]);
+  };
 
   // Filter states
   const [filterType, setFilterType] = useState<string>('todos');
@@ -58,10 +54,12 @@ export const DashboardRecommendationsSection: React.FC<DashboardRecommendationsS
 
   // Status update handler
   const handleUpdateStatus = (id: string, newStatus: 'aplicada' | 'revisada') => {
-    setRecommendations(prev =>
-      prev.map(rec => (rec.id === id ? { ...rec, status: newStatus } : rec))
-    );
     const updatedItem = recommendations.find(r => r.id === id);
+    setRecommendations(prev => {
+      const next = prev.map(rec => (rec.id === id ? { ...rec, status: newStatus } : rec));
+      persistRecommendations(next);
+      return next;
+    });
     if (updatedItem) {
       const typeLabel =
         updatedItem.type === 'adubacao' ? 'Adubação' : updatedItem.type === 'calagem' ? 'Calagem' : 'Gessagem';

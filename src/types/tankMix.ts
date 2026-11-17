@@ -125,7 +125,7 @@ export interface WaterQualityParameters {
   ironMgL: number;
   manganeseMgL: number;
   bicarbonatesMgL: number;
-  classification?: 'Muito Mole' | 'Mole' | 'Média' | 'Dura' | 'Muito Dura';
+  classification?: 'Muito Mole' | 'Mole' | 'Média' | 'Dura' | 'Muito Dura' | string;
 }
 
 export interface TankSelectedProduct {
@@ -228,13 +228,4 @@ export interface SprayApplicationRecord {
   notes: string;
   photos: string[];
   createdAt: string;
-}
-
-export interface JarTestStep {
-  stepNumber: number;
-  title: string;
-  description: string;
-  proportionFormula: string;
-  waitTimeMinutes: number;
-  observationCheckpoints: string[];
 }

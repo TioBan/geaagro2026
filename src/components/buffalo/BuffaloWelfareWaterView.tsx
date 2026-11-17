@@ -188,40 +188,46 @@ export const BuffaloWelfareWaterView: React.FC<BuffaloWelfareWaterViewProps> = (
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {waterPoints.map((point) => (
-            <div
-              key={point.id}
-              className="p-4 bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 rounded-2xl space-y-3 flex flex-col justify-between"
-            >
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="px-2 py-0.5 bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 font-bold text-[10px] rounded">
-                    {point.type}
-                  </span>
-                  <span className="text-[11px] font-bold text-emerald-600">{point.maintenanceStatus}</span>
-                </div>
-                <h4 className="font-extrabold text-xs text-slate-900 dark:text-white">{point.name}</h4>
-                <p className="text-[11px] text-slate-500">Localização: {point.locationPaddock}</p>
-                
-                <div className="grid grid-cols-2 gap-2 pt-2 text-xs">
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Capacidade</span>
-                    <span className="font-bold text-slate-800 dark:text-zinc-200">{point.capacityM3} m³</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Temperatura Água</span>
-                    <span className="font-bold text-teal-600">{point.waterTemperatureC}°C</span>
-                  </div>
-                </div>
-              </div>
-
-              {point.notes && (
-                <p className="text-[11px] text-slate-600 dark:text-zinc-300 pt-2 border-t border-slate-200 dark:border-zinc-700">
-                  {point.notes}
-                </p>
-              )}
+          {waterPoints.length === 0 ? (
+            <div className="col-span-full text-center py-12 text-slate-500 text-xs">
+              Nenhum ponto de água ou açude de banho cadastrado no momento.
             </div>
-          ))}
+          ) : (
+            waterPoints.map((point) => (
+              <div
+                key={point.id}
+                className="p-4 bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 rounded-2xl space-y-3 flex flex-col justify-between"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2 py-0.5 bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 font-bold text-[10px] rounded">
+                      {point.type}
+                    </span>
+                    <span className="text-[11px] font-bold text-emerald-600">{point.maintenanceStatus}</span>
+                  </div>
+                  <h4 className="font-extrabold text-xs text-slate-900 dark:text-white">{point.name}</h4>
+                  <p className="text-[11px] text-slate-500">Localização: {point.locationPaddock}</p>
+                  
+                  <div className="grid grid-cols-2 gap-2 pt-2 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase font-bold block">Capacidade</span>
+                      <span className="font-bold text-slate-800 dark:text-zinc-200">{point.capacityM3} m³</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase font-bold block">Temperatura Água</span>
+                      <span className="font-bold text-teal-600">{point.waterTemperatureC}°C</span>
+                    </div>
+                  </div>
+                </div>
+
+                {point.notes && (
+                  <p className="text-[11px] text-slate-600 dark:text-zinc-300 pt-2 border-t border-slate-200 dark:border-zinc-700">
+                    {point.notes}
+                  </p>
+                )}
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

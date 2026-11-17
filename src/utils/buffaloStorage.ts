@@ -16,12 +16,12 @@ import {
 } from '../data/buffaloData';
 
 const STORAGE_KEYS = {
-  ANIMALS: 'geaagro_buffalo_animals_v1',
-  PADDOCKS: 'geaagro_buffalo_paddocks_v1',
-  WATER_POINTS: 'geaagro_buffalo_water_points_v1',
-  PHARMACY: 'geaagro_buffalo_pharmacy_v1',
-  FACILITIES: 'geaagro_buffalo_facilities_v1',
-  THERMAL: 'geaagro_buffalo_thermal_v1'
+  ANIMALS: 'geaagro_buffalo_animals_v2',
+  PADDOCKS: 'geaagro_buffalo_paddocks_v2',
+  WATER_POINTS: 'geaagro_buffalo_water_points_v2',
+  PHARMACY: 'geaagro_buffalo_pharmacy_v2',
+  FACILITIES: 'geaagro_buffalo_facilities_v2',
+  THERMAL: 'geaagro_buffalo_thermal_v2'
 };
 
 export const buffaloStorage = {
@@ -32,7 +32,7 @@ export const buffaloStorage = {
     } catch (e) {
       console.warn('Erro ao carregar búfalos do storage:', e);
     }
-    return INITIAL_BUFFALO_ANIMALS;
+    return [];
   },
 
   saveAnimals(animals: BuffaloAnimal[]) {
@@ -141,6 +141,12 @@ export const buffaloStorage = {
       localStorage.removeItem(STORAGE_KEYS.PHARMACY);
       localStorage.removeItem(STORAGE_KEYS.FACILITIES);
       localStorage.removeItem(STORAGE_KEYS.THERMAL);
+      localStorage.removeItem('geaagro_buffalo_animals_v1');
+      localStorage.removeItem('geaagro_buffalo_paddocks_v1');
+      localStorage.removeItem('geaagro_buffalo_water_points_v1');
+      localStorage.removeItem('geaagro_buffalo_pharmacy_v1');
+      localStorage.removeItem('geaagro_buffalo_facilities_v1');
+      localStorage.removeItem('geaagro_buffalo_thermal_v1');
     } catch (e) {
       console.error('Erro ao resetar storage de bubalinos:', e);
     }

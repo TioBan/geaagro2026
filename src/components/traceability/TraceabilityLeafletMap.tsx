@@ -2559,7 +2559,7 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
               {/* Autocomplete suggestions dropdown */}
               {searchResults.length > 0 && (
-                <div className="absolute left-0 right-0 top-full mt-1.5 z-[1000] max-h-56 overflow-y-auto bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl divide-y divide-slate-100 dark:divide-zinc-800 text-xs">
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-40 max-h-56 overflow-y-auto bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl divide-y divide-slate-100 dark:divide-zinc-800 text-xs">
                   {searchResults.map((r, i) => (
                     <div
                       key={i}
@@ -2599,7 +2599,7 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
                 {/* Dropdown Menu Modal Popover */}
                 {showExportModal && (
-                  <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-[1100] p-3 text-xs space-y-2 animate-fade-in">
+                  <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-40 p-3 text-xs space-y-2 animate-fade-in">
                     <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-zinc-800">
                       <span className="font-black text-slate-800 dark:text-zinc-100 flex items-center gap-1.5">
                         <Layers3 className="w-4 h-4 text-emerald-600" />
@@ -2695,12 +2695,12 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
           )}
 
           {/* Map wrapper container */}
-          <div className="relative w-full h-[540px] rounded-3xl overflow-hidden border border-slate-200 dark:border-zinc-800 shadow-sm bg-slate-100 dark:bg-zinc-950">
+          <div className="relative isolate z-0 w-full h-[540px] rounded-3xl overflow-hidden border border-slate-200 dark:border-zinc-800 shadow-sm bg-slate-100 dark:bg-zinc-950">
             <div ref={containerRef} className="w-full h-full" style={{ minHeight: '480px' }} />
 
             {/* Floating Top In-Map Quick Raster Controller ("Ajustar Camada") */}
             {showNdvi && (
-              <div className="absolute top-3 left-14 sm:left-16 right-3 sm:right-auto z-[400] transition-all duration-300 max-w-[calc(100%-4.5rem)] sm:max-w-xl pointer-events-auto">
+              <div className="absolute top-3 left-14 sm:left-16 right-3 sm:right-auto z-30 transition-all duration-300 max-w-[calc(100%-4.5rem)] sm:max-w-xl pointer-events-auto">
                 {!isNdviPanelExpanded ? (
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <button

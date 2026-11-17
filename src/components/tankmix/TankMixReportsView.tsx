@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import {
-  FileText,
   Printer,
   AlertTriangle,
 } from 'lucide-react';
 import { TankSelectedProduct, WaterQualityParameters, WeatherCondition, TankMixEvaluationResult } from '../../types/tankMix';
-import { TANKMIX_PRODUCTS_DATABASE, POPULAR_TANK_RECIPES } from '../../data/tankMixData';
+import { TANKMIX_PRODUCTS_DATABASE } from '../../data/tankMixData';
 
 interface Props {
   selectedProducts: TankSelectedProduct[];
@@ -26,7 +25,7 @@ export const TankMixReportsView: React.FC<Props> = ({
 }) => {
   const [reportAgronomist, setReportAgronomist] = useState('Eng. Agrônomo Responsável');
   const [reportCrea, setReportCrea] = useState('CREA/ART Nº 2026-BR-8891');
-  const [targetCrop, setTargetCrop] = useState('Soja / Milho');
+  const targetCrop = 'Soja / Milho';
 
   const handlePrint = () => {
     window.print();

@@ -3,10 +3,7 @@ import {
   TrendingUp,
   TrendingDown,
   Filter,
-  CheckCircle2,
-  AlertTriangle,
   Info,
-  Calendar,
   Layers,
   Sparkles,
   BarChart2,
@@ -15,11 +12,9 @@ import {
 } from 'lucide-react';
 import {
   ResponsiveContainer,
-  AreaChart,
+  ComposedChart,
   Area,
-  LineChart,
   Line,
-  BarChart,
   Bar,
   XAxis,
   YAxis,
@@ -300,8 +295,8 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
               className="bg-transparent font-semibold text-slate-800 dark:text-zinc-200 focus:outline-none cursor-pointer"
             >
               <option value="all" className="bg-white dark:bg-zinc-900">Todos ({(farm?.plots || []).length})</option>
-              {(farm?.plots || []).filter(Boolean).map((p) => (
-                <option key={p?.id || Math.random()} value={p?.id || ''} className="bg-white dark:bg-zinc-900">
+              {(farm?.plots || []).filter(Boolean).map((p, idx) => (
+                <option key={p?.id || `plot-${idx}`} value={p?.id || ''} className="bg-white dark:bg-zinc-900">
                   {p?.name || 'Talhão'}
                 </option>
               ))}
@@ -467,81 +462,82 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
         ) : (
           <div className="h-72 w-full relative">
             <ResponsiveContainer width="100%" height="100%">
-              {chartType === 'area' ? (
-                <AreaChart data={chartData} margin={{ top: 15, right: 20, left: -10, bottom: 5 }}>
+              <ComposedChart data={chartData} margin={{ top: 15, right: 20, left: -10, bottom: 5 }}>
+                {chartType === 'area' && (
                   <defs>
                     <linearGradient id="vPercentGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
                       <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.15} vertical={false} />
-                  <XAxis
-                    dataKey="dateLabel"
-                    tickLine={false}
-                    axisLine={{ opacity: 0.2 }}
-                    tick={{ fontSize: 11, fill: '#888888' }}
-                  />
+                )}
+                <CartesianGrid strokeDasharray="3 3" opacity={0.15} vertical={false} />
+                <XAxis
+                  dataKey="dateLabel"
+                  tickLine={false}
+                  axisLine={{ opacity: 0.2 }}
+                  tick={{ fontSize: 11, fill: '#888888' }}
+                />
+                <YAxis
+                  yAxisId="left"
+                  domain={[0, 100]}
+                  tickLine={false}
+                  axisLine={{ opacity: 0.2 }}
+                  tick={{ fontSize: 11, fill: '#888888' }}
+                  unit="%"
+                />
+                {comparisonNutrient !== 'none' && (
                   <YAxis
-                    yAxisId="left"
-                    domain={[0, 100]}
+                    yAxisId="right"
+                    orientation="right"
+                    domain={NUTRIENT_CONFIGS[comparisonNutrient].domain}
                     tickLine={false}
                     axisLine={{ opacity: 0.2 }}
-                    tick={{ fontSize: 11, fill: '#888888' }}
-                    unit="%"
-                  />
-                  {comparisonNutrient !== 'none' && (
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      domain={NUTRIENT_CONFIGS[comparisonNutrient].domain}
-                      tickLine={false}
-                      axisLine={{ opacity: 0.2 }}
-                      tick={{ fontSize: 11, fill: NUTRIENT_CONFIGS[comparisonNutrient].color }}
-                      label={{
-                        value: NUTRIENT_CONFIGS[comparisonNutrient].label,
-                        angle: 90,
-                        position: 'insideRight',
-                        fontSize: 10,
-                        fill: NUTRIENT_CONFIGS[comparisonNutrient].color,
-                        offset: 5
-                      }}
-                    />
-                  )}
-                  <Tooltip content={<CustomTooltip />} />
-                  {comparisonNutrient !== 'none' && (
-                    <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
-                  )}
-
-                  {/* Ideal Target Band (60% to 75%) */}
-                  {showTargetZone && (
-                    <ReferenceArea
-                      {...({
-                        y1: 60,
-                        y2: 75,
-                        fill: '#10b981',
-                        fillOpacity: 0.07,
-                        stroke: 'none',
-                      } as any)}
-                    />
-                  )}
-
-                  {/* Target Line */}
-                  <ReferenceLine
-                    y={targetVPercent}
-                    stroke="#10b981"
-                    strokeDasharray="4 4"
-                    strokeWidth={1.5}
+                    tick={{ fontSize: 11, fill: NUTRIENT_CONFIGS[comparisonNutrient].color }}
                     label={{
-                      value: `Meta V%: ${targetVPercent}%`,
-                      fill: '#10b981',
+                      value: NUTRIENT_CONFIGS[comparisonNutrient].label,
+                      angle: 90,
+                      position: 'insideRight',
                       fontSize: 10,
-                      position: 'top',
+                      fill: NUTRIENT_CONFIGS[comparisonNutrient].color,
+                      offset: 5,
                     }}
                   />
+                )}
+                <Tooltip content={<CustomTooltip />} />
+                {comparisonNutrient !== 'none' && (
+                  <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
+                )}
 
-                  {/* Critical Line */}
+                {showTargetZone && chartType === 'area' && (
+                  <ReferenceArea
+                    {...({
+                      y1: 60,
+                      y2: 75,
+                      fill: '#10b981',
+                      fillOpacity: 0.07,
+                      stroke: 'none',
+                    } as any)}
+                  />
+                )}
+
+                <ReferenceLine
+                  yAxisId="left"
+                  y={targetVPercent}
+                  stroke="#10b981"
+                  strokeDasharray="4 4"
+                  strokeWidth={1.5}
+                  label={{
+                    value: `Meta V%: ${targetVPercent}%`,
+                    fill: '#10b981',
+                    fontSize: 10,
+                    position: 'top',
+                  }}
+                />
+
+                {chartType !== 'bar' && (
                   <ReferenceLine
+                    yAxisId="left"
                     y={50}
                     stroke="#ef4444"
                     strokeDasharray="3 3"
@@ -553,7 +549,9 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
                       position: 'bottom',
                     }}
                   />
+                )}
 
+                {chartType === 'area' && (
                   <Area
                     yAxisId="left"
                     type="monotone"
@@ -565,76 +563,9 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
                     fill="url(#vPercentGrad)"
                     activeDot={{ r: 6, stroke: '#10b981', strokeWidth: 2, fill: '#ffffff' }}
                   />
-                  {comparisonNutrient !== 'none' && (
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey={NUTRIENT_CONFIGS[comparisonNutrient].dataKey}
-                      name={NUTRIENT_CONFIGS[comparisonNutrient].label}
-                      stroke={NUTRIENT_CONFIGS[comparisonNutrient].color}
-                      strokeWidth={2.5}
-                      dot={{ r: 4, fill: NUTRIENT_CONFIGS[comparisonNutrient].color }}
-                      activeDot={{ r: 6 }}
-                    />
-                  )}
-                </AreaChart>
-              ) : chartType === 'line' ? (
-                <LineChart data={chartData} margin={{ top: 15, right: 20, left: -10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.15} vertical={false} />
-                  <XAxis
-                    dataKey="dateLabel"
-                    tickLine={false}
-                    axisLine={{ opacity: 0.2 }}
-                    tick={{ fontSize: 11, fill: '#888888' }}
-                  />
-                  <YAxis
-                    yAxisId="left"
-                    domain={[0, 100]}
-                    tickLine={false}
-                    axisLine={{ opacity: 0.2 }}
-                    tick={{ fontSize: 11, fill: '#888888' }}
-                    unit="%"
-                  />
-                  {comparisonNutrient !== 'none' && (
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      domain={NUTRIENT_CONFIGS[comparisonNutrient].domain}
-                      tickLine={false}
-                      axisLine={{ opacity: 0.2 }}
-                      tick={{ fontSize: 11, fill: NUTRIENT_CONFIGS[comparisonNutrient].color }}
-                      label={{
-                        value: NUTRIENT_CONFIGS[comparisonNutrient].label,
-                        angle: 90,
-                        position: 'insideRight',
-                        fontSize: 10,
-                        fill: NUTRIENT_CONFIGS[comparisonNutrient].color,
-                        offset: 5
-                      }}
-                    />
-                  )}
-                  <Tooltip content={<CustomTooltip />} />
-                  {comparisonNutrient !== 'none' && (
-                    <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
-                  )}
-                  <ReferenceLine
-                    y={targetVPercent}
-                    stroke="#10b981"
-                    strokeDasharray="4 4"
-                    strokeWidth={1.5}
-                    label={{
-                      value: `Meta: ${targetVPercent}%`,
-                      fill: '#10b981',
-                      fontSize: 10,
-                      position: 'top',
-                    }}
-                  />
-                  <ReferenceLine
-                    y={50}
-                    stroke="#ef4444"
-                    strokeDasharray="3 3"
-                    strokeWidth={1}
-                  />
+                )}
+
+                {chartType === 'line' && (
                   <Line
                     yAxisId="left"
                     type="monotone"
@@ -645,64 +576,9 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
                     dot={{ r: 4, fill: '#059669', strokeWidth: 1 }}
                     activeDot={{ r: 7 }}
                   />
-                  {comparisonNutrient !== 'none' && (
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey={NUTRIENT_CONFIGS[comparisonNutrient].dataKey}
-                      name={NUTRIENT_CONFIGS[comparisonNutrient].label}
-                      stroke={NUTRIENT_CONFIGS[comparisonNutrient].color}
-                      strokeWidth={2.5}
-                      dot={{ r: 4, fill: NUTRIENT_CONFIGS[comparisonNutrient].color }}
-                      activeDot={{ r: 6 }}
-                    />
-                  )}
-                </LineChart>
-              ) : (
-                <BarChart data={chartData} margin={{ top: 15, right: 20, left: -10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.15} vertical={false} />
-                  <XAxis
-                    dataKey="dateLabel"
-                    tickLine={false}
-                    axisLine={{ opacity: 0.2 }}
-                    tick={{ fontSize: 11, fill: '#888888' }}
-                  />
-                  <YAxis
-                    yAxisId="left"
-                    domain={[0, 100]}
-                    tickLine={false}
-                    axisLine={{ opacity: 0.2 }}
-                    tick={{ fontSize: 11, fill: '#888888' }}
-                    unit="%"
-                  />
-                  {comparisonNutrient !== 'none' && (
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      domain={NUTRIENT_CONFIGS[comparisonNutrient].domain}
-                      tickLine={false}
-                      axisLine={{ opacity: 0.2 }}
-                      tick={{ fontSize: 11, fill: NUTRIENT_CONFIGS[comparisonNutrient].color }}
-                      label={{
-                        value: NUTRIENT_CONFIGS[comparisonNutrient].label,
-                        angle: 90,
-                        position: 'insideRight',
-                        fontSize: 10,
-                        fill: NUTRIENT_CONFIGS[comparisonNutrient].color,
-                        offset: 5
-                      }}
-                    />
-                  )}
-                  <Tooltip content={<CustomTooltip />} />
-                  {comparisonNutrient !== 'none' && (
-                    <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
-                  )}
-                  <ReferenceLine
-                    y={targetVPercent}
-                    stroke="#10b981"
-                    strokeDasharray="4 4"
-                    strokeWidth={1.5}
-                  />
+                )}
+
+                {chartType === 'bar' && (
                   <Bar
                     yAxisId="left"
                     dataKey="vPercent"
@@ -711,20 +587,21 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
                     radius={[6, 6, 0, 0]}
                     maxBarSize={45}
                   />
-                  {comparisonNutrient !== 'none' && (
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey={NUTRIENT_CONFIGS[comparisonNutrient].dataKey}
-                      name={NUTRIENT_CONFIGS[comparisonNutrient].label}
-                      stroke={NUTRIENT_CONFIGS[comparisonNutrient].color}
-                      strokeWidth={2.5}
-                      dot={{ r: 4, fill: NUTRIENT_CONFIGS[comparisonNutrient].color }}
-                      activeDot={{ r: 6 }}
-                    />
-                  )}
-                </BarChart>
-              )}
+                )}
+
+                {comparisonNutrient !== 'none' && (
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey={NUTRIENT_CONFIGS[comparisonNutrient].dataKey}
+                    name={NUTRIENT_CONFIGS[comparisonNutrient].label}
+                    stroke={NUTRIENT_CONFIGS[comparisonNutrient].color}
+                    strokeWidth={2.5}
+                    dot={{ r: 4, fill: NUTRIENT_CONFIGS[comparisonNutrient].color }}
+                    activeDot={{ r: 6 }}
+                  />
+                )}
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         )}

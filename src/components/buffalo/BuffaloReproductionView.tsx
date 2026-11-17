@@ -36,12 +36,12 @@ export const BuffaloReproductionView: React.FC<BuffaloReproductionViewProps> = (
   const [selectedFemaleId, setSelectedFemaleId] = useState<string>(females[0]?.id || '');
   const [eventType, setEventType] = useState<BuffaloReproductionRecord['eventType']>('Protocolo IATF');
   const [eventDate, setEventDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [bullSemen, setBullSemen] = useState('SEMEN-MURRAH-IND-90');
-  const [protocolName, setProtocolName] = useState('IATF Ovsynch Bubalino + eCG (400 UI)');
+  const [bullSemen, setBullSemen] = useState('');
+  const [protocolName, setProtocolName] = useState('');
   const [dgResult, setDgResult] = useState<'Positivo (Gestante)' | 'Negativo (Vazia)' | 'Dúvida / Reexaminar'>('Positivo (Gestante)');
   const [calvingType, setCalvingType] = useState<'Eutócico (Normal)' | 'Distócico Leve' | 'Distócico Cirúrgico'>('Eutócico (Normal)');
   const [calfSex, setCalfSex] = useState<'Fêmea' | 'Macho'>('Fêmea');
-  const [calfWeight, setCalfWeight] = useState(38);
+  const [calfWeight, setCalfWeight] = useState(0);
   const [notes, setNotes] = useState('');
 
   const handleSaveEvent = (e: React.FormEvent) => {
@@ -99,8 +99,8 @@ export const BuffaloReproductionView: React.FC<BuffaloReproductionViewProps> = (
 
         <div className="p-5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xs space-y-2">
           <span className="text-[10px] uppercase font-bold text-slate-400">Intervalo entre Partos (IEP)</span>
-          <div className="text-3xl font-black text-blue-600">402 <span className="text-sm font-bold text-slate-400">dias</span></div>
-          <span className="text-xs text-slate-500">13.4 meses (Eficiência alta)</span>
+          <div className="text-3xl font-black text-blue-600">{females.length > 0 ? '402' : '-'} <span className="text-sm font-bold text-slate-400">{females.length > 0 ? 'dias' : ''}</span></div>
+          <span className="text-xs text-slate-500">{females.length > 0 ? '13.4 meses (Eficiência alta)' : 'Sem fêmeas cadastradas'}</span>
         </div>
 
         <div className="p-5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xs space-y-2">
@@ -151,43 +151,49 @@ export const BuffaloReproductionView: React.FC<BuffaloReproductionViewProps> = (
         </h4>
 
         <div className="divide-y divide-slate-100 dark:divide-zinc-800">
-          {females.map((cow) => {
-            const records = cow.reproductionRecords || [];
-            const lastRepro = records[records.length - 1];
-            return (
-              <div key={cow.id} className="py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-black text-sm text-slate-900 dark:text-white">{cow.identificationNumber}</span>
-                    <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">{cow.name}</span>
-                    <span className="px-2 py-0.5 bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 font-bold text-[10px] rounded">
-                      {cow.status}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    Partos: <strong>{cow.parityCount || 0}</strong> • IEP: <strong>{cow.calvingIntervalDays || 405} dias</strong>
-                    {cow.expectedCalvingDate && (
-                      <span className="text-emerald-600 font-semibold ml-2">
-                        • Previsão de Parto: {cow.expectedCalvingDate}
+          {females.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 text-xs">
+              Nenhuma fêmea cadastrada no rebanho. Cadastre matrizes ou novilhas no Registro Individual.
+            </div>
+          ) : (
+            females.map((cow) => {
+              const records = cow.reproductionRecords || [];
+              const lastRepro = records[records.length - 1];
+              return (
+                <div key={cow.id} className="py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-black text-sm text-slate-900 dark:text-white">{cow.identificationNumber}</span>
+                      <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">{cow.name}</span>
+                      <span className="px-2 py-0.5 bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 font-bold text-[10px] rounded">
+                        {cow.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Partos: <strong>{cow.parityCount || 0}</strong> • IEP: <strong>{cow.calvingIntervalDays || 405} dias</strong>
+                      {cow.expectedCalvingDate && (
+                        <span className="text-emerald-600 font-semibold ml-2">
+                          • Previsão de Parto: {cow.expectedCalvingDate}
+                        </span>
+                      )}
+                    </p>
+                    {lastRepro && (
+                      <span className="text-[11px] text-slate-600 dark:text-zinc-400 block">
+                        Último evento: <strong>{lastRepro.eventType}</strong> ({lastRepro.date})
                       </span>
                     )}
-                  </p>
-                  {lastRepro && (
-                    <span className="text-[11px] text-slate-600 dark:text-zinc-400 block">
-                      Último evento: <strong>{lastRepro.eventType}</strong> ({lastRepro.date})
-                    </span>
-                  )}
-                </div>
+                  </div>
 
-                <button
-                  onClick={() => onOpenDigitalTwin(cow.id)}
-                  className="px-3 py-1.5 bg-slate-100 dark:bg-zinc-800 hover:bg-teal-50 dark:hover:bg-teal-950 text-slate-700 dark:text-zinc-300 hover:text-teal-600 rounded-xl text-xs font-bold cursor-pointer transition-all"
-                >
-                  Ver Ficha Completa
-                </button>
-              </div>
-            );
-          })}
+                  <button
+                    onClick={() => onOpenDigitalTwin(cow.id)}
+                    className="px-3 py-1.5 bg-slate-100 dark:bg-zinc-800 hover:bg-teal-50 dark:hover:bg-teal-950 text-slate-700 dark:text-zinc-300 hover:text-teal-600 rounded-xl text-xs font-bold cursor-pointer transition-all"
+                  >
+                    Ver Ficha Completa
+                  </button>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 

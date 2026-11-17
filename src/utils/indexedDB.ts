@@ -48,6 +48,17 @@ export const REQUIRED_OBJECT_STORES = [
   // Configurações & Sincronização Offline-First
   'app_settings',
   'sync_queue',
+
+  // GeaAgro Estatística (Módulo Científico Integrado)
+  'estatistica_projetos',
+  'estatistica_experimentos',
+  'estatistica_dados',
+  'estatistica_variaveis',
+  'estatistica_analises',
+  'estatistica_resultados',
+  'estatistica_graficos',
+  'estatistica_historico',
+  'estatistica_backups_metadata',
 ] as const;
 
 export type OfflineStoreName = typeof REQUIRED_OBJECT_STORES[number];

@@ -47,6 +47,12 @@ import {
   parseUTMPastedCoordinates,
 } from '../../utils/periciaGeoUtils';
 import { PericiaKmlImporterModal } from './PericiaKmlImporterModal';
+import {
+  AgroOpenStreetMap,
+  MapPolygonItem,
+  MapMarkerItem,
+} from '../common/AgroOpenStreetMap';
+import { reverseGeocodeNominatim } from '../../data/brazilianAgroCities';
 
 interface PericiaGeorreferenciamentoSectionProps {
   pericia: Pericia;
@@ -69,6 +75,7 @@ export const PericiaGeorreferenciamentoSection: React.FC<
   // Real device GPS loading state
   const [isCapturingGps, setIsCapturingGps] = useState(false);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(2.1);
+  const [mapViewMode, setMapViewMode] = useState<'osm' | 'svg'>('osm');
 
   // File input ref
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -227,15 +234,16 @@ export const PericiaGeorreferenciamentoSection: React.FC<
     });
   };
 
-  // Capture real GPS via Geolocation API
+  // Capture real GPS via Geolocation API: cai na cidade automaticamente via OpenStreetMap
   const handleCaptureRealGps = () => {
     if (!navigator.geolocation) {
       showToast('Geolocalização não suportada neste dispositivo/navegador.');
       return;
     }
     setIsCapturingGps(true);
+    showToast('Sintonizando satélites GPS...');
     navigator.geolocation.getCurrentPosition(
-      position => {
+      async position => {
         setIsCapturingGps(false);
         const { latitude, longitude, altitude, accuracy } = position.coords;
         const roundedLat = Number(latitude.toFixed(6));
@@ -251,7 +259,30 @@ export const PericiaGeorreferenciamentoSection: React.FC<
           precisaoMeters: roundedAcc,
         }));
 
-        showToast(`Coordenadas obtidas via GPS com precisão de ±${roundedAcc}m!`);
+        // Geocodificação reversa automática para identificar o município da perícia
+        const geoResult = await reverseGeocodeNominatim(roundedLat, roundedLng);
+        if (geoResult && geoResult.city) {
+          onUpdatePericia({
+            ...pericia,
+            municipio: geoResult.city,
+            uf: geoResult.uf,
+            georreferenciamento: {
+              ...geoData,
+              centroide: {
+                lat: roundedLat,
+                lng: roundedLng,
+                altitude: altitude ? Math.round(altitude) : geoData.centroide.altitude,
+                precisaoMeters: roundedAcc,
+              },
+            },
+            atualizadoEm: new Date().toISOString(),
+          });
+          showToast(
+            `📍 GPS detectado: ${geoResult.city} - ${geoResult.uf} (±${roundedAcc}m)! Município da perícia atualizado automaticamente!`
+          );
+        } else {
+          showToast(`Coordenadas obtidas via GPS com precisão de ±${roundedAcc}m!`);
+        }
       },
       error => {
         setIsCapturingGps(false);
@@ -599,6 +630,45 @@ export const PericiaGeorreferenciamentoSection: React.FC<
     showToast('Memorial descritivo copiado para a área de transferência!');
   };
 
+  // OpenStreetMap Polygons (Perímetro delimitado da perícia técnica)
+  const osmPolygons: MapPolygonItem[] = useMemo(() => {
+    const vertices = geoData.pontos.filter(p => p.tipo === 'vertice_perimetro');
+    if (vertices.length < 3) return [];
+
+    return [
+      {
+        id: 'pericia-talhao-poly',
+        name: `Talhão Periciado — ${pericia.imovelNome}`,
+        subtitle: `Área: ${geoData.areaCalculadaHa || pericia.objetoDescricao.areaAfetadaHa} ha | Perímetro: ${geoData.perimetroCalculadoMeters || 1780} m`,
+        areaHa: geoData.areaCalculadaHa || pericia.objetoDescricao.areaAfetadaHa,
+        points: vertices.map(v => [v.lat, v.lng] as [number, number]),
+        color: '#10b981',
+        fillColor: '#10b981',
+        fillOpacity: 0.25,
+      },
+    ];
+  }, [
+    geoData.pontos,
+    geoData.areaCalculadaHa,
+    geoData.perimetroCalculadoMeters,
+    pericia.imovelNome,
+    pericia.objetoDescricao.areaAfetadaHa,
+  ]);
+
+  // OpenStreetMap Markers (Vértices, Fotos Periciais, Amostras de Solo)
+  const osmMarkers: MapMarkerItem[] = useMemo(() => {
+    return geoData.pontos.map(p => ({
+      id: p.id,
+      label: p.identificador,
+      lat: p.lat,
+      lng: p.lng,
+      altitude: p.altitude,
+      type: p.tipo === 'foto' ? 'foto' : p.tipo === 'ponto_amostra' ? 'amostra' : 'vertice',
+      details: `${p.tipo === 'foto' ? 'Fotografia Pericial' : p.tipo === 'ponto_amostra' ? 'Ponto Amostral' : 'Vértice Perimetral'}: ${p.descricao || 'Sem descrição'}`,
+      onClick: () => setSelectedPointId(p.id),
+    }));
+  }, [geoData.pontos]);
+
   // Interactive SVG Polygon Geometry Calculation
   const polygonSvgData = useMemo(() => {
     const polygonVertices = geoData.pontos.filter(p => p.tipo === 'vertice_perimetro');
@@ -692,194 +762,275 @@ export const PericiaGeorreferenciamentoSection: React.FC<
         </div>
       </div>
 
-      {/* TOP CARD: DARK-THEMED INTERACTIVE MAP VIEWER (Exact Visual Style requested by User) */}
-      <div className="bg-slate-900 text-slate-100 p-6 rounded-2xl space-y-4 relative overflow-hidden shadow-md">
+      {/* MAP CONTROLS & VIEWER CARD: OPENSTREETMAP OR CAD VETORIAL */}
+      <div className="space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <p className="text-xs text-emerald-400 font-mono uppercase font-bold tracking-wider">
-              PONTOS E POLÍGONOS DE CAMPO
-            </p>
-            <h4 className="text-base font-bold">
-              {pericia.imovelNome} — {pericia.municipio}/{pericia.uf}
-            </h4>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="px-3 py-1 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded-full text-xs font-mono font-bold">
-              Lat: {geoData.centroide.lat.toFixed(4)}° | Lng: {geoData.centroide.lng.toFixed(4)}°
-            </span>
-
-            <a
-              href={`https://www.google.com/maps?q=${geoData.centroide.lat},${geoData.centroide.lng}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-full text-[11px] font-mono flex items-center gap-1 transition-all"
-              title="Visualizar localização no Google Maps"
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setMapViewMode('osm')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                mapViewMode === 'osm'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300'
+              }`}
             >
-              <ExternalLink className="w-3 h-3 text-emerald-400" />
-              <span>Google Maps</span>
-            </a>
+              <Navigation className="w-3.5 h-3.5" />
+              <span>OpenStreetMap Interativo</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setMapViewMode('svg')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                mapViewMode === 'svg'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Vetor CAD (SVG)</span>
+            </button>
+          </div>
+
+          {/* Quick Export Tools */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDownloadKML}
+              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 rounded-lg text-[11px] font-mono flex items-center gap-1 transition-all cursor-pointer font-bold"
+              title="Exportar polígono em KML para Google Earth"
+            >
+              <Download className="w-3 h-3 text-emerald-600" />
+              <span>KML</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadGeoJSON}
+              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 rounded-lg text-[11px] font-mono flex items-center gap-1 transition-all cursor-pointer font-bold"
+              title="Exportar polígono em GeoJSON para QGIS/ArcGIS"
+            >
+              <Download className="w-3 h-3 text-blue-600" />
+              <span>GeoJSON</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadCSV}
+              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 rounded-lg text-[11px] font-mono flex items-center gap-1 transition-all cursor-pointer font-bold"
+              title="Exportar tabela de coordenadas em CSV"
+            >
+              <FileSpreadsheet className="w-3 h-3 text-amber-600" />
+              <span>CSV</span>
+            </button>
           </div>
         </div>
 
-        {/* MAP CONTAINER WITH VIRTUAL/SVG RENDERING */}
-        <div className="relative min-h-64 sm:h-72 bg-slate-800/90 rounded-xl border border-slate-700 overflow-hidden flex flex-col justify-between p-3">
-          {/* Geodesic Background Grid & Compass */}
-          <div className="absolute inset-0 pointer-events-none opacity-25">
-            <svg width="100%" height="100%">
-              <defs>
-                <pattern id="geoGrid" width="40" height="40" patternUnits="userSpaceOnUse">
-                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#64748b" strokeWidth="0.5" />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#geoGrid)" />
-            </svg>
-          </div>
+        {mapViewMode === 'osm' ? (
+          <AgroOpenStreetMap
+            heightClassName="h-[460px]"
+            title={`Georreferenciamento OpenStreetMap — ${pericia.imovelNome}`}
+            subtitle="Sincronização por cidade informada, busca manual e localização GPS automática"
+            currentCity={pericia.municipio}
+            currentUf={pericia.uf}
+            polygons={osmPolygons}
+            markers={osmMarkers}
+            selectedMarkerId={selectedPointId}
+            onPolygonClick={poly => showToast(`Polígono selecionado: ${poly.name}`)}
+            onMarkerClick={marker => setSelectedPointId(marker.id)}
+            onCitySelected={city => {
+              onUpdatePericia({
+                ...pericia,
+                municipio: city.name,
+                uf: city.state,
+                atualizadoEm: new Date().toISOString(),
+              });
+              showToast(`Município da perícia atualizado para ${city.name}/${city.state}!`);
+            }}
+            onGpsLocated={loc => {
+              onUpdatePericia({
+                ...pericia,
+                municipio: loc.city,
+                uf: loc.uf,
+                georreferenciamento: {
+                  ...geoData,
+                  centroide: {
+                    lat: loc.lat,
+                    lng: loc.lng,
+                    precisaoMeters: loc.accuracy,
+                  },
+                },
+                atualizadoEm: new Date().toISOString(),
+              });
+              setNewPoint(prev => ({
+                ...prev,
+                lat: loc.lat,
+                lng: loc.lng,
+                precisaoMeters: loc.accuracy,
+              }));
+              setGpsAccuracy(loc.accuracy);
+              showToast(
+                `📍 GPS detectado: ${loc.city} - ${loc.uf} (±${loc.accuracy}m)! Município da perícia atualizado!`
+              );
+            }}
+            onMapClick={coords => {
+              setNewPoint(prev => ({
+                ...prev,
+                lat: coords.lat,
+                lng: coords.lng,
+              }));
+              showToast(`Coordenadas capturadas do OpenStreetMap: Lat ${coords.lat}, Lng ${coords.lng}`);
+            }}
+            allowClickToAddPoint={true}
+            clickInstruction="Clique no OpenStreetMap para capturar as coordenadas exatas diretamente no formulário de vértices."
+          />
+        ) : (
+          /* TOP CARD: DARK-THEMED INTERACTIVE MAP VIEWER (Exact Visual Style requested by User) */
+          <div className="bg-slate-900 text-slate-100 p-6 rounded-2xl space-y-4 relative overflow-hidden shadow-md">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <p className="text-xs text-emerald-400 font-mono uppercase font-bold tracking-wider">
+                  PONTOS E POLÍGONOS DE CAMPO (VETORIAL)
+                </p>
+                <h4 className="text-base font-bold">
+                  {pericia.imovelNome} — {pericia.municipio}/{pericia.uf}
+                </h4>
+              </div>
 
-          {/* Compass Rose Badge */}
-          <div className="absolute top-3 right-3 z-10 flex items-center gap-1 px-2 py-1 bg-slate-900/80 backdrop-blur-xs border border-slate-700 rounded-lg text-[10px] font-mono text-emerald-300">
-            <Compass className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Norte Geodésico</span>
-          </div>
-
-          {/* Scale & Datum Badge */}
-          <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
-            <span className="px-2 py-0.5 bg-slate-900/80 backdrop-blur-xs border border-slate-700 rounded text-[10px] font-mono text-slate-300">
-              {geoData.sistemaReferencia}
-            </span>
-            {geoData.arquivoImportadoNome && (
-              <span className="px-2 py-0.5 bg-emerald-950/80 border border-emerald-800 rounded text-[10px] font-mono text-emerald-300 flex items-center gap-1">
-                <FileCode className="w-3 h-3 text-emerald-400" />
-                {geoData.arquivoImportadoNome}
-              </span>
-            )}
-          </div>
-
-          {/* Interactive SVG Geometry Rendering */}
-          {polygonSvgData && polygonSvgData.projectedPoints.length > 0 ? (
-            <div className="w-full h-full flex items-center justify-center my-auto relative z-0">
-              <svg
-                viewBox={`0 0 ${polygonSvgData.width} ${polygonSvgData.height}`}
-                className="w-full h-56 max-h-60"
-              >
-                {/* Polygon Fill and Outline */}
-                {polygonSvgData.polyPath && (
-                  <path
-                    d={polygonSvgData.polyPath}
-                    fill="rgba(16, 185, 129, 0.22)"
-                    stroke="#10b981"
-                    strokeWidth="2.5"
-                    strokeDasharray="none"
-                  />
-                )}
-
-                {/* Vertices and Markers */}
-                {polygonSvgData.projectedPoints.map(p => {
-                  const isSelected = selectedPointId === p.id;
-                  const isFoto = p.tipo === 'foto';
-                  const isAmostra = p.tipo === 'ponto_amostra';
-                  const markerColor = isFoto ? '#38bdf8' : isAmostra ? '#f59e0b' : '#10b981';
-
-                  return (
-                    <g
-                      key={p.id}
-                      className="cursor-pointer transition-transform duration-200"
-                      onClick={() => setSelectedPointId(p.id === selectedPointId ? null : p.id)}
-                    >
-                      {/* Pulse circle */}
-                      <circle
-                        cx={p.pos.x}
-                        cy={p.pos.y}
-                        r={isSelected ? 10 : 6}
-                        fill={markerColor}
-                        fillOpacity={isSelected ? 0.9 : 0.8}
-                        stroke="#ffffff"
-                        strokeWidth={isSelected ? 2 : 1.5}
-                      />
-                      {/* Vertex Label */}
-                      <text
-                        x={p.pos.x}
-                        y={p.pos.y - 10}
-                        textAnchor="middle"
-                        fill="#f8fafc"
-                        fontSize="10"
-                        fontFamily="monospace"
-                        fontWeight="bold"
-                        className="pointer-events-none drop-shadow-md"
-                      >
-                        {p.identificador}
-                      </text>
-                    </g>
-                  );
-                })}
-              </svg>
-            </div>
-          ) : (
-            <div className="my-auto text-center space-y-2 relative z-10">
-              <MapPin className="w-10 h-10 text-emerald-400 mx-auto animate-bounce" />
-              <p className="text-xs font-mono text-slate-300">Mapa de Delimitação do Talhão Periciado</p>
-              <p className="text-[10px] text-slate-400">
-                Área Periciada: {geoData.areaCalculadaHa || pericia.objetoDescricao.areaAfetadaHa} ha • Pontos de Fotografia: {pericia.fotografias.length}
-              </p>
-            </div>
-          )}
-
-          {/* Bottom Info Bar inside Dark Map */}
-          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-700/80 text-xs">
-            <div className="flex items-center gap-3 font-mono text-[11px] text-slate-300 flex-wrap">
-              <span>
-                Área: <strong className="text-emerald-400">{geoData.areaCalculadaHa || pericia.objetoDescricao.areaAfetadaHa} ha</strong>
-              </span>
-              <span>•</span>
-              <span>
-                Perímetro: <strong className="text-emerald-400">{geoData.perimetroCalculadoMeters || 1780} m</strong>
-              </span>
-              <span>•</span>
-              <span>
-                Vértices: <strong className="text-emerald-400">{geoData.pontos.length}</strong>
-              </span>
-              {selectedPointId && (
-                <span className="bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded border border-emerald-800">
-                  Selecionado:{' '}
-                  {geoData.pontos.find(p => p.id === selectedPointId)?.identificador} (
-                  {geoData.pontos.find(p => p.id === selectedPointId)?.lat.toFixed(6)},{' '}
-                  {geoData.pontos.find(p => p.id === selectedPointId)?.lng.toFixed(6)})
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-3 py-1 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded-full text-xs font-mono font-bold">
+                  Lat: {geoData.centroide.lat.toFixed(4)}° | Lng: {geoData.centroide.lng.toFixed(4)}°
                 </span>
-              )}
+
+                <a
+                  href={`https://www.google.com/maps?q=${geoData.centroide.lat},${geoData.centroide.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-full text-[11px] font-mono flex items-center gap-1 transition-all"
+                  title="Visualizar localização no Google Maps"
+                >
+                  <ExternalLink className="w-3 h-3 text-emerald-400" />
+                  <span>Google Maps</span>
+                </a>
+              </div>
             </div>
 
-            {/* Quick Export Tools */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleDownloadKML}
-                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-[11px] font-mono flex items-center gap-1 transition-all cursor-pointer"
-                title="Exportar polígono em KML para Google Earth"
-              >
-                <Download className="w-3 h-3 text-emerald-400" />
-                <span>KML</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleDownloadGeoJSON}
-                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-[11px] font-mono flex items-center gap-1 transition-all cursor-pointer"
-                title="Exportar polígono em GeoJSON para QGIS/ArcGIS"
-              >
-                <Download className="w-3 h-3 text-blue-400" />
-                <span>GeoJSON</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleDownloadCSV}
-                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-[11px] font-mono flex items-center gap-1 transition-all cursor-pointer"
-                title="Exportar tabela de coordenadas em CSV"
-              >
-                <FileSpreadsheet className="w-3 h-3 text-amber-400" />
-                <span>CSV</span>
-              </button>
+            {/* MAP CONTAINER WITH VIRTUAL/SVG RENDERING */}
+            <div className="relative min-h-64 sm:h-72 bg-slate-800/90 rounded-xl border border-slate-700 overflow-hidden flex flex-col justify-between p-3">
+              {/* Geodesic Background Grid & Compass */}
+              <div className="absolute inset-0 pointer-events-none opacity-25">
+                <svg width="100%" height="100%">
+                  <defs>
+                    <pattern id="geoGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+                      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#64748b" strokeWidth="0.5" />
+                    </pattern>
+                  </defs>
+                  <rect width="100%" height="100%" fill="url(#geoGrid)" />
+                </svg>
+              </div>
+
+              {/* Compass Rose Badge */}
+              <div className="absolute top-3 right-3 z-10 flex items-center gap-1 px-2 py-1 bg-slate-900/80 backdrop-blur-xs border border-slate-700 rounded-lg text-[10px] font-mono text-emerald-300">
+                <Compass className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Norte Geodésico</span>
+              </div>
+
+              {/* Scale & Datum Badge */}
+              <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
+                <span className="px-2 py-0.5 bg-slate-900/80 backdrop-blur-xs border border-slate-700 rounded text-[10px] font-mono text-slate-300">
+                  {geoData.sistemaReferencia}
+                </span>
+                {geoData.arquivoImportadoNome && (
+                  <span className="px-2 py-0.5 bg-emerald-950/80 border border-emerald-800 rounded text-[10px] font-mono text-emerald-300 flex items-center gap-1">
+                    <FileCode className="w-3 h-3 text-emerald-400" />
+                    {geoData.arquivoImportadoNome}
+                  </span>
+                )}
+              </div>
+
+              {/* Interactive SVG Geometry Rendering */}
+              {polygonSvgData && polygonSvgData.projectedPoints.length > 0 ? (
+                <div className="w-full h-full flex items-center justify-center my-auto relative z-0">
+                  <svg
+                    viewBox={`0 0 ${polygonSvgData.width} ${polygonSvgData.height}`}
+                    className="w-full h-56 max-h-60"
+                  >
+                    {polygonSvgData.polyPath && (
+                      <path
+                        d={polygonSvgData.polyPath}
+                        fill="rgba(16, 185, 129, 0.22)"
+                        stroke="#10b981"
+                        strokeWidth="2.5"
+                        strokeDasharray="none"
+                      />
+                    )}
+
+                    {polygonSvgData.projectedPoints.map(p => {
+                      const isSelected = selectedPointId === p.id;
+                      const isFoto = p.tipo === 'foto';
+                      const isAmostra = p.tipo === 'ponto_amostra';
+                      const markerColor = isFoto ? '#38bdf8' : isAmostra ? '#f59e0b' : '#10b981';
+
+                      return (
+                        <g
+                          key={p.id}
+                          className="cursor-pointer transition-transform duration-200"
+                          onClick={() => setSelectedPointId(p.id === selectedPointId ? null : p.id)}
+                        >
+                          <circle
+                            cx={p.pos.x}
+                            cy={p.pos.y}
+                            r={isSelected ? 10 : 6}
+                            fill={markerColor}
+                            fillOpacity={isSelected ? 0.9 : 0.8}
+                            stroke="#ffffff"
+                            strokeWidth={isSelected ? 2 : 1.5}
+                          />
+                          <text
+                            x={p.pos.x}
+                            y={p.pos.y - 10}
+                            textAnchor="middle"
+                            fill="#f8fafc"
+                            fontSize="10"
+                            fontFamily="monospace"
+                            fontWeight="bold"
+                            className="pointer-events-none drop-shadow-md"
+                          >
+                            {p.identificador}
+                          </text>
+                        </g>
+                      );
+                    })}
+                  </svg>
+                </div>
+              ) : (
+                <div className="my-auto text-center space-y-2 relative z-10">
+                  <MapPin className="w-10 h-10 text-emerald-400 mx-auto animate-bounce" />
+                  <p className="text-xs font-mono text-slate-300">Mapa de Delimitação do Talhão Periciado</p>
+                  <p className="text-[10px] text-slate-400">
+                    Área Periciada: {geoData.areaCalculadaHa || pericia.objetoDescricao.areaAfetadaHa} ha • Pontos de Fotografia: {pericia.fotografias.length}
+                  </p>
+                </div>
+              )}
+
+              {/* Bottom Info Bar inside Dark Map */}
+              <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-700/80 text-xs">
+                <div className="flex items-center gap-3 font-mono text-[11px] text-slate-300 flex-wrap">
+                  <span>
+                    Área: <strong className="text-emerald-400">{geoData.areaCalculadaHa || pericia.objetoDescricao.areaAfetadaHa} ha</strong>
+                  </span>
+                  <span>•</span>
+                  <span>
+                    Perímetro: <strong className="text-emerald-400">{geoData.perimetroCalculadoMeters || 1780} m</strong>
+                  </span>
+                  <span>•</span>
+                  <span>
+                    Vértices: <strong className="text-emerald-400">{geoData.pontos.length}</strong>
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* TABS FOR COORDINATE INPUT MODES */}

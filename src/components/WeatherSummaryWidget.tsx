@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { Thermometer, Wind, Droplets, CloudRain, CloudSun, ArrowRight, RefreshCw, MapPin } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { Thermometer, Wind, Droplets, CloudRain, CloudSun, ArrowRight, RefreshCw } from 'lucide-react';
 import { initialFarmWeatherStation } from '../data/weatherData';
 import { fetchRealtimeWeatherDataForFarm } from '../services/weatherApi';
 import { FarmWeatherStation } from '../types/weather';
@@ -9,17 +9,31 @@ export const WeatherSummaryWidget: React.FC<{ farm?: Farm; onClickDetails?: () =
   const [station, setStation] = useState<FarmWeatherStation>(initialFarmWeatherStation);
   const [loading, setLoading] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<string>('');
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const loadRealtimeData = useCallback(async () => {
+    if (!farm || (!farm.city && !farm.latitude)) {
+      return;
+    }
     setLoading(true);
     try {
       const live = await fetchRealtimeWeatherDataForFarm(farm);
+      if (!isMountedRef.current) return;
       setStation(live.station);
       setLastUpdated(live.fetchedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     } catch (err) {
-      console.warn('Erro ao carregar telemetria em tempo real:', err);
+      if (isMountedRef.current) {
+        console.warn('Erro ao carregar telemetria em tempo real:', err);
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) setLoading(false);
     }
   }, [farm?.id, farm?.latitude, farm?.longitude, farm?.city, farm?.state, farm?.name]);
 
@@ -80,11 +94,13 @@ export const WeatherSummaryWidget: React.FC<{ farm?: Farm; onClickDetails?: () =
             <Thermometer className="w-4 h-4 text-amber-500" />
           </div>
           <div className="text-2xl font-light text-slate-900 dark:text-zinc-100 flex items-baseline gap-1">
-            <span>{station.currentAirTempC}</span>
+            <span>{station.currentAirTempC !== 0 ? station.currentAirTempC : '--'}</span>
             <small className="text-xs font-normal text-slate-500">°C</small>
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded ml-auto">
-              Ao Vivo
-            </span>
+            {station.currentAirTempC !== 0 && (
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded ml-auto">
+                Ao Vivo
+              </span>
+            )}
           </div>
           <div className="text-[10px] text-slate-500 dark:text-zinc-400 flex justify-between">
             <span>Orvalho: {station.dewPointC !== undefined ? `${station.dewPointC}°C` : `${((station.currentAirTempC || 24) - 4).toFixed(1)}°C`}</span>

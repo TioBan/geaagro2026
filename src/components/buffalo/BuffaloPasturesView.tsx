@@ -18,7 +18,7 @@ interface BuffaloPasturesViewProps {
 export const BuffaloPasturesView: React.FC<BuffaloPasturesViewProps> = ({ paddocks }) => {
   const totalAreaHa = paddocks.reduce((acc, p) => acc + p.areaHa, 0);
   const totalAnimalsGrazing = paddocks.reduce((acc, p) => acc + p.currentAnimalCount, 0);
-  const avgStockingRate = paddocks.reduce((acc, p) => acc + p.currentStockingRateUaHa, 0) / (paddocks.length || 1);
+  const avgStockingRate = paddocks.length > 0 ? paddocks.reduce((acc, p) => acc + p.currentStockingRateUaHa, 0) / paddocks.length : 0;
 
   return (
     <div className="space-y-6">
@@ -26,14 +26,14 @@ export const BuffaloPasturesView: React.FC<BuffaloPasturesViewProps> = ({ paddoc
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xs space-y-2">
           <span className="text-[10px] uppercase font-bold text-slate-400">Área Total de Pastagens</span>
-          <div className="text-3xl font-black text-slate-900 dark:text-white">{totalAreaHa} <span className="text-sm font-bold text-slate-400">ha</span></div>
+          <div className="text-3xl font-black text-slate-900 dark:text-white">{totalAreaHa.toFixed(1)} <span className="text-sm font-bold text-slate-400">ha</span></div>
           <span className="text-xs text-slate-500">{paddocks.length} piquetes rotacionados</span>
         </div>
 
         <div className="p-5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xs space-y-2">
           <span className="text-[10px] uppercase font-bold text-slate-400">Taxa de Lotação Média</span>
           <div className="text-3xl font-black text-emerald-600">{avgStockingRate.toFixed(1)} <span className="text-sm font-bold text-slate-400">UA/ha</span></div>
-          <span className="text-xs text-teal-600 font-bold">Alta capacidade de suporte</span>
+          <span className="text-xs text-teal-600 font-bold">{paddocks.length > 0 ? 'Alta capacidade de suporte' : 'Sem dados de lotação'}</span>
         </div>
 
         <div className="p-5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xs space-y-2">
@@ -44,18 +44,29 @@ export const BuffaloPasturesView: React.FC<BuffaloPasturesViewProps> = ({ paddoc
 
         <div className="p-5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xs space-y-2">
           <span className="text-[10px] uppercase font-bold text-slate-400">Sombreamento Médio</span>
-          <div className="text-3xl font-black text-amber-600">25%</div>
-          <span className="text-xs text-slate-500">Árvores nativas + sombrites</span>
+          <div className="text-3xl font-black text-amber-600">
+            {paddocks.length > 0 ? `${Math.round(paddocks.reduce((acc, p) => acc + p.shadeAreaPct, 0) / paddocks.length)}%` : '0%'}
+          </div>
+          <span className="text-xs text-slate-500">{paddocks.length > 0 ? 'Árvores nativas + sombrites' : 'Sem piquetes cadastrados'}</span>
         </div>
       </div>
 
       {/* Lista de Piquetes Cadastrados */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {paddocks.map((paddock) => (
-          <div
-            key={paddock.id}
-            className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-4"
-          >
+      {paddocks.length === 0 ? (
+        <div className="bg-white dark:bg-zinc-900 border border-dashed border-slate-300 dark:border-zinc-700 rounded-3xl p-12 text-center space-y-2">
+          <Sprout className="w-12 h-12 text-slate-300 dark:text-zinc-600 mx-auto" />
+          <h3 className="text-base font-black text-slate-800 dark:text-zinc-200">Nenhum piquete cadastrado</h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            Cadastre os piquetes e módulos de pastejo rotacionado para acompanhar a capacidade de suporte e altura de manejo da forragem.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {paddocks.map((paddock) => (
+            <div
+              key={paddock.id}
+              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-4"
+            >
             <div className="flex items-start justify-between">
               <div>
                 <span className="px-2.5 py-0.5 bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 text-[10px] font-bold rounded-md">
@@ -101,7 +112,8 @@ export const BuffaloPasturesView: React.FC<BuffaloPasturesViewProps> = ({ paddoc
             )}
           </div>
         ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

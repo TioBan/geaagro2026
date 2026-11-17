@@ -11,22 +11,18 @@ import {
   WifiOff,
   ChevronDown,
   ChevronUp,
-  FlaskConical,
-  Activity,
   Layers,
   Scale,
   Zap,
   Info,
   Check,
   ArrowRight,
-  ShieldCheck,
   Crosshair,
-  Maximize2,
   Bug,
   X
 } from 'lucide-react';
 import { Farm, SoilSample, LeafSample } from '../types/agronomy';
-import { FOLIAR_SUFFICIENCY_RANGES, interpretNutrient, calculateRatios } from '../data/foliarData';
+import { interpretNutrient, calculateRatios } from '../data/foliarData';
 
 interface AIFarmScoreWidgetProps {
   farm: Farm;
@@ -151,8 +147,7 @@ export const AIFarmScoreWidget: React.FC<AIFarmScoreWidgetProps> = ({
   // Robust Agronomic Calculation integrating Soil + Foliar Analysis
   const calculateIntegratedOfflineScore = (
     soilList: SoilSample[],
-    leafList: LeafSample[],
-    currentFarm: Farm
+    leafList: LeafSample[]
   ): ScoreBreakdown => {
     const hasSoil = (soilList || []).length > 0;
     const hasLeaf = (leafList || []).length > 0;
@@ -502,20 +497,23 @@ export const AIFarmScoreWidget: React.FC<AIFarmScoreWidgetProps> = ({
     };
   };
 
-  const analyzeFarm = async () => {
+  const analyzeFarm = async (signal?: AbortSignal) => {
     setLoading(true);
     setIsOfflineMode(false);
 
-    // If forced offline or offline browser mode
-    if (forceOffline || !navigator.onLine) {
-      setIsOfflineMode(true);
+    const hasAnySamples = currentFarmSoilSamples.length > 0 || currentFarmLeafSamples.length > 0;
+
+    // Short-circuit locally when offline, forced offline, or no soil/leaf samples exist yet
+    if (forceOffline || !navigator.onLine || !hasAnySamples) {
+      setIsOfflineMode(forceOffline || !navigator.onLine);
       const offlineCalc = calculateIntegratedOfflineScore(
         currentFarmSoilSamples,
-        currentFarmLeafSamples,
-        farm
+        currentFarmLeafSamples
       );
-      setScoreData(offlineCalc);
-      setLoading(false);
+      if (!signal?.aborted) {
+        setScoreData(offlineCalc);
+        setLoading(false);
+      }
       return;
     }
 
@@ -523,6 +521,7 @@ export const AIFarmScoreWidget: React.FC<AIFarmScoreWidgetProps> = ({
       const response = await fetch('/api/nema-ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal,
         body: JSON.stringify({
           farmName: farm.name,
           domain: 'Solo & Nutrição',
@@ -540,14 +539,14 @@ Foque em:
 
       if (!response.ok) throw new Error('API offline/error');
       const { data } = await response.json();
+      if (signal?.aborted) return;
 
       const calculatedScore = Math.max(0, Math.min(100, 100 - (data.riskScorePercentage || 25)));
       
       // Calculate local baseline for precise breakdowns
       const localBase = calculateIntegratedOfflineScore(
         currentFarmSoilSamples,
-        currentFarmLeafSamples,
-        farm
+        currentFarmLeafSamples
       );
 
       let label = 'Bom';
@@ -606,34 +605,35 @@ Foque em:
         correlations: foliarDiag?.soilPlantSynchrony ? [foliarDiag.soilPlantSynchrony, ...localBase.correlations] : localBase.correlations
       });
 
-    } catch (err) {
+    } catch (err: any) {
+      if (signal?.aborted || err?.name === 'AbortError') return;
       console.warn('Fallback para cálculo algorítmico local Nema IA:', err);
       setIsOfflineMode(true);
       const offlineCalc = calculateIntegratedOfflineScore(
         currentFarmSoilSamples,
-        currentFarmLeafSamples,
-        farm
+        currentFarmLeafSamples
       );
       setScoreData(offlineCalc);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
   useEffect(() => {
-    analyzeFarm();
-    
-    const handleOnline = () => analyzeFarm();
-    const handleOffline = () => analyzeFarm();
-    
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
+    const controller = new AbortController();
+    analyzeFarm(controller.signal);
+
+    const handleConnectivity = () => analyzeFarm(controller.signal);
+
+    window.addEventListener('online', handleConnectivity);
+    window.addEventListener('offline', handleConnectivity);
+
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      controller.abort();
+      window.removeEventListener('online', handleConnectivity);
+      window.removeEventListener('offline', handleConnectivity);
     };
-  }, [farm?.id, soilSamples, leafSamples, forceOffline]);
+  }, [farm?.id, currentFarmSoilSamples, currentFarmLeafSamples, forceOffline]);
 
   const toggleCard = (cardType: ExpandedCardType) => {
     setExpandedCard(prev => prev === cardType ? null : cardType);

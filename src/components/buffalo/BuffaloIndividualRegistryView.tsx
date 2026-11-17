@@ -23,6 +23,7 @@ import {
   ChevronDown,
   CheckCircle2,
   FileText,
+  Tag,
   Camera,
   X
 } from 'lucide-react';
@@ -86,18 +87,18 @@ export const BuffaloIndividualRegistryView: React.FC<BuffaloIndividualRegistryVi
     coatColor: 'Preta',
     birthDate: new Date().toISOString().split('T')[0],
     purpose: 'Leite',
-    ownerFarm: 'Fazenda Vale dos Búfalos',
-    batchName: 'Lote Alta Lactação (Leite A)',
+    ownerFarm: '',
+    batchName: '',
     status: 'Em Lactação',
     bloodDegree: 'PO (Puro de Origem)',
     registrationCodeABCB: '',
-    currentWeightKg: 650,
-    birthWeightKg: 38,
+    currentWeightKg: 0,
+    birthWeightKg: 0,
     bodyConditionScore: 3.5,
     sireName: '',
     damName: '',
-    averageDailyMilkLiters: 14.5,
-    averageFatPct: 7.8,
+    averageDailyMilkLiters: 0,
+    averageFatPct: 0,
     notes: ''
   });
 
@@ -122,8 +123,8 @@ export const BuffaloIndividualRegistryView: React.FC<BuffaloIndividualRegistryVi
   const handleOpenAdd = () => {
     setEditingAnimal(null);
     setFormData({
-      identificationNumber: `BUF-${Math.floor(1000 + Math.random() * 9000)}`,
-      rfidCode: `9820003${Math.floor(10000000 + Math.random() * 90000000)}`,
+      identificationNumber: '',
+      rfidCode: '',
       name: '',
       breed: 'Murrah',
       sex: 'Fêmea',
@@ -131,18 +132,18 @@ export const BuffaloIndividualRegistryView: React.FC<BuffaloIndividualRegistryVi
       coatColor: 'Preta',
       birthDate: new Date().toISOString().split('T')[0],
       purpose: 'Leite',
-      ownerFarm: 'Fazenda Vale dos Búfalos',
-      batchName: 'Lote Alta Lactação (Leite A)',
+      ownerFarm: '',
+      batchName: '',
       status: 'Em Lactação',
       bloodDegree: 'PO (Puro de Origem)',
-      registrationCodeABCB: `ABCB-MR-${Math.floor(10000 + Math.random() * 90000)}`,
-      currentWeightKg: 640,
-      birthWeightKg: 38,
+      registrationCodeABCB: '',
+      currentWeightKg: 0,
+      birthWeightKg: 0,
       bodyConditionScore: 3.5,
       sireName: '',
       damName: '',
-      averageDailyMilkLiters: 14.0,
-      averageFatPct: 7.8,
+      averageDailyMilkLiters: 0,
+      averageFatPct: 0,
       notes: ''
     });
     setShowModal(true);
@@ -317,12 +318,38 @@ export const BuffaloIndividualRegistryView: React.FC<BuffaloIndividualRegistryVi
       </div>
 
       {/* Grid de Cards de Búfalos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filteredAnimals.map((animal) => (
-          <div
-            key={animal.id}
-            className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 relative"
-          >
+      {filteredAnimals.length === 0 ? (
+        <div className="bg-white dark:bg-zinc-900 border border-dashed border-slate-300 dark:border-zinc-700 rounded-3xl p-12 text-center space-y-4">
+          <div className="w-16 h-16 bg-teal-50 dark:bg-teal-950/50 text-teal-600 rounded-2xl flex items-center justify-center mx-auto">
+            <Tag className="w-8 h-8" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-black text-slate-800 dark:text-zinc-200">
+              {animals.length === 0 ? 'Nenhum animal cadastrado no rebanho' : 'Nenhum animal encontrado com os filtros aplicados'}
+            </h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              {animals.length === 0
+                ? 'Comece cadastrando suas matrizes, reprodutores e bezerros para ativar os controles zootécnicos e o Gêmeo Digital.'
+                : 'Tente alterar os termos de busca ou remover os filtros de raça, categoria ou status.'}
+            </p>
+          </div>
+          {animals.length === 0 && (
+            <button
+              onClick={handleOpenAdd}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Cadastrar Primeiro Búfalo</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filteredAnimals.map((animal) => (
+            <div
+              key={animal.id}
+              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 relative"
+            >
             {/* Header do Card */}
             <div>
               <div className="flex items-start justify-between gap-2">
@@ -423,7 +450,8 @@ export const BuffaloIndividualRegistryView: React.FC<BuffaloIndividualRegistryVi
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
 
       {/* Modal de Cadastro / Edição */}
       {showModal && (

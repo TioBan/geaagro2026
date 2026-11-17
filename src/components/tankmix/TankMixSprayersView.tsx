@@ -3,16 +3,8 @@ import {
   Tractor,
   Plus,
   Trash2,
-  Sliders,
-  CheckCircle2,
-  AlertTriangle,
-  Info,
-  Layers,
-  Gauge,
-  Zap,
 } from 'lucide-react';
 import { SprayerEquipment } from '../../types/tankMix';
-import { DEFAULT_SPRAYERS } from '../../data/tankMixData';
 
 interface Props {
   sprayers: SprayerEquipment[];
@@ -32,10 +24,8 @@ export const TankMixSprayersView: React.FC<Props> = ({
   const [boomWidth, setBoomWidth] = useState(30);
   const [nozzleType, setNozzleType] = useState('Leque com Indução de Ar 110-02');
   const [spacingCm, setSpacingCm] = useState(50);
-  const [pressureBar, setPressureBar] = useState(3.0);
   const [speedKmH, setSpeedKmH] = useState(16);
   const [flowRateLMin, setFlowRateLMin] = useState(0.8);
-  const [filterMesh, setFilterMesh] = useState(100);
 
   // Calculate Application Rate in L/ha:
   // Taxa (L/ha) = (Vazao_bico (L/min) * 60.000) / (Velocidade (km/h) * Espacamento (cm))
@@ -54,11 +44,11 @@ export const TankMixSprayersView: React.FC<Props> = ({
       boomWidthMeters: boomWidth,
       nozzleType,
       nozzleSpacingCm: spacingCm,
-      operatingPressureBar: pressureBar,
+      operatingPressureBar: 3.0,
       operatingSpeedKmH: speedKmH,
       nozzleFlowRateLMin: flowRateLMin,
       applicationRateLHa: calculatedRateLHa,
-      filterMesh,
+      filterMesh: 100,
     };
 
     setSprayers(prev => [...prev, newSprayer]);

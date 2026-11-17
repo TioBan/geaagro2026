@@ -62,21 +62,22 @@ export const BuffaloDashboardView: React.FC<BuffaloDashboardViewProps> = ({
   // Métricas Leiteiras
   const totalDailyMilk = lactatingCows.reduce((acc, a) => acc + (a.averageDailyMilkLiters || 0), 0);
   const avgMilkPerCow = lactatingCows.length > 0 ? (totalDailyMilk / lactatingCows.length) : 0;
-  const avgFat = lactatingCows.length > 0 ? lactatingCows.reduce((acc, a) => acc + (a.averageFatPct || 7.8), 0) / lactatingCows.length : 7.8;
-  const avgProtein = lactatingCows.length > 0 ? lactatingCows.reduce((acc, a) => acc + (a.averageProteinPct || 4.4), 0) / lactatingCows.length : 4.4;
-  const mozzarellaLitersPerKg = calculateMozzarellaYieldLitersPerKg(avgFat, avgProtein);
+  const avgFat = lactatingCows.length > 0 ? lactatingCows.reduce((acc, a) => acc + (a.averageFatPct || 0), 0) / lactatingCows.length : 0;
+  const avgProtein = lactatingCows.length > 0 ? lactatingCows.reduce((acc, a) => acc + (a.averageProteinPct || 0), 0) / lactatingCows.length : 0;
+  const mozzarellaLitersPerKg = (avgFat > 0 && avgProtein > 0) ? calculateMozzarellaYieldLitersPerKg(avgFat, avgProtein) : 0;
   const dailyMozzarellaKg = mozzarellaLitersPerKg > 0 ? totalDailyMilk / mozzarellaLitersPerKg : 0;
 
   // Métricas de Carne & Peso
   const avgWeight = totalAnimals > 0 ? Math.round(animals.reduce((acc, a) => acc + a.currentWeightKg, 0) / totalAnimals) : 0;
   const beefAnimals = animals.filter(a => a.purpose === 'Corte' || a.category.includes('Engorda') || a.category.includes('Terminação'));
-  const avgBeefWeight = beefAnimals.length > 0 ? Math.round(beefAnimals.reduce((acc, a) => acc + a.currentWeightKg, 0) / beefAnimals.length) : 512;
-  const avgGMD = 0.76; // kg/dia médio
+  const avgBeefWeight = beefAnimals.length > 0 ? Math.round(beefAnimals.reduce((acc, a) => acc + a.currentWeightKg, 0) / beefAnimals.length) : 0;
+  const avgGMD = beefAnimals.length > 0 ? 0.76 : 0;
 
   // Indicadores Reprodutivos
   const pregnantCount = (animals || []).filter(a => a && (a.status === 'Gestante' || (a.reproductionRecords && a.reproductionRecords.length > 0 && a.reproductionRecords[a.reproductionRecords.length - 1]?.dgResult === 'Positivo (Gestante)'))).length;
   const pregnancyRate = (females || []).length > 0 ? Math.round((pregnantCount / (females || []).length) * 100) : 0;
-  const calvingIntervalAvg = 402; // dias
+  const animalsWithIEP = (females || []).filter(a => a.calvingIntervalDays);
+  const calvingIntervalAvg = animalsWithIEP.length > 0 ? Math.round(animalsWithIEP.reduce((acc, a) => acc + (a.calvingIntervalDays || 0), 0) / animalsWithIEP.length) : 0;
 
   // Sanidade
   const pendingVaccines = 0; // Rebanho imunizado
@@ -327,19 +328,19 @@ export const BuffaloDashboardView: React.FC<BuffaloDashboardViewProps> = ({
             <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-100 dark:border-zinc-800">
               <span className="text-slate-500 dark:text-zinc-400 text-xs block">Bezerras e Bezerros (0-6m)</span>
               <div className="text-xl font-black text-slate-900 dark:text-white mt-1">{calves.length}</div>
-              <span className="text-[10px] text-emerald-600 font-semibold">100% colostrados</span>
+              <span className="text-[10px] text-emerald-600 font-semibold">{calves.length > 0 ? '100% colostrados' : '-'}</span>
             </div>
 
             <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-100 dark:border-zinc-800">
               <span className="text-slate-500 dark:text-zinc-400 text-xs block">Novilhas em Recria (7-24m)</span>
               <div className="text-xl font-black text-slate-900 dark:text-white mt-1">{heifers.length}</div>
-              <span className="text-[10px] text-slate-500">Média 345 kg</span>
+              <span className="text-[10px] text-slate-500">{heifers.length > 0 ? 'Média 345 kg' : '-'}</span>
             </div>
 
             <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-100 dark:border-zinc-800">
               <span className="text-slate-500 dark:text-zinc-400 text-xs block">Engorda &amp; Terminação</span>
               <div className="text-xl font-black text-slate-900 dark:text-white mt-1">{beefFattening.length}</div>
-              <span className="text-[10px] text-slate-500">Previsão abate 530 kg</span>
+              <span className="text-[10px] text-slate-500">{beefFattening.length > 0 ? 'Previsão abate 530 kg' : '-'}</span>
             </div>
           </div>
 
@@ -348,35 +349,41 @@ export const BuffaloDashboardView: React.FC<BuffaloDashboardViewProps> = ({
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 block">
               Animais Destaque (Acesso Rápido ao Gêmeo Digital)
             </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {animals.slice(0, 2).map((animal) => (
-                <div
-                  key={animal.id}
-                  onClick={() => {
-                    if (onSelectAnimalForTwin) onSelectAnimalForTwin(animal.id);
-                    onNavigateTab('digital_twin');
-                  }}
-                  className="p-3 bg-slate-50 dark:bg-zinc-800/40 hover:bg-teal-50 dark:hover:bg-teal-950/30 border border-slate-200 dark:border-zinc-700 hover:border-teal-400 rounded-xl cursor-pointer transition-all flex items-center justify-between"
-                >
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-extrabold text-xs text-slate-900 dark:text-white">{animal.identificationNumber}</span>
-                      <span className="px-1.5 py-0.2 bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 font-bold text-[10px] rounded">
-                        {animal.breed}
-                      </span>
+            {animals.length === 0 ? (
+              <p className="text-xs text-slate-400 py-3 text-center bg-slate-50 dark:bg-zinc-800/30 rounded-xl border border-dashed border-slate-200 dark:border-zinc-800">
+                Nenhum animal cadastrado no rebanho. Acesse a aba <strong>Registro Individual</strong> para iniciar o plantel.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {animals.slice(0, 2).map((animal) => (
+                  <div
+                    key={animal.id}
+                    onClick={() => {
+                      if (onSelectAnimalForTwin) onSelectAnimalForTwin(animal.id);
+                      onNavigateTab('digital_twin');
+                    }}
+                    className="p-3 bg-slate-50 dark:bg-zinc-800/40 hover:bg-teal-50 dark:hover:bg-teal-950/30 border border-slate-200 dark:border-zinc-700 hover:border-teal-400 rounded-xl cursor-pointer transition-all flex items-center justify-between"
+                  >
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-extrabold text-xs text-slate-900 dark:text-white">{animal.identificationNumber}</span>
+                        <span className="px-1.5 py-0.2 bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 font-bold text-[10px] rounded">
+                          {animal.breed}
+                        </span>
+                      </div>
+                      <p className="text-xs font-bold text-slate-700 dark:text-zinc-300">{animal.name}</p>
+                      <span className="text-[11px] text-slate-500">{animal.category} • {animal.currentWeightKg} kg</span>
                     </div>
-                    <p className="text-xs font-bold text-slate-700 dark:text-zinc-300">{animal.name}</p>
-                    <span className="text-[11px] text-slate-500">{animal.category} • {animal.currentWeightKg} kg</span>
+                    <div className="text-right">
+                      <span className="text-xs font-black text-teal-600 dark:text-teal-400 block">
+                        {animal.status === 'Em Lactação' ? `${animal.averageDailyMilkLiters} L/dia` : `${animal.currentWeightKg} kg`}
+                      </span>
+                      <span className="text-[10px] text-slate-400">Ver Gêmeo →</span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-xs font-black text-teal-600 dark:text-teal-400 block">
-                      {animal.status === 'Em Lactação' ? `${animal.averageDailyMilkLiters} L/dia` : `${animal.currentWeightKg} kg`}
-                    </span>
-                    <span className="text-[10px] text-slate-400">Ver Gêmeo →</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

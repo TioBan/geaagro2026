@@ -113,7 +113,7 @@ export function getTankMixSummaryMetrics(operations: FieldOperation[]) {
 
   const avgPh = phReadings.length > 0
     ? (phReadings.reduce((a, b) => a + b, 0) / phReadings.length).toFixed(1)
-    : '5.8';
+    : '--';
 
   const totalInvestment = tankMixOps.reduce((sum, op) => sum + (op.costs?.total || 0), 0);
 

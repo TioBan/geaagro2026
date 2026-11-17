@@ -274,16 +274,16 @@ export const initialIrrigationSchedule: IrrigationTimerSchedule = {
 };
 
 export const initialHydroponicSensors: HydroponicEnvironmentSensors = {
-  greenhouseName: 'Estufa 01 - Hidroponia Principal',
-  airTempC: 25.8,
-  relativeHumidityPercent: 68,
-  vpdKpa: 1.05,
-  lightLux: 48500,
-  radiationWm2: 640,
-  co2Ppm: 580,
-  ventilationActive: true,
+  greenhouseName: 'Nenhuma estufa conectada',
+  airTempC: 0,
+  relativeHumidityPercent: 0,
+  vpdKpa: 0,
+  lightLux: 0,
+  radiationWm2: 0,
+  co2Ppm: 0,
+  ventilationActive: false,
   foggingActive: false,
-  shadingScreenPercent: 50,
+  shadingScreenPercent: 0,
 };
 
 export const initialHydroponicAlerts: HydroponicAlert[] = [];
@@ -291,25 +291,25 @@ export const initialHydroponicAlerts: HydroponicAlert[] = [];
 export const initialHydroponicOrders: HydroponicCustomerOrder[] = [];
 
 export const initialHydroponicFinancials: HydroponicFinancialSummary = {
-  monthYear: 'Agosto / 2026',
-  grossRevenueBrl: 28450.0,
-  totalHarvestedUnits: 8900,
-  totalHarvestedKg: 2850,
+  monthYear: '--',
+  grossRevenueBrl: 0,
+  totalHarvestedUnits: 0,
+  totalHarvestedKg: 0,
   costBreakdown: {
-    fertilizers: 2150.0,
-    seeds: 950.0,
-    phenolicFoamAndCups: 1240.0,
-    electricity: 1850.0,
-    water: 420.0,
-    packagingAndLabels: 1120.0,
-    labor: 4200.0,
-    transport: 980.0,
+    fertilizers: 0,
+    seeds: 0,
+    phenolicFoamAndCups: 0,
+    electricity: 0,
+    water: 0,
+    packagingAndLabels: 0,
+    labor: 0,
+    transport: 0,
   },
-  totalOperatingCostBrl: 12910.0,
-  netProfitBrl: 15540.0,
-  profitMarginPercent: 54.6,
-  unitCostPerPlantBrl: 1.45,
-  unitSellingPriceAvgBrl: 3.2,
+  totalOperatingCostBrl: 0,
+  netProfitBrl: 0,
+  profitMarginPercent: 0,
+  unitCostPerPlantBrl: 0,
+  unitSellingPriceAvgBrl: 0,
 };
 
 export const hydroponicPestDiseaseCatalog: HydroponicPestDiseaseGuide[] = [

@@ -336,7 +336,7 @@ export interface BuffaloFeedItem {
 
 export interface BuffaloIEBCalculation {
   overallScore: number; // 0 to 100
-  classification: 'Excelente / Elite' | 'Muito Bom' | 'Satisfatório' | 'Abaixo da Média' | 'Crítico';
+  classification: 'Excelente / Elite' | 'Muito Bom' | 'Satisfatório' | 'Abaixo da Média' | 'Crítico' | 'Sem Dados';
   reproductiveEfficiencyScore: number; // 25%
   productiveEfficiencyScore: number; // 25%
   healthBiosecurityScore: number; // 15%

@@ -105,8 +105,7 @@ class PesticideIndexedDBService {
    */
   public async initialize(defaultCatalog: PesticideProduct[] = INITIAL_PESTICIDES_CATALOG): Promise<PesticideProduct[]> {
     try {
-      const db = await this.getDB();
-      const count = await this.countProducts(db);
+      await this.getDB();
 
       // If already initialized with valid records without stale series suffixes, load them
       const stored = await this.getAllProducts();
@@ -127,23 +126,6 @@ class PesticideIndexedDBService {
       }
       return Array.from(this.memoryFallbackStore.values());
     }
-  }
-
-  /**
-   * Count products in the store
-   */
-  private async countProducts(db: IDBDatabase): Promise<number> {
-    return new Promise<number>((resolve) => {
-      try {
-        const tx = db.transaction(PRODUCTS_STORE, 'readonly');
-        const store = tx.objectStore(PRODUCTS_STORE);
-        const req = store.count();
-        req.onsuccess = () => resolve(req.result || 0);
-        req.onerror = () => resolve(0);
-      } catch {
-        resolve(0);
-      }
-    });
   }
 
   /**

@@ -228,7 +228,12 @@ export const PlantabilityModule: React.FC<PlantabilityModuleProps> = ({
         )}
 
         {activeTab === 'map' && (
-          <PlantabilityMapView fields={fields} samplings={samplings} configs={configs} />
+          <PlantabilityMapView
+            fields={fields}
+            samplings={samplings}
+            configs={configs}
+            onSaveField={handleSaveField}
+          />
         )}
 
         {activeTab === 'photo-diary' && (

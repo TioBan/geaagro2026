@@ -67,7 +67,7 @@ function getFormulation(name: string): string {
   return 'Outro - Isca ou Armadilha de Feromônio Fisiológica';
 }
 
-function getBiologicalDetails(name: string, ai: string): { crop: string[]; target: string; desc: string } {
+function getBiologicalDetails(name: string): { crop: string[]; target: string; desc: string } {
   const upper = name.toUpperCase();
   if (upper.includes('AGREE') || upper.includes('THURICIDE')) {
     return {
@@ -192,7 +192,7 @@ function getBiologicalDetails(name: string, ai: string): { crop: string[]; targe
 export const BIOCONTROLE_OFFICIAL_CATALOG: PesticideProduct[] = RAW_PRODUCTS.map((raw, idx) => {
   const uniqueId = `agro-bio-${String(idx + 1).padStart(4, '0')}`;
   const formulation = getFormulation(raw.name);
-  const bioInfo = getBiologicalDetails(raw.name, raw.ai);
+  const bioInfo = getBiologicalDetails(raw.name);
 
   return {
     id: uniqueId,

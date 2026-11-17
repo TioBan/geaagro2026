@@ -29,16 +29,49 @@
     transition: background-color 0.2s ease, color 0.2s ease;
   }
 
-  .dark body,
-  html.dark body {
-    background-color: #0b110d;
+  .dark:not(.amoled) body,
+  html.dark:not(.amoled) body {
+    background-color: #0f172a;
     color: #f1f5f9;
+  }
+
+  .dark.amoled body,
+  html.dark.amoled body {
+    background-color: #000000;
+    color: #ffffff;
   }
 }
 
-/* AMOLED Deep Dark Helpers */
+/* AMOLED Deep Dark (100% Pitch Black) & Power Saver Helpers */
 .dark {
   color-scheme: dark;
+}
+
+html.dark.amoled,
+html.dark.amoled body,
+html.dark.amoled main,
+html.dark.amoled #app-sidebar-drawer,
+html.dark.amoled header,
+html.dark.amoled footer {
+  background-color: #000000 !important;
+}
+
+html.dark.amoled .dark\:bg-\[\#0b110d\],
+html.dark.amoled .dark\:bg-zinc-900,
+html.dark.amoled .dark\:bg-zinc-950,
+html.dark.amoled .dark\:bg-slate-900,
+html.dark.amoled .dark\:bg-slate-950 {
+  background-color: #000000 !important;
+}
+
+html.power-saver *,
+html.power-saver *::before,
+html.power-saver *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /* Custom subtle scrollbar (light & dark AMOLED) */

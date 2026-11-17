@@ -1,4 +1,4 @@
-import { PesticideProduct, CropIndication } from '../types/pesticideLeaflet';
+import { PesticideProduct } from '../types/pesticideLeaflet';
 import { pesticideIndexedDB, SerializedIndexCache } from './pesticideIndexedDB';
 
 /**

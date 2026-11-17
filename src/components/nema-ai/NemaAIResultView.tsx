@@ -400,11 +400,11 @@ export const NemaAIResultView: React.FC<NemaAIResultViewProps> = ({
               <ShieldAlert className="w-4 h-4" />
               Manejo de Insumos Químicos / Farmacológicos
             </span>
-            <div className="bg-white dark:bg-zinc-900 p-3 rounded-lg border border-slate-250 dark:border-zinc-800 text-xs space-y-1">
+            <div className="bg-white dark:bg-zinc-900 p-3 rounded-lg border border-slate-200 dark:border-zinc-800 text-xs space-y-1">
               <span className="text-[10px] font-bold text-slate-400 block uppercase">
                 Intervenção Química Recomendada?
               </span>
-              <strong className={`text-xs block ${analysisResult.chemicalManagementPlan?.recommended ? 'text-amber-500' : 'text-emerald-600'}`}>
+              <strong className={`text-xs block ${analysisResult.chemicalManagementPlan?.recommended ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600'}`}>
                 {analysisResult.chemicalManagementPlan?.recommended ? 'Sim, justificado sob alta pressão' : 'Não prioritário / Preservar controle biológico'}
               </strong>
               {analysisResult.chemicalManagementPlan?.activeIngredients && analysisResult.chemicalManagementPlan.activeIngredients.length > 0 && (
@@ -433,18 +433,18 @@ export const NemaAIResultView: React.FC<NemaAIResultViewProps> = ({
         </div>
 
         {/* Technical Checklist */}
-        <div className="p-4 rounded-xl bg-slate-950 text-white space-y-3.5">
-          <span className="text-xs font-black uppercase text-amber-400 flex items-center gap-1.5">
+        <div className="p-4 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 space-y-3.5">
+          <span className="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
             <CheckCircle2 className="w-4 h-4" />
             Checklist Operacional de Campo da Nema IA
           </span>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
             {(analysisResult.actionChecklist || []).map((c, idx) => (
-              <div key={idx} className="flex items-start gap-2.5 bg-zinc-900 p-3 rounded-xl border border-zinc-800">
-                <span className="bg-amber-500/15 text-amber-400 text-[10px] font-black px-2 py-0.5 rounded-md shrink-0">
+              <div key={idx} className="flex items-start gap-2.5 bg-white dark:bg-zinc-900 p-3 rounded-xl border border-slate-200 dark:border-zinc-800">
+                <span className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0">
                   PASSO {idx + 1}
                 </span>
-                <span className="text-zinc-200 text-[11px] leading-relaxed font-semibold">{c}</span>
+                <span className="text-slate-700 dark:text-zinc-200 text-[11px] leading-relaxed font-medium">{c}</span>
               </div>
             ))}
           </div>

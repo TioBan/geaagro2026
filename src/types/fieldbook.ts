@@ -179,6 +179,7 @@ export interface FieldOperation {
 
 export interface Field {
   id: string;
+  code?: string;
   farmId: string;
   name: string;
   areaHa: number;
@@ -186,6 +187,7 @@ export interface Field {
   variety: string;
   season: string;
   soilType: string;
+  plantingDate?: string;
   coordinates: { lat: number; lng: number }[];
   activeNurseryBatchId?: string; // Vínculo com lote de mudas
   seedlingTransplantDate?: string;
@@ -202,3 +204,59 @@ export interface FieldBookDashboardSummary {
   fuelUsedLiters: number;
   iggsScore: number; // Índice GeaAgro de Gestão da Safra
 }
+
+export interface GlobalGapAuditChapter {
+  id: string;
+  code: string;
+  title: string;
+  mustType: 'Major' | 'Minor';
+  status: 'compliant' | 'pending';
+  scorePct: number;
+  verifiedCount: number;
+  totalCount: number;
+  description: string;
+}
+
+export interface GlobalGapResidueSubstance {
+  ingredient: string;
+  detectedValueMgKg: number;
+  mrlAllowedMgKg: number;
+  mrlSource: string;
+  status: 'OK' | 'ALERT';
+}
+
+export interface GlobalGapAuditData {
+  certificateNumber: string;
+  certificationBody: string;
+  standardVersion: string;
+  auditDate: string;
+  expiryDate: string;
+  status: 'pending' | 'certified' | 'expired';
+  auditorName: string;
+  auditorRegistration: string;
+  farmName: string;
+  scope: string[];
+  complianceScore: {
+    overallPct: number;
+    majorMustsPct: number;
+    minorMustsPct: number;
+    recommendationsPct: number;
+  };
+  summaryStats: {
+    totalControlPoints: number;
+    compliantPoints: number;
+    minorNonCompliancesResolved: number;
+    majorNonCompliances: number;
+    notApplicable: number;
+  };
+  chapters: GlobalGapAuditChapter[];
+  residueAnalysis: {
+    labName: string;
+    sampleDate: string;
+    reportNumber: string;
+    overallStatus: string;
+    testedMatrix: string;
+    substances: GlobalGapResidueSubstance[];
+  };
+}
+

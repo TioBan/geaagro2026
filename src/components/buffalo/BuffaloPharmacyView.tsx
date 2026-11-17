@@ -92,30 +92,38 @@ export const BuffaloPharmacyView: React.FC<BuffaloPharmacyViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
-              {filteredItems.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-zinc-800/50">
-                  <td className="p-3">
-                    <div className="font-bold text-slate-900 dark:text-white">{item.name}</div>
-                    <span className="text-[11px] text-slate-500">Lote: {item.batchNumber} • {item.activeIngredient}</span>
+              {filteredItems.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-slate-500 text-xs">
+                    Nenhum medicamento ou insumo farmacêutico em estoque.
                   </td>
-                  <td className="p-3 font-semibold text-teal-600">{item.category}</td>
-                  <td className="p-3 font-black">
-                    <span className={item.stockQuantity <= item.minimumStock ? 'text-amber-600' : 'text-slate-900 dark:text-white'}>
-                      {item.stockQuantity} {item.unit}
-                    </span>
-                  </td>
-                  <td className="p-3 font-bold text-emerald-600">R$ {item.unitCostBRL.toFixed(2)}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${item.milkWithdrawalDays === 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                      {item.milkWithdrawalDays === 0 ? 'Zero dias' : `${item.milkWithdrawalDays} dias`}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    <span className="text-slate-700 dark:text-zinc-300 font-semibold">{item.meatWithdrawalDays} dias</span>
-                  </td>
-                  <td className="p-3 font-semibold text-slate-600 dark:text-zinc-400">{item.expirationDate}</td>
                 </tr>
-              ))}
+              ) : (
+                filteredItems.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-zinc-800/50">
+                    <td className="p-3">
+                      <div className="font-bold text-slate-900 dark:text-white">{item.name}</div>
+                      <span className="text-[11px] text-slate-500">Lote: {item.batchNumber} • {item.activeIngredient}</span>
+                    </td>
+                    <td className="p-3 font-semibold text-teal-600">{item.category}</td>
+                    <td className="p-3 font-black">
+                      <span className={item.stockQuantity <= item.minimumStock ? 'text-amber-600' : 'text-slate-900 dark:text-white'}>
+                        {item.stockQuantity} {item.unit}
+                      </span>
+                    </td>
+                    <td className="p-3 font-bold text-emerald-600">R$ {item.unitCostBRL.toFixed(2)}</td>
+                    <td className="p-3">
+                      <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${item.milkWithdrawalDays === 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                        {item.milkWithdrawalDays === 0 ? 'Zero dias' : `${item.milkWithdrawalDays} dias`}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <span className="text-slate-700 dark:text-zinc-300 font-semibold">{item.meatWithdrawalDays} dias</span>
+                    </td>
+                    <td className="p-3 font-semibold text-slate-600 dark:text-zinc-400">{item.expirationDate}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

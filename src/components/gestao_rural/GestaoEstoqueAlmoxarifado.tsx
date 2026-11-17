@@ -1,23 +1,17 @@
 import React, { useState } from 'react';
 import {
   Package,
-  AlertTriangle,
   Plus,
   Search,
-  CheckCircle2,
-  Clock,
-  Building2,
-  Calendar,
-  Layers,
 } from 'lucide-react';
 import { ItemEstoqueRural, FornecedorRural, CompraInsumoRecord } from '../../types/gestaoRural';
 
 interface GestaoEstoqueAlmoxarifadoProps {
   estoque: ItemEstoqueRural[];
   fornecedores: FornecedorRural[];
-  compras: CompraInsumoRecord[];
+  compras?: CompraInsumoRecord[];
   onAddEstoqueItem: (item: ItemEstoqueRural) => void;
-  onAddMovimentacao: (
+  onAddMovimentacao?: (
     itemId: string,
     tipo: 'entrada' | 'saida',
     quantidade: number,
@@ -28,9 +22,7 @@ interface GestaoEstoqueAlmoxarifadoProps {
 export const GestaoEstoqueAlmoxarifado: React.FC<GestaoEstoqueAlmoxarifadoProps> = ({
   estoque,
   fornecedores,
-  compras,
   onAddEstoqueItem,
-  onAddMovimentacao,
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('TODOS');
@@ -82,6 +74,20 @@ export const GestaoEstoqueAlmoxarifado: React.FC<GestaoEstoqueAlmoxarifadoProps>
 
     onAddEstoqueItem(created);
     setShowAddModal(false);
+    setNewItem({
+      codigo: `INS-0${estoque.length + 2}`,
+      nome: '',
+      categoria: 'Fertilizantes',
+      lote: '',
+      dataValidade: '',
+      fornecedorNome: fornecedores[0]?.nomeEmpresa || '',
+      quantidadeAtual: 0,
+      unidadeMedida: 'kg',
+      precoUnitarioR$: 0,
+      estoqueMinimo: 0,
+      localArmazenamento: '',
+      statusAlerta: 'normal',
+    });
   };
 
   const CATEGORIAS = [
@@ -282,8 +288,8 @@ export const GestaoEstoqueAlmoxarifado: React.FC<GestaoEstoqueAlmoxarifadoProps>
               })}
               {filteredEstoque.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-400">
-                    Nenhum item cadastrado no estoque. Clique em &ldquo;Cadastrar Novo Produto&rdquo; para adicionar insumos.
+                  <td colSpan={8} className="p-8 text-center text-slate-400">
+                    Nenhum item cadastrado no estoque. Clique em &ldquo;Cadastrar Novo Produto / Insumo&rdquo; para adicionar insumos.
                   </td>
                 </tr>
               )}

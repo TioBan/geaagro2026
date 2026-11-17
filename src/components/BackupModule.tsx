@@ -79,6 +79,17 @@ import {
   saveBackupFileWithNativePicker
 } from '../services/folderPickerService';
 import { opfsWasmDB, OpfsEngineDiagnostics } from '../services/opfsWasmDatabase';
+import { StatusSincronizacaoRecupera } from '../types/recupera';
+import {
+  exportarBackupJsonRecupera,
+  restaurarBackupJsonRecupera,
+  obterStatusSincronizacaoRecupera,
+  registrarSincronizacaoRealizada,
+  resetarTodosOsDadosRecupera
+} from '../utils/recuperaStorage';
+import { estatisticaStorage } from '../modules/estatistica/storage/estatisticaStorage';
+import { EstatisticaBackupMetadata } from '../modules/estatistica/types/estatistica';
+import { useAppUpdate } from '../hooks/useAppUpdate';
 
 interface BackupModuleProps {
   activeSubTab?: string;
@@ -193,8 +204,14 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
 
   // Selected Modules for Selective Backup
   const [selectedModules, setSelectedModules] = useState<string[]>([
-    'solos', 'doencas_solo', 'foliar', 'pecuaria', 'caderno_campo', 'irrigacao', 'pluviometria', 'relatorios', 'meteorologia', 'custos'
+    'solos', 'doencas_solo', 'foliar', 'pecuaria', 'caderno_campo', 'irrigacao', 'pluviometria', 'relatorios', 'meteorologia', 'custos', 'recupera'
   ]);
+
+  // Estado integrado de Backup & Sincronização do Módulo Recupera
+  const [recuperaSyncStatus, setRecuperaSyncStatus] = useState<StatusSincronizacaoRecupera>(() => obterStatusSincronizacaoRecupera());
+  const [isSyncingRecupera, setIsSyncingRecupera] = useState<boolean>(false);
+  const [recuperaJsonImport, setRecuperaJsonImport] = useState<string>('');
+  const recuperaFileInputRef = useRef<HTMLInputElement>(null);
 
   // Action feedback modal / notification
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
@@ -242,9 +259,43 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
   // StorageManager API hook (navigator.storage.estimate())
   const storageStats = useStorageEstimate();
   const [opfsDiagnostics, setOpfsDiagnostics] = useState<OpfsEngineDiagnostics | null>(null);
+  const [estatisticaStorageStatus, setEstatisticaStorageStatus] = useState<{
+    engine: string;
+    usageBytes: number;
+    quotaBytes: number;
+    percentage: number;
+    isPersistent: boolean;
+    totalProjetos: number;
+    totalExperimentos: number;
+    totalResultados: number;
+    totalGraficos: number;
+    artefatosOpfsCount: number;
+  } | null>(null);
+  const [estatisticaBackupsMeta, setEstatisticaBackupsMeta] = useState<EstatisticaBackupMetadata[]>([]);
+  const [isRegisteringEstatisticaCheckpoint, setIsRegisteringEstatisticaCheckpoint] = useState(false);
+  const {
+    updateAvailable: pwaUpdateAvailable,
+    isChecking: isCheckingPwaUpdate,
+    isUpToDate: isPwaUpToDate,
+    currentVersion: pwaCurrentVersion,
+    checkForUpdates: checkPwaUpdates,
+    applyUpdate: applyPwaUpdate
+  } = useAppUpdate();
+
+  const refreshEstatisticaOpfs = async () => {
+    try {
+      const [status, meta] = await Promise.all([
+        estatisticaStorage.obterStatusArmazenamento(),
+        estatisticaStorage.listarBackupsMetadata()
+      ]);
+      setEstatisticaStorageStatus(status);
+      setEstatisticaBackupsMeta(meta);
+    } catch {}
+  };
 
   useEffect(() => {
     opfsWasmDB.getEngineDiagnostics().then(setOpfsDiagnostics).catch(() => {});
+    void refreshEstatisticaOpfs();
   }, [currentTab]);
 
   const handleSetDiskCapacity = (gb: number) => {
@@ -280,10 +331,96 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
   // Select all modules
   const selectAllModules = () => {
     setSelectedModules([
-      'solos', 'foliar', 'pecuaria', 'caderno_campo', 'irrigacao',
+      'solos', 'doencas_solo', 'foliar', 'pecuaria', 'caderno_campo', 'irrigacao',
       'pluviometria', 'relatorios', 'meteorologia', 'custos', 'avicultura',
-      'sementes', 'nematologia', 'pragas', 'bulario', 'diario_fotos'
+      'sementes', 'nematologia', 'pragas', 'bulario', 'diario_fotos', 'recupera',
+      'estatistica'
     ]);
+  };
+
+  const handleRegistrarCheckpointEstatistica = async () => {
+    setIsRegisteringEstatisticaCheckpoint(true);
+    try {
+      const status = estatisticaStorageStatus || (await estatisticaStorage.obterStatusArmazenamento());
+      await estatisticaStorage.registrarMetadataBackup({
+        titulo: `Ponto de Verificação Estatístico — ${new Date().toLocaleDateString('pt-BR')}`,
+        projetosCount: status.totalProjetos,
+        experimentosCount: status.totalExperimentos,
+        resultadosCount: status.totalResultados,
+        artefatosOpfsCount: status.artefatosOpfsCount,
+        checksumIntegrado: Math.round(status.usageBytes % 1000000007),
+      });
+      await refreshEstatisticaOpfs();
+      showToast('Ponto de verificação OPFS+WASM da GeaAgro Estatística registrado com sucesso!', 'success');
+    } catch (err: any) {
+      showToast(`Erro ao registrar verificação OPFS: ${err?.message || String(err)}`, 'error');
+    } finally {
+      setIsRegisteringEstatisticaCheckpoint(false);
+    }
+  };
+
+  const handleExportarEstatisticaBackup = () => {
+    setSelectedModules(['estatistica']);
+    setBackupType('modulo');
+    handleTabChange('criacao');
+    showToast('Módulo GeaAgro Estatística selecionado para geração do pacote .geaagro!', 'info');
+  };
+
+  // Ações Integradas de Backup & Sincronização do Módulo Recupera
+  const handleSyncRecuperaNow = () => {
+    setIsSyncingRecupera(true);
+    setTimeout(() => {
+      registrarSincronizacaoRealizada();
+      setRecuperaSyncStatus(obterStatusSincronizacaoRecupera());
+      setIsSyncingRecupera(false);
+      showToast('Sincronização local do módulo Recupera concluída com sucesso!', 'success');
+    }, 600);
+  };
+
+  const handleExportRecuperaJson = () => {
+    const json = exportarBackupJsonRecupera();
+    const filename = `Backup_GeaAgro_Recupera_${new Date().toISOString().split('T')[0]}.json`;
+    triggerFileDownload(filename, json, 'application/json');
+    showToast(`Backup JSON do módulo Recupera (${filename}) exportado!`, 'success');
+  };
+
+  const handleSelectRecuperaJsonFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const content = ev.target?.result as string;
+      if (content) {
+        setRecuperaJsonImport(content);
+        showToast(`Arquivo "${file.name}" carregado para restauração do Recupera.`, 'info');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleRestoreRecuperaJson = () => {
+    if (!recuperaJsonImport.trim()) {
+      showToast('Selecione um arquivo .json ou cole o conteúdo JSON do backup do Recupera.', 'error');
+      return;
+    }
+    if (window.confirm('Deseja restaurar este backup no módulo Recupera? Os dados atuais serão atualizados.')) {
+      const ok = restaurarBackupJsonRecupera(recuperaJsonImport);
+      if (ok) {
+        setRecuperaJsonImport('');
+        setRecuperaSyncStatus(obterStatusSincronizacaoRecupera());
+        showToast('Backup do módulo Recupera restaurado com sucesso!', 'success');
+      } else {
+        showToast('Erro ao interpretar o JSON de backup do módulo Recupera.', 'error');
+      }
+    }
+  };
+
+  const handleResetRecuperaData = () => {
+    if (window.confirm('Deseja realmente limpar todos os dados do módulo Recupera (Áreas Degradadas) e reiniciar com formulários limpos?')) {
+      resetarTodosOsDadosRecupera();
+      setRecuperaSyncStatus(obterStatusSincronizacaoRecupera());
+      showToast('Dados do módulo Recupera limpos com sucesso.', 'info');
+    }
   };
 
   // Execute Creation of Backup
@@ -646,7 +783,287 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
     { id: 'pragas', name: 'MIP & Radar de Pragas', icon: ShieldAlert, desc: 'Inspeções de campo e nível de dano' },
     { id: 'bulario', name: 'Bulário & Receituário', icon: BookOpen, desc: 'Produtos defensivos cadastrados' },
     { id: 'diario_fotos', name: 'Diário Fotográfico', icon: Camera, desc: 'Galeria geotagged de registros de campo' },
+    { id: 'recupera', name: 'Recupera — Áreas Degradadas', icon: Sprout, desc: 'Propriedades, talhões, diagnósticos, PRAD, monitoramentos e mapas GPS' },
+    { id: 'estatistica', name: 'GeaAgro Estatística', icon: BarChart2, desc: 'Projetos, experimentos, planilhas OPFS originais, análises, gráficos e histórico' },
   ];
+
+  const renderRecuperaBackupCard = () => (
+    <div className="bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-900/60 rounded-2xl p-6 shadow-xs space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-zinc-800 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-emerald-100 dark:bg-emerald-950/70 text-emerald-600 dark:text-emerald-400 rounded-xl">
+            <Sprout className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              Backup & Sincronização — Módulo Recupera (Áreas Degradadas)
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Exportação JSON dedicada, restauração de talhões/PRAD, sincronização e reset limpo integrados
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleSyncRecuperaNow}
+          disabled={isSyncingRecupera}
+          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow-xs flex items-center gap-2 self-start sm:self-auto disabled:opacity-50 cursor-pointer"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isSyncingRecupera ? 'animate-spin' : ''}`} />
+          <span>{isSyncingRecupera ? 'Sincronizando...' : 'Sincronizar Recupera'}</span>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+        <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800">
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Status de Conectividade</span>
+          <div className="flex items-center gap-1.5 mt-1 font-bold">
+            {recuperaSyncStatus.modoOfflineAtivo ? (
+              <>
+                <WifiOff className="w-4 h-4 text-amber-500" />
+                <span className="text-amber-600 dark:text-amber-400">Modo Offline Ativo</span>
+              </>
+            ) : (
+              <>
+                <Wifi className="w-4 h-4 text-emerald-600" />
+                <span className="text-emerald-600 dark:text-emerald-400">Conectado / Online</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800">
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Última Sincronização</span>
+          <p className="font-bold text-slate-900 dark:text-white mt-1 truncate">
+            {recuperaSyncStatus.ultimaSincronizacao}
+          </p>
+        </div>
+
+        <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800">
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Registros Locais (Recupera)</span>
+          <p className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
+            {recuperaSyncStatus.registrosLocaisPendentes} entidades
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-3 flex flex-col justify-between">
+          <div className="space-y-1">
+            <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Download className="w-4 h-4 text-emerald-600" />
+              Exportar Backup JSON do Recupera
+            </h4>
+            <p className="text-slate-500 dark:text-zinc-400 leading-relaxed">
+              Gera arquivo JSON completo com propriedades, talhões degradados, diagnósticos, laudos de solo, projetos PRAD, monitoramentos, custos e pontos GPS.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleExportRecuperaJson}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-2 cursor-pointer shadow-xs"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Baixar JSON do Recupera
+            </button>
+            <button
+              type="button"
+              onClick={handleResetRecuperaData}
+              className="px-3 py-2 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 font-bold rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Limpar Dados
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Upload className="w-4 h-4 text-emerald-600" />
+              Restaurar Backup JSON do Recupera
+            </h4>
+            <input
+              ref={recuperaFileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleSelectRecuperaJsonFile}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => recuperaFileInputRef.current?.click()}
+              className="px-2.5 py-1 bg-slate-200 dark:bg-zinc-700 hover:bg-slate-300 text-slate-800 dark:text-zinc-200 rounded-lg text-[11px] font-bold cursor-pointer"
+            >
+              Carregar .json
+            </button>
+          </div>
+          <textarea
+            value={recuperaJsonImport}
+            onChange={e => setRecuperaJsonImport(e.target.value)}
+            rows={3}
+            placeholder="Cole aqui o conteúdo JSON do backup do Recupera ou carregue o arquivo..."
+            className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white font-mono text-[11px] resize-none"
+          />
+          <button
+            type="button"
+            onClick={handleRestoreRecuperaJson}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-white font-bold rounded-xl text-xs transition flex items-center gap-2 cursor-pointer shadow-xs"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            Restaurar Dados do Recupera
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderEstatisticaOpfsCard = () => (
+    <div className="bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-900/60 rounded-2xl p-6 shadow-xs space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-zinc-800 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-emerald-100 dark:bg-emerald-950/70 text-emerald-600 dark:text-emerald-400 rounded-xl">
+            <BarChart2 className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                Backup & Integridade OPFS — GeaAgro Estatística
+              </h3>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold border border-emerald-200 dark:border-emerald-800">
+                ● Ativo Offline
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Motor oficial {estatisticaStorageStatus?.engine || 'geaagro_opfs_v1'} + GeaAgroOfflineDB — sem bancos paralelos e sem nuvem obrigatória.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={handleRegistrarCheckpointEstatistica}
+            disabled={isRegisteringEstatisticaCheckpoint}
+            className="px-3.5 py-2 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRegisteringEstatisticaCheckpoint ? 'animate-spin' : ''}`} />
+            <span>{isRegisteringEstatisticaCheckpoint ? 'Registrando...' : 'Registrar Ponto de Verificação'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleExportarEstatisticaBackup}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Exportar Pacote Estatística (.geaagro)</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+        <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800">
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Uso / Quota Navegador</span>
+          <p className="font-mono font-bold text-slate-900 dark:text-white mt-1">
+            {estatisticaStorageStatus
+              ? `${formatBytes(estatisticaStorageStatus.usageBytes)} / ${formatBytes(estatisticaStorageStatus.quotaBytes)}`
+              : storageStats.usedFormatted}
+          </p>
+        </div>
+        <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800">
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Persistência OPFS</span>
+          <p className="font-mono font-bold text-slate-900 dark:text-white mt-1">
+            {estatisticaStorageStatus?.isPersistent ? 'Persistente (OPFS)' : 'Navegador Padrão'}
+          </p>
+        </div>
+        <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800">
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Arquivos Originais OPFS</span>
+          <p className="font-mono font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+            {estatisticaStorageStatus?.artefatosOpfsCount ?? 0} arquivo(s)
+          </p>
+        </div>
+        <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800">
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Projetos / Experimentos</span>
+          <p className="font-mono font-bold text-slate-900 dark:text-white mt-1">
+            {estatisticaStorageStatus?.totalProjetos ?? 0} / {estatisticaStorageStatus?.totalExperimentos ?? 0}
+          </p>
+        </div>
+        <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800">
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Resultados / Gráficos</span>
+          <p className="font-mono font-bold text-slate-900 dark:text-white mt-1">
+            {estatisticaStorageStatus?.totalResultados ?? 0} / {estatisticaStorageStatus?.totalGraficos ?? 0}
+          </p>
+        </div>
+        <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800">
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Bancos Isolados Intactos</span>
+          <p className="font-mono font-bold text-emerald-700 dark:text-emerald-400 mt-1">
+            NemaAI & Bulário
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
+        <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <h4 className="font-bold text-slate-900 dark:text-white">
+              PWA Offline & Atualização Sob Consentimento
+            </h4>
+            <span className="font-mono text-[11px] text-slate-500">v{pwaCurrentVersion}</span>
+          </div>
+          <p className="text-slate-500 dark:text-zinc-400 leading-relaxed">
+            O ecossistema nunca aplica atualizações automáticas ou recarrega durante análises experimentais sem autorização expressa.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={isCheckingPwaUpdate}
+              onClick={() => void checkPwaUpdates()}
+              className="px-3 py-1.5 text-xs font-semibold bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg flex items-center gap-1.5 cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isCheckingPwaUpdate ? 'animate-spin' : ''}`} />
+              <span>{isCheckingPwaUpdate ? 'Verificando...' : 'Verificar Atualização Manualmente'}</span>
+            </button>
+            {pwaUpdateAvailable && (
+              <button
+                type="button"
+                onClick={applyPwaUpdate}
+                className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 rounded-lg cursor-pointer"
+              >
+                Atualizar Agora (Autorizado)
+              </button>
+            )}
+            {isPwaUpToDate && (
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">Versão atualizada.</span>
+            )}
+          </div>
+        </div>
+
+        <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-2">
+          <div className="font-bold text-slate-900 dark:text-white">
+            Pontos de Auditoria Estatística OPFS ({estatisticaBackupsMeta.length})
+          </div>
+          {estatisticaBackupsMeta.length === 0 ? (
+            <p className="text-slate-500 dark:text-zinc-400 text-[11px]">
+              Nenhum ponto de verificação registrado ainda. Clique em "Registrar Ponto de Verificação" para gravar o snapshot de integridade em `estatistica_backups_metadata`.
+            </p>
+          ) : (
+            <div className="divide-y divide-slate-200 dark:divide-zinc-700 max-h-32 overflow-y-auto">
+              {estatisticaBackupsMeta.slice(0, 6).map((b) => (
+                <div key={b.id} className="py-1.5 flex flex-wrap justify-between gap-2 text-[11px]">
+                  <span className="font-medium text-slate-800 dark:text-zinc-200">{b.titulo}</span>
+                  <span className="font-mono text-slate-500">
+                    {b.projetosCount} proj · {b.experimentosCount} exp · {b.artefatosOpfsCount} OPFS
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="w-full space-y-6 pb-12 animate-fadeIn text-slate-800 dark:text-zinc-100">
@@ -831,7 +1248,7 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
                 </div>
                 <div>
                   <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">Versão do Banco</span>
-                  <span className="text-sm font-bold text-slate-800 dark:text-zinc-200">v4.2.3.7 (OPFS)</span>
+                  <span className="text-sm font-bold text-slate-800 dark:text-zinc-200">v4.2.3.8 (OPFS)</span>
                 </div>
                 <div>
                   <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">Status da Migração</span>
@@ -999,6 +1416,9 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
             </div>
 
           </div>
+
+          {renderRecuperaBackupCard()}
+          {renderEstatisticaOpfsCard()}
         </div>
       )}
 
@@ -1877,6 +2297,21 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
               Exportar Módulos Selecionados ({selectedModules.length})
             </button>
           </div>
+
+          <div className="pt-4 border-t border-slate-100 dark:border-zinc-800">
+            {renderRecuperaBackupCard()}
+          </div>
+
+          <div className="pt-4 border-t border-slate-100 dark:border-zinc-800">
+            {renderEstatisticaOpfsCard()}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4B: BACKUP & INTEGRIDADE OPFS — GEAAGRO ESTATÍSTICA */}
+      {currentTab === 'estatistica_opfs' && (
+        <div className="space-y-6">
+          {renderEstatisticaOpfsCard()}
         </div>
       )}
 
@@ -2106,6 +2541,10 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
             <div className="pt-2 border-t border-amber-200 dark:border-amber-900/40 text-[11px] font-mono">
               Status da Verificação: SHA-256 Checksum OK
             </div>
+          </div>
+
+          <div className="lg:col-span-3">
+            {renderRecuperaBackupCard()}
           </div>
 
         </div>

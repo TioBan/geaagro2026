@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Building2, MapPin } from 'lucide-react';
+import { X, Save, MapPin } from 'lucide-react';
 import { Farm, RuralProducer, Agronomist, Company } from '../../types/agronomy';
 import { BRAZIL_STATES } from '../../data/brazilStates';
 

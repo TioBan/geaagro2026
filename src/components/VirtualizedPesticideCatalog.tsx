@@ -10,7 +10,6 @@ import {
   Info,
   Trash2,
   ArrowUp,
-  Zap,
   ShieldAlert,
   Search,
   CheckCircle2,
@@ -23,7 +22,6 @@ import {
   FlaskConical,
   ShieldCheck,
   Shield,
-  Clock,
   ChevronDown,
 } from 'lucide-react';
 import { PesticideProduct } from '../types/pesticideLeaflet';
@@ -40,7 +38,7 @@ interface VirtualizedPesticideCatalogProps {
 
 const PAGE_SIZE = 36;
 
-export const VirtualizedPesticideCatalog: React.FC<VirtualizedPesticideCatalogProps> = ({
+export const VirtualizedPesticideCatalog: React.FC<VirtualizedPesticideCatalogProps> = React.memo(({
   products,
   searchTerm,
   onClearFilters,
@@ -696,4 +694,4 @@ export const VirtualizedPesticideCatalog: React.FC<VirtualizedPesticideCatalogPr
       )}
     </div>
   );
-};
+});
