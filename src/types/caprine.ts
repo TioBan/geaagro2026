@@ -1,22 +1,19 @@
 export type CaprineTab =
   | 'dashboard'
-  | 'registry'
   | 'digital_twin'
+  | 'registry'
   | 'genealogy'
   | 'reproduction'
   | 'kids'
-  | 'dairy'
+  | 'milk'
   | 'meat'
   | 'nutrition'
   | 'pastures'
-  | 'pasture_twin'
   | 'health'
-  | 'diseases_lib'
   | 'pharmacy'
-  | 'facilities'
-  | 'smart_map'
+  | 'disease_library'
   | 'photo_diary'
-  | 'iec_score'
+  | 'facilities'
   | 'reports';
 
 export type CaprineSex = 'Fêmea' | 'Macho (Bode)' | 'Macho Castrado';
@@ -49,8 +46,8 @@ export type CaprineBloodDegree = 'PO (Puro de Origem)' | 'PC (Puro por Cruza)' |
 
 export interface CaprineAnimal {
   id: string;
-  earTag: string; // Número ID / Brinco
-  rfidCode: string; // Brinco eletrônico RFID/NFC
+  earTag: string;
+  rfidCode: string;
   qrCode: string;
   name: string;
   breed: CaprineBreed;
@@ -58,8 +55,8 @@ export interface CaprineAnimal {
   category: CaprineCategory;
   birthDate: string;
   weightKg: number;
-  bodyConditionScore: number; // ECC 1.0 - 5.0
-  famachaScore?: number; // 1 (Vermelho/Ótimo) a 5 (Branco/Anêmico Severo)
+  bodyConditionScore: number;
+  famachaScore?: number;
   photoUrl?: string;
   owner: string;
   lot: string;
@@ -74,7 +71,7 @@ export interface CaprineAnimal {
   maternalGrandmother?: string;
   bloodDegree: CaprineBloodDegree;
   geneticLineage: string;
-  inbreedingCoeff?: number; // % consanguinidade
+  inbreedingCoeff?: number;
   currentPaddockId?: string;
   currentFacilityId?: string;
   notes?: string;
@@ -85,37 +82,46 @@ export interface CaprineWeighingRecord {
   date: string;
   animalId: string;
   weightKg: number;
-  gmdGramsDay?: number; // Ganho Médio Diário em g/dia
+  gmdGramsDay?: number;
   bodyConditionScore?: number;
   famachaScore?: number;
   notes?: string;
 }
 
+export type CaprineReproductionEventType =
+  | 'Monta Natural'
+  | 'Inseminação Artificial (IA)'
+  | 'Diagnóstico de Gestação'
+  | 'Parto'
+  | 'Aborto'
+  | 'Desmame'
+  | 'Cio / Estro';
+
 export interface CaprineReproductionRecord {
   id: string;
   date: string;
-  animalId: string; // Matriz
-  eventType: 'Monta Natural' | 'Inseminação Artificial (IA)' | 'Diagnóstico de Gestação' | 'Parto' | 'Aborto' | 'Desmame' | 'Cio / Estro';
+  animalId: string;
+  eventType: CaprineReproductionEventType;
   sireId?: string;
   sireName?: string;
   pregnancyStatus?: 'Confirmada' | 'Não Gestante' | 'Aguardando DG';
   ultrasoundDays?: number;
-  kidsCount?: number; // 1 (Simples), 2 (Gêmeos), 3 (Tríplice), 4 (Quádruplo)
+  kidsCount?: number;
   birthWeightTotalKg?: number;
-  interBirthDays?: number; // IEP
+  interBirthDays?: number;
   notes?: string;
 }
 
 export interface CaprineKidRecord {
   id: string;
-  kidAnimalId: string;
+  kidAnimalId?: string;
   earTag: string;
   name: string;
   motherId: string;
   fatherId?: string;
   birthDate: string;
   birthWeightKg: number;
-  colostrumHours: number; // horas até colostragem
+  colostrumHours: number;
   colostrumStatus: 'Excelente (<2h)' | 'Adequado (2-6h)' | 'Deficiente (>6h)';
   weaningDate?: string;
   weaningWeightKg?: number;
@@ -134,7 +140,7 @@ export interface CaprineMilkRecord {
   fatPct?: number;
   proteinPct?: number;
   lactosePct?: number;
-  ccsThousand?: number; // CCS em milhares/mL
+  ccsThousand?: number;
   lot?: string;
 }
 
@@ -143,21 +149,30 @@ export interface CaprineMeatRecord {
   animalId: string;
   date: string;
   liveWeightKg: number;
-  gmdGramsDay: number; // g/dia
-  feedConversion: number; // CA (kg ração / kg ganho)
+  gmdGramsDay: number;
+  feedConversion: number;
   targetSlaughterWeightKg: number;
-  carcassYieldPct: number; // % rendimento de carcaça
+  carcassYieldPct: number;
   slaughterAgeMonths: number;
   notes?: string;
 }
 
+export type CaprineFeedCategory =
+  | 'Pastagem'
+  | 'Silagem'
+  | 'Feno'
+  | 'Palma Forrageira'
+  | 'Concentrado'
+  | 'Mineral'
+  | 'Aditivo';
+
 export interface CaprineFeedItem {
   id: string;
   name: string;
-  category: 'Pastagem' | 'Silagem' | 'Feno' | 'Palma Forrageira' | 'Concentrado' | 'Mineral' | 'Aditivo';
-  dryMatterPct: number; // % MS
-  crudeProteinPct: number; // % PB
-  ndtPct: number; // % NDT / Energia
+  category: CaprineFeedCategory;
+  dryMatterPct: number;
+  crudeProteinPct: number;
+  ndtPct: number;
   costPerKgBrl: number;
   notes?: string;
 }
@@ -175,85 +190,134 @@ export interface CaprinePasturePaddock {
   restDays: number;
   occupancyDays: number;
   currentOccupancyGoats: number;
-  soilFertilityScore: number; // 0-100
+  soilFertilityScore: number;
   lastFertilizationDate: string;
   lastRainfallMm: number;
   photoUrl?: string;
   notes?: string;
 }
 
+export type CaprineHealthType =
+  | 'Vacina'
+  | 'Vermifugação (FAMACHA)'
+  | 'Ectoparasita'
+  | 'Tratamento'
+  | 'Cirurgia'
+  | 'Exame (CAE/Linfoadenite)';
+
 export interface CaprineHealthRecord {
   id: string;
   date: string;
   animalId: string;
-  type: 'Vacina' | 'Vermifugação (FAMACHA)' | 'Ectoparasita' | 'Tratamento' | 'Cirurgia' | 'Exame (CAE/Linfoadenite)';
+  type: CaprineHealthType;
   productName: string;
   dosage: string;
-  famachaScore?: number; // 1-5
-  opgCount?: number; // Contagem de Ovos por Grama
+  famachaScore?: number;
+  opgCount?: number;
   withdrawalMilkDays: number;
   withdrawalMeatDays: number;
   veterinarian: string;
   notes?: string;
 }
 
-export interface CaprineDiseaseInfo {
-  id: string;
-  name: string;
-  category: 'Viral' | 'Bacteriana' | 'Parasitária' | 'Metabólica' | 'Notificação MAPA' | 'Gastrointestinal';
-  causativeAgent: string;
-  transmission: string;
-  symptoms: string[];
-  prevention: string[];
-  management: string[];
-  technicalRef: string;
-  photoUrl?: string;
-}
+export type CaprinePharmacyCategory =
+  | 'Vermífugo'
+  | 'Vacina'
+  | 'Antibiótico'
+  | 'Anti-inflamatório'
+  | 'Vitamina/Mineral'
+  | 'Material Cirúrgico'
+  | 'Medicamento'
+  | 'Antiparasitário'
+  | 'Vitamina/Suplemento';
 
 export interface CaprinePharmacyItem {
   id: string;
   name: string;
-  category: 'Vacina' | 'Medicamento' | 'Antiparasitário' | 'Vitamina/Suplemento';
-  activeIngredient: string;
-  quantity: number;
+  category: CaprinePharmacyCategory;
+  activeIngredient?: string;
+  currentQuantity: number;
+  minQuantityAlert: number;
+  /** Legacy compatibility aliases */
+  quantity?: number;
+  minStock?: number;
   unit: string;
-  batchNumber: string;
-  expiryDate: string;
+  batchNumber?: string;
+  expirationDate: string;
+  /** Legacy compatibility alias */
+  expiryDate?: string;
   withdrawalMilkDays: number;
   withdrawalMeatDays: number;
-  minStock: number;
   costPerUnitBrl: number;
 }
 
+export type CaprineFacilityType =
+  | 'Aprisco Suspenso Ripado'
+  | 'Aprisco Ripado/Suspenso'
+  | 'Maternidade'
+  | 'Maternidade Caprina'
+  | 'Bezerreiro / Creche'
+  | 'Baia de Crescimento'
+  | 'Sala de Ordenha'
+  | 'Pedilúvio'
+  | 'Esterqueira / Compostagem'
+  | 'Caprineira'
+  | 'Depósito de Ração'
+  | 'Comedouro/Bebedouro';
+
 export interface CaprineFacility {
   id: string;
-  code: string;
+  code?: string;
   name: string;
-  type: 'Aprisco Ripado/Suspenso' | 'Baia de Crescimento' | 'Maternidade Caprina' | 'Sala de Ordenha' | 'Caprineira' | 'Depósito de Ração' | 'Comedouro/Bebedouro';
-  totalCapacity: number;
+  type: CaprineFacilityType;
+  capacityHead: number;
+  /** Legacy compatibility alias */
+  totalCapacity?: number;
   currentOccupancy: number;
-  lastCleaningDate: string;
-  disinfectionMethod: string;
-  maintenanceNotes: string;
+  areaSqMeters: number;
+  sanitationStatus: string;
+  lastSanitationDate: string;
+  /** Legacy compatibility aliases */
+  lastCleaningDate?: string;
+  disinfectionMethod?: string;
+  maintenanceNotes?: string;
+  notes?: string;
 }
+
+export type CaprinePhotoCategory =
+  | 'Escore Corporal'
+  | 'Podologia / Casco'
+  | 'Aprisco & Instalações'
+  | 'Ocorrência Clínica'
+  | 'Matriz & Cria'
+  | 'Animal'
+  | 'Lesão/Sanidade'
+  | 'Parto'
+  | 'Crescimento'
+  | 'ECC/FAMACHA'
+  | 'Instalação/Piquete';
 
 export interface CaprinePhotoEntry {
   id: string;
   date: string;
   title: string;
-  category: 'Animal' | 'Lesão/Sanidade' | 'Parto' | 'Crescimento' | 'ECC/FAMACHA' | 'Instalação/Piquete';
+  categoryTag: CaprinePhotoCategory;
+  /** Legacy compatibility alias */
+  category?: CaprinePhotoCategory;
   animalId?: string;
   paddockId?: string;
   photoUrl: string;
-  notes: string;
+  description?: string;
+  /** Legacy compatibility alias */
+  notes?: string;
 }
 
 export interface CaprineIecBreakdown {
-  reproductiveScore: number; // 0-20
-  milkGmdScore: number; // 0-20
-  famachaHealthScore: number; // 0-20
-  feedEfficiencyScore: number; // 0-15
-  pastureScore: number; // 0-15
-  financialMarginScore: number; // 0-10
-  totalIec: number; // 0-100
+  reproductiveScore: number;
+  milkGmdScore: number;
+  famachaHealthScore: number;
+  feedEfficiencyScore: number;
+  pastureScore: number;
+  financialMarginScore: number;
+  totalIec: number;
 }

@@ -373,102 +373,46 @@ Os laudos laboratoriais de solo analisados (Anexo II) atestam condições nutric
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Submodule Navigation Bar */}
-      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100 dark:bg-zinc-800/80 rounded-2xl border border-slate-200 dark:border-zinc-700 text-xs">
-        <button
-          onClick={() => setActiveTab('laudo')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'laudo'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <FileCheck2 className="w-3.5 h-3.5" />
-          5.1 Estrutura do Laudo
-        </button>
-
-        {/* 5.2 RESULTADOS E DISCUSSÃO (ANTES DE QUESITOS) */}
-        <button
-          onClick={() => setActiveTab('resultado_discussao')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'resultado_discussao'
-              ? 'bg-emerald-600 text-white shadow-xs'
-              : 'text-emerald-800 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100'
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          5.2 Resultados e Discussão
-        </button>
-
-        {/* 5.3 RESPOSTA AOS QUESITOS */}
-        <button
-          onClick={() => setActiveTab('quesitos')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'quesitos'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <HelpCircle className="w-3.5 h-3.5" />
-          5.3 Resposta aos Quesitos ({pericia.quesitos.length})
-        </button>
-
-        {/* 5.4 ANEXOS DO LAUDO (FOTOS, SOLO, OUTROS) */}
-        <button
-          onClick={() => setActiveTab('anexos')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'anexos'
-              ? 'bg-amber-600 text-white shadow-xs'
-              : 'text-amber-800 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100'
-          }`}
-        >
-          <Paperclip className="w-3.5 h-3.5" />
-          5.4 Anexos do Laudo ({anexosList.length})
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 dark:border-zinc-800">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+          {[
+            { id: 'laudo' as const, label: '5.1 Estrutura', icon: FileCheck2 },
+            { id: 'resultado_discussao' as const, label: '5.2 Resultados & Discussão', icon: Sparkles },
+            { id: 'quesitos' as const, label: `5.3 Quesitos (${pericia.quesitos.length})`, icon: HelpCircle },
+            { id: 'anexos' as const, label: `5.4 Anexos (${anexosList.length})`, icon: Paperclip },
+            { id: 'capa' as const, label: '5.5 Capa', icon: Printer },
+            { id: 'assinatura' as const, label: '5.6 Validação & ART', icon: ShieldCheck },
+            { id: 'encerramento' as const, label: '5.7 Encerramento', icon: Archive },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3 py-2.5 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
+                  active
+                    ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400 dark:border-emerald-500'
+                    : 'border-transparent text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:border-slate-300 dark:hover:border-zinc-700'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
         <button
-          onClick={() => setActiveTab('capa')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'capa'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <Printer className="w-3.5 h-3.5" />
-          5.5 Configuração da Capa
-        </button>
-
-        <button
-          onClick={() => setActiveTab('assinatura')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'assinatura'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <ShieldCheck className="w-3.5 h-3.5" />
-          5.6 Validação & ART
-        </button>
-
-        <button
-          onClick={() => setActiveTab('encerramento')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'encerramento'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <Archive className="w-3.5 h-3.5" />
-          5.7 Encerramento
-        </button>
-
-        <button
+          type="button"
           onClick={() => setShowAiAssistant(true)}
-          className="ml-auto px-4 py-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black rounded-xl flex items-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer text-xs border border-emerald-400/30 shrink-0"
+          className="mb-1.5 h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer text-xs shrink-0"
         >
-          <Sprout className="w-4 h-4 text-emerald-200 animate-pulse" />
-          <span>IA Assistente de Perícia</span>
+          <Sprout className="w-3.5 h-3.5" />
+          <span>Assistente de Redação IA</span>
         </button>
       </div>
 

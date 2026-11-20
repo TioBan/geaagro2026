@@ -202,7 +202,7 @@ export function calculateSwineExecutiveKPIs(
             100
           ).toFixed(1)
         )
-      : 2.1;
+      : 0;
 
   // Average GMD and Feed Conversion from batches
   const activeBatches = batches.filter(b => b.status === 'Ativo');
@@ -211,7 +211,7 @@ export function calculateSwineExecutiveKPIs(
       ? Math.round(
           activeBatches.reduce((acc, b) => acc + b.averageDailyGainG, 0) / activeBatches.length
         )
-      : 760;
+      : 0;
 
   const avgFeedConversionRatio =
     activeBatches.length > 0
@@ -221,7 +221,7 @@ export function calculateSwineExecutiveKPIs(
             activeBatches.length
           ).toFixed(2)
         )
-      : 2.09;
+      : 0;
 
   // Reproductive KPIs from Sow histories
   let totalIAs = 0;
@@ -241,13 +241,27 @@ export function calculateSwineExecutiveKPIs(
     });
   });
 
-  const conceptionRatePct = totalIAs > 0 ? Math.min(100, Math.round((positiveDGs / totalIAs) * 100)) : 91;
-  const farrowingRatePct = totalIAs > 0 ? Math.min(100, Math.round((totalPartos / Math.max(1, positiveDGs)) * 100)) : 89;
+  const conceptionRatePct =
+    totalIAs > 0 ? Math.min(100, Math.round((positiveDGs / totalIAs) * 100)) : 0;
+  const farrowingRatePct =
+    positiveDGs > 0 ? Math.min(100, Math.round((totalPartos / positiveDGs) * 100)) : 0;
 
-  // Weaned per sow / year standard calculation (Partos/ano 2.38 * Desmamados/parto 12.8)
-  const avgWeanedPerLitter = 12.8;
-  const farrowingsPerSowYear = 2.40;
-  const weanedPerSowYear = Number((avgWeanedPerLitter * farrowingsPerSowYear).toFixed(1)); // ~30.7 DPA
+  // Weaned per sow / year calculated from real weaned litters (2.40 farrowings/sow/year reference)
+  const weanedLitters = litters.filter(l => l.status === 'Desmamada' && (l.pigletsWeaned ?? 0) > 0);
+  const activeLitters = litters.filter(l => l.currentPigletsCount > 0);
+  const avgWeanedPerLitter =
+    weanedLitters.length > 0
+      ? weanedLitters.reduce((acc, l) => acc + (l.pigletsWeaned ?? 0), 0) / weanedLitters.length
+      : activeLitters.length > 0
+        ? activeLitters.reduce((acc, l) => acc + l.currentPigletsCount, 0) / activeLitters.length
+        : 0;
+  const weanedPerSowYear =
+    avgWeanedPerLitter > 0 ? Number((avgWeanedPerLitter * 2.4).toFixed(1)) : 0;
+
+  // Replacement rate from actual gilts / active sows ratio
+  const giltsCount = animals.filter(a => a.category.includes('Marrã')).length;
+  const replacementRatePct =
+    activeSows > 0 ? Number(((giltsCount / activeSows) * 100).toFixed(1)) : 0;
 
   // Pending health and inventory alerts
   let pendingVaccinesCount = 0;
@@ -282,7 +296,7 @@ export function calculateSwineExecutiveKPIs(
     conceptionRatePct,
     farrowingRatePct,
     weanedPerSowYear,
-    replacementRatePct: 42.5,
+    replacementRatePct,
     pendingVaccinesCount,
     healthAlertsCount,
     criticalStockAlerts,
@@ -295,30 +309,55 @@ export function calculateSwineIES(
   sheds: SwineShedEnvironment[] = [],
   biosecurity: SwineBiosecurityLog[] = []
 ): SwineIESScore {
+  const hasOperationalData =
+    kpis.totalAnimals > 0 ||
+    kpis.avgFeedConversionRatio > 0 ||
+    kpis.avgDailyGainG > 0 ||
+    kpis.weanedPerSowYear > 0 ||
+    sheds.length > 0 ||
+    biosecurity.length > 0;
+
+  if (!hasOperationalData) {
+    return {
+      totalScore: 0,
+      classification: 'Crítico',
+      feedConversionScore: 0,
+      gmdScore: 0,
+      mortalityScore: 0,
+      reproductiveEfficiencyScore: 0,
+      environmentComfortScore: 0,
+      biosecurityComplianceScore: 0,
+      keyRecommendations: [
+        'Cadastre lotes ativos, leitegadas, galpões e registros de biosseguridade para calcular o Índice IES real da granja.',
+      ],
+    };
+  }
+
   // 1. Feed Conversion Score (CA ideal <= 2.2 in grow-finish / nursery avg) - max 25 pts
-  // If CA is 2.0 -> 25pts; if 2.8 -> 10pts
   const ca = kpis.avgFeedConversionRatio;
-  let feedConversionScore = Math.max(5, Math.min(25, 25 - (ca - 1.8) * 20));
+  const feedConversionScore = ca > 0 ? Math.max(5, Math.min(25, 25 - (ca - 1.8) * 20)) : 0;
 
   // 2. GMD Score (Ideal >= 850g/day overall) - max 20 pts
   const gmd = kpis.avgDailyGainG;
-  let gmdScore = Math.max(5, Math.min(20, ((gmd - 400) / 550) * 20));
+  const gmdScore = gmd > 0 ? Math.max(5, Math.min(20, ((gmd - 400) / 550) * 20)) : 0;
 
   // 3. Mortality Score (Ideal < 2.5%) - max 20 pts
   const mort = kpis.overallMortalityPct;
-  let mortalityScore = Math.max(2, Math.min(20, 20 - mort * 3.5));
+  const mortalityScore =
+    kpis.totalAnimals > 0 ? Math.max(2, Math.min(20, 20 - mort * 3.5)) : 0;
 
   // 4. Reproductive Efficiency Score (DPA ideal >= 30.0) - max 15 pts
   const dpa = kpis.weanedPerSowYear;
-  let reproductiveEfficiencyScore = Math.max(3, Math.min(15, ((dpa - 22) / 10) * 15));
+  const reproductiveEfficiencyScore =
+    dpa > 0 ? Math.max(3, Math.min(15, ((dpa - 22) / 10) * 15)) : 0;
 
   // 5. Environment Comfort Score (max 10 pts)
   const shedsOk = sheds.filter(s => s.comfortStatus === 'Conforto Ótimo').length;
-  const environmentComfortScore = sheds.length > 0 ? (shedsOk / sheds.length) * 10 : 8.5;
+  const environmentComfortScore = sheds.length > 0 ? (shedsOk / sheds.length) * 10 : 0;
 
   // 6. Biosecurity Compliance Score (max 10 pts)
   const bioOk = biosecurity.filter(b => b.status === 'Conforme').length;
-  const biosecurityComplianceScore = biosecurity.length > 0 ? (bioOk / biosecurity.length) * 10 : 9.0;
+  const biosecurityComplianceScore = biosecurity.length > 0 ? (bioOk / biosecurity.length) * 10 : 0;
 
   const totalScore = Math.min(
     100,
@@ -342,17 +381,26 @@ export function calculateSwineIES(
   else classification = 'Crítico';
 
   const recommendations: string[] = [];
-  if (feedConversionScore < 18) {
-    recommendations.push('Ajustar granulometria do milho e regular comedouros para evitar desperdício de ração.');
+  if (ca === 0) {
+    recommendations.push('Cadastre lotes em Creche ou Terminação para computar Conversão Alimentar e GMD.');
+  } else {
+    if (feedConversionScore < 18) {
+      recommendations.push('Ajustar granulometria do milho e regular comedouros para evitar desperdício de ração.');
+    }
+    if (gmdScore < 15) {
+      recommendations.push('Verificar densidade de alojamento por baia e vazão dos bebedouros tipo chupeta.');
+    }
   }
-  if (gmdScore < 15) {
-    recommendations.push('Verificar densidade de alojamento por baia e vazão dos bebedouros tipo chupeta.');
-  }
-  if (mortalityScore < 15) {
+  if (kpis.totalAnimals > 0 && mortalityScore < 15) {
     recommendations.push('Intensificar monitoramento do colostro na primeira hora de vida e verificar temperatura das campânulas.');
   }
-  if (environmentComfortScore < 8) {
+  if (sheds.length === 0) {
+    recommendations.push('Registre leituras de ambiência dos galpões para pontuar conforto térmico e gases.');
+  } else if (environmentComfortScore < 8) {
     recommendations.push('Aumentar taxa de renovação de ar nos galpões para reduzir concentrações de amônia (NH₃) e CO₂.');
+  }
+  if (biosecurity.length === 0) {
+    recommendations.push('Adicione registros de auditoria na aba Biosseguridade para completar os 10 pontos do pilar.');
   }
   if (recommendations.length === 0) {
     recommendations.push('Indicadores em padrão de excelência zootécnica. Manter protocolos de biosseguridade estrita.');

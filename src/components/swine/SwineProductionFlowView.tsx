@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  Layers,
   Heart,
   Calendar,
   Baby,
@@ -8,14 +7,9 @@ import {
   Scale,
   TrendingUp,
   Truck,
-  AlertCircle,
   CheckCircle2,
   ChevronRight,
   ArrowRight,
-  Sparkles,
-  Info,
-  Clock,
-  ShieldCheck,
   Zap,
 } from 'lucide-react';
 import {
@@ -26,6 +20,11 @@ import {
   ProductionStage,
   SwineTab,
 } from '../../types/swine';
+import {
+  SWINE_CARD_CLASS,
+  SWINE_PRIMARY_BTN_CLASS,
+  SWINE_SUBCARD_CLASS,
+} from './swineUi';
 
 interface SwineProductionFlowViewProps {
   animals: SwineAnimal[];
@@ -38,22 +37,20 @@ interface SwineProductionFlowViewProps {
 interface StageDetail {
   id: ProductionStage;
   title: string;
+  shortTitle: string;
   subtitle: string;
   icon: React.ElementType;
-  color: string;
-  badgeColor: string;
   animalCount: number;
   durationDays: string;
-  avgWeightKg: number;
-  targetWeightKg?: number;
-  gmdGramsDay?: number;
-  dailyFeedPerAnimalKg: number;
-  mortalityPct: number;
+  avgWeightLabel: string;
+  feedRefLabel: string;
+  mortalityLabel: string;
   shedLocation: string;
-  status: 'Fluxo Normal' | 'Atenção / Gargalo' | 'Excelente';
-  bottleneckWarning?: string;
+  targetTempLabel: string;
+  hasLiveData: boolean;
   keyEvents: string[];
   vitalMetrics: { label: string; value: string }[];
+  targetTab: SwineTab;
 }
 
 export const SwineProductionFlowView: React.FC<SwineProductionFlowViewProps> = ({
@@ -65,244 +62,351 @@ export const SwineProductionFlowView: React.FC<SwineProductionFlowViewProps> = (
 }) => {
   const [selectedStageId, setSelectedStageId] = useState<ProductionStage>('maternidade');
 
-  // Compute live stage counts & metrics
-  const breedingSows = animals.filter(a => a.category.includes('Vazia') || a.category.includes('Marrã') || a.status === 'Em Cobertura / IA').length;
-  const pregnantSows = animals.filter(a => a.status === 'Gestante' || a.category === 'Matriz Gestante').length;
-  const maternityPiglets = litters.reduce((acc, l) => acc + (l.status === 'Em Lactação' ? l.currentPigletsCount : 0), 0);
-  const lactatingSows = litters.filter(l => l.status === 'Em Lactação').length;
-  
-  const nurseryBatch = batches.find(b => b.stage === 'creche' && b.status === 'Ativo');
-  const nurseryCount = nurseryBatch ? nurseryBatch.currentAnimalsCount : 217;
-  
-  const growBatch = batches.find(b => b.stage === 'crescimento' && b.status === 'Ativo');
-  const growCount = growBatch ? growBatch.currentAnimalsCount : 278;
+  const stages = useMemo<StageDetail[]>(() => {
+    const breedingSows = animals.filter(
+      a =>
+        a.category.includes('Vazia') ||
+        a.category.includes('Marrã') ||
+        a.status === 'Em Cobertura / IA'
+    );
+    const pregnantSows = animals.filter(
+      a => a.status === 'Gestante' || a.category === 'Matriz Gestante'
+    );
+    const lactatingLitters = litters.filter(l => l.status === 'Em Lactação');
+    const maternityPiglets = lactatingLitters.reduce((acc, l) => acc + l.currentPigletsCount, 0);
 
-  const finishBatch = batches.find(b => b.stage === 'terminacao' && b.status === 'Ativo');
-  const finishCount = finishBatch ? finishBatch.currentAnimalsCount : 346;
+    const nurseryBatches = batches.filter(b => b.stage === 'creche' && b.status === 'Ativo');
+    const nurseryCount = nurseryBatches.reduce((acc, b) => acc + b.currentAnimalsCount, 0);
 
-  const stages: StageDetail[] = [
-    {
-      id: 'reproducao',
-      title: '1. Reprodução & IA',
-      subtitle: 'Detecção de cio, rufiação e inseminação',
-      icon: Heart,
-      color: 'from-rose-500 to-pink-600',
-      badgeColor: 'bg-rose-100 text-rose-800',
-      animalCount: breedingSows > 0 ? breedingSows : 14,
-      durationDays: '4 a 7 dias pós-desmame',
-      avgWeightKg: 220,
-      dailyFeedPerAnimalKg: 2.6,
-      mortalityPct: 0.1,
-      shedLocation: 'Galpão 02 (Setor IA)',
-      status: 'Excelente',
-      keyEvents: ['Rufiação diária com cachaço 2x/dia', 'Protocolo IA heterospérmica 0h/24h', 'Flushing nutricional'],
-      vitalMetrics: [
-        { label: 'Taxa de Concepção', value: '91.5%' },
-        { label: 'Intervalo Desmame-Cio (IDC)', value: '4.8 dias' },
-        { label: 'Doses por Cobertura', value: '2.4 doses' },
-      ],
-    },
-    {
-      id: 'gestacao',
-      title: '2. Gestação',
-      subtitle: 'Controle de escore corporal e ultrassom',
-      icon: Calendar,
-      color: 'from-pink-600 to-purple-600',
-      badgeColor: 'bg-purple-100 text-purple-800',
-      animalCount: pregnantSows > 0 ? pregnantSows : 165,
-      durationDays: '114 dias (3m, 3s, 3d)',
-      avgWeightKg: 240,
-      dailyFeedPerAnimalKg: 2.3,
-      mortalityPct: 0.3,
-      shedLocation: 'Galpão 02 - Gestação Coletiva ESF',
-      status: 'Fluxo Normal',
-      keyEvents: ['DG Ultrassom aos 21-28 dias', 'Alimentação de precisão por curva ECC', 'Vacinação pré-parto aos 85 e 100 dias'],
-      vitalMetrics: [
-        { label: 'Taxa de Retenção Gestacional', value: '96.2%' },
-        { label: 'ECC Médio Plantel', value: '3.1 / 5.0' },
-        { label: 'Dias Médios Gestação', value: '114.5 dias' },
-      ],
-    },
-    {
-      id: 'maternidade',
-      title: '3. Maternidade',
-      subtitle: 'Parto assistido, colostro e lactação',
-      icon: Baby,
-      color: 'from-amber-500 to-orange-600',
-      badgeColor: 'bg-amber-100 text-amber-800',
-      animalCount: maternityPiglets > 0 ? maternityPiglets : 27,
-      durationDays: '21 a 28 dias',
-      avgWeightKg: 1.45,
-      targetWeightKg: 6.8,
-      gmdGramsDay: 240,
-      dailyFeedPerAnimalKg: 6.5, // Consumo da matriz em lactação
-      mortalityPct: 4.8,
-      shedLocation: 'Galpão 01 - Maternidade A (Piso Suspenso)',
-      status: 'Excelente',
-      keyEvents: ['Manejo de colostro na 1ª hora', 'Aplicação de Ferro Dextrano 200mg aos 3 dias', 'Aquecimento a 32°C no escamoteador'],
-      vitalMetrics: [
-        { label: 'Nascidos Vivos / Parto', value: '14.8 leitões' },
-        { label: 'Peso ao Nascer', value: '1.45 kg' },
-        { label: 'Peso ao Desmame (21d)', value: '6.85 kg' },
-        { label: 'Uniformidade da Leitegada', value: 'CV 8.5%' },
-      ],
-    },
-    {
-      id: 'creche',
-      title: '4. Creche Climatizada',
-      subtitle: 'Transição pós-desmame e desenvolvimento',
-      icon: Activity,
-      color: 'from-indigo-500 to-blue-600',
-      badgeColor: 'bg-indigo-100 text-indigo-800',
-      animalCount: nurseryCount,
-      durationDays: '42 dias (3 a 9 semanas)',
-      avgWeightKg: 24.5,
-      targetWeightKg: 28.0,
-      gmdGramsDay: 440,
-      dailyFeedPerAnimalKg: 0.95,
-      mortalityPct: 1.4,
-      shedLocation: 'Galpão 03 - Creche Climatizada',
-      status: 'Excelente',
-      keyEvents: ['Ração Pré-Inicial 1 micropeletizada', 'Controle rigoroso de temperatura (27°C)', 'Vacinação Circovírus PCV2 + Mycoplasma'],
-      vitalMetrics: [
-        { label: 'Conversão Alimentar (CA)', value: '1.25 kg/kg' },
-        { label: 'GMD Creche', value: '440 g/dia' },
-        { label: 'Peso Médio Saída', value: '27.8 kg' },
-      ],
-    },
-    {
-      id: 'crescimento',
-      title: '5. Crescimento & Recria',
-      subtitle: 'Desenvolvimento muscular e ósseo',
-      icon: TrendingUp,
-      color: 'from-emerald-500 to-teal-600',
-      badgeColor: 'bg-emerald-100 text-emerald-800',
-      animalCount: growCount,
-      durationDays: '50 dias (10 a 17 semanas)',
-      avgWeightKg: 62.4,
-      targetWeightKg: 70.0,
-      gmdGramsDay: 880,
-      dailyFeedPerAnimalKg: 2.10,
-      mortalityPct: 0.7,
-      shedLocation: 'Galpão 06 - Crescimento e Recria',
-      status: 'Fluxo Normal',
-      keyEvents: ['Transição Crescimento 1 para 2', 'Monitoramento da vazão de água (1.5 L/min)', 'Ajuste de densidade por baia (0.65 m²/suíno)'],
-      vitalMetrics: [
-        { label: 'Conversão Alimentar (CA)', value: '2.38 kg/kg' },
-        { label: 'GMD Crescimento', value: '880 g/dia' },
-        { label: 'Custo Ração/Animal/Dia', value: 'R$ 3.20' },
-      ],
-    },
-    {
-      id: 'terminacao',
-      title: '6. Terminação',
-      subtitle: 'Engorda final e deposição de carne magra',
-      icon: Scale,
-      color: 'from-teal-600 to-emerald-700',
-      badgeColor: 'bg-teal-100 text-teal-800',
-      animalCount: finishCount,
-      durationDays: '45 dias (18 a 24 semanas)',
-      avgWeightKg: 114.2,
-      targetWeightKg: 125.0,
-      gmdGramsDay: 960,
-      dailyFeedPerAnimalKg: 2.85,
-      mortalityPct: 0.5,
-      shedLocation: 'Galpão 05 - Terminação Turbo',
-      status: 'Fluxo Normal',
-      keyEvents: ['Ração Terminação sem antibióticos', 'Controle estrito de carência de medicamentos (Zero)', 'Pesagem por amostragem semanal'],
-      vitalMetrics: [
-        { label: 'Conversão Alimentar (CA)', value: '2.65 kg/kg' },
-        { label: 'GMD Terminação', value: '960 g/dia' },
-        { label: 'Espessura Toucinho P2', value: '11.5 mm' },
-      ],
-    },
-    {
-      id: 'comercializacao',
-      title: '7. Comercialização & Abate',
-      subtitle: 'Pesagem final, jejum e emissão de GTA',
-      icon: Truck,
-      color: 'from-amber-600 to-yellow-600',
-      badgeColor: 'bg-amber-100 text-amber-800',
-      animalCount: 346,
-      durationDays: 'Embarque em 10 dias',
-      avgWeightKg: 125.0,
-      dailyFeedPerAnimalKg: 0, // Jejum pré-abate 12h
-      mortalityPct: 0.05,
-      shedLocation: 'Galpão 05 / Plataforma de Embarque',
-      status: 'Excelente',
-      keyEvents: ['Jejum hídrico/alimentar de 12 horas', 'Checklist de bem-estar e rampa antiderrapante', 'Emissão da Guia de Trânsito Animal (GTA)'],
-      vitalMetrics: [
-        { label: 'Rendimento de Carcaça', value: '74.5%' },
-        { label: 'Carne Magra na Carcaça', value: '59.8%' },
-        { label: 'Preço Estimado Vivo', value: 'R$ 7.40 / kg' },
-      ],
-    },
-  ];
+    const growBatches = batches.filter(b => b.stage === 'crescimento' && b.status === 'Ativo');
+    const growCount = growBatches.reduce((acc, b) => acc + b.currentAnimalsCount, 0);
 
-  const currentStage = (stages || []).find(s => s?.id === selectedStageId) || stages?.[2] || stages?.[0] || null;
+    const finishBatches = batches.filter(b => b.stage === 'terminacao' && b.status === 'Ativo');
+    const finishCount = finishBatches.reduce((acc, b) => acc + b.currentAnimalsCount, 0);
+
+    const readyBatches = batches.filter(
+      b => b.status === 'Embarcado para Abate' || (b.stage === 'terminacao' && b.currentAvgWeightKg >= b.targetWeightKg)
+    );
+    const readyCount = readyBatches.reduce((acc, b) => acc + b.currentAnimalsCount, 0);
+
+    const avgWeightOf = (list: SwineBatch[]) => {
+      if (list.length === 0) return '—';
+      const avg = list.reduce((acc, b) => acc + b.currentAvgWeightKg, 0) / list.length;
+      return `${avg.toFixed(1)} kg`;
+    };
+
+    const avgMortOf = (list: SwineBatch[]) => {
+      const init = list.reduce((acc, b) => acc + b.initialAnimalsCount, 0);
+      if (init === 0) return '—';
+      const dead = list.reduce((acc, b) => acc + b.mortalityCount, 0);
+      return `${((dead / init) * 100).toFixed(1)}%`;
+    };
+
+    const avgCaOf = (list: SwineBatch[]) => {
+      if (list.length === 0) return '—';
+      const avg = list.reduce((acc, b) => acc + b.feedConversionRatio, 0) / list.length;
+      return `${avg.toFixed(2)} kg/kg`;
+    };
+
+    const avgGmdOf = (list: SwineBatch[]) => {
+      if (list.length === 0) return '—';
+      const avg = list.reduce((acc, b) => acc + b.averageDailyGainG, 0) / list.length;
+      return `${Math.round(avg)} g/dia`;
+    };
+
+    const shedFor = (stage: ProductionStage, fallback: string) =>
+      sheds.find(s => s.phase === stage)?.name ?? fallback;
+
+    const avgLitterBornAlive =
+      lactatingLitters.length > 0
+        ? (
+            lactatingLitters.reduce((acc, l) => acc + l.bornAlive, 0) / lactatingLitters.length
+          ).toFixed(1)
+        : '—';
+
+    const avgLitterBirthWeight =
+      lactatingLitters.length > 0
+        ? `${(
+            lactatingLitters.reduce((acc, l) => acc + l.avgBirthWeightKg, 0) /
+            lactatingLitters.length
+          ).toFixed(2)} kg`
+        : '—';
+
+    const matMortPct = (() => {
+      const born = litters.reduce((acc, l) => acc + l.bornAlive, 0);
+      if (born === 0) return '—';
+      const dead = litters.reduce((acc, l) => acc + l.preWeaningMortalityCount, 0);
+      return `${((dead / born) * 100).toFixed(1)}%`;
+    })();
+
+    const avgPregnantEcc =
+      pregnantSows.length > 0
+        ? `${(
+            pregnantSows.reduce((acc, s) => acc + s.bodyConditionScore, 0) / pregnantSows.length
+          ).toFixed(1)} / 5`
+        : '—';
+
+    return [
+      {
+        id: 'reproducao',
+        title: '1. Reprodução & IA',
+        shortTitle: 'Reprodução',
+        subtitle: 'Detecção de cio, rufiação e inseminação artificial',
+        icon: Heart,
+        animalCount: breedingSows.length,
+        durationDays: '4 a 7 dias pós-desmame',
+        avgWeightLabel:
+          breedingSows.length > 0
+            ? `${Math.round(
+                breedingSows.reduce((a, s) => a + s.currentWeightKg, 0) / breedingSows.length
+              )} kg`
+            : '—',
+        feedRefLabel: '2,6 kg/dia (ref.)',
+        mortalityLabel: 'Meta < 0,5%',
+        shedLocation: shedFor('reproducao', 'Setor de Cobertura / IA'),
+        targetTempLabel: '18°C a 22°C',
+        hasLiveData: breedingSows.length > 0,
+        keyEvents: [
+          'Rufiação diária com cachaço 2x/dia',
+          'Protocolo IA heterospérmica 0h / 24h',
+          'Flushing nutricional pré-cobertura',
+        ],
+        vitalMetrics: [
+          { label: 'Fêmeas em cobertura / marrãs', value: `${breedingSows.length}` },
+          { label: 'Meta Taxa de Concepção', value: '> 90%' },
+          { label: 'Meta IDC (Desmame-Cio)', value: '4 a 6 dias' },
+        ],
+        targetTab: 'reproduction',
+      },
+      {
+        id: 'gestacao',
+        title: '2. Gestação',
+        shortTitle: 'Gestação',
+        subtitle: 'Controle de escore corporal (ECC) e ultrassom',
+        icon: Calendar,
+        animalCount: pregnantSows.length,
+        durationDays: '114 dias (3m 3s 3d)',
+        avgWeightLabel:
+          pregnantSows.length > 0
+            ? `${Math.round(
+                pregnantSows.reduce((a, s) => a + s.currentWeightKg, 0) / pregnantSows.length
+              )} kg`
+            : '—',
+        feedRefLabel: '2,2 a 2,5 kg/dia (ref.)',
+        mortalityLabel: 'Meta < 1,0%',
+        shedLocation: shedFor('gestacao', 'Galpão de Gestação'),
+        targetTempLabel: '18°C a 22°C',
+        hasLiveData: pregnantSows.length > 0,
+        keyEvents: [
+          'Diagnóstico de gestação (DG) aos 21–28 dias',
+          'Ajuste de curva alimentar conforme escore ECC',
+          'Vacinação pré-parto aos 85 e 100 dias',
+        ],
+        vitalMetrics: [
+          { label: 'Matrizes gestantes ativas', value: `${pregnantSows.length}` },
+          { label: 'ECC médio gestação', value: avgPregnantEcc },
+          { label: 'Meta retenção gestacional', value: '> 95%' },
+        ],
+        targetTab: 'reproduction',
+      },
+      {
+        id: 'maternidade',
+        title: '3. Maternidade',
+        shortTitle: 'Maternidade',
+        subtitle: 'Parto assistido, colostro e lactação',
+        icon: Baby,
+        animalCount: maternityPiglets,
+        durationDays: '21 a 28 dias',
+        avgWeightLabel: avgLitterBirthWeight,
+        feedRefLabel: '6,5 kg/dia matriz (ref.)',
+        mortalityLabel: matMortPct,
+        shedLocation: shedFor('maternidade', 'Setor de Maternidade'),
+        targetTempLabel: '22°C sala / 32°C escamoteador',
+        hasLiveData: lactatingLitters.length > 0,
+        keyEvents: [
+          'Ingestão de colostro monitorada na 1ª hora de vida',
+          'Ferro Dextrano 200 mg até o 3º dia de vida',
+          'Aquecimento no escamoteador entre 30°C e 32°C',
+        ],
+        vitalMetrics: [
+          { label: 'Leitegadas em lactação', value: `${lactatingLitters.length}` },
+          { label: 'Média nascidos vivos', value: avgLitterBornAlive },
+          { label: 'Peso médio ao nascer', value: avgLitterBirthWeight },
+          { label: 'Mortalidade pré-desmame', value: matMortPct },
+        ],
+        targetTab: 'maternity',
+      },
+      {
+        id: 'creche',
+        title: '4. Creche Climatizada',
+        shortTitle: 'Creche',
+        subtitle: 'Transição pós-desmame e adaptação alimentar',
+        icon: Activity,
+        animalCount: nurseryCount,
+        durationDays: '42 dias (3 a 9 semanas)',
+        avgWeightLabel: avgWeightOf(nurseryBatches),
+        feedRefLabel: '0,8 a 1,1 kg/dia (ref.)',
+        mortalityLabel: avgMortOf(nurseryBatches),
+        shedLocation: shedFor('creche', 'Galpão de Creche'),
+        targetTempLabel: '26°C a 28°C',
+        hasLiveData: nurseryBatches.length > 0,
+        keyEvents: [
+          'Ração Pré-Inicial micropeletizada na entrada',
+          'Controle de temperatura e ausência de correntes de ar',
+          'Vacinação PCV2 e Mycoplasma conforme calendário',
+        ],
+        vitalMetrics: [
+          { label: 'Lotes ativos na creche', value: `${nurseryBatches.length}` },
+          { label: 'Conversão Alimentar (CA)', value: avgCaOf(nurseryBatches) },
+          { label: 'GMD médio creche', value: avgGmdOf(nurseryBatches) },
+        ],
+        targetTab: 'nursery',
+      },
+      {
+        id: 'crescimento',
+        title: '5. Crescimento & Recria',
+        shortTitle: 'Crescimento',
+        subtitle: 'Desenvolvimento muscular e ganho de estrutura',
+        icon: TrendingUp,
+        animalCount: growCount,
+        durationDays: '50 dias (10 a 17 semanas)',
+        avgWeightLabel: avgWeightOf(growBatches),
+        feedRefLabel: '2,0 a 2,3 kg/dia (ref.)',
+        mortalityLabel: avgMortOf(growBatches),
+        shedLocation: shedFor('crescimento', 'Galpão de Crescimento'),
+        targetTempLabel: '20°C a 23°C',
+        hasLiveData: growBatches.length > 0,
+        keyEvents: [
+          'Transição nutricional Crescimento 1 → 2',
+          'Checagem de vazão de bebedouros (1,5 L/min)',
+          'Densidade recomendada ~ 0,65 m²/animal',
+        ],
+        vitalMetrics: [
+          { label: 'Lotes em crescimento', value: `${growBatches.length}` },
+          { label: 'Conversão Alimentar (CA)', value: avgCaOf(growBatches) },
+          { label: 'GMD médio crescimento', value: avgGmdOf(growBatches) },
+        ],
+        targetTab: 'grow_finish',
+      },
+      {
+        id: 'terminacao',
+        title: '6. Terminação',
+        shortTitle: 'Terminação',
+        subtitle: 'Engorda final e deposição de carne magra',
+        icon: Scale,
+        animalCount: finishCount,
+        durationDays: '45 dias (18 a 24 semanas)',
+        avgWeightLabel: avgWeightOf(finishBatches),
+        feedRefLabel: '2,7 a 3,0 kg/dia (ref.)',
+        mortalityLabel: avgMortOf(finishBatches),
+        shedLocation: shedFor('terminacao', 'Galpão de Terminação'),
+        targetTempLabel: '18°C a 21°C',
+        hasLiveData: finishBatches.length > 0,
+        keyEvents: [
+          'Ração de terminação respeitando carência zero',
+          'Pesagem amostral para uniformidade de lote',
+          'Controle de ventilação e amônia < 15 ppm',
+        ],
+        vitalMetrics: [
+          { label: 'Lotes em terminação', value: `${finishBatches.length}` },
+          { label: 'Conversão Alimentar (CA)', value: avgCaOf(finishBatches) },
+          { label: 'GMD médio terminação', value: avgGmdOf(finishBatches) },
+        ],
+        targetTab: 'grow_finish',
+      },
+      {
+        id: 'comercializacao',
+        title: '7. Comercialização & Abate',
+        shortTitle: 'Abate / GTA',
+        subtitle: 'Pesagem final, jejum pré-abate e emissão de GTA',
+        icon: Truck,
+        animalCount: readyCount,
+        durationDays: 'Jejum 12h + embarque',
+        avgWeightLabel: avgWeightOf(readyBatches),
+        feedRefLabel: 'Jejum sólido pré-abate',
+        mortalityLabel: 'Meta < 0,1%',
+        shedLocation: 'Plataforma de Embarque',
+        targetTempLabel: 'Embarque em horário ameno',
+        hasLiveData: readyBatches.length > 0,
+        keyEvents: [
+          'Jejum sólido de 12 horas com água à vontade',
+          'Manejo de bem-estar em rampa antiderrapante',
+          'Conferência de carência zero e emissão de Pré-GTA',
+        ],
+        vitalMetrics: [
+          { label: 'Lotes prontos / embarcados', value: `${readyBatches.length}` },
+          { label: 'Meta rendimento carcaça', value: '74% a 76%' },
+          { label: 'Meta carne magra', value: '> 58%' },
+        ],
+        targetTab: 'reports',
+      },
+    ];
+  }, [animals, batches, litters, sheds]);
+
+  const currentStage = stages.find(s => s.id === selectedStageId) ?? stages[0];
+  const StageIcon = currentStage.icon;
+
+  const matchingShed = sheds.find(s => s.phase === selectedStageId);
 
   return (
-    <div className="space-y-6">
-      {/* Header & Pipeline Concept */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs space-y-2">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-pink-50 text-pink-700 rounded-full text-xs font-bold mb-1">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Diferencial Exclusivo GeaAgro</span>
-            </div>
-            <h2 className="text-xl font-black text-gray-900">
-              Painel de Fluxo Contínuo da Produção Suinícola
-            </h2>
-            <p className="text-xs text-gray-500 max-w-3xl">
-              Acompanhe a transição dos animais ao longo de todas as 7 etapas do ciclo biológico e produtivo.
-              Identifique gargalos de lotação, atrasos de crescimento e desvios de conversão alimentar em tempo real.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-gray-600">Tempo Total do Ciclo:</span>
-            <span className="px-3 py-1.5 bg-gray-900 text-white rounded-xl text-xs font-bold">
-              ~ 165 a 175 dias
-            </span>
-          </div>
+    <div className="space-y-4">
+      {/* Compact Header */}
+      <div className={`${SWINE_CARD_CLASS} p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
+        <div>
+          <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100">
+            Fluxo Contínuo da Produção Suinícola
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Acompanhe as 7 etapas do ciclo produtivo com populações reais e benchmarks de referência.
+          </p>
+        </div>
+        <div className="text-xs font-medium text-slate-700 dark:text-zinc-300 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 px-3 py-1.5 rounded-lg shrink-0 tabular-nums">
+          Ciclo completo: ~165 a 175 dias
         </div>
       </div>
 
-      {/* Horizontal Pipeline Steps Navigation */}
-      <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-xs overflow-x-auto">
-        <div className="flex items-center gap-2 min-w-max">
+      {/* Horizontal Pipeline Steps */}
+      <div className={`${SWINE_CARD_CLASS} p-2.5 overflow-x-auto`}>
+        <div className="flex items-center gap-1.5 min-w-max">
           {stages.map((stg, idx) => {
             const Icon = stg.icon;
             const isSelected = selectedStageId === stg.id;
             return (
               <React.Fragment key={stg.id}>
                 <button
+                  type="button"
                   onClick={() => setSelectedStageId(stg.id)}
-                  className={`p-3.5 rounded-xl text-left transition-all flex items-center gap-3 border ${
+                  className={`px-3 py-2 rounded-lg text-left transition-colors flex items-center gap-2.5 border cursor-pointer ${
                     isSelected
-                      ? 'bg-pink-600 text-white border-pink-600 shadow-md shadow-pink-600/20 scale-[1.02]'
-                      : 'bg-gray-50/80 hover:bg-gray-100 text-gray-800 border-gray-200/80'
+                      ? 'bg-rose-600 text-white border-rose-600'
+                      : 'bg-slate-50 dark:bg-zinc-950 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-800 dark:text-zinc-200 border-slate-200 dark:border-zinc-800'
                   }`}
                 >
-                  <div
-                    className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                      isSelected ? 'bg-white/20 text-white' : 'bg-white text-gray-700 border border-gray-200'
+                  <Icon
+                    className={`w-4 h-4 shrink-0 ${
+                      isSelected ? 'text-white' : 'text-rose-600 dark:text-rose-400'
                     }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                  </div>
+                  />
                   <div>
-                    <span className={`text-[10px] font-bold block uppercase tracking-wider ${isSelected ? 'text-pink-100' : 'text-gray-500'}`}>
+                    <div
+                      className={`text-[10px] font-medium ${
+                        isSelected ? 'text-rose-100' : 'text-slate-500 dark:text-zinc-400'
+                      }`}
+                    >
                       Fase 0{idx + 1}
-                    </span>
-                    <h4 className="text-xs font-bold truncate max-w-[120px]">{stg.title.split('. ')[1]}</h4>
-                    <span className={`text-[11px] font-black ${isSelected ? 'text-white' : 'text-pink-600'}`}>
-                      {stg.animalCount} animais
-                    </span>
+                    </div>
+                    <div className="text-xs font-semibold leading-tight">{stg.shortTitle}</div>
+                    <div
+                      className={`text-[11px] font-medium tabular-nums ${
+                        isSelected ? 'text-white' : 'text-slate-600 dark:text-zinc-400'
+                      }`}
+                    >
+                      {stg.animalCount} cab.
+                    </div>
                   </div>
                 </button>
                 {idx < stages.length - 1 && (
-                  <ArrowRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-600 shrink-0" />
                 )}
               </React.Fragment>
             );
@@ -310,80 +414,103 @@ export const SwineProductionFlowView: React.FC<SwineProductionFlowViewProps> = (
         </div>
       </div>
 
-      {/* Detailed Stage Deep Dive Card */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Stage Summary & Metrics */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-pink-600 to-rose-700 text-white flex items-center justify-center shadow-md shadow-pink-600/20">
-                <currentStage.icon className="w-6 h-6" />
+      {/* Detailed Stage View */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className={`lg:col-span-2 ${SWINE_CARD_CLASS} p-4 space-y-4`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-zinc-800 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                <StageIcon className="w-4 h-4" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-black text-gray-900">{currentStage.title}</h3>
-                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${currentStage.badgeColor}`}>
-                    {currentStage.status}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                    {currentStage.title}
+                  </h3>
+                  <span
+                    className={`text-[10px] font-medium px-2 py-0.5 rounded-md border ${
+                      currentStage.hasLiveData
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                        : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700'
+                    }`}
+                  >
+                    {currentStage.hasLiveData ? 'Em operação' : 'Sem registros na fase'}
                   </span>
                 </div>
-                <p className="text-xs text-gray-500">{currentStage.subtitle}</p>
+                <p className="text-xs text-slate-500 dark:text-zinc-400">{currentStage.subtitle}</p>
               </div>
             </div>
 
-            <div className="text-right">
-              <span className="text-[11px] font-semibold text-gray-500 block">População Atual</span>
-              <span className="text-2xl font-black text-pink-600">{currentStage.animalCount} animais</span>
+            <div className="sm:text-right">
+              <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">População na Fase</span>
+              <span className="text-xl font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                {currentStage.animalCount} animais
+              </span>
             </div>
           </div>
 
-          {/* KPI Metrics Grid for Selected Stage */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-100">
-              <span className="text-[11px] text-gray-500 font-medium block">Duração Típica</span>
-              <span className="text-sm font-bold text-gray-900 mt-0.5 block">{currentStage.durationDays}</span>
+          {/* 4 Stage Metrics */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className={`${SWINE_SUBCARD_CLASS} p-2.5`}>
+              <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Duração Típica</span>
+              <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100 mt-0.5 block">
+                {currentStage.durationDays}
+              </span>
             </div>
-            <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-100">
-              <span className="text-[11px] text-gray-500 font-medium block">Peso Médio Atual</span>
-              <span className="text-sm font-bold text-gray-900 mt-0.5 block">{currentStage.avgWeightKg} kg</span>
+            <div className={`${SWINE_SUBCARD_CLASS} p-2.5`}>
+              <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Peso Médio Atual</span>
+              <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100 mt-0.5 block tabular-nums">
+                {currentStage.avgWeightLabel}
+              </span>
             </div>
-            <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-100">
-              <span className="text-[11px] text-gray-500 font-medium block">Ração / Animal / Dia</span>
-              <span className="text-sm font-bold text-gray-900 mt-0.5 block">{currentStage.dailyFeedPerAnimalKg} kg/dia</span>
+            <div className={`${SWINE_SUBCARD_CLASS} p-2.5`}>
+              <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Consumo Ração</span>
+              <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100 mt-0.5 block">
+                {currentStage.feedRefLabel}
+              </span>
             </div>
-            <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-100">
-              <span className="text-[11px] text-gray-500 font-medium block">Mortalidade Fase</span>
-              <span className="text-sm font-bold text-emerald-600 mt-0.5 block">{currentStage.mortalityPct}%</span>
+            <div className={`${SWINE_SUBCARD_CLASS} p-2.5`}>
+              <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Mortalidade Fase</span>
+              <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100 mt-0.5 block tabular-nums">
+                {currentStage.mortalityLabel}
+              </span>
             </div>
           </div>
 
-          {/* Vital Indicators */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
-              <Activity className="w-4 h-4 text-pink-600" />
-              <span>Indicadores Zootécnicos da Fase</span>
+          {/* Vital Metrics */}
+          <div className="space-y-2">
+            <h4 className="text-[11px] font-semibold text-slate-600 dark:text-zinc-400 uppercase tracking-wider">
+              Indicadores da Etapa
             </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {currentStage.vitalMetrics.map((met, i) => (
-                <div key={i} className="p-3 bg-pink-50/40 rounded-xl border border-pink-100/60 flex items-center justify-between">
-                  <span className="text-xs font-medium text-gray-700">{met.label}</span>
-                  <span className="text-xs font-black text-pink-900">{met.value}</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {currentStage.vitalMetrics.map(met => (
+                <div
+                  key={met.label}
+                  className={`${SWINE_SUBCARD_CLASS} px-3 py-2 flex items-center justify-between gap-2`}
+                >
+                  <span className="text-xs text-slate-600 dark:text-zinc-400">{met.label}</span>
+                  <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100 tabular-nums">
+                    {met.value}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Protocols & Key Events */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Protocolos & Manejos Críticos em Execução</span>
+          {/* Protocols */}
+          <div className="space-y-2">
+            <h4 className="text-[11px] font-semibold text-slate-600 dark:text-zinc-400 uppercase tracking-wider">
+              Protocolos e Manejos Críticos
             </h4>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {currentStage.keyEvents.map((evt, idx) => (
-                <div key={idx} className="flex items-start gap-2.5 p-2.5 bg-gray-50 rounded-xl text-xs text-gray-700">
-                  <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 text-[10px] font-bold mt-0.5">
+                <div
+                  key={evt}
+                  className={`${SWINE_SUBCARD_CLASS} px-3 py-2 flex items-center gap-2.5 text-xs text-slate-700 dark:text-zinc-300`}
+                >
+                  <span className="w-5 h-5 rounded-md bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0 text-[10px] font-semibold tabular-nums">
                     {idx + 1}
-                  </div>
+                  </span>
                   <span>{evt}</span>
                 </div>
               ))}
@@ -391,61 +518,63 @@ export const SwineProductionFlowView: React.FC<SwineProductionFlowViewProps> = (
           </div>
         </div>
 
-        {/* Right Column: Location, Ambience & Bottleneck Analysis */}
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-5">
-          <div>
-            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+        {/* Right Column: Facility & Action */}
+        <div className={`${SWINE_CARD_CLASS} p-4 space-y-4 flex flex-col justify-between`}>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 border-b border-slate-100 dark:border-zinc-800 pb-2.5">
               <Zap className="w-4 h-4 text-amber-500" />
-              <span>Diagnóstico de Capacidade & Gargalos</span>
-            </h4>
-            <p className="text-xs text-gray-500 mt-1">
-              Avaliação preditiva de fluxo entre fases para evitar superlotação ou ociosidade.
-            </p>
+              <h4 className="text-xs font-semibold text-slate-900 dark:text-zinc-100 uppercase tracking-wider">
+                Capacidade & Instalação
+              </h4>
+            </div>
+
+            <div className={`${SWINE_SUBCARD_CLASS} p-3 space-y-1.5`}>
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-zinc-200">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>
+                  {matchingShed
+                    ? `Ocupação: ${matchingShed.currentOccupancy}/${matchingShed.capacityAnimals}`
+                    : currentStage.hasLiveData
+                      ? 'Fase em operação'
+                      : 'Sem lotes vinculados'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
+                {matchingShed
+                  ? `Galpão ${matchingShed.name} operando a ${matchingShed.temperatureC}°C (${matchingShed.comfortStatus}).`
+                  : 'Cadastre animais, lotes ou leituras de ambiência nesta etapa para monitorar lotação e gargalos em tempo real.'}
+              </p>
+            </div>
+
+            <div className={`${SWINE_SUBCARD_CLASS} p-3 space-y-2 text-xs`}>
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-500 dark:text-zinc-400">Localização</span>
+                <span className="font-medium text-slate-900 dark:text-zinc-100 text-right">
+                  {currentStage.shedLocation}
+                </span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-500 dark:text-zinc-400">Ventilação</span>
+                <span className="font-medium text-slate-900 dark:text-zinc-100 text-right">
+                  {matchingShed ? matchingShed.ventilationType : 'Conforme galpão'}
+                </span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-500 dark:text-zinc-400">Temperatura Alvo</span>
+                <span className="font-medium text-slate-900 dark:text-zinc-100 text-right">
+                  {matchingShed ? `${matchingShed.targetTempC}°C` : currentStage.targetTempLabel}
+                </span>
+              </div>
+            </div>
           </div>
 
-          {/* Status Box */}
-          <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 space-y-2">
-            <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Capacidade Balanceada</span>
-            </div>
-            <p className="text-xs text-emerald-800 leading-relaxed">
-              O fluxo de entrada e saída no {currentStage.shedLocation} está sincronizado com a taxa de parto de 2.4 partos/semana.
-            </p>
-          </div>
-
-          {/* Location & Shed Twin Info */}
-          <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-2.5 text-xs text-gray-700">
-            <span className="font-bold text-gray-900 block">Instalação Vinculada:</span>
-            <div className="flex justify-between">
-              <span>Localização:</span>
-              <span className="font-bold text-gray-900">{currentStage.shedLocation}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Climatização:</span>
-              <span className="font-bold text-emerald-600">Pressão Negativa / Túnel</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Temperatura Alvo:</span>
-              <span className="font-bold text-gray-900">
-                {selectedStageId === 'creche' ? '27.0°C' : selectedStageId === 'maternidade' ? '22.0°C (32°C leitão)' : '20.0°C'}
-              </span>
-            </div>
-          </div>
-
-          {/* Quick jump to dedicated subtab */}
           <button
-            onClick={() => {
-              if (selectedStageId === 'reproducao' || selectedStageId === 'gestacao') onNavigate('reproduction');
-              else if (selectedStageId === 'maternidade') onNavigate('maternity');
-              else if (selectedStageId === 'creche') onNavigate('nursery');
-              else if (selectedStageId === 'crescimento' || selectedStageId === 'terminacao') onNavigate('grow_finish');
-              else onNavigate('reports');
-            }}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
+            type="button"
+            onClick={() => onNavigate(currentStage.targetTab)}
+            className={`${SWINE_PRIMARY_BTN_CLASS} w-full h-9`}
           >
-            <span>Gerenciar {currentStage.title.split('. ')[1]} Detalhadamente</span>
-            <ChevronRight className="w-4 h-4" />
+            <span>Gerenciar {currentStage.shortTitle}</span>
+            <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>

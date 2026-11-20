@@ -40,25 +40,25 @@ export type BuffaloStatus =
 
 export type BuffaloPurpose = 'Leite' | 'Corte' | 'Dupla Aptidão' | 'Genética / PO';
 
-export type BuffaloTab = 
+export type BuffaloTab =
   | 'dashboard'
-  | 'animais'
-  | 'gemeo_digital'
-  | 'genealogia'
-  | 'reproducao'
-  | 'bezerros'
-  | 'leite'
-  | 'corte'
-  | 'nutricao'
-  | 'pastagens'
-  | 'bem_estar_agua'
-  | 'sanidade'
-  | 'doencas'
-  | 'farmacia'
-  | 'instalacoes'
-  | 'diario_fotos'
-  | 'mapa'
-  | 'relatorios';
+  | 'registry'
+  | 'digital_twin'
+  | 'genealogy'
+  | 'reproduction'
+  | 'calves'
+  | 'dairy'
+  | 'beef'
+  | 'welfare_water'
+  | 'nutrition'
+  | 'pastures'
+  | 'health'
+  | 'diseases_lib'
+  | 'pharmacy'
+  | 'facilities'
+  | 'smart_map'
+  | 'reports'
+  | 'photo_diary';
 
 export interface BuffaloWeighing {
   id: string;

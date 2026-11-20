@@ -1,10 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { TraceabilityLeafletMap } from './traceability/TraceabilityLeafletMap';
-import { DigitalFoodPassportModal } from './traceability/DigitalFoodPassportModal';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { GeoprocessamentoDashboard } from './geoprocessamento/GeoprocessamentoDashboard';
-import { RasterImportModal } from './geoprocessamento/RasterImportModal';
-import { InspectionModal } from './geoprocessamento/InspectionModal';
-import { ReportExportModal } from './geoprocessamento/ReportExportModal';
 import {
   INITIAL_TRACEABILITY_PROPERTY,
   INITIAL_TRACEABILITY_LOTS,
@@ -36,17 +31,29 @@ import {
   Layers,
   BarChart3,
   MapPin,
-  Leaf,
   Upload,
   Download,
-  AlertTriangle,
-  Sparkles,
-  Camera,
-  HardDrive,
-  RefreshCw
+  RefreshCw,
+  X
 } from 'lucide-react';
-
 import { Company, Agronomist, RuralProducer, Farm } from '../types/agronomy';
+import { lazyWithRetry } from '../utils/lazyWithRetry';
+
+const TraceabilityLeafletMap = lazyWithRetry(() =>
+  import('./traceability/TraceabilityLeafletMap').then(m => ({ default: m.TraceabilityLeafletMap }))
+);
+const DigitalFoodPassportModal = lazyWithRetry(() =>
+  import('./traceability/DigitalFoodPassportModal').then(m => ({ default: m.DigitalFoodPassportModal }))
+);
+const RasterImportModal = lazyWithRetry(() =>
+  import('./geoprocessamento/RasterImportModal').then(m => ({ default: m.RasterImportModal }))
+);
+const InspectionModal = lazyWithRetry(() =>
+  import('./geoprocessamento/InspectionModal').then(m => ({ default: m.InspectionModal }))
+);
+const ReportExportModal = lazyWithRetry(() =>
+  import('./geoprocessamento/ReportExportModal').then(m => ({ default: m.ReportExportModal }))
+);
 
 interface GeoprocessamentoModuleProps {
   activeSubTab?: string;
@@ -61,6 +68,30 @@ interface GeoprocessamentoModuleProps {
   farms?: Farm[];
 }
 
+function readStoredJson<T>(key: string, fallback: T): T {
+  try {
+    const saved = localStorage.getItem(key);
+    if (!saved) return fallback;
+    return JSON.parse(saved) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function readStoredArray<T extends { id?: string }>(key: string, fallback: T[]): T[] {
+  try {
+    const saved = localStorage.getItem(key);
+    if (!saved) return fallback;
+    const parsed = JSON.parse(saved);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed.filter((item): item is T => Boolean(item && item.id));
+    }
+  } catch {
+    // Fallback para estado inicial limpo
+  }
+  return fallback;
+}
+
 export const GeoprocessamentoModule: React.FC<GeoprocessamentoModuleProps> = ({
   activeSubTab,
   setActiveSubTab,
@@ -73,7 +104,6 @@ export const GeoprocessamentoModule: React.FC<GeoprocessamentoModuleProps> = ({
   producers,
   farms,
 }) => {
-  // Navigation view mode: 'dashboard' (Smart Dashboard) | 'map' (Interactive GIS Multilayer Map)
   const [viewMode, setViewMode] = useState<'dashboard' | 'map'>(() => {
     if (activeSubTab === 'draw' || activeSubTab === 'ndvi' || activeSubTab === 'pois' || activeSubTab === 'layers' || activeSubTab === 'list') {
       return 'map';
@@ -82,88 +112,38 @@ export const GeoprocessamentoModule: React.FC<GeoprocessamentoModuleProps> = ({
   });
 
   // Base traceability & agronomic technical registration state
-  const [property] = useState<TraceabilityProperty>(() => {
-    const saved = localStorage.getItem('geaagro_traceability_property');
-    return saved ? JSON.parse(saved) : INITIAL_TRACEABILITY_PROPERTY;
-  });
+  const [property] = useState<TraceabilityProperty>(() =>
+    readStoredJson('geaagro_traceability_property', INITIAL_TRACEABILITY_PROPERTY)
+  );
+  const [plots, setPlots] = useState<TraceabilityPlot[]>(() =>
+    readStoredJson('geaagro_traceability_plots', INITIAL_TRACEABILITY_PLOTS)
+  );
+  const [lots] = useState<TraceabilityLot[]>(() =>
+    readStoredJson('geaagro_traceability_lots', INITIAL_TRACEABILITY_LOTS)
+  );
+  const [operations] = useState<TraceabilityOperation[]>(() =>
+    readStoredJson('geaagro_traceability_operations', INITIAL_TRACEABILITY_OPERATIONS)
+  );
+  const [harvests] = useState<TraceabilityHarvestItem[]>(() =>
+    readStoredJson('geaagro_traceability_harvests', INITIAL_TRACEABILITY_HARVESTS)
+  );
+  const [photoDiary] = useState<TraceabilityPhotoDiaryItem[]>(() =>
+    readStoredJson('geaagro_traceability_photos', INITIAL_TRACEABILITY_PHOTO_DIARY)
+  );
 
-  const [plots, setPlots] = useState<TraceabilityPlot[]>(() => {
-    const saved = localStorage.getItem('geaagro_traceability_plots');
-    return saved ? JSON.parse(saved) : INITIAL_TRACEABILITY_PLOTS;
-  });
-
-  const [lots] = useState<TraceabilityLot[]>(() => {
-    const saved = localStorage.getItem('geaagro_traceability_lots');
-    return saved ? JSON.parse(saved) : INITIAL_TRACEABILITY_LOTS;
-  });
-
-  const [operations] = useState<TraceabilityOperation[]>(() => {
-    const saved = localStorage.getItem('geaagro_traceability_operations');
-    return saved ? JSON.parse(saved) : INITIAL_TRACEABILITY_OPERATIONS;
-  });
-
-  const [harvests] = useState<TraceabilityHarvestItem[]>(() => {
-    const saved = localStorage.getItem('geaagro_traceability_harvests');
-    return saved ? JSON.parse(saved) : INITIAL_TRACEABILITY_HARVESTS;
-  });
-
-  const [photoDiary] = useState<TraceabilityPhotoDiaryItem[]>(() => {
-    const saved = localStorage.getItem('geaagro_traceability_photos');
-    return saved ? JSON.parse(saved) : INITIAL_TRACEABILITY_PHOTO_DIARY;
-  });
-
-  // Remote Sensing & Intelligent Geoprocessing States
-  const [geoPlots, setGeoPlots] = useState<GeoprocessamentoPlotState[]>(() => {
-    const saved = localStorage.getItem('geaagro_geoprocessamento_plots');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.filter(p => p && p.id);
-        }
-      } catch (e) {}
-    }
-    return INITIAL_GEO_PLOTS;
-  });
-
-  const [alerts, setAlerts] = useState<GeoprocessamentoAlert[]>(() => {
-    const saved = localStorage.getItem('geaagro_geoprocessamento_alerts');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.filter(a => a && a.id);
-        }
-      } catch (e) {}
-    }
-    return INITIAL_GEO_ALERTS;
-  });
-
-  const [inspections, setInspections] = useState<GeoprocessamentoInspectionPoint[]>(() => {
-    const saved = localStorage.getItem('geaagro_geoprocessamento_inspections');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.filter(i => i && i.id);
-        }
-      } catch (e) {}
-    }
-    return INITIAL_GEO_INSPECTIONS;
-  });
-
-  const [rasters, setRasters] = useState<GeoprocessamentoRasterUpload[]>(() => {
-    const saved = localStorage.getItem('geaagro_geoprocessamento_rasters');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.filter(r => r && r.id);
-        }
-      } catch (e) {}
-    }
-    return INITIAL_GEO_RASTERS;
-  });
+  // Remote Sensing & Geoprocessing States
+  const [geoPlots, setGeoPlots] = useState<GeoprocessamentoPlotState[]>(() =>
+    readStoredArray('geaagro_geoprocessamento_plots', INITIAL_GEO_PLOTS)
+  );
+  const [alerts] = useState<GeoprocessamentoAlert[]>(() =>
+    readStoredArray('geaagro_geoprocessamento_alerts', INITIAL_GEO_ALERTS)
+  );
+  const [inspections, setInspections] = useState<GeoprocessamentoInspectionPoint[]>(() =>
+    readStoredArray('geaagro_geoprocessamento_inspections', INITIAL_GEO_INSPECTIONS)
+  );
+  const [rasters, setRasters] = useState<GeoprocessamentoRasterUpload[]>(() =>
+    readStoredArray('geaagro_geoprocessamento_rasters', INITIAL_GEO_RASTERS)
+  );
 
   const [selectedGeoPlot, setSelectedGeoPlot] = useState<GeoprocessamentoPlotState | undefined>(
     () => geoPlots[0] || INITIAL_GEO_PLOTS[0]
@@ -172,32 +152,47 @@ export const GeoprocessamentoModule: React.FC<GeoprocessamentoModuleProps> = ({
   useEffect(() => {
     if (!selectedGeoPlot && geoPlots.length > 0) {
       setSelectedGeoPlot(geoPlots[0]);
-    } else if (!selectedGeoPlot && INITIAL_GEO_PLOTS.length > 0) {
-      setSelectedGeoPlot(INITIAL_GEO_PLOTS[0]);
+    } else if (selectedGeoPlot && !geoPlots.some(p => p.id === selectedGeoPlot.id)) {
+      setSelectedGeoPlot(geoPlots[0]);
     }
   }, [geoPlots, selectedGeoPlot]);
 
-  // Modals state
+  // Modals & sync state
   const [isRasterModalOpen, setIsRasterModalOpen] = useState<boolean>(false);
   const [isInspectionModalOpen, setIsInspectionModalOpen] = useState<boolean>(false);
   const [editingInspection, setEditingInspection] = useState<GeoprocessamentoInspectionPoint | null>(null);
   const [targetInspectionPlotId, setTargetInspectionPlotId] = useState<string | undefined>();
   const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
+  const [reportFormat, setReportFormat] = useState<'pdf' | 'csv' | 'excel' | 'geotiff'>('pdf');
   const [passportModalLot, setPassportModalLot] = useState<TraceabilityLot | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
 
+  const syncTimersRef = useRef<number[]>([]);
+
+  useEffect(() => {
+    return () => {
+      syncTimersRef.current.forEach(t => window.clearTimeout(t));
+      syncTimersRef.current = [];
+    };
+  }, []);
+
   const handleSyncSatellite = () => {
+    syncTimersRef.current.forEach(t => window.clearTimeout(t));
+    syncTimersRef.current = [];
+
     setIsSyncing(true);
     setSyncStatusMsg('Conectando ao catálogo Copernicus Sentinel-2 L2A (10m)...');
-    setTimeout(() => {
-      setSyncStatusMsg('Verificando cobertura de nuvens recente (Passagem recente: 0.0% nuvens)...');
-    }, 1200);
-    setTimeout(() => {
+    const t1 = window.setTimeout(() => {
+      setSyncStatusMsg('Verificando cobertura de nuvens recente (0.0% nuvens)...');
+    }, 1000);
+    const t2 = window.setTimeout(() => {
       setIsSyncing(false);
-      setSyncStatusMsg('Sincronização concluída com sucesso! Cenas multiespectrais atualizadas.');
-      setTimeout(() => setSyncStatusMsg(null), 3500);
-    }, 2500);
+      setSyncStatusMsg('Sincronização concluída. Cenas multiespectrais atualizadas.');
+      const t3 = window.setTimeout(() => setSyncStatusMsg(null), 3500);
+      syncTimersRef.current.push(t3);
+    }, 2200);
+    syncTimersRef.current.push(t1, t2);
   };
 
   // Sync activeSubTab from parent Navbar
@@ -211,12 +206,11 @@ export const GeoprocessamentoModule: React.FC<GeoprocessamentoModuleProps> = ({
     }
   }, [activeSubTab]);
 
-  // Synchronize plot changes
+  // Synchronize plot changes between Traceability and Geoprocessamento
   const handleSavePlots = (updatedPlots: TraceabilityPlot[]) => {
     setPlots(updatedPlots);
     localStorage.setItem('geaagro_traceability_plots', JSON.stringify(updatedPlots));
 
-    // Also update geoPlots to reflect new boundaries or new plots
     const updatedGeoPlots = updatedPlots.map((tp, idx) => {
       const existing = geoPlots.find(gp => gp.id === tp.id);
       if (existing) {
@@ -302,13 +296,10 @@ export const GeoprocessamentoModule: React.FC<GeoprocessamentoModuleProps> = ({
   };
 
   const handleSaveInspection = (newInspection: GeoprocessamentoInspectionPoint) => {
-    let updated: GeoprocessamentoInspectionPoint[];
     const exists = inspections.some(i => i.id === newInspection.id);
-    if (exists) {
-      updated = inspections.map(i => i.id === newInspection.id ? newInspection : i);
-    } else {
-      updated = [newInspection, ...inspections];
-    }
+    const updated = exists
+      ? inspections.map(i => (i.id === newInspection.id ? newInspection : i))
+      : [newInspection, ...inspections];
     setInspections(updated);
     localStorage.setItem('geaagro_geoprocessamento_inspections', JSON.stringify(updated));
     setEditingInspection(null);
@@ -321,195 +312,227 @@ export const GeoprocessamentoModule: React.FC<GeoprocessamentoModuleProps> = ({
     }
   };
 
+  const handleOpenExportReport = (plot?: GeoprocessamentoPlotState, format: 'pdf' | 'excel' | 'csv' | 'geotiff' = 'pdf') => {
+    if (plot) setSelectedGeoPlot(plot);
+    setReportFormat(format);
+    setIsReportModalOpen(true);
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Sync Status Banner if active */}
+    <div className="space-y-4">
+      {/* Sync Status Notice */}
       {syncStatusMsg && (
-        <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 p-3.5 rounded-2xl flex items-center justify-between text-xs font-semibold animate-in fade-in">
-          <div className="flex items-center gap-2">
-            <RefreshCw className={`w-4 h-4 text-emerald-600 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{syncStatusMsg}</span>
+        <div
+          role="status"
+          className="bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-200 px-3.5 py-2.5 rounded-lg flex items-center justify-between gap-2 text-xs font-medium"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span className="truncate">{syncStatusMsg}</span>
           </div>
+          {!isSyncing && (
+            <button
+              type="button"
+              onClick={() => setSyncStatusMsg(null)}
+              className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 p-0.5 cursor-pointer"
+              aria-label="Fechar aviso"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       )}
 
-      {/* UNIFIED PROFESSIONAL HEADER CARD */}
-      <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-        {/* Top Info Section */}
-        <div className="p-5 sm:p-6 pb-4">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-md shadow-emerald-600/20 shrink-0">
-              <Compass className="w-6 h-6" />
+      {/* Unified Flat Hairline Module Header */}
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-slate-200/80 dark:border-zinc-800 overflow-hidden">
+        <div className="px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <Compass className="w-4 h-4" />
             </div>
-            <div className="space-y-1 flex-1 min-w-0">
-              <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
-                SIG &amp; Geoprocessamento Agronômico
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-zinc-100 tracking-tight truncate">
+                SIG e Geoprocessamento Agronômico
               </h2>
-              <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-                {property.farmName} &bull; {geoPlots.length} Talhões Monitorados &bull; Integração Cadastro Técnico &bull; Sensoriamento Remoto Multiespectral
+              <p className="text-xs text-slate-500 dark:text-zinc-400 truncate tabular-nums">
+                {property.farmName} · {geoPlots.length} {geoPlots.length === 1 ? 'talhão monitorado' : 'talhões monitorados'} · Sensoriamento Remoto Multiespectral
               </p>
             </div>
           </div>
-        </div>
 
-        {/* Bottom Actions Bar (Botões na parte inferior da UI) */}
-        <div className="px-5 py-3 bg-slate-50/80 dark:bg-zinc-950/60 border-t border-slate-100 dark:border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Navigation View Switcher on the Left */}
-          <div className="bg-white dark:bg-zinc-800 p-1 rounded-2xl flex items-center gap-1 border border-slate-200/80 dark:border-zinc-700/80 shadow-2xs">
+          {/* Primary Export CTA */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => setViewMode('dashboard')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                viewMode === 'dashboard'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <BarChart3 className="w-3.5 h-3.5" />
-              <span>Dashboard Inteligente</span>
-            </button>
-            <button
-              onClick={() => setViewMode('map')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                viewMode === 'map'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>Mapa Multicamadas</span>
-            </button>
-          </div>
-
-          {/* Action Tools on the Right */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={handleSyncSatellite}
-              disabled={isSyncing}
-              className="px-3.5 py-2 rounded-xl bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-bold transition flex items-center gap-1.5 border border-slate-200 dark:border-zinc-700 shadow-2xs cursor-pointer disabled:opacity-50"
-              title="Sincronizar dados de satélite"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 text-blue-500 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Satélite'}</span>
-            </button>
-
-            <button
-              onClick={() => setIsRasterModalOpen(true)}
-              className="px-3.5 py-2 rounded-xl bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-bold transition flex items-center gap-1.5 border border-slate-200 dark:border-zinc-700 shadow-2xs cursor-pointer"
-              title="Importar Drone, GeoTIFF ou Imagem Georreferenciada"
-            >
-              <Upload className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Importar Imagem</span>
-            </button>
-
-            <button
-              onClick={() => handleOpenNewInspection(selectedGeoPlot?.id)}
-              className="px-3.5 py-2 rounded-xl bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-bold transition flex items-center gap-1.5 border border-slate-200 dark:border-zinc-700 shadow-2xs cursor-pointer"
-              title="Gerar Ponto de Vistoria em Campo"
-            >
-              <MapPin className="w-3.5 h-3.5 text-blue-500" />
-              <span>Ponto de Vistoria</span>
-            </button>
-
-            <button
-              onClick={() => setIsReportModalOpen(true)}
-              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-              title="Exportar Laudo Técnico e Dados"
+              type="button"
+              onClick={() => handleOpenExportReport(selectedGeoPlot, 'pdf')}
+              disabled={!selectedGeoPlot}
+              className="h-9 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+              title={selectedGeoPlot ? 'Exportar laudo técnico e dados SIG' : 'Cadastre um talhão para exportar laudos'}
             >
               <Download className="w-3.5 h-3.5" />
               <span>Exportar Laudo</span>
             </button>
           </div>
         </div>
+
+        {/* Workspace Navigation & Utility Toolbar */}
+        <div className="px-4 sm:px-5 py-2.5 bg-slate-50/70 dark:bg-zinc-950/60 border-t border-slate-100 dark:border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+          {/* Segmented View Switcher */}
+          <div className="inline-flex items-center bg-slate-100/90 dark:bg-zinc-900 p-1 rounded-lg border border-slate-200/80 dark:border-zinc-800 gap-0.5 self-start">
+            <button
+              type="button"
+              onClick={() => setViewMode('dashboard')}
+              className={`h-7 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                viewMode === 'dashboard'
+                  ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 border border-slate-200/80 dark:border-zinc-700'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 border border-transparent'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Painel Analítico</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('map')}
+              className={`h-7 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                viewMode === 'map'
+                  ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 border border-slate-200/80 dark:border-zinc-700'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 border border-transparent'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Mapa Multicamadas</span>
+            </button>
+          </div>
+
+          {/* Field & Satellite Actions */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleSyncSatellite}
+              disabled={isSyncing}
+              className="h-8 px-3 rounded-lg bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-medium transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-zinc-700 cursor-pointer disabled:opacity-50 whitespace-nowrap"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-sky-600 dark:text-sky-400 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Satélite'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsRasterModalOpen(true)}
+              className="h-8 px-3 rounded-lg bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-medium transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-zinc-700 cursor-pointer whitespace-nowrap"
+            >
+              <Upload className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Importar Imagem</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleOpenNewInspection(selectedGeoPlot?.id)}
+              className="h-8 px-3 rounded-lg bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-medium transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-zinc-700 cursor-pointer whitespace-nowrap"
+            >
+              <MapPin className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+              <span>Ponto de Vistoria</span>
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Main Module Body based on ViewMode */}
+      {/* Main Module Body */}
       {viewMode === 'dashboard' ? (
         <GeoprocessamentoDashboard
           plots={geoPlots}
           alerts={alerts}
           inspections={inspections}
           rasters={rasters}
-          selectedPlot={selectedGeoPlot || geoPlots[0] || INITIAL_GEO_PLOTS[0]}
+          selectedPlot={selectedGeoPlot || geoPlots[0]}
           onSelectPlot={setSelectedGeoPlot}
           onOpenMap={handleOpenMapWithTab}
           onNewInspection={handleOpenNewInspection}
           onEditInspection={handleEditInspection}
           onDeleteInspection={handleDeleteInspection}
-          onExportReport={(plot, format) => {
-            setSelectedGeoPlot(plot);
-            setIsReportModalOpen(true);
-          }}
+          onExportReport={handleOpenExportReport}
         />
       ) : (
-        <TraceabilityLeafletMap
-          property={property}
-          plots={plots}
-          lots={lots}
-          onSavePlots={handleSavePlots}
-          onSelectLot={() => {}}
-          onOpenPassport={setPassportModalLot}
-          activeSubTab={activeSubTab}
-          setActiveSubTab={setActiveSubTab}
-        />
+        <Suspense
+          fallback={
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-10 text-center text-xs text-slate-500 dark:text-zinc-400">
+              Carregando mapa multicamadas SIG...
+            </div>
+          }
+        >
+          <TraceabilityLeafletMap
+            property={property}
+            plots={plots}
+            lots={lots}
+            onSavePlots={handleSavePlots}
+            onSelectLot={() => {}}
+            onOpenPassport={setPassportModalLot}
+            activeSubTab={activeSubTab}
+            setActiveSubTab={setActiveSubTab}
+          />
+        </Suspense>
       )}
 
-      {/* RASTER IMPORT MODAL (100% Offline + GeoTIFF / Drone) */}
-      <RasterImportModal
-        isOpen={isRasterModalOpen}
-        onClose={() => setIsRasterModalOpen(false)}
-        plots={geoPlots}
-        onUploadRaster={handleUploadRaster}
-      />
+      {/* Lazy Modals */}
+      {isRasterModalOpen && (
+        <Suspense fallback={null}>
+          <RasterImportModal
+            isOpen={isRasterModalOpen}
+            onClose={() => setIsRasterModalOpen(false)}
+            plots={geoPlots}
+            onUploadRaster={handleUploadRaster}
+          />
+        </Suspense>
+      )}
 
-      {/* INSPECTION POINT MODAL (Field Inspection & Sampling) */}
-      <InspectionModal
-        isOpen={isInspectionModalOpen}
-        onClose={() => {
-          setIsInspectionModalOpen(false);
-          setEditingInspection(null);
-        }}
-        plots={geoPlots}
-        initialPlotId={targetInspectionPlotId}
-        inspectionToEdit={editingInspection}
-        onSaveInspection={handleSaveInspection}
-        onDeleteInspection={handleDeleteInspection}
-      />
+      {isInspectionModalOpen && (
+        <Suspense fallback={null}>
+          <InspectionModal
+            isOpen={isInspectionModalOpen}
+            onClose={() => {
+              setIsInspectionModalOpen(false);
+              setEditingInspection(null);
+            }}
+            plots={geoPlots}
+            initialPlotId={targetInspectionPlotId}
+            inspectionToEdit={editingInspection}
+            onSaveInspection={handleSaveInspection}
+            onDeleteInspection={handleDeleteInspection}
+          />
+        </Suspense>
+      )}
 
-      {/* REPORT & GIS EXPORT MODAL (PDF, CSV, Excel, GeoTIFF) */}
-      <ReportExportModal
-        isOpen={isReportModalOpen}
-        onClose={() => setIsReportModalOpen(false)}
-        plot={selectedGeoPlot}
-        allPlots={geoPlots}
-        company={currentCompany || companies?.[0]}
-        agronomist={currentAgronomist || agronomists?.[0]}
-        producer={currentProducer || producers?.[0]}
-        farm={currentFarm || farms?.[0]}
-        property={property}
-        inspections={inspections}
-        photos={photoDiary}
-      />
+      {isReportModalOpen && (
+        <Suspense fallback={null}>
+          <ReportExportModal
+            isOpen={isReportModalOpen}
+            onClose={() => setIsReportModalOpen(false)}
+            plot={selectedGeoPlot}
+            allPlots={geoPlots}
+            initialFormat={reportFormat}
+            company={currentCompany || companies?.[0]}
+            agronomist={currentAgronomist || agronomists?.[0]}
+            producer={currentProducer || producers?.[0]}
+            farm={currentFarm || farms?.[0]}
+            property={property}
+            inspections={inspections}
+            photos={photoDiary}
+          />
+        </Suspense>
+      )}
 
-      {/* Digital Food Passport Modal */}
       {passportModalLot && (
-        <div className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-900 rounded-3xl p-4 sm:p-6 text-white border border-white/10">
-            <button
-              onClick={() => setPassportModalLot(null)}
-              className="absolute top-4 right-4 z-10 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl text-xs transition"
-            >
-              Fechar X
-            </button>
-            <DigitalFoodPassportModal
-              lot={passportModalLot}
-              property={property}
-              operations={operations}
-              harvests={harvests}
-              photos={photoDiary}
-              onClose={() => setPassportModalLot(null)}
-            />
-          </div>
-        </div>
+        <Suspense fallback={null}>
+          <DigitalFoodPassportModal
+            lot={passportModalLot}
+            property={property}
+            operations={operations}
+            harvests={harvests}
+            photos={photoDiary}
+            onClose={() => setPassportModalLot(null)}
+          />
+        </Suspense>
       )}
     </div>
   );

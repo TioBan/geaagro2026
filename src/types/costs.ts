@@ -1,19 +1,5 @@
 // Types for Gestão de Custos Agrícolas & Gêmeo Econômico da Safra
 
-export type CostCategoryType =
-  | 'Preparo do Solo'
-  | 'Correção (Calagem/Gessagem)'
-  | 'Semeadura / Plantio'
-  | 'Fertilizantes & Adubação'
-  | 'Defensivos & Manejo'
-  | 'Bioinsumos & Inoculantes'
-  | 'Irrigação & Energia'
-  | 'Mão de Obra & Diárias'
-  | 'Máquinas & Combustível'
-  | 'Colheita & Transporte'
-  | 'Pós-Colheita & Comercialização'
-  | 'Outros Custos Operacionais';
-
 export type InputCategory =
   | 'Sementes'
   | 'Fertilizantes'
@@ -251,15 +237,4 @@ export interface EconomicSimulationResult {
   baseBreakEvenBagsHa: number;
   simulatedBreakEvenBagsHa: number;
   simulatedProfitabilityPct: number;
-}
-
-export interface TimelineFinancialEvent {
-  id: string;
-  date: string;
-  phase: 'Compra de Insumos' | 'Preparo & Implantação' | 'Tratos Culturais' | 'Colheita' | 'Comercialização';
-  title: string;
-  description: string;
-  amount: number;
-  type: 'inflow' | 'outflow'; // receita ou despesa
-  category: string;
 }

@@ -1,440 +1,532 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Scale,
-  TrendingUp,
-  Plus,
+  Ruler,
   Calculator,
-  Calendar,
-  User,
-  Sparkles,
-  Info,
+  Plus,
   X,
-  CheckCircle2,
+  Activity,
 } from 'lucide-react';
 import { EquineAnimal, EquineBiometricsRecord } from '../../types/equine';
+import { EquinoIcon } from '../icons/EquinoIcon';
 
 interface Props {
   animals: EquineAnimal[];
   selectedAnimalId?: string;
   biometricsRecords: EquineBiometricsRecord[];
   onAddBiometrics: (record: EquineBiometricsRecord) => void;
-  onUpdateAnimal: (animal: EquineAnimal) => void;
 }
+
+const HENNEKE_SCALE = [
+  { score: 1, title: 'Emaciado', desc: 'Costelas, coluna e garupa extremamente proeminentes; sem tecido adiposo.' },
+  { score: 2, title: 'Muito Magro', desc: 'Cobertura mínima sobre vértebras; ossos do quadril bem evidentes.' },
+  { score: 3, title: 'Magro', desc: 'Costelas facilmente visíveis; pescoço e cernelha acentuados.' },
+  { score: 4, title: 'Moderadamente Magro', desc: 'Contorno discreto das costelas; ligeira cobertura na garupa.' },
+  { score: 5, title: 'Moderado (Ideal)', desc: 'Costelas palpáveis sem serem visíveis; dorso nivelado.' },
+  { score: 6, title: 'Moderadamente Gordo', desc: 'Gordura suave sobre costelas e inserção da cauda; excelente para esportes.' },
+  { score: 7, title: 'Gordo', desc: 'Depósitos de gordura palpáveis nas costelas, pescoço e cernelha.' },
+  { score: 8, title: 'Muito Gordo', desc: 'Sulco dorsal aparente; espessamento nítido de pescoço; risco de laminite.' },
+  { score: 9, title: 'Obeso', desc: 'Acúmulo severo em crista do pescoço e garupa; alto risco metabólico.' },
+];
+
+const inputCls =
+  'w-full h-9 px-3 rounded-lg bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500';
+const labelCls = 'block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1';
 
 export const EquineBiometricsView: React.FC<Props> = ({
   animals,
   selectedAnimalId,
   biometricsRecords,
   onAddBiometrics,
-  onUpdateAnimal,
 }) => {
-  const [currentId, setCurrentId] = useState<string>(selectedAnimalId || (animals[0]?.id ?? ''));
-  const animal = animals.find(a => a?.id === currentId) || animals[0];
-
+  const safeAnimals = useMemo(() => (animals || []).filter(a => a && a.id), [animals]);
+  const [currentId, setCurrentId] = useState<string>(selectedAnimalId || safeAnimals[0]?.id || '');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Barimetric Calculator state
-  const [calcChestCm, setCalcChestCm] = useState<number>(animal?.chestCircumferenceCm || 184);
-  const [calcLengthCm, setCalcLengthCm] = useState<number>(animal?.bodyLengthCm || 156);
+  const [calcHeartGirth, setCalcHeartGirth] = useState<number>(178);
+  const [calcBodyLength, setCalcBodyLength] = useState<number>(165);
 
-  // Hall's Barimetric Equation for Equines: (Chest^2 * Length) / 11877
-  const estimatedWeightKg = Math.round((Math.pow(calcChestCm, 2) * calcLengthCm) / 11877);
-
-  // Form State for new measurement
   const [formData, setFormData] = useState<Partial<EquineBiometricsRecord>>({
-    animalId: animal?.id || '',
     date: new Date().toISOString().split('T')[0],
-    weightKg: animal?.weightKg || 450,
-    heightM: animal?.heightM || 1.52,
-    bodyScore: animal?.bodyScore || 6,
-    chestCircumferenceCm: animal?.chestCircumferenceCm || 180,
-    shinCircumferenceCm: animal?.shinCircumferenceCm || 19.5,
-    bodyLengthCm: animal?.bodyLengthCm || 152,
-    measuredBy: 'Dr. Fernando Campos - CRMV 14920',
+    weightKg: 450,
+    heightM: 1.52,
+    chestCircumferenceCm: 178,
+    bodyLengthCm: 165,
+    shinCircumferenceCm: 19.5,
+    bodyScore: 6,
+    measuredBy: '',
     notes: '',
   });
 
-  const animalRecords = biometricsRecords
-    .filter(b => b.animalId === currentId)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  useEffect(() => {
+    if (selectedAnimalId && safeAnimals.some(a => a.id === selectedAnimalId)) {
+      setCurrentId(selectedAnimalId);
+    } else if (!safeAnimals.some(a => a.id === currentId)) {
+      setCurrentId(safeAnimals[0]?.id || '');
+    }
+  }, [selectedAnimalId, safeAnimals, currentId]);
+
+  const animal = safeAnimals.find(a => a.id === currentId) || safeAnimals[0];
+
+  useEffect(() => {
+    if (animal) {
+      setCalcHeartGirth(animal.chestCircumferenceCm || 178);
+      setCalcBodyLength(animal.bodyLengthCm || 165);
+      setFormData(prev => ({
+        ...prev,
+        weightKg: animal.weightKg || 450,
+        heightM: animal.heightM || 1.52,
+        chestCircumferenceCm: animal.chestCircumferenceCm || 178,
+        bodyLengthCm: animal.bodyLengthCm || 165,
+        bodyScore: animal.bodyScore || 5,
+      }));
+    }
+  }, [animal?.id]);
+
+  // Hall & Carroll formula: Peso (kg) = (PT^2 * CC) / 11877
+  const estimatedWeightKg = Math.round((calcHeartGirth * calcHeartGirth * calcBodyLength) / 11877);
+
+  const animalHistory = useMemo(
+    () =>
+      (biometricsRecords || [])
+        .filter(r => r && r.animalId === animal?.id)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    [biometricsRecords, animal?.id]
+  );
+
+  const handleOpenModalFromCalc = () => {
+    setFormData(prev => ({
+      ...prev,
+      weightKg: estimatedWeightKg,
+      estimatedWeightKg,
+      chestCircumferenceCm: calcHeartGirth,
+      bodyLengthCm: calcBodyLength,
+    }));
+    setIsModalOpen(true);
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!animal) return;
 
     const newRecord: EquineBiometricsRecord = {
-      ...(formData as EquineBiometricsRecord),
       id: `bio-${Date.now()}`,
       animalId: animal.id,
-      estimatedWeightKg: Math.round(
-        (Math.pow(formData.chestCircumferenceCm || 180, 2) * (formData.bodyLengthCm || 152)) / 11877
-      ),
+      date: formData.date || new Date().toISOString().split('T')[0],
+      weightKg: Number(formData.weightKg) || estimatedWeightKg,
+      heightM: Number(formData.heightM) || animal.heightM || 1.5,
+      chestCircumferenceCm: Number(formData.chestCircumferenceCm) || calcHeartGirth,
+      bodyLengthCm: formData.bodyLengthCm ? Number(formData.bodyLengthCm) : calcBodyLength,
+      shinCircumferenceCm: formData.shinCircumferenceCm ? Number(formData.shinCircumferenceCm) : undefined,
+      estimatedWeightKg,
+      bodyScore: Number(formData.bodyScore) || 5,
+      measuredBy: formData.measuredBy?.trim() || 'Responsável Técnico',
+      notes: formData.notes || '',
     };
 
     onAddBiometrics(newRecord);
-
-    // Update animal's current physical parameters
-    const updatedAnimal: EquineAnimal = {
-      ...animal,
-      weightKg: formData.weightKg || animal.weightKg,
-      heightM: formData.heightM || animal.heightM,
-      chestCircumferenceCm: formData.chestCircumferenceCm || animal.chestCircumferenceCm,
-      bodyScore: formData.bodyScore || animal.bodyScore,
-      updatedAt: new Date().toISOString(),
-    };
-    onUpdateAnimal(updatedAnimal);
-
     setIsModalOpen(false);
   };
 
-  const hennekeScores = [
-    { score: '1-2', label: 'Muito Magro / Caquético', desc: 'Ossos das costelas e garupa extremamente salientes.', color: 'text-red-700 bg-red-50' },
-    { score: '3-4', label: 'Magro / Abaixo do Peso', desc: 'Costelas facilmente visíveis, pouca cobertura de gordura.', color: 'text-amber-700 bg-amber-50' },
-    { score: '5-6', label: 'Escore Ideal (Atleta/Manejo)', desc: 'Costelas facilmente palpáveis mas não visíveis. Dorso nivelado.', color: 'text-emerald-800 bg-emerald-50' },
-    { score: '7-8', label: 'Sobrepeso / Gordo', desc: 'Depósitos de gordura ao longo do pescoço, garupa e cernelha.', color: 'text-amber-800 bg-amber-50' },
-    { score: '9', label: 'Extremamente Obeso', desc: 'Pescoço abaulado com crista dura, calha dorsal profunda.', color: 'text-red-800 bg-red-50' },
-  ];
-
   if (!animal) {
     return (
-      <div className="bg-white p-8 rounded-2xl border border-stone-200 text-center">
-        <span className="text-4xl">🐎</span>
-        <h3 className="text-base font-black text-stone-900 mt-2">Nenhum animal selecionado</h3>
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-10 text-center space-y-2">
+        <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-400 mx-auto flex items-center justify-center">
+          <EquinoIcon className="w-5 h-5" />
+        </div>
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+          Nenhum equino cadastrado
+        </h3>
+        <p className="text-xs text-slate-500 dark:text-zinc-400">
+          Cadastre um animal no Plantel para registrar pesagens, medidas morfométricas e escore Henneke.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Top Bar Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 shadow-xs">
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <div className="text-[10px] font-black uppercase text-amber-900 tracking-wider flex items-center gap-1">
-            <Scale className="w-3.5 h-3.5 text-amber-700" /> Biometria, Resenha Morfológica & Escore Corporal
-          </div>
-          <h2 className="text-xl font-black text-stone-900">{animal.name}</h2>
-          <div className="text-xs text-stone-500 font-mono mt-0.5">
-            Registro: <strong>{animal.registrationNumber}</strong> • Categoria: <strong>{animal.category}</strong>
-          </div>
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+            <Scale className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span>Biometria, Pesagem & Escala Henneke</span>
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Estimativa barimétrica de peso vivo (Hall &amp; Carroll), alçada e evolução corporal do plantel
+          </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <select
-            value={currentId}
-            onChange={e => {
-              setCurrentId(e.target.value);
-              const found = animals.find(a => a?.id === e.target.value);
-              if (found) {
-                setCalcChestCm(found.chestCircumferenceCm || 184);
-                setCalcLengthCm(found.bodyLengthCm || 156);
-              }
-            }}
-            className="px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden focus:border-amber-600"
+            value={animal.id}
+            onChange={e => setCurrentId(e.target.value)}
+            className="h-8 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs font-medium text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
           >
-            {animals.map(a => (
-              <option key={a?.id || Math.random()} value={a?.id || ''}>
-                {a?.name} ({a?.breed})
+            {safeAnimals.map((a, idx) => (
+              <option key={a.id || idx} value={a.id}>
+                {a.name} ({a.breed})
               </option>
             ))}
           </select>
 
           <button
-            onClick={() => {
-              setFormData({
-                animalId: animal.id,
-                date: new Date().toISOString().split('T')[0],
-                weightKg: animal.weightKg,
-                heightM: animal.heightM,
-                bodyScore: animal.bodyScore,
-                chestCircumferenceCm: animal.chestCircumferenceCm,
-                shinCircumferenceCm: animal.shinCircumferenceCm || 19.5,
-                bodyLengthCm: animal.bodyLengthCm || 152,
-                measuredBy: 'Dr. Fernando Campos - CRMV 14920',
-                notes: '',
-              });
-              setIsModalOpen(true);
-            }}
-            className="flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
-            <span>Nova Aferição</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>Nova Medição</span>
           </button>
         </div>
       </div>
 
-      {/* Current Physical Status KPI Badges */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
-          <span className="text-[10px] text-stone-500 font-bold uppercase block">Peso Balança</span>
-          <span className="text-2xl font-black text-stone-900 font-mono">{animal.weightKg} kg</span>
-          <span className="text-[11px] text-emerald-700 block mt-0.5 font-semibold">Balança oficial</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
-          <span className="text-[10px] text-stone-500 font-bold uppercase block">Altura Cernelha</span>
-          <span className="text-2xl font-black text-stone-900 font-mono">{animal.heightM} m</span>
-          <span className="text-[11px] text-stone-500 block mt-0.5">Hipômetro rígido</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
-          <span className="text-[10px] text-stone-500 font-bold uppercase block">Perímetro Torácico</span>
-          <span className="text-2xl font-black text-stone-900 font-mono">{animal.chestCircumferenceCm} cm</span>
-          <span className="text-[11px] text-stone-500 block mt-0.5">Atrás da cernelha</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
-          <span className="text-[10px] text-stone-500 font-bold uppercase block">Escore Henneke</span>
-          <span className="text-2xl font-black text-emerald-800 font-mono">{animal.bodyScore} / 9</span>
-          <span className="text-[11px] text-emerald-700 block mt-0.5 font-semibold">Ideal atlético</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs col-span-2 sm:col-span-1">
-          <span className="text-[10px] text-amber-800 font-bold uppercase block">Fita Barimétrica</span>
-          <span className="text-2xl font-black text-amber-900 font-mono">{estimatedWeightKg} kg</span>
-          <span className="text-[11px] text-stone-500 block mt-0.5">Fórmula de Hall</span>
+      {/* Unified Current Measurements Strip */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-zinc-800">
+          <div className="p-3.5">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Peso Atual</span>
+            <span className="mt-1 text-lg font-semibold text-slate-900 dark:text-zinc-100 tabular-nums block">
+              {animal.weightKg} kg
+            </span>
+          </div>
+          <div className="p-3.5">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Altura de Cernelha</span>
+            <span className="mt-1 text-lg font-semibold text-slate-900 dark:text-zinc-100 tabular-nums block">
+              {animal.heightM.toFixed(2)} m
+            </span>
+          </div>
+          <div className="p-3.5">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Perímetro Torácico</span>
+            <span className="mt-1 text-lg font-semibold text-slate-900 dark:text-zinc-100 tabular-nums block">
+              {animal.chestCircumferenceCm || '—'} cm
+            </span>
+          </div>
+          <div className="p-3.5">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Escore Henneke</span>
+            <span className="mt-1 text-lg font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums block">
+              {animal.bodyScore} / 9
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* 2 Cols: Barimetric Calculator & Henneke Guide */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Interactive Barimetric Weight Calculator */}
-        <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b pb-3">
+      {/* Barimetric Calculator + Henneke Reference */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 sm:p-5 space-y-4">
+          <div className="border-b border-slate-100 dark:border-zinc-800 pb-3">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+              <Calculator className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Calculadora Barimétrica (Hall &amp; Carroll)</span>
+            </h3>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+              Peso (kg) = (Perímetro Torácico² × Comprimento Corporal) ÷ 11.877
+            </p>
+          </div>
+
+          <div className="space-y-4">
             <div>
-              <h3 className="text-sm font-black text-stone-900 uppercase tracking-wider flex items-center gap-2">
-                <Calculator className="w-4 h-4 text-amber-700" />
-                <span>Calculadora Barimétrica de Peso (Equação de Hall)</span>
-              </h3>
-              <p className="text-xs text-stone-500">Estimativa rápida de peso quando não houver balança de plataforma</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-stone-700 block">
-                Perímetro Torácico (PT em cm):
-              </label>
-              <input
-                type="number"
-                value={calcChestCm}
-                onChange={e => setCalcChestCm(parseFloat(e.target.value) || 0)}
-                className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold font-mono"
-              />
-              <span className="text-[10px] text-stone-400 block">Medir logo atrás da cernelha</span>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-stone-700 block">
-                Comprimento Corporal (CC em cm):
-              </label>
-              <input
-                type="number"
-                value={calcLengthCm}
-                onChange={e => setCalcLengthCm(parseFloat(e.target.value) || 0)}
-                className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold font-mono"
-              />
-              <span className="text-[10px] text-stone-400 block">Ponta da espádua à tuberosidade isquiática</span>
-            </div>
-          </div>
-
-          <div className="p-4 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-xl shadow-md flex items-center justify-between">
-            <div>
-              <span className="text-xs font-bold uppercase text-amber-100 block">Peso Estimado pela Fita</span>
-              <div className="text-2xl font-black font-mono">{estimatedWeightKg} kg</div>
-            </div>
-            <div className="text-right text-[11px] text-amber-100 font-mono">
-              Fórmula: <br />
-              (PT² × CC) ÷ 11877
-            </div>
-          </div>
-        </div>
-
-        {/* Henneke Body Condition Scale Guide */}
-        <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b pb-3">
-            <div>
-              <h3 className="text-sm font-black text-stone-900 uppercase tracking-wider flex items-center gap-2">
-                <Info className="w-4 h-4 text-emerald-700" />
-                <span>Escala Henneke de Escore Corporal (1 a 9)</span>
-              </h3>
-              <p className="text-xs text-stone-500">Padrão internacional de avaliação de gordura corporal equina</p>
-            </div>
-          </div>
-
-          <div className="space-y-2 text-xs">
-            {hennekeScores.map(h => (
-              <div key={h.score} className={`p-2.5 rounded-xl border border-stone-200 flex items-start gap-2.5 ${h.color}`}>
-                <span className="font-black text-xs font-mono px-2 py-0.5 rounded-md bg-white shadow-xs shrink-0">
-                  {h.score}
+              <div className="flex items-center justify-between text-xs mb-1.5">
+                <span className="font-medium text-slate-700 dark:text-zinc-300">
+                  Perímetro Torácico (PT)
                 </span>
-                <div>
-                  <div className="font-black text-xs">{h.label}</div>
-                  <div className="text-[11px] opacity-80">{h.desc}</div>
-                </div>
+                <span className="font-semibold text-slate-900 dark:text-zinc-100 tabular-nums">
+                  {calcHeartGirth} cm
+                </span>
               </div>
-            ))}
+              <input
+                type="range"
+                min={120}
+                max={220}
+                value={calcHeartGirth}
+                onChange={e => setCalcHeartGirth(Number(e.target.value))}
+                className="w-full accent-emerald-600 cursor-pointer"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between text-xs mb-1.5">
+                <span className="font-medium text-slate-700 dark:text-zinc-300">
+                  Comprimento Corporal — Ponta da Espádua ao Ísquio (CC)
+                </span>
+                <span className="font-semibold text-slate-900 dark:text-zinc-100 tabular-nums">
+                  {calcBodyLength} cm
+                </span>
+              </div>
+              <input
+                type="range"
+                min={110}
+                max={200}
+                value={calcBodyLength}
+                onChange={e => setCalcBodyLength(Number(e.target.value))}
+                className="w-full accent-emerald-600 cursor-pointer"
+              />
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between gap-3">
+            <div>
+              <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">
+                Peso Vivo Estimado
+              </span>
+              <span className="text-2xl font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">
+                {estimatedWeightKg} kg
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleOpenModalFromCalc}
+              className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 text-xs font-medium text-slate-700 dark:text-zinc-200 inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <Ruler className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Lançar esta Medição</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Henneke 1-9 Reference */}
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 sm:p-5 space-y-3">
+          <div className="border-b border-slate-100 dark:border-zinc-800 pb-3 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+                <Activity className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <span>Escala de Escore Corporal Henneke (1–9)</span>
+              </h3>
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                Faixa ideal para atletas e matrizes: 5,0 a 6,0
+              </p>
+            </div>
+            <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">
+              Atual: {animal.bodyScore}/9
+            </span>
+          </div>
+
+          <div className="divide-y divide-slate-100 dark:divide-zinc-800 max-h-60 overflow-y-auto pr-1">
+            {HENNEKE_SCALE.map(item => {
+              const isCurrent = Math.round(animal.bodyScore || 5) === item.score;
+              return (
+                <div
+                  key={item.score}
+                  className={`py-2 px-2 rounded-md flex items-start gap-2.5 text-xs ${
+                    isCurrent ? 'bg-emerald-50/70 dark:bg-emerald-950/30' : ''
+                  }`}
+                >
+                  <span
+                    className={`w-5 h-5 rounded text-[11px] font-semibold flex items-center justify-center shrink-0 tabular-nums ${
+                      isCurrent
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300'
+                    }`}
+                  >
+                    {item.score}
+                  </span>
+                  <div className="min-w-0">
+                    <span className="font-medium text-slate-900 dark:text-zinc-100">
+                      {item.title}
+                    </span>
+                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-snug">
+                      {item.desc}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      {/* Historical Biometrics Table */}
-      <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-xs space-y-4">
-        <h3 className="text-sm font-black text-stone-900 uppercase tracking-wider">
-          Histórico de Pesagens e Medições de {animal.name}
-        </h3>
+      {/* Historical Measurements Table */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+            Histórico Biométrico — {animal.name}
+          </h3>
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+            {animalHistory.length} registro{animalHistory.length === 1 ? '' : 's'}
+          </span>
+        </div>
 
-        {animalRecords.length > 0 ? (
+        {animalHistory.length === 0 ? (
+          <div className="p-6 text-center text-xs text-slate-500 dark:text-zinc-400">
+            Nenhuma medição histórica registrada para este animal.
+          </div>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-stone-50 text-stone-600 font-bold border-b">
+              <thead className="bg-slate-50 dark:bg-zinc-950/60 text-slate-500 dark:text-zinc-400 border-b border-slate-200 dark:border-zinc-800">
                 <tr>
-                  <th className="p-3">Data</th>
-                  <th className="p-3">Peso Real (kg)</th>
-                  <th className="p-3">Altura (m)</th>
-                  <th className="p-3">P. Torácico (cm)</th>
-                  <th className="p-3">Escore Henneke</th>
-                  <th className="p-3">Aferido por</th>
-                  <th className="p-3">Observações</th>
+                  <th className="px-4 py-2.5 font-medium">Data</th>
+                  <th className="px-4 py-2.5 font-medium">Peso (kg)</th>
+                  <th className="px-4 py-2.5 font-medium">Cernelha</th>
+                  <th className="px-4 py-2.5 font-medium">Perím. Torácico</th>
+                  <th className="px-4 py-2.5 font-medium">Canela</th>
+                  <th className="px-4 py-2.5 font-medium">Henneke</th>
+                  <th className="px-4 py-2.5 font-medium">Avaliador</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-stone-100">
-                {animalRecords.map(r => (
-                  <tr key={r.id} className="hover:bg-stone-50">
-                    <td className="p-3 font-mono font-bold text-stone-900">
-                      {new Date(r.date).toLocaleDateString('pt-BR')}
+              <tbody className="divide-y divide-slate-100 dark:divide-zinc-800 tabular-nums">
+                {animalHistory.map(rec => (
+                  <tr key={rec.id} className="hover:bg-slate-50/70 dark:hover:bg-zinc-800/40">
+                    <td className="px-4 py-2.5 font-medium text-slate-900 dark:text-zinc-100">
+                      {new Date(rec.date).toLocaleDateString('pt-BR')}
                     </td>
-                    <td className="p-3 font-bold font-mono text-stone-900">{r.weightKg} kg</td>
-                    <td className="p-3 font-mono">{r.heightM} m</td>
-                    <td className="p-3 font-mono">{r.chestCircumferenceCm} cm</td>
-                    <td className="p-3 font-bold text-emerald-800">{r.bodyScore} / 9</td>
-                    <td className="p-3 text-stone-600">{r.measuredBy}</td>
-                    <td className="p-3 text-stone-500 italic">{r.notes || '-'}</td>
+                    <td className="px-4 py-2.5 font-semibold text-slate-900 dark:text-zinc-100">
+                      {rec.weightKg} kg
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-700 dark:text-zinc-300">
+                      {rec.heightM.toFixed(2)} m
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-700 dark:text-zinc-300">
+                      {rec.chestCircumferenceCm} cm
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-700 dark:text-zinc-300">
+                      {rec.shinCircumferenceCm ? `${rec.shinCircumferenceCm} cm` : '—'}
+                    </td>
+                    <td className="px-4 py-2.5 font-semibold text-emerald-700 dark:text-emerald-400">
+                      {rec.bodyScore}/9
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-500 dark:text-zinc-400">
+                      {rec.measuredBy}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        ) : (
-          <div className="text-center py-6 text-stone-400 text-xs italic">
-            Nenhuma medição cadastrada ainda.
-          </div>
         )}
       </div>
 
-      {/* Add Biometric Measurement Modal */}
+      {/* Modal: New Biometric Measurement */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl border border-stone-200 max-w-lg w-full">
-            <div className="bg-stone-900 text-white px-6 py-4 flex items-center justify-between rounded-t-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl max-w-lg w-full">
+            <div className="px-5 py-3.5 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Scale className="w-5 h-5 text-amber-400" />
-                <h3 className="font-black text-sm">Registrar Aferição Biométrica</h3>
+                <Scale className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                  Registrar Avaliação Biométrica — {animal.name}
+                </h3>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="text-stone-300 hover:text-white cursor-pointer">
-                <X className="w-5 h-5" />
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="h-7 w-7 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-500 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="p-6 space-y-4 text-xs text-stone-800">
+            <form onSubmit={handleSave} className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Data da Pesagem</label>
+                  <label className={labelCls}>Data da Medição</label>
                   <input
                     type="date"
                     value={formData.date}
                     onChange={e => setFormData({ ...formData, date: e.target.value })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl"
+                    className={inputCls}
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Peso Balança (kg) *</label>
+                  <label className={labelCls}>Peso Vivo (kg) *</label>
                   <input
                     type="number"
-                    step="1"
                     required
                     value={formData.weightKg}
-                    onChange={e => setFormData({ ...formData, weightKg: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-bold font-mono"
+                    onChange={e => setFormData({ ...formData, weightKg: Number(e.target.value) || 0 })}
+                    className={`${inputCls} tabular-nums`}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Altura Cernelha (m)</label>
+                  <label className={labelCls}>Cernelha (m)</label>
                   <input
                     type="number"
                     step="0.01"
                     value={formData.heightM}
-                    onChange={e => setFormData({ ...formData, heightM: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-mono"
+                    onChange={e => setFormData({ ...formData, heightM: Number(e.target.value) || 0 })}
+                    className={`${inputCls} tabular-nums`}
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">P. Torácico (cm)</label>
+                  <label className={labelCls}>Escore Henneke (1–9)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={9}
+                    step={0.5}
+                    value={formData.bodyScore}
+                    onChange={e => setFormData({ ...formData, bodyScore: Number(e.target.value) || 5 })}
+                    className={`${inputCls} tabular-nums`}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelCls}>Perímetro Torácico (cm)</label>
                   <input
                     type="number"
                     value={formData.chestCircumferenceCm}
-                    onChange={e => setFormData({ ...formData, chestCircumferenceCm: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-mono"
+                    onChange={e => setFormData({ ...formData, chestCircumferenceCm: Number(e.target.value) || 0 })}
+                    className={`${inputCls} tabular-nums`}
                   />
                 </div>
-
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Comprimento Corporal (cm)</label>
+                  <label className={labelCls}>Comprimento Corporal (cm)</label>
                   <input
                     type="number"
                     value={formData.bodyLengthCm}
-                    onChange={e => setFormData({ ...formData, bodyLengthCm: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-mono"
+                    onChange={e => setFormData({ ...formData, bodyLengthCm: Number(e.target.value) || 0 })}
+                    className={`${inputCls} tabular-nums`}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelCls}>Perímetro de Canela (cm)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={formData.shinCircumferenceCm ?? ''}
+                    onChange={e => setFormData({ ...formData, shinCircumferenceCm: Number(e.target.value) || undefined })}
+                    className={`${inputCls} tabular-nums`}
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Escore Henneke (1-9)</label>
+                  <label className={labelCls}>Avaliador / Responsável</label>
                   <input
-                    type="number"
-                    min="1"
-                    max="9"
-                    step="0.5"
-                    value={formData.bodyScore}
-                    onChange={e => setFormData({ ...formData, bodyScore: parseFloat(e.target.value) || 6 })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-bold"
+                    type="text"
+                    value={formData.measuredBy || ''}
+                    onChange={e => setFormData({ ...formData, measuredBy: e.target.value })}
+                    placeholder="Zootecnista / Veterinário"
+                    className={inputCls}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="font-bold text-stone-700 block mb-1">Responsável / Veterinário</label>
-                <input
-                  type="text"
-                  value={formData.measuredBy || ''}
-                  onChange={e => setFormData({ ...formData, measuredBy: e.target.value })}
-                  className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-stone-700 block mb-1">Observações</label>
-                <input
-                  type="text"
+                <label className={labelCls}>Observações</label>
+                <textarea
+                  rows={2}
                   value={formData.notes || ''}
                   onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Ex: Ótimo tônus muscular dorsal..."
-                  className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl"
+                  className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
-              <div className="pt-3 border-t flex justify-end gap-3">
+              <div className="pt-3 border-t border-slate-200 dark:border-zinc-800 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-stone-100 text-stone-700 font-bold rounded-xl cursor-pointer"
+                  className="h-8 px-3.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-600 dark:text-zinc-300 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl shadow-md cursor-pointer"
+                  className="h-8 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium cursor-pointer"
                 >
-                  Salvar Aferição
+                  Salvar Medição
                 </button>
               </div>
             </form>

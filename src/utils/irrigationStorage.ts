@@ -2,7 +2,6 @@
 import {
   SoilPhysicsProfile,
   CropWaterRequirement,
-  IrrigationEquipmentItem,
   IrrigationSystemRecord,
   ClimateDayRecord,
   IrrigationEventLog,

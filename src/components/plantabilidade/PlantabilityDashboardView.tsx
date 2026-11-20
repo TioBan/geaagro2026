@@ -1,19 +1,27 @@
 import React from 'react';
-import { PropertyField, PlanterEquipment, SeedBatch, SeedingConfig, PlantabilitySamplingPoint } from '../../types/plantability';
-import { calculatePlantabilityMetrics, simulateEconomicLoss, generatePlanterDiagnostics } from '../../utils/plantabilityCalculations';
+import {
+  PropertyField,
+  PlanterEquipment,
+  SeedBatch,
+  SeedingConfig,
+  PlantabilitySamplingPoint
+} from '../../types/plantability';
+import {
+  calculatePlantabilityMetrics,
+  simulateEconomicLoss,
+  generatePlanterDiagnostics
+} from '../../utils/plantabilityCalculations';
 import {
   Sprout,
-  Sparkles,
   TrendingUp,
   AlertTriangle,
   Tractor,
   DollarSign,
   Gauge,
   CheckCircle2,
-  Calendar,
   Layers,
-  Thermometer,
-  CloudRain
+  Plus,
+  ArrowRight
 } from 'lucide-react';
 
 interface Props {
@@ -29,199 +37,255 @@ export const PlantabilityDashboardView: React.FC<Props> = ({
   fields,
   samplings,
   configs,
+  planters = [],
+  seeds = [],
   onNavigateTab
 }) => {
-  // Aggregate stats across all fields or active field
-  const totalAreaHa = fields.reduce((acc, f) => acc + f.areaHa, 0);
+  const safeFields = (fields || []).filter(f => f && f.id);
+  const safeSamplings = samplings || [];
+  const totalAreaHa = safeFields.reduce((acc, f) => acc + (Number(f.areaHa) || 0), 0);
   const activeConfig = configs.length > 0 ? configs[0] : undefined;
-  const metrics = calculatePlantabilityMetrics(samplings, activeConfig);
+  const metrics = calculatePlantabilityMetrics(safeSamplings, activeConfig);
   const lossSim = simulateEconomicLoss(metrics, totalAreaHa > 0 ? totalAreaHa : 100);
   const diagnostics = generatePlanterDiagnostics(metrics, activeConfig);
 
+  const navigate = (tabId: string) => {
+    onNavigateTab?.(tabId);
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Top Banner KPI Header - Integrated Unified Banner */}
-      <div className="bg-gradient-to-r from-emerald-950 via-stone-900 to-zinc-950 text-white p-6 rounded-3xl border border-stone-800 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-          <Sprout className="w-64 h-64 text-emerald-400" />
-        </div>
-
-        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-          <div className="space-y-2">
-            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white flex items-center gap-3">
-              🌱 Plantabilidade & Qualidade de Semeadura
-            </h1>
-            <p className="text-xs md:text-sm text-stone-300 max-w-2xl leading-relaxed">
-              Avaliação técnica de uniformidade de emergência, falhas, duplos, coeficiente de variação (CV%), calibração de dosadores e projeção de impacto econômico.
+    <div className="space-y-4">
+      {/* Executive IGP Summary + KPI Strip */}
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-slate-200/80 dark:border-zinc-800 p-4 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-zinc-800/80">
+          <div className="space-y-1 min-w-0">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+              Índice GeaAgro de Plantabilidade (IGP)
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Uniformidade de emergência, coeficiente de variação (CV%), falhas, duplos e projeção de perdas com base nas amostragens de campo.
             </p>
-          </div>
-
-          {/* IGP Main Score Card Badge */}
-          <div className={`p-5 rounded-2xl border-2 flex items-center gap-4 ${metrics.igpColorClass} shadow-2xl shrink-0`}>
-            <div className="text-center border-r border-stone-300 dark:border-stone-700 pr-4">
-              <span className="text-[10px] font-black uppercase tracking-wider block opacity-75">Pontuação IGP</span>
-              <span className="text-4xl font-black font-mono tracking-tight">{metrics.igpScore}</span>
-              <span className="text-[10px] font-bold block">/ 100 pts</span>
-            </div>
-            <div>
-              <span className="text-xs font-black uppercase tracking-wider block">Classificação</span>
-              <span className="text-lg font-extrabold block">{metrics.igpClassification}</span>
-              <span className="text-[11px] font-medium opacity-90 block">CV: {metrics.cvPercent}% | Aceitáveis: {metrics.acceptablePercent}%</span>
+            <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+              <span>Plantadeiras: <strong className="text-slate-800 dark:text-zinc-200">{planters.length}</strong></span>
+              <span className="text-slate-300 dark:text-zinc-700">|</span>
+              <span>Lotes de sementes: <strong className="text-slate-800 dark:text-zinc-200">{seeds.length}</strong></span>
+              <span className="text-slate-300 dark:text-zinc-700">|</span>
+              <span>Amostras: <strong className="text-slate-800 dark:text-zinc-200">{safeSamplings.length}</strong></span>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Primary Metrics Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
-        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-stone-200 dark:border-zinc-800 shadow-sm space-y-1">
-          <div className="flex justify-between items-center text-stone-500 text-xs font-bold">
-            <span>Talhões Avaliados</span>
-            <Layers className="w-4 h-4 text-emerald-600" />
-          </div>
-          <p className="text-2xl font-black text-stone-900 dark:text-white font-mono">{(fields || []).length}</p>
-          <p className="text-[11px] text-stone-500">{totalAreaHa.toFixed(1)} ha mapeados</p>
-        </div>
-
-        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-stone-200 dark:border-zinc-800 shadow-sm space-y-1">
-          <div className="flex justify-between items-center text-stone-500 text-xs font-bold">
-            <span>Falhas (%)</span>
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
-          </div>
-          <p className="text-2xl font-black text-stone-900 dark:text-white font-mono">{metrics.skipsPercent}%</p>
-          <p className="text-[11px] text-stone-500">Meta: &lt; 5.0%</p>
-        </div>
-
-        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-stone-200 dark:border-zinc-800 shadow-sm space-y-1">
-          <div className="flex justify-between items-center text-stone-500 text-xs font-bold">
-            <span>Duplos (%)</span>
-            <Layers className="w-4 h-4 text-sky-500" />
-          </div>
-          <p className="text-2xl font-black text-stone-900 dark:text-white font-mono">{metrics.doublesPercent}%</p>
-          <p className="text-[11px] text-stone-500">Meta: &lt; 5.0%</p>
-        </div>
-
-        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-stone-200 dark:border-zinc-800 shadow-sm space-y-1">
-          <div className="flex justify-between items-center text-stone-500 text-xs font-bold">
-            <span>População Real</span>
-            <Sprout className="w-4 h-4 text-emerald-600" />
-          </div>
-          <p className="text-xl font-black text-emerald-700 dark:text-emerald-400 font-mono">
-            {metrics.realPopulationPerHa.toLocaleString('pt-BR')}
-          </p>
-          <p className="text-[11px] text-stone-500">Alvo: {metrics.targetPopulationPerHa.toLocaleString('pt-BR')} p/ha</p>
-        </div>
-
-        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-stone-200 dark:border-zinc-800 shadow-sm space-y-1 col-span-2 sm:col-span-1">
-          <div className="flex justify-between items-center text-stone-500 text-xs font-bold">
-            <span>Velocidade Média</span>
-            <Gauge className="w-4 h-4 text-purple-600" />
-          </div>
-          <p className="text-2xl font-black text-stone-900 dark:text-white font-mono">
-            {activeConfig ? activeConfig.targetSpeedKmH : 6.5} km/h
-          </p>
-          <p className="text-[11px] text-emerald-600 font-bold">Faixa Ideal (5.5 - 7.5 km/h)</p>
-        </div>
-      </div>
-
-      {/* Loss Simulator Quick Card & Diagnostics Split */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Economic Loss Preview */}
-        <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-stone-200 dark:border-zinc-800 shadow-sm space-y-4 lg:col-span-1 flex flex-col justify-between">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-extrabold uppercase text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-800">
-                Simulador Exclusivo
+          <div className={`px-4 py-3 rounded-lg border flex items-center gap-4 shrink-0 ${metrics.igpColorClass}`}>
+            <div className="pr-4 border-r border-current/20 text-center">
+              <span className="text-[10px] font-semibold uppercase tracking-wide block opacity-80">
+                IGP Geral
               </span>
-              <DollarSign className="w-5 h-5 text-amber-600" />
+              <span className="text-2xl font-bold tabular-nums leading-tight">
+                {metrics.igpScore}
+              </span>
+              <span className="text-[10px] block opacity-75">/ 100 pts</span>
             </div>
-            <h3 className="text-lg font-black text-stone-900 dark:text-white">Projeção de Perda Econômica</h3>
-            <p className="text-xs text-stone-500">
-              Impacto financeiro estimado devido a falhas, duplos e variação no espaçamento entre sementes no campo.
+            <div className="space-y-0.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wide block opacity-80">
+                Classificação
+              </span>
+              <span className="text-sm font-bold block">{metrics.igpClassification}</span>
+              <span className="text-[11px] tabular-nums block opacity-90">
+                CV {metrics.cvPercent}% • Aceitáveis {metrics.acceptablePercent}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Compact KPI Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="p-3 rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800 space-y-1">
+            <div className="flex items-center justify-between text-[11px] font-medium text-slate-500 dark:text-zinc-400">
+              <span>Talhões Avaliados</span>
+              <Layers className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <p className="text-lg font-bold text-slate-900 dark:text-white tabular-nums">
+              {safeFields.length}
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+              {totalAreaHa.toFixed(1)} ha mapeados
             </p>
           </div>
 
-          <div className="bg-stone-50 dark:bg-zinc-800/60 p-4 rounded-2xl border border-stone-200 dark:border-zinc-700 space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-stone-600 dark:text-stone-300 font-medium">Perda Estimada por Hectare:</span>
-              <span className="text-sm font-black text-rose-600 font-mono">R$ {lossSim.financialLossPerHa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / ha</span>
+          <div className="p-3 rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800 space-y-1">
+            <div className="flex items-center justify-between text-[11px] font-medium text-slate-500 dark:text-zinc-400">
+              <span>Falhas</span>
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
             </div>
-            <div className="flex justify-between items-center border-t border-stone-200 dark:border-zinc-700 pt-2">
-              <span className="text-xs text-stone-600 dark:text-stone-300 font-medium">Perda em Sacas ({lossSim.crop}):</span>
-              <span className="text-sm font-black text-stone-900 dark:text-white font-mono">{lossSim.yieldLossScHa} sc/ha ({lossSim.yieldLossPercent}%)</span>
+            <p className="text-lg font-bold text-slate-900 dark:text-white tabular-nums">
+              {metrics.skipsPercent}%
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400">Meta: &lt; 5,0%</p>
+          </div>
+
+          <div className="p-3 rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800 space-y-1">
+            <div className="flex items-center justify-between text-[11px] font-medium text-slate-500 dark:text-zinc-400">
+              <span>Duplos</span>
+              <Layers className="w-3.5 h-3.5 text-sky-500" />
             </div>
-            <div className="flex justify-between items-center border-t border-stone-200 dark:border-zinc-700 pt-2">
-              <span className="text-xs font-bold text-stone-800 dark:text-stone-200">Prejuízo Total na Área ({lossSim.fieldAreaHa} ha):</span>
-              <span className="text-base font-black text-rose-700 dark:text-rose-400 font-mono">R$ {lossSim.totalFinancialLoss.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            <p className="text-lg font-bold text-slate-900 dark:text-white tabular-nums">
+              {metrics.doublesPercent}%
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400">Meta: &lt; 5,0%</p>
+          </div>
+
+          <div className="p-3 rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800 space-y-1">
+            <div className="flex items-center justify-between text-[11px] font-medium text-slate-500 dark:text-zinc-400">
+              <span>População Real</span>
+              <Sprout className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
+              {metrics.realPopulationPerHa.toLocaleString('pt-BR')}
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+              Alvo: {metrics.targetPopulationPerHa.toLocaleString('pt-BR')} p/ha
+            </p>
+          </div>
+
+          <div className="p-3 rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800 space-y-1 col-span-2 md:col-span-1">
+            <div className="flex items-center justify-between text-[11px] font-medium text-slate-500 dark:text-zinc-400">
+              <span>Velocidade Média</span>
+              <Gauge className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
+            </div>
+            <p className="text-lg font-bold text-slate-900 dark:text-white tabular-nums">
+              {activeConfig ? activeConfig.targetSpeedKmH : 6.5} km/h
+            </p>
+            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+              Faixa ideal: 5,5 – 7,5 km/h
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Economic Loss Preview & Planter Diagnostics */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-slate-200/80 dark:border-zinc-800 p-4 flex flex-col justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                Impacto Econômico
+              </span>
+              <DollarSign className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            </div>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+              Projeção de Perdas na Semeadura
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Estimativa financeira gerada por falhas, duplos e variabilidade de espaçamento.
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800 divide-y divide-slate-200/70 dark:divide-zinc-800 text-xs">
+            <div className="flex items-center justify-between px-3 py-2">
+              <span className="text-slate-600 dark:text-zinc-400">Perda por hectare</span>
+              <span className="font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
+                R$ {lossSim.financialLossPerHa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/ha
+              </span>
+            </div>
+            <div className="flex items-center justify-between px-3 py-2">
+              <span className="text-slate-600 dark:text-zinc-400">Perda em sacas ({lossSim.crop})</span>
+              <span className="font-semibold text-slate-900 dark:text-white tabular-nums">
+                {lossSim.yieldLossScHa} sc/ha ({lossSim.yieldLossPercent}%)
+              </span>
+            </div>
+            <div className="flex items-center justify-between px-3 py-2">
+              <span className="font-medium text-slate-800 dark:text-zinc-200">
+                Total estimado ({lossSim.fieldAreaHa} ha)
+              </span>
+              <span className="font-bold text-rose-700 dark:text-rose-400 tabular-nums">
+                R$ {lossSim.totalFinancialLoss.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
             </div>
           </div>
 
           <button
-            onClick={() => onNavigateTab('simulator')}
-            className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+            type="button"
+            onClick={() => navigate('loss-simulator')}
+            className="h-9 px-3 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 transition-colors cursor-pointer"
           >
-            <TrendingUp className="w-4 h-4" />
-            Abrir Simulador Interativo
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span>Abrir Simulador Interativo</span>
           </button>
         </div>
 
-        {/* Planter Diagnostic Rules */}
-        <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-stone-200 dark:border-zinc-800 shadow-sm space-y-4 lg:col-span-2">
-          <div className="flex justify-between items-center">
+        <div className="lg:col-span-2 bg-white dark:bg-zinc-900 rounded-xl border border-slate-200/80 dark:border-zinc-800 p-4 space-y-3">
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-lg font-black text-stone-900 dark:text-white flex items-center gap-2">
-                <Tractor className="w-5 h-5 text-emerald-600" />
-                Diagnóstico Automático de Regulagem da Plantadeira
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Tractor className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span>Diagnóstico Automático de Regulagem</span>
               </h3>
-              <p className="text-xs text-stone-500 mt-0.5">
-                Regras agronômicas automatizadas detectando possíveis causas e correções em tempo real sem dependência de internet.
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                Regras agronômicas locais identificando causas prováveis e ações corretivas imediatas.
               </p>
             </div>
-
             <button
-              onClick={() => onNavigateTab('diagnostic')}
-              className="text-xs font-extrabold text-emerald-600 hover:text-emerald-500 underline"
+              type="button"
+              onClick={() => navigate('diagnostics')}
+              className="h-8 px-2.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 inline-flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer"
             >
-              Ver Tudo
+              <span>Ver completo</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {diagnostics.length === 0 ? (
-            <div className="p-8 text-center bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200 dark:border-emerald-800 space-y-2">
-              <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
-              <p className="text-sm font-bold text-emerald-900 dark:text-emerald-300">Semeadura em Excelentes Condições!</p>
-              <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                Os parâmetros de distribuição, profundidade e velocidade estão dentro das metas de alta produtividade.
+            <div className="p-6 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/70 dark:border-emerald-900/60 text-center space-y-1.5">
+              <CheckCircle2 className="w-6 h-6 text-emerald-600 dark:text-emerald-400 mx-auto" />
+              <p className="text-xs font-semibold text-emerald-900 dark:text-emerald-300">
+                {safeSamplings.length === 0
+                  ? 'Aguardando amostragens para diagnóstico automático'
+                  : 'Semeadura dentro dos parâmetros ideais'}
+              </p>
+              <p className="text-xs text-emerald-700/90 dark:text-emerald-400/90">
+                {safeSamplings.length === 0
+                  ? 'Registre medições na aba Amostragem para ativar o motor de regras técnicas.'
+                  : 'Distribuição, profundidade e velocidade estão dentro das metas de produtividade.'}
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {diagnostics.map((diag, i) => (
-                <div key={i} className="p-4 rounded-2xl bg-stone-50 dark:bg-zinc-800/80 border border-stone-200 dark:border-zinc-700 space-y-2">
-                  <div className="flex justify-between items-start">
-                    <span className="text-xs font-black text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      {diag.symptom}
+            <div className="space-y-2.5">
+              {diagnostics.map(diag => (
+                <div
+                  key={diag.id}
+                  className="p-3 rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800 space-y-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{diag.symptom}</span>
                     </span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      diag.severity === 'Alta' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
-                    }`}>
+                    <span
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded border shrink-0 ${
+                        diag.severity === 'Alta'
+                          ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900/60'
+                          : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900/60'
+                      }`}
+                    >
                       Prioridade {diag.severity}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-stone-500 block">Possíveis Causas:</span>
-                      <ul className="list-disc list-inside text-stone-700 dark:text-stone-300 space-y-0.5">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400 block mb-1">
+                        Possíveis Causas
+                      </span>
+                      <ul className="list-disc list-inside text-slate-600 dark:text-zinc-300 space-y-0.5">
                         {diag.possibleCauses.slice(0, 2).map((c, idx) => (
                           <li key={idx}>{c}</li>
                         ))}
                       </ul>
                     </div>
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-emerald-600 block">Ações Recomendadas:</span>
-                      <ul className="list-disc list-inside text-stone-700 dark:text-stone-300 space-y-0.5">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 block mb-1">
+                        Ações Recomendadas
+                      </span>
+                      <ul className="list-disc list-inside text-slate-600 dark:text-zinc-300 space-y-0.5">
                         {diag.recommendedActions.slice(0, 2).map((a, idx) => (
                           <li key={idx}>{a}</li>
                         ))}
@@ -235,63 +299,111 @@ export const PlantabilityDashboardView: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Field List Overview Cards */}
-      <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-stone-200 dark:border-zinc-800 shadow-sm space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-base font-extrabold text-stone-900 dark:text-white flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-emerald-600" />
-            Talhões com Avaliação de Plantabilidade
-          </h3>
-          <button
-            onClick={() => onNavigateTab('sampling')}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center gap-1.5"
-          >
-            + Nova Amostragem
-          </button>
+      {/* Evaluated Fields Overview */}
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-slate-200/80 dark:border-zinc-800 p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+              Talhões com Avaliação de Plantabilidade
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Clique em um talhão para inspecionar o Gêmeo Digital 360°.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('fields')}
+              className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              Gerenciar Talhões
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('sampling')}
+              className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Nova Amostragem</span>
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(fields || []).filter(f => f && f.id).map(f => {
-            const fieldSamplings = (samplings || []).filter(s => s?.fieldId === f.id);
-            const fieldMetrics = calculatePlantabilityMetrics(fieldSamplings);
+        {safeFields.length === 0 ? (
+          <div className="p-8 rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800 text-center space-y-2">
+            <p className="text-xs font-semibold text-slate-700 dark:text-zinc-200">
+              Nenhum talhão cadastrado para avaliação
+            </p>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Cadastre a propriedade e seus talhões semeados para acompanhar o IGP por área.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('fields')}
+              className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium inline-flex items-center gap-1.5 mt-1 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Cadastrar Primeiro Talhão</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {safeFields.map(f => {
+              const fieldSamplings = safeSamplings.filter(s => s?.fieldId === f.id);
+              const fieldConfig = configs.find(c => c?.fieldId === f.id);
+              const fieldMetrics = calculatePlantabilityMetrics(fieldSamplings, fieldConfig);
 
-            return (
-              <div
-                key={f.id}
-                onClick={() => onNavigateTab('digital_twin')}
-                className="p-5 rounded-2xl bg-stone-50 dark:bg-zinc-800/60 hover:bg-stone-100 dark:hover:bg-zinc-800 border border-stone-200 dark:border-zinc-700 transition-all cursor-pointer space-y-3"
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-[10px] font-bold text-emerald-700 uppercase bg-emerald-100 px-2 py-0.5 rounded">
-                      {f.crop} • {f.cultivar}
-                    </span>
-                    <h4 className="text-sm font-black text-stone-900 dark:text-white mt-1">{f.fieldCode}</h4>
-                    <p className="text-xs text-stone-500">{f.farmName} ({f.areaHa} ha)</p>
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => navigate('digital-twin')}
+                  className="text-left p-3.5 rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 hover:bg-slate-100/80 dark:hover:bg-zinc-800/70 border border-slate-200/70 dark:border-zinc-800 transition-colors cursor-pointer space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 block truncate">
+                        {f.crop} • {f.cultivar}
+                      </span>
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate mt-0.5">
+                        {f.fieldCode}
+                      </h4>
+                      <p className="text-xs text-slate-500 dark:text-zinc-400 truncate tabular-nums">
+                        {f.farmName} ({f.areaHa} ha)
+                      </p>
+                    </div>
+                    <div
+                      className={`px-2 py-1 rounded-md border text-[11px] font-semibold tabular-nums shrink-0 ${fieldMetrics.igpColorClass}`}
+                    >
+                      IGP {fieldMetrics.igpScore}
+                    </div>
                   </div>
-                  <div className={`px-2.5 py-1 rounded-xl text-xs font-black ${fieldMetrics.igpColorClass}`}>
-                    IGP {fieldMetrics.igpScore}
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-3 gap-2 text-center text-xs pt-2 border-t border-stone-200 dark:border-zinc-700 font-mono">
-                  <div>
-                    <span className="text-[10px] text-stone-500 block uppercase">Aceitáveis</span>
-                    <span className="font-bold text-emerald-600">{fieldMetrics.acceptablePercent}%</span>
+                  <div className="grid grid-cols-3 gap-2 pt-2.5 border-t border-slate-200/70 dark:border-zinc-800 text-center text-xs tabular-nums">
+                    <div>
+                      <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Aceitáveis</span>
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                        {fieldMetrics.acceptablePercent}%
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Falhas</span>
+                      <span className="font-semibold text-amber-600 dark:text-amber-400">
+                        {fieldMetrics.skipsPercent}%
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Duplos</span>
+                      <span className="font-semibold text-sky-600 dark:text-sky-400">
+                        {fieldMetrics.doublesPercent}%
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-[10px] text-stone-500 block uppercase">Falhas</span>
-                    <span className="font-bold text-amber-600">{fieldMetrics.skipsPercent}%</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-stone-500 block uppercase">Duplos</span>
-                    <span className="font-bold text-sky-600">{fieldMetrics.doublesPercent}%</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

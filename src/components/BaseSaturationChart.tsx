@@ -2,12 +2,10 @@ import React, { useState, useMemo } from 'react';
 import {
   TrendingUp,
   TrendingDown,
-  Filter,
   Info,
-  Layers,
-  Sparkles,
   BarChart2,
   LineChart as LineChartIcon,
+  AreaChart as AreaChartIcon,
   HelpCircle,
 } from 'lucide-react';
 import {
@@ -29,25 +27,28 @@ import { SoilSample, Farm } from '../types/agronomy';
 interface BaseSaturationChartProps {
   farm: Farm;
   soilSamples: SoilSample[];
-  targetVPercent?: number; // Target V% (e.g., 70% for Soybean/Corn/Coffee)
+  targetVPercent?: number;
 }
 
-const NUTRIENT_CONFIGS: Record<string, {
-  label: string;
-  dataKey: string;
-  color: string;
-  unit: string;
-  domain: [number, number];
-}> = {
+const NUTRIENT_CONFIGS: Record<
+  string,
+  {
+    label: string;
+    dataKey: string;
+    color: string;
+    unit: string;
+    domain: [number, number];
+  }
+> = {
   ph: {
-    label: 'pH (CaCl2)',
+    label: 'pH (CaCl₂)',
     dataKey: 'phCaCl2',
     color: '#6366f1',
     unit: '',
     domain: [3.5, 7.5],
   },
   mo: {
-    label: 'M.O. (Matéria Orgânica)',
+    label: 'Matéria orgânica',
     dataKey: 'organicMatter',
     color: '#b45309',
     unit: ' g/dm³',
@@ -87,7 +88,6 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
   const [showTargetZone, setShowTargetZone] = useState<boolean>(true);
   const [comparisonNutrient, setComparisonNutrient] = useState<string>('none');
 
-  // Filter soil samples for current farm, plot, and depth
   const filteredSamples = useMemo(() => {
     if (!farm?.id) return [];
     return soilSamples
@@ -97,28 +97,12 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
       .sort((a, b) => new Date(a.collectionDate).getTime() - new Date(b.collectionDate).getTime());
   }, [soilSamples, farm?.id, selectedPlotId, selectedDepth]);
 
-  // Transform data for Recharts
   const chartData = useMemo(() => {
     return filteredSamples.map((s) => {
       const plot = (farm?.plots || []).find((p) => p?.id === s?.plotId);
       const plotName = plot ? plot.name : `Talhão ${s?.plotId || ''}`;
       const vVal = s?.vPercent !== undefined ? s.vPercent : 0;
 
-      let statusLabel = 'Crítico';
-      let statusColor = '#ef4444'; // red
-
-      if (vVal >= targetVPercent) {
-        statusLabel = 'Ótimo';
-        statusColor = '#10b981'; // emerald
-      } else if (vVal >= 50) {
-        statusLabel = 'Médio';
-        statusColor = '#f59e0b'; // amber
-      } else {
-        statusLabel = 'Baixo / Crítico';
-        statusColor = '#ef4444'; // red
-      }
-
-      // Date formatting: e.g. "25/07/2024" or "2024"
       const dateObj = new Date(s.collectionDate);
       const formattedDate = isNaN(dateObj.getTime())
         ? s.collectionDate
@@ -134,19 +118,15 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
         dateLabel: formattedDate,
         vPercent: Number(vVal.toFixed(1)),
         targetV: targetVPercent,
-        criticalV: 50,
         phCaCl2: s.phCaCl2,
         organicMatter: s.organicMatterGdm3,
         ca: s.caCmolcDm3,
         mg: s.mgCmolcDm3,
         k: s.kCmolcDm3,
-        statusLabel,
-        statusColor,
       };
     });
   }, [filteredSamples, farm?.plots, targetVPercent]);
 
-  // Statistics
   const stats = useMemo(() => {
     if (chartData.length === 0) {
       return { latest: 0, avg: 0, min: 0, max: 0, delta: 0, count: 0 };
@@ -155,103 +135,87 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
     const latest = values[values.length - 1];
     const earliest = values[0];
     const sum = values.reduce((acc, curr) => acc + curr, 0);
-    const avg = sum / values.length;
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const delta = latest - earliest;
-
     return {
       latest,
-      avg,
-      min,
-      max,
-      delta,
+      avg: sum / values.length,
+      min: Math.min(...values),
+      max: Math.max(...values),
+      delta: latest - earliest,
       count: values.length,
     };
   }, [chartData]);
 
-  // Helper for status badge
-  const getStatusBadge = (v: number) => {
-    if (v >= targetVPercent) {
-      return {
-        text: 'Nível Ideal',
-        bg: 'bg-emerald-50 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
-      };
-    }
-    if (v >= 50) {
-      return {
-        text: 'Atenção / Médio',
-        bg: 'bg-amber-50 dark:bg-amber-950/70 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800',
-      };
-    }
-    return {
-      text: 'Crítico / Calagem Necessária',
-      bg: 'bg-red-50 dark:bg-red-950/70 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800',
-    };
-  };
+  const latestStatus =
+    stats.latest >= targetVPercent
+      ? { text: 'Ideal', color: 'text-emerald-700 dark:text-emerald-400' }
+      : stats.latest >= 50
+      ? { text: 'Atenção', color: 'text-amber-600 dark:text-amber-400' }
+      : { text: 'Crítico', color: 'text-rose-600 dark:text-rose-400' };
 
-  const latestBadge = getStatusBadge(stats.latest);
-
-  // Custom Tooltip Component for Recharts
-  const CustomTooltip = ({ active, payload }: any) => {
+  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: (typeof chartData)[number] }> }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      const compConfig = comparisonNutrient !== 'none' ? NUTRIENT_CONFIGS[comparisonNutrient] : null;
+      const compValue = compConfig ? (data as Record<string, unknown>)[compConfig.dataKey] : null;
+
       return (
-        <div className="bg-slate-900/95 dark:bg-zinc-900/95 text-white border border-slate-700 dark:border-zinc-700 rounded-xl p-3.5 shadow-xl text-xs space-y-2 backdrop-blur-md min-w-[220px]">
-          <div className="flex items-center justify-between border-b border-slate-800 dark:border-zinc-800 pb-2 gap-2">
+        <div className="bg-white dark:bg-zinc-900 text-slate-900 dark:text-zinc-100 border border-slate-200 dark:border-zinc-700 rounded-xl p-3 shadow-lg text-xs space-y-2 min-w-[210px]">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-1.5 gap-2">
             <div>
-              <span className="font-bold text-slate-200">{data.sampleCode}</span>
-              <p className="text-[10px] text-slate-400">{data.plotName} ({data.depth} cm)</p>
+              <span className="font-semibold">{data.sampleCode}</span>
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                {data.plotName} ({data.depth} cm)
+              </p>
             </div>
-            <span className="text-[10px] bg-slate-800 dark:bg-zinc-800 text-slate-300 px-2 py-0.5 rounded font-mono">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
               {data.dateLabel}
             </span>
           </div>
 
-          <div className="flex items-baseline justify-between pt-1">
-            <span className="text-slate-400 text-[11px]">Saturação de Bases (V%):</span>
-            <span className="text-lg font-black text-emerald-400">
+          <div className="flex items-baseline justify-between">
+            <span className="text-slate-500 dark:text-zinc-400">Saturação (V%):</span>
+            <span className="text-base font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">
               {data.vPercent}%
             </span>
           </div>
 
-          {comparisonNutrient !== 'none' && (
-            <div className="flex items-baseline justify-between border-t border-slate-800/80 dark:border-zinc-800/80 pt-1.5 mt-1.5">
-              <span className="text-slate-300 text-[11px] font-medium">
-                {NUTRIENT_CONFIGS[comparisonNutrient].label}:
-              </span>
-              <span className="text-sm font-extrabold" style={{ color: NUTRIENT_CONFIGS[comparisonNutrient].color }}>
-                {data[NUTRIENT_CONFIGS[comparisonNutrient].dataKey]?.toFixed(2) || data[NUTRIENT_CONFIGS[comparisonNutrient].dataKey]}
-                {NUTRIENT_CONFIGS[comparisonNutrient].unit}
+          {compConfig && compValue !== null && compValue !== undefined && (
+            <div className="flex items-baseline justify-between border-t border-slate-100 dark:border-zinc-800 pt-1.5">
+              <span className="text-slate-500 dark:text-zinc-400">{compConfig.label}:</span>
+              <span className="font-semibold tabular-nums" style={{ color: compConfig.color }}>
+                {typeof compValue === 'number' ? compValue.toFixed(2) : String(compValue)}
+                {compConfig.unit}
               </span>
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80 dark:border-zinc-800 text-[10px]">
+          <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-slate-100 dark:border-zinc-800 text-[11px] tabular-nums">
             <div>
-              <span className="text-slate-400 block">pH (CaCl2):</span>
-              <span className="font-bold text-slate-200">{data.phCaCl2?.toFixed(1)}</span>
+              <span className="text-slate-400 block">pH (CaCl₂)</span>
+              <span className="font-medium">{data.phCaCl2?.toFixed(1)}</span>
             </div>
             <div>
-              <span className="text-slate-400 block">M.O.:</span>
-              <span className="font-bold text-slate-200">{data.organicMatter?.toFixed(1)} g/dm³</span>
+              <span className="text-slate-400 block">M.O.</span>
+              <span className="font-medium">{data.organicMatter?.toFixed(1)} g/dm³</span>
             </div>
             <div>
-              <span className="text-slate-400 block">Ca + Mg:</span>
-              <span className="font-bold text-slate-200">
+              <span className="text-slate-400 block">Ca + Mg</span>
+              <span className="font-medium">
                 {((data.ca || 0) + (data.mg || 0)).toFixed(2)} cmolc
               </span>
             </div>
             <div>
-              <span className="text-slate-400 block">Potássio (K):</span>
-              <span className="font-bold text-slate-200">{data.k?.toFixed(2)} cmolc</span>
+              <span className="text-slate-400 block">Potássio (K)</span>
+              <span className="font-medium">{data.k?.toFixed(2)} cmolc</span>
             </div>
           </div>
 
-          <div className="pt-2 border-t border-slate-800 dark:border-zinc-800 flex justify-between items-center text-[10px]">
-            <span className="text-slate-400">Meta da Cultura: {targetVPercent}%</span>
-            <span className="font-bold text-emerald-400">
-              {data.vPercent >= targetVPercent ? '✓ Atingida' : `${(targetVPercent - data.vPercent).toFixed(1)}% abaixo`}
+          <div className="pt-1.5 border-t border-slate-100 dark:border-zinc-800 flex justify-between items-center text-[11px] tabular-nums">
+            <span className="text-slate-500 dark:text-zinc-400">Meta: {targetVPercent}%</span>
+            <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+              {data.vPercent >= targetVPercent
+                ? 'Atingida'
+                : `${(targetVPercent - data.vPercent).toFixed(1)}% abaixo`}
             </span>
           </div>
         </div>
@@ -261,212 +225,162 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-zinc-950 rounded-xl border border-slate-200 dark:border-zinc-800 p-5 sm:p-6 shadow-xs space-y-6 transition-colors">
-      {/* Header & Controls */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 dark:border-zinc-800/80 pb-4">
+    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800 overflow-hidden">
+      {/* Header & Filters */}
+      <div className="px-4 py-3.5 sm:px-5 border-b border-slate-200 dark:border-zinc-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-lg border border-emerald-100 dark:border-emerald-900/50">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-900 dark:text-zinc-100 text-base flex items-center gap-2">
-                Evolução da Saturação por Bases (V%)
-                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-900 text-slate-600 dark:text-zinc-400 border border-slate-200 dark:border-zinc-800">
-                  {farm.name}
-                </span>
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-zinc-400">
-                Histórico de fertilidade química e resposta à calagem ao longo das amostras de solo
-              </p>
-            </div>
-          </div>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+            Evolução da saturação por bases (V%)
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+            {farm.name} · Histórico de fertilidade química e resposta à calagem
+          </p>
         </div>
 
-        {/* Filters and View Controls */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          {/* Plot Filter */}
-          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-slate-500 dark:text-zinc-400 font-medium">Talhão:</span>
-            <select
-              value={selectedPlotId}
-              onChange={(e) => setSelectedPlotId(e.target.value)}
-              className="bg-transparent font-semibold text-slate-800 dark:text-zinc-200 focus:outline-none cursor-pointer"
-            >
-              <option value="all" className="bg-white dark:bg-zinc-900">Todos ({(farm?.plots || []).length})</option>
-              {(farm?.plots || []).filter(Boolean).map((p, idx) => (
-                <option key={p?.id || `plot-${idx}`} value={p?.id || ''} className="bg-white dark:bg-zinc-900">
-                  {p?.name || 'Talhão'}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            aria-label="Filtrar por talhão"
+            value={selectedPlotId}
+            onChange={(e) => setSelectedPlotId(e.target.value)}
+            className="h-7 px-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs font-medium text-slate-700 dark:text-zinc-300 focus:border-emerald-500 outline-none cursor-pointer"
+          >
+            <option value="all">Todos os talhões ({(farm?.plots || []).length})</option>
+            {(farm?.plots || []).filter(Boolean).map((p, idx) => (
+              <option key={p?.id || `plot-${idx}`} value={p?.id || ''}>
+                {p?.name || 'Talhão'}
+              </option>
+            ))}
+          </select>
 
-          {/* Depth Filter */}
-          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5">
-            <Layers className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-slate-500 dark:text-zinc-400 font-medium">Prof.:</span>
-            <select
-              value={selectedDepth}
-              onChange={(e) => setSelectedDepth(e.target.value as any)}
-              className="bg-transparent font-semibold text-slate-800 dark:text-zinc-200 focus:outline-none cursor-pointer"
-            >
-              <option value="0-20" className="bg-white dark:bg-zinc-900">0-20 cm (Superficial)</option>
-              <option value="20-40" className="bg-white dark:bg-zinc-900">20-40 cm (Subsuperfície)</option>
-              <option value="all" className="bg-white dark:bg-zinc-900">Todas as Camadas</option>
-            </select>
-          </div>
+          <select
+            aria-label="Filtrar por profundidade"
+            value={selectedDepth}
+            onChange={(e) => setSelectedDepth(e.target.value as 'all' | '0-20' | '20-40')}
+            className="h-7 px-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs font-medium text-slate-700 dark:text-zinc-300 focus:border-emerald-500 outline-none cursor-pointer"
+          >
+            <option value="0-20">0–20 cm</option>
+            <option value="20-40">20–40 cm</option>
+            <option value="all">Todas camadas</option>
+          </select>
 
-          {/* Nutrient Comparison Selector */}
-          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5">
-            <BarChart2 className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-slate-500 dark:text-zinc-400 font-medium">Comparar com:</span>
-            <select
-              value={comparisonNutrient}
-              onChange={(e) => setComparisonNutrient(e.target.value)}
-              className="bg-transparent font-semibold text-slate-800 dark:text-zinc-200 focus:outline-none cursor-pointer"
-            >
-              <option value="none" className="bg-white dark:bg-zinc-900">Apenas V%</option>
-              <option value="ph" className="bg-white dark:bg-zinc-900">pH (CaCl2)</option>
-              <option value="mo" className="bg-white dark:bg-zinc-900">Matéria Orgânica (M.O.)</option>
-              <option value="ca" className="bg-white dark:bg-zinc-900">Cálcio (Ca)</option>
-              <option value="mg" className="bg-white dark:bg-zinc-900">Magnésio (Mg)</option>
-              <option value="k" className="bg-white dark:bg-zinc-900">Potássio (K)</option>
-            </select>
-          </div>
+          <select
+            aria-label="Comparar com nutriente"
+            value={comparisonNutrient}
+            onChange={(e) => setComparisonNutrient(e.target.value)}
+            className="h-7 px-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs font-medium text-slate-700 dark:text-zinc-300 focus:border-emerald-500 outline-none cursor-pointer"
+          >
+            <option value="none">Apenas V%</option>
+            <option value="ph">Comparar: pH (CaCl₂)</option>
+            <option value="mo">Comparar: M.O.</option>
+            <option value="ca">Comparar: Cálcio (Ca)</option>
+            <option value="mg">Comparar: Magnésio (Mg)</option>
+            <option value="k">Comparar: Potássio (K)</option>
+          </select>
 
-          {/* Chart Type Selector */}
-          <div className="flex items-center bg-slate-100 dark:bg-zinc-900 p-0.5 rounded-lg border border-slate-200 dark:border-zinc-800">
-            <button
-              onClick={() => setChartType('area')}
-              title="Gráfico de Área"
-              className={`p-1.5 rounded-md transition-all ${
-                chartType === 'area'
-                  ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-xs font-bold'
-                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setChartType('line')}
-              title="Gráfico de Linha"
-              className={`p-1.5 rounded-md transition-all ${
-                chartType === 'line'
-                  ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-xs font-bold'
-                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <LineChartIcon className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setChartType('bar')}
-              title="Gráfico de Barras"
-              className={`p-1.5 rounded-md transition-all ${
-                chartType === 'bar'
-                  ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-xs font-bold'
-                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <BarChart2 className="w-3.5 h-3.5" />
-            </button>
+          <div className="inline-flex items-center p-0.5 rounded-lg bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700">
+            {[
+              { id: 'area' as const, label: 'Gráfico de área', icon: AreaChartIcon },
+              { id: 'line' as const, label: 'Gráfico de linha', icon: LineChartIcon },
+              { id: 'bar' as const, label: 'Gráfico de barras', icon: BarChart2 },
+            ].map(opt => {
+              const Icon = opt.icon;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setChartType(opt.id)}
+                  title={opt.label}
+                  className={`h-6 w-7 inline-flex items-center justify-center rounded-md transition-colors cursor-pointer ${
+                    chartType === opt.id
+                      ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-2xs'
+                      : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      {/* Metric Summary Cards Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {/* Latest V% */}
-        <div className="p-3.5 bg-slate-50 dark:bg-zinc-900/80 rounded-xl border border-slate-100 dark:border-zinc-800 space-y-1">
-          <span className="text-[10px] text-slate-500 dark:text-zinc-400 font-bold uppercase tracking-wider block">
-            Último V% Medido
-          </span>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-black text-slate-900 dark:text-zinc-50">
+      {/* 4-Column Hairline Metrics Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-slate-200 dark:border-zinc-800 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-zinc-800">
+        <div className="p-4 space-y-0.5">
+          <span className="text-xs text-slate-500 dark:text-zinc-400 block">Último V% medido</span>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-lg font-semibold text-slate-900 dark:text-zinc-100 tabular-nums">
               {stats.latest.toFixed(1)}%
             </span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${latestBadge.bg}`}>
-              {latestBadge.text}
-            </span>
+            <span className={`text-xs font-medium ${latestStatus.color}`}>{latestStatus.text}</span>
           </div>
         </div>
 
-        {/* Average V% */}
-        <div className="p-3.5 bg-slate-50 dark:bg-zinc-900/80 rounded-xl border border-slate-100 dark:border-zinc-800 space-y-1">
-          <span className="text-[10px] text-slate-500 dark:text-zinc-400 font-bold uppercase tracking-wider block">
-            V% Médio ({stats.count} análises)
+        <div className="p-4 space-y-0.5">
+          <span className="text-xs text-slate-500 dark:text-zinc-400 block tabular-nums">
+            Média ({stats.count} análises)
           </span>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-slate-800 dark:text-zinc-200">
+          <div className="flex items-baseline justify-between gap-2 tabular-nums">
+            <span className="text-lg font-semibold text-slate-900 dark:text-zinc-100">
               {stats.avg.toFixed(1)}%
             </span>
-            <span className="text-[10px] text-slate-500">
-              Min {stats.min.toFixed(0)}% · Max {stats.max.toFixed(0)}%
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400">
+              {stats.min.toFixed(0)}–{stats.max.toFixed(0)}%
             </span>
           </div>
         </div>
 
-        {/* Evolution Delta */}
-        <div className="p-3.5 bg-slate-50 dark:bg-zinc-900/80 rounded-xl border border-slate-100 dark:border-zinc-800 space-y-1">
-          <span className="text-[10px] text-slate-500 dark:text-zinc-400 font-bold uppercase tracking-wider block">
-            Evolução Histórica
-          </span>
-          <div className="flex items-center justify-between">
+        <div className="p-4 space-y-0.5">
+          <span className="text-xs text-slate-500 dark:text-zinc-400 block">Evolução histórica</span>
+          <div className="flex items-center justify-between gap-2 tabular-nums">
             <span
-              className={`text-xl font-bold flex items-center gap-1 ${
-                stats.delta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'
+              className={`text-lg font-semibold inline-flex items-center gap-1 ${
+                stats.delta >= 0
+                  ? 'text-emerald-700 dark:text-emerald-400'
+                  : 'text-rose-600 dark:text-rose-400'
               }`}
             >
               {stats.delta >= 0 ? (
-                <TrendingUp className="w-4 h-4 inline" />
+                <TrendingUp className="w-4 h-4" />
               ) : (
-                <TrendingDown className="w-4 h-4 inline" />
+                <TrendingDown className="w-4 h-4" />
               )}
               {stats.delta >= 0 ? `+${stats.delta.toFixed(1)}%` : `${stats.delta.toFixed(1)}%`}
-            </span>
-            <span className="text-[10px] text-slate-400">
-              {stats.delta >= 0 ? 'Ganhos em fertilidade' : 'Redução no período'}
             </span>
           </div>
         </div>
 
-        {/* Target V% */}
-        <div className="p-3.5 bg-emerald-900/10 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-900/60 space-y-1">
-          <span className="text-[10px] text-emerald-800 dark:text-emerald-400 font-bold uppercase tracking-wider block">
-            Meta Recomendada
-          </span>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-black text-emerald-700 dark:text-emerald-300">
+        <div className="p-4 space-y-0.5">
+          <span className="text-xs text-slate-500 dark:text-zinc-400 block">Meta recomendada</span>
+          <div className="flex items-baseline justify-between gap-2 tabular-nums">
+            <span className="text-lg font-semibold text-emerald-700 dark:text-emerald-400">
               {targetVPercent}%
             </span>
-            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-              Saturação Ideal
-            </span>
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400">Saturação ideal</span>
           </div>
         </div>
       </div>
 
-      {/* Main Chart Graphic */}
-      <div className="pt-2">
+      {/* Main Chart */}
+      <div className="p-4 sm:p-5">
         {chartData.length === 0 ? (
-          <div className="h-64 flex flex-col items-center justify-center border border-dashed border-slate-200 dark:border-zinc-800 rounded-xl text-center p-6 space-y-2">
-            <Info className="w-8 h-8 text-slate-400" />
-            <p className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
+          <div className="h-56 flex flex-col items-center justify-center border border-dashed border-slate-200 dark:border-zinc-800 rounded-lg text-center p-6 space-y-1.5">
+            <Info className="w-6 h-6 text-slate-400" />
+            <p className="text-xs font-medium text-slate-700 dark:text-zinc-300">
               Nenhuma amostra de solo encontrada para os filtros selecionados.
             </p>
-            <p className="text-xs text-slate-500">
-              Tente selecionar outro talhão ou profundidade de amostragem.
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Selecione outro talhão ou profundidade de amostragem.
             </p>
           </div>
         ) : (
-          <div className="h-72 w-full relative">
+          <div className="h-68 w-full relative">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartData} margin={{ top: 15, right: 20, left: -10, bottom: 5 }}>
                 {chartType === 'area' && (
                   <defs>
                     <linearGradient id="vPercentGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.32} />
                       <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
@@ -506,7 +420,7 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
                 )}
                 <Tooltip content={<CustomTooltip />} />
                 {comparisonNutrient !== 'none' && (
-                  <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
+                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '5px' }} />
                 )}
 
                 {showTargetZone && chartType === 'area' && (
@@ -517,7 +431,7 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
                       fill: '#10b981',
                       fillOpacity: 0.07,
                       stroke: 'none',
-                    } as any)}
+                    } as Record<string, unknown>)}
                   />
                 )}
 
@@ -528,7 +442,7 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
                   strokeDasharray="4 4"
                   strokeWidth={1.5}
                   label={{
-                    value: `Meta V%: ${targetVPercent}%`,
+                    value: `Meta: ${targetVPercent}%`,
                     fill: '#10b981',
                     fontSize: 10,
                     position: 'top',
@@ -558,10 +472,10 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
                     dataKey="vPercent"
                     name="Saturação por Bases (V%)"
                     stroke="#10b981"
-                    strokeWidth={2.5}
+                    strokeWidth={2}
                     fillOpacity={1}
                     fill="url(#vPercentGrad)"
-                    activeDot={{ r: 6, stroke: '#10b981', strokeWidth: 2, fill: '#ffffff' }}
+                    activeDot={{ r: 5, stroke: '#10b981', strokeWidth: 2, fill: '#ffffff' }}
                   />
                 )}
 
@@ -572,9 +486,9 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
                     dataKey="vPercent"
                     name="Saturação por Bases (V%)"
                     stroke="#059669"
-                    strokeWidth={3}
-                    dot={{ r: 4, fill: '#059669', strokeWidth: 1 }}
-                    activeDot={{ r: 7 }}
+                    strokeWidth={2.5}
+                    dot={{ r: 3.5, fill: '#059669', strokeWidth: 1 }}
+                    activeDot={{ r: 6 }}
                   />
                 )}
 
@@ -584,8 +498,8 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
                     dataKey="vPercent"
                     name="Saturação por Bases (V%)"
                     fill="#10b981"
-                    radius={[6, 6, 0, 0]}
-                    maxBarSize={45}
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={42}
                   />
                 )}
 
@@ -596,9 +510,9 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
                     dataKey={NUTRIENT_CONFIGS[comparisonNutrient].dataKey}
                     name={NUTRIENT_CONFIGS[comparisonNutrient].label}
                     stroke={NUTRIENT_CONFIGS[comparisonNutrient].color}
-                    strokeWidth={2.5}
-                    dot={{ r: 4, fill: NUTRIENT_CONFIGS[comparisonNutrient].color }}
-                    activeDot={{ r: 6 }}
+                    strokeWidth={2}
+                    dot={{ r: 3.5, fill: NUTRIENT_CONFIGS[comparisonNutrient].color }}
+                    activeDot={{ r: 5 }}
                   />
                 )}
               </ComposedChart>
@@ -607,29 +521,30 @@ export const BaseSaturationChart: React.FC<BaseSaturationChartProps> = ({
         )}
       </div>
 
-      {/* Legend & Agronomic Interpretation Footnote */}
-      <div className="pt-3 border-t border-slate-100 dark:border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+      {/* Footer Legend */}
+      <div className="px-4 py-2.5 sm:px-5 border-t border-slate-200 dark:border-zinc-800 bg-slate-50/60 dark:bg-zinc-950/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px]">
         <div className="flex flex-wrap items-center gap-4 text-slate-600 dark:text-zinc-400">
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
-            <span>Ideal (V% ≥ {targetVPercent}%)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>
-            <span>Médio (50% - {targetVPercent}%)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-red-500 inline-block"></span>
-            <span>Crítico (V% &lt; 50%)</span>
-          </div>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            Ideal (≥ {targetVPercent}%)
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
+            Médio (50%–{targetVPercent}%)
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-rose-500" />
+            Crítico (&lt; 50%)
+          </span>
         </div>
 
         <button
+          type="button"
           onClick={() => setShowTargetZone(!showTargetZone)}
-          className="text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200 text-[11px] underline flex items-center gap-1 self-start sm:self-auto cursor-pointer"
+          className="text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 inline-flex items-center gap-1 self-start sm:self-auto cursor-pointer"
         >
           <HelpCircle className="w-3.5 h-3.5" />
-          {showTargetZone ? 'Ocultar Faixa Ótima' : 'Exibir Faixa Ótima'}
+          <span>{showTargetZone ? 'Ocultar faixa ótima' : 'Exibir faixa ótima'}</span>
         </button>
       </div>
     </div>

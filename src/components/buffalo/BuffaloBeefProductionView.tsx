@@ -1,16 +1,6 @@
 import React, { useState } from 'react';
 import { BuffaloAnimal } from '../../types/buffalo';
-import {
-  Beef,
-  Scale,
-  TrendingUp,
-  Award,
-  Sparkles,
-  Layers3,
-  Calendar,
-  CheckCircle2,
-  Plus
-} from 'lucide-react';
+import { Beef } from 'lucide-react';
 
 interface BuffaloBeefProductionViewProps {
   animals: BuffaloAnimal[];
@@ -21,118 +11,217 @@ export const BuffaloBeefProductionView: React.FC<BuffaloBeefProductionViewProps>
   animals,
   onOpenDigitalTwin
 }) => {
-  const beefAnimals = animals.filter(a => a.purpose === 'Corte' || a.category.includes('Engorda') || a.category.includes('Terminação') || a.category.includes('Recria'));
-  
-  const avgWeight = beefAnimals.length > 0 ? Math.round(beefAnimals.reduce((acc, a) => acc + a.currentWeightKg, 0) / beefAnimals.length) : 0;
-  const avgGmd = beefAnimals.length > 0 ? 0.78 : 0; // kg/dia médio
-  const carcassYieldPct = 51.5; // % rendimento de carcaça
-  const priceArrobaBRL = 310.0; // R$ / @
+  const [carcassYieldPct, setCarcassYieldPct] = useState(51.5);
+  const [priceArrobaBRL, setPriceArrobaBRL] = useState(310);
+
+  const beefAnimals = animals.filter(
+    a =>
+      a.purpose === 'Corte' ||
+      a.category.includes('Engorda') ||
+      a.category.includes('Terminação') ||
+      a.category.includes('Recria')
+  );
+
+  const avgWeight =
+    beefAnimals.length > 0
+      ? Math.round(beefAnimals.reduce((acc, a) => acc + (a.currentWeightKg || 0), 0) / beefAnimals.length)
+      : 0;
+
+  const beefGmds = beefAnimals
+    .flatMap(a => a.weighings || [])
+    .map(w => w.dailyGainKg)
+    .filter((v): v is number => typeof v === 'number' && v > 0);
+
+  const avgGmd =
+    beefGmds.length > 0
+      ? Number((beefGmds.reduce((acc, v) => acc + v, 0) / beefGmds.length).toFixed(2))
+      : 0;
+
+  const totalEstimatedArrobas = beefAnimals.reduce(
+    (acc, a) => acc + ((a.currentWeightKg || 0) * (carcassYieldPct / 100)) / 15,
+    0
+  );
 
   return (
-    <div className="space-y-6">
-      {/* Top Banner de Métricas de Carne */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xs space-y-2">
-          <span className="text-[10px] uppercase font-bold text-slate-400">Animais em Recria / Engorda</span>
-          <div className="text-3xl font-black text-rose-600">{beefAnimals.length}</div>
-          <span className="text-xs text-slate-500">Peso médio: <strong>{avgWeight} kg</strong></span>
-        </div>
-
-        <div className="p-5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xs space-y-2">
-          <span className="text-[10px] uppercase font-bold text-slate-400">Ganho Médio Diário (GMD)</span>
-          <div className="text-3xl font-black text-emerald-600">{avgGmd} <span className="text-sm font-bold text-slate-400">kg/dia</span></div>
-          <span className="text-xs text-teal-600 font-bold">Pasto Mombaça + Suplemento Proteico</span>
-        </div>
-
-        <div className="p-5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xs space-y-2">
-          <span className="text-[10px] uppercase font-bold text-slate-400">Rendimento de Carcaça</span>
-          <div className="text-3xl font-black text-slate-900 dark:text-white">{carcassYieldPct}%</div>
-          <span className="text-xs text-slate-500">Gordura branca, menor colesterol</span>
-        </div>
-
-        <div className="p-5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xs space-y-2">
-          <span className="text-[10px] uppercase font-bold text-slate-400">Cotação da @ do Búfalo</span>
-          <div className="text-3xl font-black text-teal-600">R$ {priceArrobaBRL.toFixed(2)}</div>
-          <span className="text-xs text-emerald-600 font-semibold">Valorização por carne saudável</span>
-        </div>
-      </div>
-
-      {/* Diferenciais da Carne de Búfalo */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-rose-950 border border-rose-500/30 rounded-3xl p-6 sm:p-8 text-white shadow-xl space-y-4">
-        <div className="space-y-1">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-rose-500/20 text-rose-300 border border-rose-500/40 rounded-full text-xs font-bold uppercase">
-            <Award className="w-3.5 h-3.5 text-rose-400" />
-            <span>Perfil Nutricional Superior da Carne Bubalina</span>
-          </div>
-          <h3 className="text-2xl font-black">Por que a Carne de Búfalo se Destaca no Mercado Gourmet?</h3>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-          <div className="p-4 bg-slate-950/60 rounded-2xl border border-rose-500/30 text-center space-y-1">
-            <span className="text-3xl font-black text-emerald-400">-40%</span>
-            <span className="text-xs font-bold text-slate-300 block">Menos Colesterol</span>
-            <p className="text-[11px] text-slate-400">Gordura predominantemente branca e periférica (fácil remoção).</p>
-          </div>
-
-          <div className="p-4 bg-slate-950/60 rounded-2xl border border-rose-500/30 text-center space-y-1">
-            <span className="text-3xl font-black text-rose-400">-55%</span>
-            <span className="text-xs font-bold text-slate-300 block">Menos Calorias</span>
-            <p className="text-[11px] text-slate-400">Carne altamente proteica e com baixos teores de lipídios intramusculares.</p>
-          </div>
-
-          <div className="p-4 bg-slate-950/60 rounded-2xl border border-rose-500/30 text-center space-y-1">
-            <span className="text-3xl font-black text-amber-400">+10%</span>
-            <span className="text-xs font-bold text-slate-300 block">Mais Minerais &amp; Ferro</span>
-            <p className="text-[11px] text-slate-400">Excelente retenção de ferro e fósforo em pastagens tropicais.</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Lista de Lotes de Corte & Pesagens */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-4">
-        <h4 className="font-extrabold text-sm text-slate-900 dark:text-white uppercase tracking-wider">
-          Animais em Engorda &amp; Terminação
-        </h4>
-
-        <div className="divide-y divide-slate-100 dark:divide-zinc-800">
-          {beefAnimals.length === 0 ? (
-            <div className="text-center py-8 text-slate-500 text-xs">
-              Nenhum búfalo cadastrado com aptidão para corte ou em engorda/terminação.
+    <div className="space-y-4">
+      {/* Faixa unificada de KPIs */}
+      <section className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+        <div className="grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 dark:divide-zinc-800">
+          <div className="p-3.5">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+              Animais de Corte / Recria
+            </span>
+            <div className="text-xl font-semibold text-slate-900 dark:text-white tabular-nums mt-0.5">
+              {beefAnimals.length}
             </div>
-          ) : (
-            beefAnimals.map((animal) => {
-              const arrobas = Number((animal.currentWeightKg * (carcassYieldPct / 100) / 15).toFixed(1));
-              const estimatedValueBRL = Number((arrobas * priceArrobaBRL).toFixed(2));
-              return (
-                <div key={animal.id} className="py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-black text-sm text-slate-900 dark:text-white">{animal.identificationNumber}</span>
-                      <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">{animal.name}</span>
-                      <span className="px-2 py-0.5 bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 font-bold text-[10px] rounded">
-                        {animal.category}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      Peso Vivo: <strong>{animal.currentWeightKg} kg</strong> (ECC {animal.bodyConditionScore}) • Equivalente: <strong>{arrobas} @</strong>
-                    </p>
-                    <span className="text-[11px] text-teal-600 font-semibold block">
-                      Valor Estimado de Carcaça: R$ {estimatedValueBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+              Peso médio: {avgWeight} kg
+            </span>
+          </div>
 
-                  <button
-                    onClick={() => onOpenDigitalTwin(animal.id)}
-                    className="px-4 py-2 bg-slate-100 dark:bg-zinc-800 hover:bg-rose-50 dark:hover:bg-rose-950 text-slate-700 dark:text-zinc-300 hover:text-rose-600 rounded-xl text-xs font-bold cursor-pointer transition-all"
-                  >
-                    Ver Curva de Ganho
-                  </button>
-                </div>
-              );
-            })
-          )}
+          <div className="p-3.5">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">GMD Médio</span>
+            <div className="text-xl font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums mt-0.5">
+              {avgGmd > 0 ? `${avgGmd} kg/dia` : '—'}
+            </div>
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400">Calculado das pesagens</span>
+          </div>
+
+          <div className="p-3.5">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+              Total em Arrobas Est.
+            </span>
+            <div className="text-xl font-semibold text-teal-600 dark:text-teal-400 tabular-nums mt-0.5">
+              {totalEstimatedArrobas.toFixed(1)} @
+            </div>
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+              Rendimento {carcassYieldPct}%
+            </span>
+          </div>
+
+          <div className="p-3.5">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+              Valor Bruto do Lote
+            </span>
+            <div className="text-xl font-semibold text-slate-900 dark:text-white tabular-nums mt-0.5">
+              R$ {(totalEstimatedArrobas * priceArrobaBRL).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+            </div>
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+              Cotação R$ {priceArrobaBRL.toFixed(2)}/@
+            </span>
+          </div>
         </div>
-      </div>
+      </section>
+
+      {/* Parâmetros de Simulação + Perfil Nutricional */}
+      <section className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-zinc-800">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+              <Beef className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+              <span>Parâmetros de Carcaça &amp; Perfil da Carne Bubalina</span>
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Ajuste o rendimento de carcaça e a cotação da arroba para estimar a receita do lote
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <label className="flex items-center gap-1.5 text-slate-600 dark:text-zinc-400">
+              <span>Rendimento (%)</span>
+              <input
+                type="number"
+                step="0.5"
+                min="40"
+                max="65"
+                value={carcassYieldPct}
+                onChange={(e) => setCarcassYieldPct(Number(e.target.value) || 50)}
+                className="w-16 h-7 px-2 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-700 rounded-md text-xs text-slate-900 dark:text-white tabular-nums"
+              />
+            </label>
+            <label className="flex items-center gap-1.5 text-slate-600 dark:text-zinc-400">
+              <span>R$/@</span>
+              <input
+                type="number"
+                step="5"
+                min="100"
+                value={priceArrobaBRL}
+                onChange={(e) => setPriceArrobaBRL(Number(e.target.value) || 0)}
+                className="w-20 h-7 px-2 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-700 rounded-md text-xs text-slate-900 dark:text-white tabular-nums"
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="p-3 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/40">
+            <span className="text-base font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">-40%</span>
+            <p className="font-medium text-slate-900 dark:text-white mt-0.5">Menos colesterol</p>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+              Gordura branca e predominantemente periférica.
+            </p>
+          </div>
+          <div className="p-3 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/40">
+            <span className="text-base font-semibold text-teal-600 dark:text-teal-400 tabular-nums">-55%</span>
+            <p className="font-medium text-slate-900 dark:text-white mt-0.5">Menos calorias</p>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+              Alto teor proteico com menor gordura intramuscular.
+            </p>
+          </div>
+          <div className="p-3 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/40">
+            <span className="text-base font-semibold text-amber-600 dark:text-amber-400 tabular-nums">+10%</span>
+            <p className="font-medium text-slate-900 dark:text-white mt-0.5">Mais minerais e ferro</p>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+              Elevada conversão de forragens tropicais em proteína magra.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Tabela de Animais de Corte */}
+      <section className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-3">
+        <h3 className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+          Lote em Recria, Engorda &amp; Terminação ({beefAnimals.length})
+        </h3>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="border-b border-slate-200 dark:border-zinc-800 text-[11px] text-slate-500 dark:text-zinc-400">
+              <tr>
+                <th className="py-2 pr-3 font-medium">Animal</th>
+                <th className="py-2 px-3 font-medium">Categoria</th>
+                <th className="py-2 px-3 font-medium text-right">Peso Vivo</th>
+                <th className="py-2 px-3 font-medium text-right">ECC</th>
+                <th className="py-2 px-3 font-medium text-right">Arrobas Est.</th>
+                <th className="py-2 px-3 font-medium text-right">Valor Est.</th>
+                <th className="py-2 pl-3 font-medium text-right">Ação</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-zinc-800 tabular-nums">
+              {beefAnimals.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-500 dark:text-zinc-400">
+                    Nenhum búfalo cadastrado com aptidão de corte ou em recria/engorda.
+                  </td>
+                </tr>
+              ) : (
+                beefAnimals.map(animal => {
+                  const arrobas = Number(((animal.currentWeightKg * (carcassYieldPct / 100)) / 15).toFixed(1));
+                  const estimatedValue = arrobas * priceArrobaBRL;
+                  return (
+                    <tr key={animal.id} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40">
+                      <td className="py-2.5 pr-3">
+                        <div className="font-semibold text-slate-900 dark:text-white">{animal.identificationNumber}</div>
+                        <span className="text-[11px] text-slate-500 dark:text-zinc-400">{animal.name}</span>
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-600 dark:text-zinc-300">{animal.category}</td>
+                      <td className="py-2.5 px-3 text-right font-semibold text-slate-900 dark:text-white">
+                        {animal.currentWeightKg} kg
+                      </td>
+                      <td className="py-2.5 px-3 text-right">{animal.bodyConditionScore}</td>
+                      <td className="py-2.5 px-3 text-right font-semibold text-teal-600 dark:text-teal-400">
+                        {arrobas} @
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                        R$ {estimatedValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-2.5 pl-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => onOpenDigitalTwin(animal.id)}
+                          className="h-7 px-2.5 rounded-md border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 text-xs font-medium text-slate-700 dark:text-zinc-200 cursor-pointer transition-colors"
+                        >
+                          Curva
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 };

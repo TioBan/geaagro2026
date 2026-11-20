@@ -9,6 +9,7 @@ import {
   Tractor,
   ShieldCheck,
   FileText,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   TankMixProduct,
@@ -62,22 +63,28 @@ interface TankMixModuleProps {
 }
 
 const SUB_TABS = [
-  { id: 'compatibility_matrix', label: 'Matriz de Compatibilidade', icon: Zap },
-  { id: 'water_quality', label: 'Qualidade da Água', icon: Droplets },
-  { id: 'formulations_library', label: 'Biblioteca de Formulações', icon: BookOpen },
-  { id: 'products_catalog', label: 'Banco de Defensivos', icon: Boxes },
-  { id: 'weather_app', label: 'Clima & Delta T', icon: CloudSun },
+  { id: 'virtual_lab', label: 'Laboratório Virtual', icon: FlaskConical },
+  { id: 'compatibility_matrix', label: 'Matriz', icon: Zap },
+  { id: 'water_quality', label: 'Água', icon: Droplets },
+  { id: 'formulations_library', label: 'Formulações', icon: BookOpen },
+  { id: 'products_catalog', label: 'Defensivos', icon: Boxes },
+  { id: 'weather_app', label: 'Clima & ΔT', icon: CloudSun },
   { id: 'sprayers', label: 'Pulverizadores', icon: Tractor },
   { id: 'traceability', label: 'Rastreabilidade', icon: ShieldCheck },
-  { id: 'reports', label: 'Laudo & Receitas', icon: FileText },
+  { id: 'reports', label: 'Laudo & Receita', icon: FileText },
 ] as const;
 
 export const TankMixModule: React.FC<TankMixModuleProps> = ({
-  activeSubTab = 'virtual_lab',
+  activeSubTab: propSubTab,
   setActiveSubTab,
   farmName = 'Fazenda Modelo',
 }) => {
-  const currentSubTab = !activeSubTab || activeSubTab === 'dashboard' ? 'compatibility_matrix' : activeSubTab;
+  const [localSubTab, setLocalSubTab] = useState<string>('compatibility_matrix');
+  const resolvedPropTab =
+    !propSubTab || propSubTab === 'dashboard' ? undefined : propSubTab;
+  const currentSubTab = resolvedPropTab ?? localSubTab;
+
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
 
   // Products state (includes pre-loaded + custom user-created)
   const [products, setProducts] = useState<TankMixProduct[]>(() => {
@@ -237,6 +244,12 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
     localStorage.setItem('geaagro_tankmix_applications', JSON.stringify(applications));
   }, [applications]);
 
+  useEffect(() => {
+    if (!statusNotice) return;
+    const timer = window.setTimeout(() => setStatusNotice(null), 3500);
+    return () => window.clearTimeout(timer);
+  }, [statusNotice]);
+
   // Recalculate evaluation dynamically when products, water, or tank parameters change
   const currentEvaluation = useMemo(
     () => calculateTankMixEvaluation(selectedProducts, waterQuality, tankVolumeL, sprayVolumeLHa),
@@ -244,6 +257,7 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
   );
 
   const handleSubTabChange = (tabId: string) => {
+    setLocalSubTab(tabId);
     if (setActiveSubTab) {
       setActiveSubTab(tabId);
     }
@@ -251,6 +265,7 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
 
   const handleAddCustomProduct = (newProd: TankMixProduct) => {
     setProducts(prev => [newProd, ...prev]);
+    setStatusNotice(`Produto "${newProd.commercialName}" adicionado ao catálogo.`);
   };
 
   const handleSelectProductForLab = (product: TankMixProduct) => {
@@ -308,6 +323,7 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
       console.error('Erro ao sincronizar TankMix com Caderno de Campo:', err);
     }
 
+    setStatusNotice('Aplicação registrada na rastreabilidade e sincronizada com o Caderno de Campo.');
     handleSubTabChange('traceability');
   };
 
@@ -380,149 +396,174 @@ export const TankMixModule: React.FC<TankMixModuleProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="bg-gradient-to-r from-teal-900 to-emerald-900 text-white rounded-2xl p-6 shadow-md border border-emerald-700/50 flex items-start gap-4">
-        <div className="p-3 bg-emerald-500/20 rounded-xl border border-emerald-400/30 shrink-0">
-          <FlaskConical className="w-8 h-8 text-emerald-300" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-white mt-1">TankMix : Compatibilidade de Defensivos</h1>
-          <p className="text-emerald-100 text-sm mt-1 max-w-3xl leading-relaxed">
-            Planejamento da compatibilidade físico-química e biológica de misturas em tanque, ordem de preparo de calda, diagnóstico de água, tecnologia de aplicação e rastreabilidade total por talhão.
-          </p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 pb-12">
+      {/* Cabeçalho Compacto do Módulo */}
+      <header className="bg-white dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 px-4 sm:px-6 pt-4 print:hidden">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <h1 className="text-base sm:text-lg font-semibold tracking-tight text-slate-900 dark:text-zinc-100">
+                TankMix : Compatibilidade de Defensivos
+              </h1>
+              <span className="text-xs text-slate-400 dark:text-zinc-500">·</span>
+              <span className="text-xs text-slate-500 dark:text-zinc-400">
+                Calda, Água, Clima &amp; Rastreabilidade
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-xs text-slate-500 dark:text-zinc-400 tabular-nums">
+              <span>{selectedProducts.length} {selectedProducts.length === 1 ? 'produto no tanque' : 'produtos no tanque'}</span>
+              <span aria-hidden="true">·</span>
+              <span>Tanque {tankVolumeL} L ({sprayVolumeLHa} L/ha)</span>
+              <span aria-hidden="true">·</span>
+              <span>Água pH {waterQuality.ph.toFixed(1)}</span>
+            </div>
+          </div>
 
-      {/* Subtabs Navigation Bar */}
-      <div className="bg-white p-2 rounded-2xl border border-gray-200 shadow-sm overflow-x-auto">
-        <div className="flex items-center gap-1.5 min-w-max">
+          <div className="flex items-center gap-2 shrink-0">
+            {currentSubTab !== 'virtual_lab' ? (
+              <button
+                type="button"
+                onClick={() => handleSubTabChange('virtual_lab')}
+                className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                <FlaskConical className="w-3.5 h-3.5 shrink-0" />
+                <span>Simular Calda</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleSubTabChange('reports')}
+                className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-medium inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5 shrink-0" />
+                <span>Ver Laudo</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Navegação Horizontal Limpa (Underline Tabs) */}
+        <nav
+          aria-label="Seções do TankMix"
+          className="max-w-7xl mx-auto flex items-center gap-1 overflow-x-auto border-t border-slate-100 dark:border-zinc-800/80 -mb-px"
+        >
           {SUB_TABS.map(tab => {
             const Icon = tab.icon;
             const isActive = currentSubTab === tab.id;
             return (
               <button
                 key={tab.id}
+                type="button"
                 onClick={() => handleSubTabChange(tab.id)}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                className={`px-2.5 py-2.5 text-xs font-medium flex items-center gap-1.5 whitespace-nowrap border-b-2 transition-colors cursor-pointer shrink-0 ${
                   isActive
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400 font-semibold'
+                    : 'border-transparent text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:border-slate-300 dark:hover:border-zinc-700'
                 }`}
               >
-                <Icon className="w-4 h-4 shrink-0" />
+                <Icon className="w-3.5 h-3.5 shrink-0" />
                 <span>{tab.label}</span>
+                {tab.id === 'virtual_lab' && selectedProducts.length > 0 && (
+                  <span className="text-[11px] font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
+                    ({selectedProducts.length})
+                  </span>
+                )}
               </button>
             );
           })}
-        </div>
-      </div>
+        </nav>
+      </header>
 
-      {/* Subtab Contents (Lazy Loaded) */}
-      <Suspense
-        fallback={
-          <div className="bg-white rounded-2xl border border-gray-200 p-10 flex items-center justify-center text-xs font-semibold text-gray-500">
-            Carregando módulo TankMix...
-          </div>
-        }
-      >
-        {currentSubTab === 'virtual_lab' && (
-          <TankMixVirtualLabView
-            allProducts={products}
-            selectedProducts={selectedProducts}
-            setSelectedProducts={setSelectedProducts}
-            waterQuality={waterQuality}
-            tankVolumeL={tankVolumeL}
-            setTankVolumeL={setTankVolumeL}
-            sprayVolumeLHa={sprayVolumeLHa}
-            setSprayVolumeLHa={setSprayVolumeLHa}
-            onSaveRecipe={(name, description) => {
-              console.log(`Receita salva: ${name} - ${description}`);
-            }}
-            onOpenTraceabilityModal={handleRegisterCurrentTankApplication}
-            onNavigateToWaterQuality={() => handleSubTabChange('water_quality')}
-          />
-        )}
-
-        {currentSubTab === 'compatibility_matrix' && <TankMixCompatibilityMatrixView />}
-
-        {currentSubTab === 'water_quality' && (
-          <TankMixWaterQualityView waterQuality={waterQuality} setWaterQuality={setWaterQuality} />
-        )}
-
-        {currentSubTab === 'formulations_library' && <TankMixFormulationsLibraryView />}
-
-        {currentSubTab === 'products_catalog' && (
-          <TankMixProductsCatalogView
-            products={products}
-            onAddCustomProduct={handleAddCustomProduct}
-            onSelectProductForLab={handleSelectProductForLab}
-          />
-        )}
-
-        {currentSubTab === 'weather_app' && (
-          <TankMixWeatherApplicationView weather={weather} setWeather={setWeather} />
-        )}
-
-        {currentSubTab === 'sprayers' && (
-          <TankMixSprayersView
-            sprayers={sprayers}
-            setSprayers={setSprayers}
-            onSelectSprayerForLab={handleSelectSprayerForLab}
-          />
-        )}
-
-        {currentSubTab === 'traceability' && (
-          <TankMixTraceabilityView
-            applications={applications}
-            onDeleteApplication={handleDeleteApplication}
-          />
-        )}
-
-        {currentSubTab === 'reports' && (
-          <TankMixReportsView
-            selectedProducts={selectedProducts}
-            evaluation={currentEvaluation}
-            waterQuality={waterQuality}
-            weather={weather}
-            farmName={farmName}
-            plotName="Talhão Principal"
-          />
-        )}
-      </Suspense>
-
-      {/* Botão "Abrir Laboratório Virtual" na parte inferior */}
-      {currentSubTab !== 'virtual_lab' ? (
-        <div className="bg-gradient-to-r from-teal-950 via-emerald-950 to-slate-900 border border-emerald-600/40 rounded-2xl p-5 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-emerald-500/20 text-emerald-300 rounded-xl border border-emerald-500/30 shrink-0">
-              <FlaskConical className="w-6 h-6 text-emerald-400" />
+      {/* Conteúdo Principal */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-5 space-y-5">
+        {statusNotice && (
+          <div className="bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-800/70 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3 text-xs text-emerald-800 dark:text-emerald-300 print:hidden">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span>{statusNotice}</span>
             </div>
-            <div>
-              <h4 className="font-bold text-white text-base">Laboratório Virtual &amp; Simulador de Calda</h4>
-              <p className="text-xs text-slate-300">
-                Simulação de ordem de adição WALES, verificação de incompatibilidade física e química e registro com rastreabilidade.
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={() => setStatusNotice(null)}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 text-xs font-medium cursor-pointer"
+            >
+              Fechar
+            </button>
           </div>
-          <button
-            onClick={() => handleSubTabChange('virtual_lab')}
-            className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold px-6 py-3 rounded-xl shadow-md transition-all transform hover:scale-[1.01] cursor-pointer whitespace-nowrap"
-          >
-            <Zap className="w-5 h-5 text-gray-950" />
-            <span>Abrir Laboratório Virtual</span>
-          </button>
-        </div>
-      ) : (
-        <div className="flex justify-start mt-6">
-          <button
-            onClick={() => handleSubTabChange('compatibility_matrix')}
-            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl border border-slate-700 shadow-sm transition-all cursor-pointer"
-          >
-            <span>← Voltar aos Módulos TankMix</span>
-          </button>
-        </div>
-      )}
+        )}
+
+        <Suspense
+          fallback={
+            <div className="bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800 p-8 flex items-center justify-center text-xs font-medium text-slate-500 dark:text-zinc-400">
+              Carregando módulo TankMix...
+            </div>
+          }
+        >
+          {currentSubTab === 'virtual_lab' && (
+            <TankMixVirtualLabView
+              allProducts={products}
+              selectedProducts={selectedProducts}
+              setSelectedProducts={setSelectedProducts}
+              waterQuality={waterQuality}
+              tankVolumeL={tankVolumeL}
+              setTankVolumeL={setTankVolumeL}
+              sprayVolumeLHa={sprayVolumeLHa}
+              setSprayVolumeLHa={setSprayVolumeLHa}
+              onSaveRecipe={name => {
+                setStatusNotice(`Receita "${name}" salva localmente.`);
+              }}
+              onOpenTraceabilityModal={handleRegisterCurrentTankApplication}
+              onNavigateToWaterQuality={() => handleSubTabChange('water_quality')}
+            />
+          )}
+
+          {currentSubTab === 'compatibility_matrix' && <TankMixCompatibilityMatrixView />}
+
+          {currentSubTab === 'water_quality' && (
+            <TankMixWaterQualityView waterQuality={waterQuality} setWaterQuality={setWaterQuality} />
+          )}
+
+          {currentSubTab === 'formulations_library' && <TankMixFormulationsLibraryView />}
+
+          {currentSubTab === 'products_catalog' && (
+            <TankMixProductsCatalogView
+              products={products}
+              onAddCustomProduct={handleAddCustomProduct}
+              onSelectProductForLab={handleSelectProductForLab}
+            />
+          )}
+
+          {currentSubTab === 'weather_app' && (
+            <TankMixWeatherApplicationView weather={weather} setWeather={setWeather} />
+          )}
+
+          {currentSubTab === 'sprayers' && (
+            <TankMixSprayersView
+              sprayers={sprayers}
+              setSprayers={setSprayers}
+              onSelectSprayerForLab={handleSelectSprayerForLab}
+            />
+          )}
+
+          {currentSubTab === 'traceability' && (
+            <TankMixTraceabilityView
+              applications={applications}
+              onDeleteApplication={handleDeleteApplication}
+            />
+          )}
+
+          {currentSubTab === 'reports' && (
+            <TankMixReportsView
+              selectedProducts={selectedProducts}
+              evaluation={currentEvaluation}
+              waterQuality={waterQuality}
+              weather={weather}
+              farmName={farmName}
+              plotName="Talhão Principal"
+            />
+          )}
+        </Suspense>
+      </main>
     </div>
   );
 };

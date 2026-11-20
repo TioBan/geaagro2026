@@ -2,16 +2,14 @@ import {
   TraceabilityProperty,
   TraceabilityPlot,
   TraceabilityCrop,
-  TraceabilityCultivar,
   TraceabilityLot,
   TraceabilityOperation,
   TraceabilityPestMonitoring,
   TraceabilityPhotoDiaryItem,
   TraceabilityHarvestItem,
-  TraceabilityPackingItem,
   TraceabilityPallet,
   TraceabilityExpedition,
-  TraceabilityComplianceChecklist,
+  TraceabilityLabelSettings,
 } from '../types/traceability';
 
 export const INITIAL_TRACEABILITY_PROPERTY: TraceabilityProperty = {
@@ -44,8 +42,6 @@ export const INITIAL_TRACEABILITY_PROPERTY: TraceabilityProperty = {
 
 export const INITIAL_TRACEABILITY_PLOTS: TraceabilityPlot[] = [];
 
-export const INITIAL_TRACEABILITY_CULTIVARS: TraceabilityCultivar[] = [];
-
 export const INITIAL_TRACEABILITY_LOTS: TraceabilityLot[] = [];
 
 export const INITIAL_TRACEABILITY_OPERATIONS: TraceabilityOperation[] = [];
@@ -56,40 +52,9 @@ export const INITIAL_TRACEABILITY_PHOTO_DIARY: TraceabilityPhotoDiaryItem[] = []
 
 export const INITIAL_TRACEABILITY_HARVESTS: TraceabilityHarvestItem[] = [];
 
-export const INITIAL_TRACEABILITY_PACKING: TraceabilityPackingItem[] = [];
-
 export const INITIAL_TRACEABILITY_PALLETS: TraceabilityPallet[] = [];
 
 export const INITIAL_TRACEABILITY_EXPEDITIONS: TraceabilityExpedition[] = [];
-
-export const INITIAL_COMPLIANCE_CHECKLIST: TraceabilityComplianceChecklist = {
-  inc022018Compliance: {
-    originIdentification: false,
-    lotCodeOnBoxes: false,
-    fieldBookMaintained: false,
-    quarantineComplianceVerified: false,
-    invoiceLinkedToLot: false,
-    receptionRecordsStored: false,
-  },
-  globalGapCompliance: {
-    pesticideStorageCertified: false,
-    operatorPpeUsed: false,
-    waterAnalysisCurrent: false,
-    wasteDisposalRecorded: false,
-    hygieneProtocolsFollowed: false,
-  },
-  integratedProductionCompliance: {
-    soilAnalysisCurrent: false,
-    leafAnalysisRecorded: false,
-    biologicalPestControlPrioritized: false,
-    registeredPesticidesOnly: false,
-  },
-  organicCompliance: {
-    syntheticChemicalFree: false,
-    certifiedOrganicInputsOnly: false,
-    bufferZonesMaintained: false,
-  },
-};
 
 export const NATIONAL_CROPS_DATABASE: TraceabilityCrop[] = [
   // HORTALIÇAS FRUTOS
@@ -554,83 +519,6 @@ export const NATIONAL_CROPS_DATABASE: TraceabilityCrop[] = [
   },
 ];
 
-export function calculateIGR(
-  lot: TraceabilityLot,
-  operations: TraceabilityOperation[],
-  harvests: TraceabilityHarvestItem[],
-  monitoring: TraceabilityPestMonitoring[],
-  packing: any[]
-): { score: number; status: 'excelente' | 'boa' | 'atencao' | 'incompleta'; breakdown: Record<string, number> } {
-  let score = 0;
-  const breakdown = {
-    identificacaoLote: 0,
-    cadernoOperacoes: 0,
-    segurancaFitossanitaria: 0,
-    registroColheita: 0,
-    embalagemQRCodes: 0,
-    expedicaoLogistica: 0,
-    responsabilidadeTecnica: 0,
-  };
-
-  if (lot.lotCode) breakdown.identificacaoLote += 5;
-  if (lot.sowingDate && (lot.nurseryTransplantDate || lot.estimatedHarvestStartDate)) breakdown.identificacaoLote += 5;
-  if (lot.seedSupplier && lot.seedLotNumber) breakdown.identificacaoLote += 5;
-  if (lot.plantsCount > 0 && lot.plantedAreaHa > 0) breakdown.identificacaoLote += 5;
-
-  const lotOps = operations.filter(o => o.lotId === lot.id || o.lotCode === lot.lotCode);
-  if (lotOps.length >= 1) breakdown.cadernoOperacoes += 5;
-  if (lotOps.some(o => o.type === 'plantio')) breakdown.cadernoOperacoes += 5;
-  if (lotOps.some(o => o.type === 'adubacao_solo' || o.type === 'fertirrigacao' || o.type === 'adubacao_cobertura')) breakdown.cadernoOperacoes += 5;
-  if (lotOps.some(o => o.type === 'pulverizacao_defensivo' || o.type === 'pulverizacao_biologico' || o.type === 'irrigacao')) breakdown.cadernoOperacoes += 5;
-
-  const sprayOps = lotOps.filter(o => o.type === 'pulverizacao_defensivo');
-  if (sprayOps.length === 0) {
-    breakdown.segurancaFitossanitaria += 15;
-  } else {
-    const allHaveMapa = sprayOps.every(o => o.mapaRegistrationNumber && o.activeIngredient);
-    if (allHaveMapa) breakdown.segurancaFitossanitaria += 8;
-    if (!lot.isUnderActiveQuarantine) breakdown.segurancaFitossanitaria += 7;
-  }
-
-  const lotHarvs = harvests.filter(h => h.lotId === lot.id || h.lotCode === lot.lotCode);
-  if (lotHarvs.length > 0) {
-    breakdown.registroColheita += 8;
-    if (lotHarvs.every(h => h.netWeightKg > 0 && h.commercialClass)) breakdown.registroColheita += 7;
-  } else if (lot.status === 'planejado' || lot.status === 'semeadura' || lot.status === 'desenvolvimento') {
-    breakdown.registroColheita += 15;
-  }
-
-  const lotPacks = packing.filter(p => p.lotId === lot.id || p.lotCode === lot.lotCode);
-  if (lotPacks.length > 0) {
-    breakdown.embalagemQRCodes += 8;
-    if (lotPacks.some(p => p.labelPrinted)) breakdown.embalagemQRCodes += 7;
-  } else if (lot.status === 'planejado' || lot.status === 'semeadura' || lot.status === 'desenvolvimento') {
-    breakdown.embalagemQRCodes += 15;
-  }
-
-  if (lot.totalExpeditedBoxes > 0) {
-    breakdown.expedicaoLogistica += 10;
-  } else {
-    breakdown.expedicaoLogistica += 10;
-  }
-
-  if (lotOps.some(o => o.agronomistSignature)) {
-    breakdown.responsabilidadeTecnica += 5;
-  } else {
-    breakdown.responsabilidadeTecnica += 3;
-  }
-
-  score = Object.values(breakdown).reduce((a, b) => a + b, 0);
-  score = Math.min(100, Math.max(0, score));
-
-  let status: 'excelente' | 'boa' | 'atencao' | 'incompleta' = 'incompleta';
-  if (score >= 90) status = 'excelente';
-  else if (score >= 75) status = 'boa';
-  else if (score >= 50) status = 'atencao';
-
-  return { score, status, breakdown };
-}
-
 export function generateGeaAgroLotCode(
   cropName: string,
   year: number,
@@ -652,7 +540,7 @@ export function generateGeaAgroLotCode(
   return `GA-${cropPrefix}-${year}-${cleanPlot}-${seqStr}`;
 }
 
-export const DEFAULT_TRACEABILITY_LABEL_SETTINGS: any = {
+export const DEFAULT_TRACEABILITY_LABEL_SETTINGS: TraceabilityLabelSettings = {
   defaultSize: '100x50',
   defaultPrinterType: 'zebra_zpl',
   defaultDpi: 203,

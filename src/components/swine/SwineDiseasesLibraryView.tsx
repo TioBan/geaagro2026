@@ -1,210 +1,236 @@
-import React, { useState } from 'react';
-import {
-  BookOpen,
-  Search,
-  AlertTriangle,
-  ShieldCheck,
-  Activity,
-  Heart,
-  FileText,
-  Sparkles,
-} from 'lucide-react';
-import {
-  SwineDiseaseInfo,
-} from '../../types/swine';
+import React, { useMemo, useState } from 'react';
+import { BookOpen, Search, AlertTriangle, ShieldCheck, Activity } from 'lucide-react';
+import { SwineDiseaseInfo } from '../../types/swine';
 import { DEFAULT_SWINE_DISEASES } from '../../data/swineDefaultData';
+import {
+  SWINE_CARD_CLASS,
+  SWINE_INPUT_CLASS,
+  SWINE_SUBCARD_CLASS,
+  getDiseaseSeverityBadgeClass,
+} from './swineUi';
 
 export const SwineDiseasesLibraryView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedDisease, setSelectedDisease] = useState<SwineDiseaseInfo>(DEFAULT_SWINE_DISEASES[0]);
+  const [selectedDiseaseId, setSelectedDiseaseId] = useState<string>(
+    DEFAULT_SWINE_DISEASES[0]?.id ?? ''
+  );
 
-  const filteredDiseases = DEFAULT_SWINE_DISEASES.filter(d => {
-    const matchesSearch =
-      d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      d.causativeAgent.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      d.symptoms.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesCat = selectedCategory === 'all' || d.category === selectedCategory;
-    return matchesSearch && matchesCat;
-  });
+  const filteredDiseases = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return DEFAULT_SWINE_DISEASES.filter(d => {
+      const matchesSearch =
+        !term ||
+        d.name.toLowerCase().includes(term) ||
+        d.causativeAgent.toLowerCase().includes(term) ||
+        d.symptoms.some(s => s.toLowerCase().includes(term));
+      const matchesCat = selectedCategory === 'all' || d.category === selectedCategory;
+      return matchesSearch && matchesCat;
+    });
+  }, [searchTerm, selectedCategory]);
+
+  const selectedDisease: SwineDiseaseInfo | null =
+    filteredDiseases.find(d => d.id === selectedDiseaseId) ?? filteredDiseases[0] ?? null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs">
-        <h2 className="text-xl font-black text-gray-900 flex items-center gap-2">
-          <BookOpen className="w-5 h-5 text-pink-600" />
-          <span>Manual Técnico de Patologias & Sanidade Suína</span>
+      <div className={`${SWINE_CARD_CLASS} p-4`}>
+        <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+          <BookOpen className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+          <span>Guia Técnico de Enfermidades Suínas</span>
         </h2>
-        <p className="text-xs text-gray-500 mt-1">
-          Guia de diagnóstico a campo, sinais clínicos, transmissão, medidas de biosseguridade e protocolos terapêuticos.
+        <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+          Referência clínica de sinais, lesões anatomopatológicas, transmissão, prevenção e controle sanitário.
         </p>
       </div>
 
-      {/* Filter & Search Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex flex-col sm:flex-row gap-3">
+      {/* Filters */}
+      <div className={`${SWINE_CARD_CLASS} p-3 flex flex-col sm:flex-row gap-2.5`}>
         <div className="relative flex-1">
-          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Buscar por doença, agente etiológico ou sintoma (ex: febre, diarreia, tosse)..."
+            placeholder="Buscar doença, agente etiológico ou sintoma..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-pink-500"
+            className={`${SWINE_INPUT_CLASS} pl-8`}
           />
         </div>
 
         <select
           value={selectedCategory}
           onChange={e => setSelectedCategory(e.target.value)}
-          className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-pink-500"
+          className={`${SWINE_INPUT_CLASS} sm:w-52`}
         >
-          <option value="all">Todas as Categorias</option>
-          <option value="Viral">Vírus</option>
-          <option value="Bacteriana">Bactérias</option>
-          <option value="Parasitária">Parasitas & Protozoários</option>
+          <option value="all">Todas as categorias</option>
+          <option value="Viral">Viral</option>
+          <option value="Bacteriana">Bacteriana</option>
+          <option value="Parasitária">Parasitária</option>
           <option value="Nutricional / Manejo">Nutricional / Manejo</option>
         </select>
       </div>
 
-      {/* Main 2-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Disease List */}
-        <div className="space-y-2.5">
-          {filteredDiseases.map(disease => (
-            <div
-              key={disease.id}
-              onClick={() => setSelectedDisease(disease)}
-              className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-                selectedDisease?.id === disease.id
-                  ? 'bg-pink-50/60 border-pink-500 shadow-xs'
-                  : 'bg-white border-gray-200 hover:border-pink-200'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-black text-gray-900">{disease.name}</h4>
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    disease.severity.includes('Notificação')
-                      ? 'bg-red-100 text-red-800'
-                      : disease.severity === 'Alta'
-                      ? 'bg-amber-100 text-amber-800'
-                      : 'bg-blue-100 text-blue-800'
+      {/* 2-Column Library */}
+      {filteredDiseases.length === 0 ? (
+        <div className={`${SWINE_CARD_CLASS} p-10 text-center space-y-1.5`}>
+          <BookOpen className="w-7 h-7 text-slate-400 dark:text-zinc-500 mx-auto" />
+          <p className="text-xs font-medium text-slate-700 dark:text-zinc-300">
+            Nenhuma enfermidade encontrada para o filtro informado.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            {filteredDiseases.map(disease => {
+              const isSelected = selectedDisease?.id === disease.id;
+              return (
+                <button
+                  key={disease.id}
+                  type="button"
+                  onClick={() => setSelectedDiseaseId(disease.id)}
+                  className={`w-full text-left p-3.5 rounded-xl border transition-colors cursor-pointer ${
+                    isSelected
+                      ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-500'
+                      : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 hover:border-rose-300 dark:hover:border-rose-700'
                   }`}
                 >
-                  {disease.category}
-                </span>
-              </div>
-              <p className="text-xs text-gray-500 italic mt-0.5">{disease.scientificName || disease.causativeAgent}</p>
-              <div className="mt-2 text-[11px] text-gray-600 truncate">
-                Fase: {disease.affectedStages.join(', ')}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Disease Detail Sheet */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-6">
-          {selectedDisease ? (
-            <>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-xl font-black text-gray-900">{selectedDisease.name}</h3>
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-xs font-semibold text-slate-900 dark:text-zinc-100 leading-snug">
+                      {disease.name}
+                    </h3>
                     <span
-                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                        selectedDisease.severity.includes('Notificação')
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}
+                      className={`text-[10px] font-medium px-2 py-0.5 rounded-md shrink-0 ${getDiseaseSeverityBadgeClass(disease.severity)}`}
                     >
-                      {selectedDisease.severity}
+                      {disease.category}
                     </span>
                   </div>
-                  <p className="text-xs text-pink-700 font-semibold italic mt-0.5">
-                    Agente Etiológico: {selectedDisease.causativeAgent}
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400 italic mt-0.5 truncate">
+                    {disease.scientificName || disease.causativeAgent}
                   </p>
-                </div>
+                  <div className="mt-1.5 text-[11px] text-slate-600 dark:text-zinc-400 truncate">
+                    Fases: {disease.affectedStages.join(', ')}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
 
-                <div className="text-right">
-                  <span className="text-[11px] text-gray-500 block">Fases Suscetíveis</span>
-                  <span className="text-xs font-bold text-gray-800">
-                    {selectedDisease.affectedStages.join(', ')}
-                  </span>
-                </div>
-              </div>
-
-              {/* Sinais Clínicos */}
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600" />
-                  <span>Sinais Clínicos & Sintomatologia</span>
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {selectedDisease.symptoms.map((sign, idx) => (
-                    <div key={idx} className="p-2.5 bg-amber-50/40 border border-amber-100 rounded-xl text-xs text-gray-800 flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-                      <span>{sign}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Lesões Anatomopatológicas */}
-              {selectedDisease.anatomopathologicalLesions && selectedDisease.anatomopathologicalLesions.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-rose-600" />
-                    <span>Lesões de Necropsia & Anatomopatologia</span>
-                  </h4>
+          <div className={`lg:col-span-2 ${SWINE_CARD_CLASS} p-4 space-y-4`}>
+            {selectedDisease && (
+              <>
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-slate-100 dark:border-zinc-800 pb-3">
                   <div className="space-y-1">
-                    {selectedDisease.anatomopathologicalLesions.map((lesion, idx) => (
-                      <div key={idx} className="p-2.5 bg-red-50/40 border border-red-100 rounded-xl text-xs text-red-950 font-medium">
-                        • {lesion}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">
+                        {selectedDisease.name}
+                      </h3>
+                      <span
+                        className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${getDiseaseSeverityBadgeClass(selectedDisease.severity)}`}
+                      >
+                        {selectedDisease.severity}
+                      </span>
+                    </div>
+                    <p className="text-xs text-rose-600 dark:text-rose-400">
+                      Agente etiológico: {selectedDisease.causativeAgent}
+                    </p>
+                    <div className="flex flex-wrap gap-2 text-[11px] text-slate-500 dark:text-zinc-400">
+                      <span>Vacina: {selectedDisease.vaccinationAvailable ? 'Disponível' : 'Não disponível'}</span>
+                      <span>·</span>
+                      <span>Zoonose: {selectedDisease.zoonosisRisk ? 'Sim' : 'Não'}</span>
+                    </div>
+                  </div>
+
+                  <div className="sm:text-right shrink-0">
+                    <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">
+                      Fases Suscetíveis
+                    </span>
+                    <span className="text-xs font-medium text-slate-800 dark:text-zinc-200">
+                      {selectedDisease.affectedStages.join(', ')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Clinical Signs */}
+                <div className="space-y-2">
+                  <h4 className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                    <span>Sinais Clínicos</span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {selectedDisease.symptoms.map(sign => (
+                      <div
+                        key={sign}
+                        className={`${SWINE_SUBCARD_CLASS} px-3 py-2 text-xs text-slate-700 dark:text-zinc-300`}
+                      >
+                        {sign}
                       </div>
                     ))}
                   </div>
                 </div>
-              )}
 
-              {/* Transmissão & Prevenção */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-1.5">
-                  <span className="text-xs font-bold text-gray-900 block">Forma de Transmissão</span>
-                  <ul className="text-xs text-gray-700 leading-relaxed list-disc list-inside space-y-0.5">
-                    {selectedDisease.transmission.map((t, i) => (
-                      <li key={i}>{t}</li>
+                {/* Lesions */}
+                {selectedDisease.anatomopathologicalLesions.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                      <span>Lesões Anatomopatológicas</span>
+                    </h4>
+                    <div className="space-y-1.5">
+                      {selectedDisease.anatomopathologicalLesions.map(lesion => (
+                        <div
+                          key={lesion}
+                          className={`${SWINE_SUBCARD_CLASS} px-3 py-2 text-xs text-slate-700 dark:text-zinc-300`}
+                        >
+                          {lesion}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Transmission & Prevention */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className={`${SWINE_SUBCARD_CLASS} p-3 space-y-1.5`}>
+                    <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100 block">
+                      Transmissão
+                    </span>
+                    <ul className="text-xs text-slate-600 dark:text-zinc-400 list-disc list-inside space-y-0.5">
+                      {selectedDisease.transmission.map(t => (
+                        <li key={t}>{t}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className={`${SWINE_SUBCARD_CLASS} p-3 space-y-1.5`}>
+                    <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 block">
+                      Prevenção & Biosseguridade
+                    </span>
+                    <ul className="text-xs text-slate-600 dark:text-zinc-400 list-disc list-inside space-y-0.5">
+                      {selectedDisease.preventionAndBiosecurity.map(p => (
+                        <li key={p}>{p}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Treatment */}
+                <div className={`${SWINE_SUBCARD_CLASS} p-3 space-y-1.5`}>
+                  <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                    <span>Protocolo de Controle / Conduta</span>
+                  </span>
+                  <ul className="text-xs text-slate-600 dark:text-zinc-400 list-disc list-inside space-y-0.5">
+                    {selectedDisease.treatmentAndControl.map(tc => (
+                      <li key={tc}>{tc}</li>
                     ))}
                   </ul>
                 </div>
-                <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-1.5">
-                  <span className="text-xs font-bold text-emerald-900 block">Prevenção & Biossegurança</span>
-                  <ul className="text-xs text-emerald-800 leading-relaxed list-disc list-inside space-y-0.5">
-                    {selectedDisease.preventionAndBiosecurity.map((p, i) => (
-                      <li key={i}>{p}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              {/* Tratamento */}
-              <div className="p-4 bg-pink-50/40 rounded-2xl border border-pink-100 space-y-2">
-                <span className="text-xs font-bold text-pink-950 flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-pink-600" />
-                  <span>Protocolo de Tratamento / Ação Recomendada</span>
-                </span>
-                <ul className="text-xs text-gray-800 leading-relaxed list-disc list-inside space-y-0.5">
-                  {selectedDisease.treatmentAndControl.map((tc, i) => (
-                    <li key={i}>{tc}</li>
-                  ))}
-                </ul>
-              </div>
-            </>
-          ) : (
-            <p className="text-xs text-gray-500">Selecione uma enfermidade para visualizar a ficha técnica.</p>
-          )}
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

@@ -16,14 +16,31 @@ export type SeedModuleTab =
 
 export type SeedClass = 'Genética' | 'Básica' | 'C1' | 'C2' | 'S1' | 'S2';
 export type IQSClassification = 'Excelente' | 'Muito Bom' | 'Bom' | 'Regular' | 'Reprovado';
+export type RegulatoryProfileId = 'laboratorio' | 'sementeira' | 'produtor' | 'pesquisa';
+
+export interface ProfileThresholds {
+  moistureLimit: number;
+  minGermination: number;
+  maxMechanicalDamage: number;
+  minVigor: number;
+  minPurity: number;
+}
+
+export interface RegulatoryProfilePreset {
+  id: RegulatoryProfileId;
+  label: string;
+  shortLabel: string;
+  description: string;
+  thresholds: ProfileThresholds;
+}
 
 export interface SeedSpeciesRAS {
   id: string;
   commonName: string;
   scientificName: string;
   family: string;
-  substrate: string; // RP, EA, SP, EP
-  temperatureC: string; // 20-30°C, 25°C constante
+  substrate: string;
+  temperatureC: string;
   firstCountDays: number;
   finalCountDays: number;
   dormancyMethods: string;
@@ -31,8 +48,6 @@ export interface SeedSpeciesRAS {
   minPurityOfficialPct: number;
   maxMoistureOfficialPct: number;
   defaultPmsG: number;
-  
-  // Módulo 3 e 10 - Tecnologia e Biblioteca
   seedType: string;
   morphology: string;
   avgWeightG: number;
@@ -50,7 +65,16 @@ export interface SampleReception {
   receiptDate: string;
   quantitySentKg: number;
   collectorName: string;
-  photos: string[];
+  photos: SeedPhotoRecord[];
+}
+
+export interface SeedPhotoRecord {
+  id: string;
+  title: string;
+  category: 'Recepção' | 'Dano Mecânico' | 'Germinação (TPG)' | 'Tetrazólio (TZ)' | 'Patologia' | 'Armazenamento';
+  date: string;
+  notes: string;
+  dataUrl: string;
 }
 
 export interface PhysicalQualityAnalysis {
@@ -63,9 +87,9 @@ export interface PhysicalQualityAnalysis {
   mechanicalDamageHypochloritePct: number;
   stinkbugDamagePct: number;
   weatheringDamagePct: number;
-  pmsG: number; // Peso de Mil Sementes
-  hectoliterWeightKgHl: number; // Massa específica kg/hL
-  screenUniformityPct: number; // % retido na peneira principal
+  pmsG: number;
+  hectoliterWeightKgHl: number;
+  screenUniformityPct: number;
 }
 
 export interface GerminationRepetition {
@@ -132,6 +156,7 @@ export interface SeedPathogenRecord {
 }
 
 export interface SeedTreatmentRecord {
+  id: string;
   productName: string;
   targetCategory: 'Inseticida' | 'Fungicida' | 'Nematicida' | 'Inoculante' | 'Bioestimulante' | 'Polímero' | 'Micronutriente';
   activeIngredient: string;
@@ -159,6 +184,13 @@ export interface StorageRecord {
   estimatedShelfLifeMonths: number;
 }
 
+export interface SeedTimelineEvent {
+  date: string;
+  title: string;
+  description: string;
+  stage: string;
+}
+
 export interface SeedLot {
   id: string;
   internalCode: string;
@@ -177,7 +209,7 @@ export interface SeedLot {
   totalWeightKg: number;
   totalBags: number;
   bagWeightKg: number;
-  
+
   reception: SampleReception;
   storage: StorageRecord;
   treatment: SeedTreatmentRecord[];
@@ -186,26 +218,13 @@ export interface SeedLot {
   vigor: VigorAnalysis;
   moisture: MoistureAnalysis;
   sanitaryQuality: SeedPathogenRecord[];
-  
+
   iqsScore: number;
   iqsClassification: IQSClassification;
-  
-  qrCodeUrl?: string;
-  barcodeUrl?: string;
-  timeline: { date: string; title: string; description: string; stage: string; imageUrl?: string }[];
-  
-  // Gêmeo Digital metrics
+
+  timeline: SeedTimelineEvent[];
+
   physiologicalAgeDays: number;
   germinationPotentialPct: number;
   vigorPotentialPct: number;
-}
-
-export interface ExpertSystemRule {
-  id: string;
-  parameter: string;
-  condition: string;
-  threshold: number;
-  alertMessage: string;
-  recommendation: string;
-  severity: 'info' | 'warning' | 'critical';
 }

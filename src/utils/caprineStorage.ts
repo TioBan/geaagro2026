@@ -8,7 +8,6 @@ import {
   CaprineFeedItem,
   CaprinePasturePaddock,
   CaprineHealthRecord,
-  CaprineDiseaseInfo,
   CaprinePharmacyItem,
   CaprineFacility,
   CaprinePhotoEntry
@@ -24,7 +23,6 @@ import {
   INITIAL_CAPRINE_FEEDS,
   INITIAL_CAPRINE_PADDOCKS,
   INITIAL_CAPRINE_HEALTH,
-  INITIAL_CAPRINE_DISEASES,
   INITIAL_CAPRINE_PHARMACY,
   INITIAL_CAPRINE_FACILITIES,
   INITIAL_CAPRINE_PHOTOS
@@ -40,7 +38,6 @@ const KEYS = {
   FEEDS: 'gea_caprine_feeds_v1',
   PADDOCKS: 'gea_caprine_paddocks_v1',
   HEALTH: 'gea_caprine_health_v1',
-  DISEASES: 'gea_caprine_diseases_v1',
   PHARMACY: 'gea_caprine_pharmacy_v1',
   FACILITIES: 'gea_caprine_facilities_v1',
   PHOTOS: 'gea_caprine_photos_v1'
@@ -136,14 +133,6 @@ export function saveCaprineHealth(health: CaprineHealthRecord[]): void {
   setItem(KEYS.HEALTH, health);
 }
 
-export function loadCaprineDiseases(): CaprineDiseaseInfo[] {
-  return getItem<CaprineDiseaseInfo[]>(KEYS.DISEASES, INITIAL_CAPRINE_DISEASES);
-}
-
-export function saveCaprineDiseases(diseases: CaprineDiseaseInfo[]): void {
-  setItem(KEYS.DISEASES, diseases);
-}
-
 export function loadCaprinePharmacy(): CaprinePharmacyItem[] {
   return getItem<CaprinePharmacyItem[]>(KEYS.PHARMACY, INITIAL_CAPRINE_PHARMACY);
 }
@@ -166,20 +155,4 @@ export function loadCaprinePhotos(): CaprinePhotoEntry[] {
 
 export function saveCaprinePhotos(photos: CaprinePhotoEntry[]): void {
   setItem(KEYS.PHOTOS, photos);
-}
-
-export function resetCaprineDataToDefaults(): void {
-  saveCaprineAnimals(INITIAL_CAPRINE_ANIMALS);
-  saveCaprineWeighings(INITIAL_CAPRINE_WEIGHINGS);
-  saveCaprineReproduction(INITIAL_CAPRINE_REPRODUCTION);
-  saveCaprineKids(INITIAL_CAPRINE_KIDS);
-  saveCaprineMilkLogs(INITIAL_CAPRINE_MILK_LOGS);
-  saveCaprineMeatLogs(INITIAL_CAPRINE_MEAT_LOGS);
-  saveCaprineFeeds(INITIAL_CAPRINE_FEEDS);
-  saveCaprinePaddocks(INITIAL_CAPRINE_PADDOCKS);
-  saveCaprineHealth(INITIAL_CAPRINE_HEALTH);
-  saveCaprineDiseases(INITIAL_CAPRINE_DISEASES);
-  saveCaprinePharmacy(INITIAL_CAPRINE_PHARMACY);
-  saveCaprineFacilities(INITIAL_CAPRINE_FACILITIES);
-  saveCaprinePhotos(INITIAL_CAPRINE_PHOTOS);
 }

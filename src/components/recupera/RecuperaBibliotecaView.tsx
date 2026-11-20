@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   BookOpen,
   Search,
@@ -352,6 +352,15 @@ export const RecuperaBibliotecaView: React.FC = () => {
   const [artigoSelecionado, setArtigoSelecionado] = useState<ArtigoTecnico | null>(null);
   const [abaExibicao, setAbaExibicao] = useState<'compendio' | 'parametros' | 'normas'>('compendio');
 
+  useEffect(() => {
+    if (!artigoSelecionado) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setArtigoSelecionado(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [artigoSelecionado]);
+
   const categorias = useMemo(() => [
     'todas',
     'Física do Solo & Compactação',
@@ -382,7 +391,6 @@ export const RecuperaBibliotecaView: React.FC = () => {
     });
   }, [busca, categoriaAtiva]);
 
-  // Lista consolidada de todos os parâmetros críticos para o Guia Rápido
   const todosParametros = useMemo(() => {
     return ARTIGOS_COMPENDIO.flatMap(a =>
       a.parametrosCriticos.map(p => ({
@@ -394,37 +402,37 @@ export const RecuperaBibliotecaView: React.FC = () => {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Cabeçalho do Módulo */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+      <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 border border-slate-200/80 dark:border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="min-w-0">
+          <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
             <Award className="w-3.5 h-3.5" />
             Compêndio Técnico de Recuperação de Áreas Degradadas
           </span>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2 mt-0.5">
-            <BookOpen className="w-5 h-5 text-emerald-600" />
+          <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-2 mt-0.5">
+            <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <span>Biblioteca Científica e Prática Agronômica Oficial</span>
           </h2>
-          <p className="text-xs text-slate-500 max-w-2xl mt-0.5">
-            Trabalhos de referência, normas ABNT/CONAMA, valores críticos de solo, parâmetros de dimensionamento e metodologias da Embrapa, IAC, ESALQ/USP, UFV e SBCS 100% disponíveis offline para atuação a campo.
+          <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-2xl mt-0.5">
+            Trabalhos de referência, normas ABNT/CONAMA, valores críticos de solo e metodologias da Embrapa, IAC, ESALQ/USP, UFV e SBCS disponíveis offline para atuação a campo.
           </p>
         </div>
 
         <div className="relative w-full md:w-72 shrink-0">
-          <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+          <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400 dark:text-zinc-500" />
           <input
             type="text"
             value={busca}
             onChange={e => setBusca(e.target.value)}
             placeholder="Buscar por termo, autor, norma ou #tag..."
-            className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+            className="w-full h-9 pl-8 pr-8 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
           />
           {busca && (
             <button
               type="button"
               onClick={() => setBusca('')}
-              className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+              className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-300"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -432,62 +440,61 @@ export const RecuperaBibliotecaView: React.FC = () => {
         </div>
       </div>
 
-      {/* Abas Superiores de Visualização */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+      {/* Abas Superiores */}
+      <div className="inline-flex flex-wrap items-center gap-1 bg-slate-100/80 dark:bg-zinc-950/60 p-1 rounded-lg border border-slate-200/70 dark:border-zinc-800">
         <button
           type="button"
           onClick={() => setAbaExibicao('compendio')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+          className={`h-8 px-3 rounded-md text-xs font-medium transition flex items-center gap-1.5 whitespace-nowrap ${
             abaExibicao === 'compendio'
-              ? 'bg-emerald-600 text-white shadow-xs'
-              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:border-emerald-300'
+              ? 'bg-emerald-600 text-white'
+              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100'
           }`}
         >
-          <BookOpen className="w-4 h-4" />
-          <span>Artigos & Manuais Técnicos ({artigosFiltrados.length})</span>
+          <BookOpen className="w-3.5 h-3.5" />
+          <span className="tabular-nums">Artigos & Manuais ({artigosFiltrados.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => setAbaExibicao('parametros')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+          className={`h-8 px-3 rounded-md text-xs font-medium transition flex items-center gap-1.5 whitespace-nowrap ${
             abaExibicao === 'parametros'
-              ? 'bg-emerald-600 text-white shadow-xs'
-              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:border-emerald-300'
+              ? 'bg-emerald-600 text-white'
+              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100'
           }`}
         >
-          <Activity className="w-4 h-4" />
-          <span>Tabela Rápida de Parâmetros Críticos</span>
+          <Activity className="w-3.5 h-3.5" />
+          <span>Parâmetros Críticos</span>
         </button>
 
         <button
           type="button"
           onClick={() => setAbaExibicao('normas')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+          className={`h-8 px-3 rounded-md text-xs font-medium transition flex items-center gap-1.5 whitespace-nowrap ${
             abaExibicao === 'normas'
-              ? 'bg-emerald-600 text-white shadow-xs'
-              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:border-emerald-300'
+              ? 'bg-emerald-600 text-white'
+              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100'
           }`}
         >
-          <ShieldCheck className="w-4 h-4" />
-          <span>Legislação & Normas Regulamentadoras</span>
+          <ShieldCheck className="w-3.5 h-3.5" />
+          <span>Legislação & Normas</span>
         </button>
       </div>
 
       {/* ABA 1: ARTIGOS & MANUAIS TÉCNICOS */}
       {abaExibicao === 'compendio' && (
-        <div className="space-y-4">
-          {/* Filtros de Categoria */}
+        <div className="space-y-3.5">
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin text-xs">
             {categorias.map(cat => (
               <button
                 key={cat}
                 type="button"
                 onClick={() => setCategoriaAtiva(cat)}
-                className={`px-3 py-1.5 rounded-xl font-bold transition whitespace-nowrap ${
+                className={`h-7 px-2.5 rounded-md font-medium transition whitespace-nowrap text-[11px] ${
                   categoriaAtiva === cat
-                    ? 'bg-slate-900 dark:bg-emerald-600 text-white shadow-xs'
-                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:border-emerald-300'
+                    ? 'bg-slate-900 dark:bg-emerald-600 text-white'
+                    : 'bg-white dark:bg-zinc-900 text-slate-600 dark:text-zinc-400 border border-slate-200/80 dark:border-zinc-800 hover:border-emerald-300 dark:hover:border-emerald-800'
                 }`}
               >
                 {cat === 'todas' ? 'Todas as Categorias' : cat}
@@ -495,57 +502,56 @@ export const RecuperaBibliotecaView: React.FC = () => {
             ))}
           </div>
 
-          {/* Grid de Artigos */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {artigosFiltrados.map(artigo => (
               <div
                 key={artigo.id}
-                className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:border-emerald-400 dark:hover:border-emerald-600 transition group"
+                className="bg-white dark:bg-zinc-900 rounded-xl p-4 border border-slate-200/80 dark:border-zinc-800 flex flex-col justify-between hover:border-emerald-400 dark:hover:border-emerald-700 transition group"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                    <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 truncate">
                       {artigo.categoria}
                     </span>
-                    <span className="text-[10px] text-slate-400 font-semibold">{artigo.ano}</span>
+                    <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-medium tabular-nums shrink-0">
+                      {artigo.ano}
+                    </span>
                   </div>
 
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-snug mb-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">
+                  <h3 className="text-xs font-semibold text-slate-900 dark:text-zinc-100 leading-snug mb-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">
                     {artigo.titulo}
                   </h3>
 
                   {artigo.subtitulo && (
-                    <p className="text-[11px] text-slate-500 leading-snug mb-2 font-medium line-clamp-2">
+                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-snug mb-1.5 line-clamp-2">
                       {artigo.subtitulo}
                     </p>
                   )}
 
-                  <p className="text-[10px] text-slate-400 font-medium mb-3">
+                  <p className="text-[10px] text-slate-400 dark:text-zinc-500 mb-2.5">
                     {artigo.autoria} • {artigo.instituicao}
                   </p>
 
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-3 line-clamp-4">
+                  <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed mb-3 line-clamp-4">
                     {artigo.resumo}
                   </p>
 
-                  {/* Tags */}
                   <div className="flex flex-wrap gap-1 mb-3">
                     {artigo.tags.slice(0, 4).map(t => (
                       <span
                         key={t}
-                        className="text-[9px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono"
+                        className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 font-mono"
                       >
                         #{t}
                       </span>
                     ))}
                   </div>
 
-                  {/* Destaque de Diretriz */}
-                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 mb-3 space-y-1">
-                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 block">
-                      💡 Ponto Chave Agronômico:
+                  <div className="p-2.5 rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800 mb-3 space-y-1">
+                    <span className="text-[10px] font-semibold text-slate-700 dark:text-zinc-300 block uppercase tracking-wider">
+                      Ponto Chave Agronômico
                     </span>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
                       {artigo.pontosChave[0]}
                     </p>
                   </div>
@@ -554,7 +560,7 @@ export const RecuperaBibliotecaView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setArtigoSelecionado(artigo)}
-                  className="w-full mt-2 py-2 px-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white text-xs font-bold transition flex items-center justify-center gap-1.5 border border-emerald-200 dark:border-emerald-800"
+                  className="w-full h-8 px-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white text-xs font-medium transition flex items-center justify-center gap-1.5 border border-emerald-200/80 dark:border-emerald-800/60"
                 >
                   <span>Abrir Ficha Técnica Completa</span>
                   <ChevronRight className="w-3.5 h-3.5" />
@@ -564,18 +570,18 @@ export const RecuperaBibliotecaView: React.FC = () => {
           </div>
 
           {artigosFiltrados.length === 0 && (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-12 text-center border border-slate-200 dark:border-slate-800 space-y-3">
-              <BookOpen className="w-12 h-12 text-slate-300 mx-auto" />
-              <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
+            <div className="bg-white dark:bg-zinc-900 rounded-xl p-10 text-center border border-slate-200/80 dark:border-zinc-800 space-y-2.5">
+              <BookOpen className="w-8 h-8 text-slate-300 dark:text-zinc-700 mx-auto" />
+              <p className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
                 Nenhum artigo encontrado para o filtro aplicado
               </p>
-              <p className="text-xs text-slate-400">
-                Tente buscar por termos mais genéricos como "calcário", "voçoroca", "raiz" ou selecione "Todas as Categorias".
+              <p className="text-xs text-slate-400 dark:text-zinc-500">
+                Tente buscar por termos como "calcário", "voçoroca", "raiz" ou selecione "Todas as Categorias".
               </p>
               <button
                 type="button"
                 onClick={() => { setBusca(''); setCategoriaAtiva('todas'); }}
-                className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition"
+                className="h-8 px-3.5 bg-emerald-600 text-white rounded-lg text-xs font-medium hover:bg-emerald-700 transition"
               >
                 Limpar Filtros de Busca
               </button>
@@ -584,52 +590,52 @@ export const RecuperaBibliotecaView: React.FC = () => {
         </div>
       )}
 
-      {/* ABA 2: GUIA RÁPIDO DE PARÂMETROS CRÍTICOS */}
+      {/* ABA 2: PARÂMETROS CRÍTICOS */}
       {abaExibicao === 'parametros' && (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+        <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 border border-slate-200/80 dark:border-zinc-800 space-y-3.5">
           <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Activity className="w-4 h-4 text-emerald-600" />
+            <h3 className="text-xs font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+              <Activity className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span>Gatilhos Críticos & Indicadores de Degradação (Diagnóstico de Campo)</span>
             </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Tabela de consulta rápida para agrônomos com valores de corte agronômico, unidades de medida e interpretação imediata.
+            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+              Tabela de consulta rápida com valores de corte agronômico, unidades de medida e interpretação imediata.
             </p>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left border-collapse">
               <thead>
-                <tr className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold border-b border-slate-200 dark:border-slate-700">
+                <tr className="bg-slate-50/80 dark:bg-zinc-950/60 text-[10px] uppercase tracking-wider text-slate-600 dark:text-zinc-400 font-semibold border-y border-slate-200/80 dark:border-zinc-800">
                   <th className="py-2.5 px-3">Parâmetro Agronômico</th>
                   <th className="py-2.5 px-3">Categoria</th>
                   <th className="py-2.5 px-3">Unidade</th>
-                  <th className="py-2.5 px-3 text-rose-600">Faixa Crítica (Degradação)</th>
-                  <th className="py-2.5 px-3 text-emerald-600">Faixa Adequada / Alvo</th>
-                  <th className="py-2.5 px-3">Interpretação e Ação Técnica Requerida</th>
+                  <th className="py-2.5 px-3 text-rose-600 dark:text-rose-400">Faixa Crítica</th>
+                  <th className="py-2.5 px-3 text-emerald-700 dark:text-emerald-400">Faixa Adequada</th>
+                  <th className="py-2.5 px-3">Interpretação e Ação Técnica</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/80">
                 {todosParametros.map((p, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
-                    <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">
+                  <tr key={idx} className="hover:bg-slate-50/70 dark:hover:bg-zinc-800/40 transition-colors">
+                    <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-zinc-100">
                       {p.parametro}
                     </td>
                     <td className="py-2.5 px-3">
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 whitespace-nowrap">
                         {p.categoria}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">
+                    <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500 dark:text-zinc-400">
                       {p.unidade}
                     </td>
-                    <td className="py-2.5 px-3 font-bold text-rose-600 dark:text-rose-400">
+                    <td className="py-2.5 px-3 font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
                       {p.faixaCritica}
                     </td>
-                    <td className="py-2.5 px-3 font-bold text-emerald-600 dark:text-emerald-400">
+                    <td className="py-2.5 px-3 font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">
                       {p.faixaIdeal}
                     </td>
-                    <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400 text-[11px] leading-relaxed">
+                    <td className="py-2.5 px-3 text-slate-600 dark:text-zinc-400 text-[11px] leading-relaxed">
                       {p.interpretacao}
                     </td>
                   </tr>
@@ -640,98 +646,109 @@ export const RecuperaBibliotecaView: React.FC = () => {
         </div>
       )}
 
-      {/* ABA 3: LEGISLAÇÃO & NORMAS REGULAMENTADORAS */}
+      {/* ABA 3: LEGISLAÇÃO & NORMAS */}
       {abaExibicao === 'normas' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 border border-slate-200/80 dark:border-zinc-800 space-y-2.5">
             <div className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-emerald-600" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <h3 className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
                 Lei Federal nº 12.651/2012 (Novo Código Florestal)
               </h3>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
               Define os limites obrigatórios de Áreas de Preservação Permanente (APP) ao longo de cursos d'água, nascentes e topos de morro, além dos percentuais exigidos para Reserva Legal em cada bioma brasileiro (Amazônia Legal: 80% floresta, 35% cerrado; Demais regiões: 20%).
             </p>
-            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-800 text-[11px] space-y-1 text-emerald-900 dark:text-emerald-200">
-              <p className="font-bold">Faixas de APP por Largura do Rio:</p>
+            <div className="p-3 bg-emerald-50/70 dark:bg-emerald-950/30 rounded-lg border border-emerald-200/80 dark:border-emerald-800/60 text-[11px] space-y-1 text-emerald-900 dark:text-emerald-200">
+              <p className="font-semibold">Faixas de APP por Largura do Rio:</p>
               <p>• Até 10 m de largura: 30 metros de proteção em cada margem.</p>
               <p>• De 10 a 50 m de largura: 50 metros de proteção em cada margem.</p>
               <p>• Nascentes e olhos d'água perenes: Raio fixo de 50 metros.</p>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 border border-slate-200/80 dark:border-zinc-800 space-y-2.5">
             <div className="flex items-center gap-2">
-              <Scale className="w-5 h-5 text-emerald-600" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              <Scale className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <h3 className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
                 Resolução CONAMA nº 429/2011 (Metodologias de PRAD)
               </h3>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
               Estabelece a metodologia legal para recuperação de Áreas de Preservação Permanente degradadas. Reconhece três caminhos técnicos oficiais:
             </p>
-            <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400">
+            <div className="space-y-1.5 text-xs text-slate-600 dark:text-zinc-400">
               <p className="flex items-start gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                <span><strong>Regeneração Natural Conduzida (RNA):</strong> Isolamento do fator de degradação e manejo do banco de sementes.</span>
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <span>
+                  <strong className="text-slate-800 dark:text-zinc-200">Regeneração Natural Conduzida (RNA):</strong> Isolamento do fator de degradação e manejo do banco de sementes.
+                </span>
               </p>
               <p className="flex items-start gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                <span><strong>Plantio de Espécies Nativas:</strong> Introdução de mudas ou sementes com equilíbrio ecológico (50/50).</span>
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <span>
+                  <strong className="text-slate-800 dark:text-zinc-200">Plantio de Espécies Nativas:</strong> Introdução de mudas ou sementes com equilíbrio ecológico (50/50).
+                </span>
               </p>
               <p className="flex items-start gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                <span><strong>Sistema Conjugado:</strong> Enriquecimento de áreas em regeneração com espécies clímax de alto valor ecológico.</span>
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <span>
+                  <strong className="text-slate-800 dark:text-zinc-200">Sistema Conjugado:</strong> Enriquecimento de áreas em regeneração com espécies clímax de alto valor ecológico.
+                </span>
               </p>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 border border-slate-200/80 dark:border-zinc-800 space-y-2">
             <div className="flex items-center gap-2">
-              <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <h3 className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
                 Norma ABNT NBR 10703: Degradação do Solo — Terminologia
               </h3>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
               Padroniza os conceitos técnicos de erosão laminar, sulcos, voçorocas, compactação, salinização e acidificação, unificando a linguagem dos laudos periciais e agronômicos junto ao Poder Judiciário e órgãos ambientais estaduais (SEMA/CETESB/IAP/INEA).
             </p>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 border border-slate-200/80 dark:border-zinc-800 space-y-2">
             <div className="flex items-center gap-2">
-              <Award className="w-5 h-5 text-emerald-600" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              <Award className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <h3 className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
                 Legislação de Sementes e Mudas (Lei Federal nº 10.711/2003)
               </h3>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
               Exige que sementes de forrageiras e plantas de cobertura comercializadas no Brasil possuam certificado oficial do MAPA com declaração expressa de pureza (P%) e germinação (G%), compondo o Valor Cultural (VC% = (P × G) / 100). Mudas florestais nativas devem ser originárias de viveiros credenciados no RENASEM.
             </p>
           </div>
         </div>
       )}
 
-      {/* MODAL DETALHADO DA FICHA TÉCNICA DO ARTIGO */}
+      {/* MODAL FICHA TÉCNICA */}
       {artigoSelecionado && (
-        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-5 text-xs text-slate-700 dark:text-slate-300">
-            {/* Cabeçalho do Modal */}
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setArtigoSelecionado(null)}
+        >
+          <div
+            className="bg-white dark:bg-zinc-900 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-slate-200/80 dark:border-zinc-800 p-5 space-y-4 text-xs text-slate-700 dark:text-zinc-300"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200/80 dark:border-zinc-800 pb-3.5">
               <div>
-                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60">
                   {artigoSelecionado.categoria}
                 </span>
-                <h2 className="text-base font-bold text-slate-900 dark:text-white mt-2 leading-snug">
+                <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100 mt-2 leading-snug">
                   {artigoSelecionado.titulo}
                 </h2>
                 {artigoSelecionado.subtitulo && (
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
                     {artigoSelecionado.subtitulo}
                   </p>
                 )}
-                <p className="text-[11px] text-slate-400 mt-1">
+                <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-1 tabular-nums">
                   {artigoSelecionado.autoria} • {artigoSelecionado.instituicao} ({artigoSelecionado.ano})
                 </p>
               </div>
@@ -739,54 +756,52 @@ export const RecuperaBibliotecaView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setArtigoSelecionado(null)}
-                className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white transition"
+                aria-label="Fechar ficha técnica"
+                className="p-1.5 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 transition shrink-0"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Resumo Científico Expandido */}
             <div className="space-y-1.5">
-              <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                <FileText className="w-4 h-4 text-emerald-600" />
+              <h4 className="font-semibold text-slate-900 dark:text-zinc-100 text-xs flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 <span>Resumo Técnico & Fundamentação</span>
               </h4>
-              <p className="text-slate-600 dark:text-slate-400 leading-relaxed bg-slate-50 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <p className="text-slate-600 dark:text-zinc-400 leading-relaxed bg-slate-50/70 dark:bg-zinc-950/60 p-3.5 rounded-lg border border-slate-200/70 dark:border-zinc-800">
                 {artigoSelecionado.resumo}
               </p>
             </div>
 
-            {/* Diagnóstico de Campo */}
             <div className="space-y-1.5">
-              <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                <Microscope className="w-4 h-4 text-emerald-600" />
+              <h4 className="font-semibold text-slate-900 dark:text-zinc-100 text-xs flex items-center gap-1.5">
+                <Microscope className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 <span>Como Diagnosticar a Campo (Sintomas & Sinais)</span>
               </h4>
-              <p className="text-slate-600 dark:text-slate-400 leading-relaxed bg-emerald-50/40 dark:bg-emerald-950/20 p-3.5 rounded-2xl border border-emerald-100 dark:border-emerald-900/40">
+              <p className="text-slate-600 dark:text-zinc-400 leading-relaxed bg-emerald-50/50 dark:bg-emerald-950/20 p-3.5 rounded-lg border border-emerald-200/70 dark:border-emerald-900/50">
                 {artigoSelecionado.diagnosticoCampo}
               </p>
             </div>
 
-            {/* Protocolo de Intervenção Passo a Passo */}
             <div className="space-y-2">
-              <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                <Zap className="w-4 h-4 text-emerald-600" />
+              <h4 className="font-semibold text-slate-900 dark:text-zinc-100 text-xs flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 <span>Protocolo de Intervenção Agronômica Sequenciada</span>
               </h4>
               <div className="grid grid-cols-1 gap-2">
                 {artigoSelecionado.protocoloIntervencao.map((etapa, i) => (
                   <div
                     key={i}
-                    className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 flex items-start gap-3"
+                    className="p-3 rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800 flex items-start gap-2.5"
                   >
-                    <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white font-bold flex items-center justify-center shrink-0 text-xs">
+                    <span className="w-5 h-5 rounded-md bg-emerald-600 text-white font-semibold flex items-center justify-center shrink-0 text-[11px] tabular-nums">
                       {i + 1}
                     </span>
                     <div>
-                      <span className="font-bold text-slate-900 dark:text-white block text-xs">
+                      <span className="font-semibold text-slate-900 dark:text-zinc-100 block text-xs">
                         {etapa.fase}: {etapa.acao}
                       </span>
-                      <p className="text-slate-500 text-[11px] mt-0.5 leading-relaxed">
+                      <p className="text-slate-500 dark:text-zinc-400 text-[11px] mt-0.5 leading-relaxed">
                         {etapa.detalhes}
                       </p>
                     </div>
@@ -795,32 +810,31 @@ export const RecuperaBibliotecaView: React.FC = () => {
               </div>
             </div>
 
-            {/* Tabela de Parâmetros Críticos do Artigo */}
             {artigoSelecionado.parametrosCriticos.length > 0 && (
               <div className="space-y-2">
-                <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <Activity className="w-4 h-4 text-emerald-600" />
+                <h4 className="font-semibold text-slate-900 dark:text-zinc-100 text-xs flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                   <span>Valores Críticos de Referência</span>
                 </h4>
-                <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl">
-                  <table className="w-full text-[11px] text-left">
-                    <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold">
+                <div className="overflow-x-auto border border-slate-200/80 dark:border-zinc-800 rounded-lg">
+                  <table className="w-full text-[11px] text-left border-collapse">
+                    <thead className="bg-slate-50/80 dark:bg-zinc-950/60 text-slate-600 dark:text-zinc-400 font-semibold border-b border-slate-200/80 dark:border-zinc-800">
                       <tr>
                         <th className="py-2 px-3">Parâmetro</th>
                         <th className="py-2 px-3">Unidade</th>
-                        <th className="py-2 px-3 text-rose-600">Faixa Crítica</th>
-                        <th className="py-2 px-3 text-emerald-600">Faixa Ideal</th>
+                        <th className="py-2 px-3 text-rose-600 dark:text-rose-400">Faixa Crítica</th>
+                        <th className="py-2 px-3 text-emerald-700 dark:text-emerald-400">Faixa Ideal</th>
                         <th className="py-2 px-3">Interpretação</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/80">
                       {artigoSelecionado.parametrosCriticos.map((p, i) => (
                         <tr key={i}>
-                          <td className="py-2 px-3 font-semibold text-slate-900 dark:text-white">{p.parametro}</td>
-                          <td className="py-2 px-3 font-mono">{p.unidade}</td>
-                          <td className="py-2 px-3 font-bold text-rose-600">{p.faixaCritica}</td>
-                          <td className="py-2 px-3 font-bold text-emerald-600">{p.faixaIdeal}</td>
-                          <td className="py-2 px-3 text-slate-500">{p.interpretacao}</td>
+                          <td className="py-2 px-3 font-medium text-slate-900 dark:text-zinc-100">{p.parametro}</td>
+                          <td className="py-2 px-3 font-mono text-slate-500 dark:text-zinc-400">{p.unidade}</td>
+                          <td className="py-2 px-3 font-semibold text-rose-600 dark:text-rose-400 tabular-nums">{p.faixaCritica}</td>
+                          <td className="py-2 px-3 font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">{p.faixaIdeal}</td>
+                          <td className="py-2 px-3 text-slate-500 dark:text-zinc-400">{p.interpretacao}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -829,40 +843,37 @@ export const RecuperaBibliotecaView: React.FC = () => {
               </div>
             )}
 
-            {/* Insumos e Espécies Chave */}
             <div className="space-y-1.5">
-              <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                <Sprout className="w-4 h-4 text-emerald-600" />
-                <span>Espécies / Insumos Recomendados:</span>
+              <h4 className="font-semibold text-slate-900 dark:text-zinc-100 text-xs flex items-center gap-1.5">
+                <Sprout className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>Espécies / Insumos Recomendados</span>
               </h4>
               <div className="flex flex-wrap gap-1.5">
                 {artigoSelecionado.insumosOuEspecies.map((ins, i) => (
                   <span
                     key={i}
-                    className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-semibold text-[11px]"
+                    className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 font-medium text-[11px]"
                   >
-                    ✓ {ins}
+                    {ins}
                   </span>
                 ))}
               </div>
             </div>
 
-            {/* Referência Bibliográfica ABNT Oficial */}
-            <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl space-y-1">
-              <span className="text-[10px] font-bold text-slate-500 block uppercase tracking-wider">
-                Citação ABNT NBR 6023 (Para inclusão em Laudos e PRADs):
+            <div className="p-3 bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800 rounded-lg space-y-1">
+              <span className="text-[10px] font-semibold text-slate-500 dark:text-zinc-400 block uppercase tracking-wider">
+                Citação ABNT NBR 6023 (Para inclusão em Laudos e PRADs)
               </span>
-              <p className="font-mono text-[10px] text-slate-700 dark:text-slate-300 select-all leading-relaxed">
+              <p className="font-mono text-[10px] text-slate-700 dark:text-zinc-300 select-all leading-relaxed">
                 {artigoSelecionado.referenciaAbnt}
               </p>
             </div>
 
-            {/* Rodapé do Modal */}
-            <div className="flex justify-end pt-2">
+            <div className="flex justify-end pt-1">
               <button
                 type="button"
                 onClick={() => setArtigoSelecionado(null)}
-                className="px-4 py-2 bg-slate-900 dark:bg-emerald-600 text-white rounded-xl text-xs font-bold hover:opacity-90 transition"
+                className="h-9 px-4 bg-slate-900 dark:bg-emerald-600 text-white rounded-lg text-xs font-medium hover:opacity-90 transition"
               >
                 Fechar Ficha Técnica
               </button>

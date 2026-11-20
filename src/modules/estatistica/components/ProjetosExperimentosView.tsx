@@ -249,10 +249,10 @@ export const ProjetosExperimentosView: React.FC<ProjetosExperimentosViewProps> =
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {feedbackMsg && (
         <div
-          className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl border text-xs font-medium ${
+          className={`flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-medium ${
             feedbackMsg.type === 'ok'
               ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-300'
               : 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-300'
@@ -269,7 +269,7 @@ export const ProjetosExperimentosView: React.FC<ProjetosExperimentosViewProps> =
           <button
             type="button"
             onClick={() => setFeedbackMsg(null)}
-            className="p-1 hover:opacity-75 cursor-pointer"
+            className="p-0.5 hover:opacity-75 cursor-pointer"
             aria-label="Fechar aviso"
           >
             <X className="w-3.5 h-3.5" />
@@ -278,27 +278,27 @@ export const ProjetosExperimentosView: React.FC<ProjetosExperimentosViewProps> =
       )}
 
       {/* Barra Superior de Pesquisa e Ações */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-1 items-center gap-3">
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex flex-1 flex-wrap items-center gap-2.5">
+          <div className="relative flex-1 min-w-[200px] max-w-md">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Buscar projeto, pesquisador, cultura ou área..."
-              className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg text-slate-800 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
+              className="w-full h-8 pl-8 pr-3 text-xs bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg text-slate-800 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
             />
           </div>
-          <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-zinc-950 rounded-lg border border-slate-200 dark:border-zinc-800">
+          <div className="inline-flex items-center p-0.5 bg-slate-100 dark:bg-zinc-950 rounded-lg border border-slate-200 dark:border-zinc-800">
             {(['ativo', 'arquivado', 'todos'] as const).map((st) => (
               <button
                 key={st}
                 type="button"
                 onClick={() => setStatusFilter(st)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+                className={`px-2.5 py-1 text-xs font-medium rounded-md whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
                   statusFilter === st
-                    ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-white shadow-2xs'
+                    ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-white'
                     : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
@@ -312,15 +312,15 @@ export const ProjetosExperimentosView: React.FC<ProjetosExperimentosViewProps> =
           <button
             type="button"
             onClick={() => setShowAuditDrawer((v) => !v)}
-            className="px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-zinc-200 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+            className="px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
           >
             <History className="w-3.5 h-3.5" />
-            <span>Trilha de Auditoria ({historico.length})</span>
+            <span>Auditoria ({historico.length})</span>
           </button>
           <button
             type="button"
             onClick={openNewProj}
-            className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+            className="px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
           >
             <FolderPlus className="w-3.5 h-3.5" />
             <span>Novo Projeto</span>
@@ -330,30 +330,27 @@ export const ProjetosExperimentosView: React.FC<ProjetosExperimentosViewProps> =
 
       {/* Estado Vazio Inicial (Sem Dados Fictícios) */}
       {projetos.length === 0 ? (
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-10 text-center space-y-4">
-          <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 flex items-center justify-center mx-auto border border-slate-200 dark:border-zinc-700">
-            <FlaskConical className="w-6 h-6" />
-          </div>
-          <div className="max-w-lg mx-auto space-y-1.5">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl px-6 py-8 text-center space-y-3">
+          <FlaskConical className="w-6 h-6 text-slate-400 dark:text-zinc-500 mx-auto" />
+          <div className="max-w-md mx-auto space-y-1">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
               Nenhum projeto de pesquisa cadastrado
             </h3>
             <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-              Crie seu primeiro projeto experimental para organizar tratamentos, repetições, importar
-              planilhas CSV/XLSX ou digitar dados de campo com persistência offline garantida em OPFS + WASM.
+              Crie um projeto experimental para organizar tratamentos, importar planilhas CSV/XLSX ou digitar dados de campo com salvamento local.
             </p>
           </div>
           <button
             type="button"
             onClick={openNewProj}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition-colors whitespace-nowrap cursor-pointer"
           >
-            <FolderPlus className="w-4 h-4" />
-            <span>Criar Primeiro Projeto de Pesquisa</span>
+            <FolderPlus className="w-3.5 h-3.5" />
+            <span>Criar Primeiro Projeto</span>
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
           {/* Coluna Esquerda: Lista de Projetos */}
           <div className="lg:col-span-5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
@@ -378,10 +375,10 @@ export const ProjetosExperimentosView: React.FC<ProjetosExperimentosViewProps> =
                     <div
                       key={proj.id}
                       onClick={() => onSelectProjeto(proj.id)}
-                      className={`p-4 cursor-pointer transition-colors ${
+                      className={`px-4 py-3 cursor-pointer transition-colors border-l-2 ${
                         isSel
-                          ? 'bg-emerald-50/60 dark:bg-emerald-950/25'
-                          : 'hover:bg-slate-50 dark:hover:bg-zinc-800/40'
+                          ? 'bg-emerald-50/60 dark:bg-emerald-950/25 border-l-emerald-600'
+                          : 'border-l-transparent hover:bg-slate-50 dark:hover:bg-zinc-800/40'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -492,7 +489,7 @@ export const ProjetosExperimentosView: React.FC<ProjetosExperimentosViewProps> =
                 <button
                   type="button"
                   onClick={openNewExp}
-                  className="px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Novo Experimento</span>
@@ -512,10 +509,10 @@ export const ProjetosExperimentosView: React.FC<ProjetosExperimentosViewProps> =
                 <button
                   type="button"
                   onClick={openNewExp}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg whitespace-nowrap cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Adicionar Primeiro Experimento</span>
+                  <span>Adicionar Experimento</span>
                 </button>
               </div>
             ) : (
@@ -527,10 +524,10 @@ export const ProjetosExperimentosView: React.FC<ProjetosExperimentosViewProps> =
                     <div
                       key={exp.id}
                       onClick={() => onSelectExperimento(exp.id)}
-                      className={`p-4 cursor-pointer transition-colors ${
+                      className={`px-4 py-3 cursor-pointer transition-colors border-l-2 ${
                         isSel
-                          ? 'bg-emerald-50/60 dark:bg-emerald-950/25'
-                          : 'hover:bg-slate-50 dark:hover:bg-zinc-800/40'
+                          ? 'bg-emerald-50/60 dark:bg-emerald-950/25 border-l-emerald-600'
+                          : 'border-l-transparent hover:bg-slate-50 dark:hover:bg-zinc-800/40'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -770,14 +767,14 @@ export const ProjetosExperimentosView: React.FC<ProjetosExperimentosViewProps> =
               <button
                 type="button"
                 onClick={() => setShowProjModal(false)}
-                className="px-4 py-2 text-xs font-medium text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 rounded-lg cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-lg cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={busy}
-                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-50 cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-50 cursor-pointer"
               >
                 {busy ? 'Salvando...' : 'Salvar Projeto'}
               </button>
@@ -883,14 +880,14 @@ export const ProjetosExperimentosView: React.FC<ProjetosExperimentosViewProps> =
               <button
                 type="button"
                 onClick={() => setShowExpModal(false)}
-                className="px-4 py-2 text-xs font-medium text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 rounded-lg cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-lg cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={busy}
-                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-50 cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-50 cursor-pointer"
               >
                 {busy ? 'Salvando...' : 'Salvar Experimento'}
               </button>
@@ -901,17 +898,17 @@ export const ProjetosExperimentosView: React.FC<ProjetosExperimentosViewProps> =
 
       {/* Modal Confirmação de Exclusão */}
       {confirmDelete && (
-        <div className="fixed inset-0 z-[1500] bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 border border-rose-200 dark:border-rose-900 rounded-xl w-full max-w-md p-6 space-y-4 shadow-xl">
+        <div className="fixed inset-0 z-[1500] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl w-full max-w-md p-5 space-y-4">
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
                   Confirmar Exclusão Permanente
                 </h4>
                 <p className="text-xs text-slate-600 dark:text-zinc-400">
                   Deseja realmente excluir o {confirmDelete.tipo}{' '}
-                  <strong>"{confirmDelete.nome}"</strong>? Todos os conjuntos de dados, arquivos OPFS
+                  <strong>&ldquo;{confirmDelete.nome}&rdquo;</strong>? Todos os conjuntos de dados, arquivos OPFS
                   vinculados, análises e gráficos associados serão removidos permanentemente.
                 </p>
               </div>
@@ -920,7 +917,7 @@ export const ProjetosExperimentosView: React.FC<ProjetosExperimentosViewProps> =
               <button
                 type="button"
                 onClick={() => setConfirmDelete(null)}
-                className="px-4 py-2 text-xs font-medium text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 rounded-lg cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-lg cursor-pointer"
               >
                 Cancelar
               </button>
@@ -928,7 +925,7 @@ export const ProjetosExperimentosView: React.FC<ProjetosExperimentosViewProps> =
                 type="button"
                 onClick={handleConfirmDelete}
                 disabled={busy}
-                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg cursor-pointer"
               >
                 {busy ? 'Excluindo...' : 'Confirmar Exclusão'}
               </button>

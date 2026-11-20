@@ -1,5 +1,3 @@
-import React from 'react';
-
 export type LayerCategory = 'multispectral' | 'stress' | 'soil_nutrients' | 'operational' | 'vectors';
 
 export interface OverlayLayerItem {

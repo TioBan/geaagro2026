@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import {
   PropriedadeRecupera,
   AreaDegradadaItem,
@@ -33,10 +33,10 @@ import {
   salvarCronogramasRecupera,
   carregarPontosGpsRecupera,
   salvarPontosGpsRecupera,
-  obterStatusSincronizacaoRecupera,
   resetarTodosOsDadosRecupera,
   criarPropriedadeVaziaRecupera
 } from '../utils/recuperaStorage';
+import { lazyWithRetry } from '../utils/lazyWithRetry';
 import {
   LayoutDashboard,
   Building2,
@@ -64,24 +64,24 @@ import {
   X
 } from 'lucide-react';
 
-// Subviews carregadas sob demanda (Code Splitting)
-const RecuperaDashboardView = lazy(() => import('./recupera/RecuperaDashboardView').then(m => ({ default: m.RecuperaDashboardView })));
-const RecuperaPropriedadesView = lazy(() => import('./recupera/RecuperaPropriedadesView').then(m => ({ default: m.RecuperaPropriedadesView })));
-const RecuperaAreasView = lazy(() => import('./recupera/RecuperaAreasView').then(m => ({ default: m.RecuperaAreasView })));
-const RecuperaDiagnosticoView = lazy(() => import('./recupera/RecuperaDiagnosticoView').then(m => ({ default: m.RecuperaDiagnosticoView })));
-const RecuperaAnalisesSoloView = lazy(() => import('./recupera/RecuperaAnalisesSoloView').then(m => ({ default: m.RecuperaAnalisesSoloView })));
-const RecuperaProjetosView = lazy(() => import('./recupera/RecuperaProjetosView').then(m => ({ default: m.RecuperaProjetosView })));
-const RecuperaCalculadorasView = lazy(() => import('./recupera/RecuperaCalculadorasView').then(m => ({ default: m.RecuperaCalculadorasView })));
-const RecuperaPastagensView = lazy(() => import('./recupera/RecuperaPastagensView').then(m => ({ default: m.RecuperaPastagensView })));
-const RecuperaPlantasCoberturaView = lazy(() => import('./recupera/RecuperaPlantasCoberturaView').then(m => ({ default: m.RecuperaPlantasCoberturaView })));
-const RecuperaConservacaoSoloView = lazy(() => import('./recupera/RecuperaConservacaoSoloView').then(m => ({ default: m.RecuperaConservacaoSoloView })));
-const RecuperaAmbientalView = lazy(() => import('./recupera/RecuperaAmbientalView').then(m => ({ default: m.RecuperaAmbientalView })));
-const RecuperaMapasView = lazy(() => import('./recupera/RecuperaMapasView').then(m => ({ default: m.RecuperaMapasView })));
-const RecuperaMonitoramentoView = lazy(() => import('./recupera/RecuperaMonitoramentoView').then(m => ({ default: m.RecuperaMonitoramentoView })));
-const RecuperaCustosView = lazy(() => import('./recupera/RecuperaCustosView').then(m => ({ default: m.RecuperaCustosView })));
-const RecuperaCronogramaView = lazy(() => import('./recupera/RecuperaCronogramaView').then(m => ({ default: m.RecuperaCronogramaView })));
-const RecuperaRelatoriosView = lazy(() => import('./recupera/RecuperaRelatoriosView').then(m => ({ default: m.RecuperaRelatoriosView })));
-const RecuperaBibliotecaView = lazy(() => import('./recupera/RecuperaBibliotecaView').then(m => ({ default: m.RecuperaBibliotecaView })));
+// Subviews carregadas sob demanda com retry automático
+const RecuperaDashboardView = lazyWithRetry(() => import('./recupera/RecuperaDashboardView').then(m => ({ default: m.RecuperaDashboardView })));
+const RecuperaPropriedadesView = lazyWithRetry(() => import('./recupera/RecuperaPropriedadesView').then(m => ({ default: m.RecuperaPropriedadesView })));
+const RecuperaAreasView = lazyWithRetry(() => import('./recupera/RecuperaAreasView').then(m => ({ default: m.RecuperaAreasView })));
+const RecuperaDiagnosticoView = lazyWithRetry(() => import('./recupera/RecuperaDiagnosticoView').then(m => ({ default: m.RecuperaDiagnosticoView })));
+const RecuperaAnalisesSoloView = lazyWithRetry(() => import('./recupera/RecuperaAnalisesSoloView').then(m => ({ default: m.RecuperaAnalisesSoloView })));
+const RecuperaProjetosView = lazyWithRetry(() => import('./recupera/RecuperaProjetosView').then(m => ({ default: m.RecuperaProjetosView })));
+const RecuperaCalculadorasView = lazyWithRetry(() => import('./recupera/RecuperaCalculadorasView').then(m => ({ default: m.RecuperaCalculadorasView })));
+const RecuperaPastagensView = lazyWithRetry(() => import('./recupera/RecuperaPastagensView').then(m => ({ default: m.RecuperaPastagensView })));
+const RecuperaPlantasCoberturaView = lazyWithRetry(() => import('./recupera/RecuperaPlantasCoberturaView').then(m => ({ default: m.RecuperaPlantasCoberturaView })));
+const RecuperaConservacaoSoloView = lazyWithRetry(() => import('./recupera/RecuperaConservacaoSoloView').then(m => ({ default: m.RecuperaConservacaoSoloView })));
+const RecuperaAmbientalView = lazyWithRetry(() => import('./recupera/RecuperaAmbientalView').then(m => ({ default: m.RecuperaAmbientalView })));
+const RecuperaMapasView = lazyWithRetry(() => import('./recupera/RecuperaMapasView').then(m => ({ default: m.RecuperaMapasView })));
+const RecuperaMonitoramentoView = lazyWithRetry(() => import('./recupera/RecuperaMonitoramentoView').then(m => ({ default: m.RecuperaMonitoramentoView })));
+const RecuperaCustosView = lazyWithRetry(() => import('./recupera/RecuperaCustosView').then(m => ({ default: m.RecuperaCustosView })));
+const RecuperaCronogramaView = lazyWithRetry(() => import('./recupera/RecuperaCronogramaView').then(m => ({ default: m.RecuperaCronogramaView })));
+const RecuperaRelatoriosView = lazyWithRetry(() => import('./recupera/RecuperaRelatoriosView').then(m => ({ default: m.RecuperaRelatoriosView })));
+const RecuperaBibliotecaView = lazyWithRetry(() => import('./recupera/RecuperaBibliotecaView').then(m => ({ default: m.RecuperaBibliotecaView })));
 
 interface Props {
   initialSubTab?: string;
@@ -116,8 +116,9 @@ function normalizeSubTab(tab?: string): string {
 }
 
 const SubviewFallback: React.FC = () => (
-  <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 border border-slate-200 dark:border-slate-800 flex items-center justify-center">
-    <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+  <div className="bg-white dark:bg-zinc-900 rounded-xl p-10 border border-slate-200/80 dark:border-zinc-800 flex items-center justify-center gap-2.5 text-xs text-slate-500 dark:text-zinc-400">
+    <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+    <span>Carregando etapa...</span>
   </div>
 );
 
@@ -125,14 +126,18 @@ const AreaObrigatoriaPlaceholder: React.FC<{
   descricao: string;
   onIrAreas: () => void;
 }> = ({ descricao, onIrAreas }) => (
-  <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 border border-slate-200 dark:border-slate-800 text-center space-y-3">
-    <Layers className="w-10 h-10 text-slate-400 mx-auto" />
-    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Nenhum talhão selecionado</h3>
-    <p className="text-xs text-slate-500 max-w-md mx-auto">{descricao}</p>
+  <div className="bg-white dark:bg-zinc-900 rounded-xl p-8 border border-slate-200/80 dark:border-zinc-800 text-center space-y-3">
+    <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-400 dark:text-zinc-500 flex items-center justify-center mx-auto">
+      <Layers className="w-5 h-5" />
+    </div>
+    <div className="space-y-1">
+      <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Nenhum talhão selecionado</h3>
+      <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto">{descricao}</p>
+    </div>
     <button
       type="button"
       onClick={onIrAreas}
-      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition"
+      className="h-8 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition inline-flex items-center gap-1.5 whitespace-nowrap"
     >
       Ir para Áreas Degradadas
     </button>
@@ -164,12 +169,8 @@ export const RecuperaModule: React.FC<Props> = ({ initialSubTab }) => {
   const [cronogramas, setCronogramas] = useState<AtividadeCronograma[]>(() => carregarCronogramasRecupera());
   const [pontosGps, setPontosGps] = useState<PontoInteresseGps[]>(() => carregarPontosGpsRecupera());
 
-  const statusSync = useMemo(
-    () => obterStatusSincronizacaoRecupera(areas.length + diagnosticos.length + projetos.length),
-    [areas.length, diagnosticos.length, projetos.length]
-  );
-
   const [activeTab, setActiveTab] = useState<string>(() => normalizeSubTab(initialSubTab));
+  const [confirmandoReset, setConfirmandoReset] = useState(false);
 
   useEffect(() => {
     if (initialSubTab) {
@@ -191,32 +192,48 @@ export const RecuperaModule: React.FC<Props> = ({ initialSubTab }) => {
   };
 
   const handleSalvarPropriedadeUnica = (propAtualizada: PropriedadeRecupera) => {
-    const existe = propriedades.some(p => p.id === propAtualizada.id);
-    const lista = existe
-      ? propriedades.map(p => (p.id === propAtualizada.id ? propAtualizada : p))
-      : [...propriedades, propAtualizada];
-    setPropriedades(lista);
-    salvarPropriedadesRecupera(lista);
-    if (!existe || !propriedadeAtivaId) {
+    setPropriedades(prev => {
+      const existe = prev.some(p => p.id === propAtualizada.id);
+      const lista = existe
+        ? prev.map(p => (p.id === propAtualizada.id ? propAtualizada : p))
+        : [...prev, propAtualizada];
+      salvarPropriedadesRecupera(lista);
+      return lista;
+    });
+    if (!propriedadeAtivaId || !propriedades.some(p => p.id === propAtualizada.id)) {
       setPropriedadeAtivaId(propAtualizada.id);
       salvarPropriedadeSelecionadaId(propAtualizada.id);
     }
   };
 
   const handleSalvarDiagnosticoUnico = (diag: DiagnosticoTecnicoCompleto) => {
-    const index = diagnosticos.findIndex(d => d.id === diag.id || d.areaId === diag.areaId);
-    const lista = [...diagnosticos];
-    if (index >= 0) lista[index] = diag;
-    else lista.push(diag);
-    setDiagnosticos(lista);
-    salvarDiagnosticos(lista);
+    setDiagnosticos(prev => {
+      const existe = prev.some(d => d.id === diag.id || d.areaId === diag.areaId);
+      const lista = existe
+        ? prev.map(d => (d.id === diag.id || d.areaId === diag.areaId ? diag : d))
+        : [...prev, diag];
+      salvarDiagnosticos(lista);
+      return lista;
+    });
   };
 
-  const handleResetarGeral = () => {
-    if (window.confirm('Deseja realmente limpar todos os dados do módulo Recupera e reiniciar com a estrutura limpa?')) {
-      resetarTodosOsDadosRecupera();
-      window.location.reload();
-    }
+  const handleConfirmarResetGeral = () => {
+    resetarTodosOsDadosRecupera();
+    const novasProps = carregarPropriedadesRecupera();
+    const novaPropId = carregarPropriedadeSelecionadaId();
+    setPropriedades(novasProps);
+    setPropriedadeAtivaId(novaPropId);
+    setAreas(carregarAreasRecupera(novaPropId || undefined));
+    setAreaAtivaId(carregarAreaSelecionadaId());
+    setDiagnosticos(carregarDiagnosticos());
+    setAnalises(carregarAnalisesSolo());
+    setProjetos(carregarProjetosRecupera());
+    setMonitoramentos(carregarMonitoramentos());
+    setCustos(carregarCustosRecupera());
+    setCronogramas(carregarCronogramasRecupera());
+    setPontosGps(carregarPontosGpsRecupera());
+    setActiveTab('dashboard');
+    setConfirmandoReset(false);
   };
 
   // Controle do Menu Suspenso
@@ -231,13 +248,23 @@ export const RecuperaModule: React.FC<Props> = ({ initialSubTab }) => {
         setIsMenuAberto(false);
       }
     };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsMenuAberto(false);
+      }
+    };
     document.addEventListener('mousedown', handleClickFora);
-    return () => document.removeEventListener('mousedown', handleClickFora);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickFora);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isMenuAberto]);
 
-  const currentIndex = SUBTABS.findIndex(t => t.key === activeTab);
-  const currentTabItem = SUBTABS[currentIndex >= 0 ? currentIndex : 0];
+  const currentIndex = Math.max(0, SUBTABS.findIndex(t => t.key === activeTab));
+  const currentTabItem = SUBTABS[currentIndex];
   const CurrentIcon = currentTabItem.icon;
+  const progressoPct = Math.round(((currentIndex + 1) / SUBTABS.length) * 100);
 
   const irParaEtapa = (indice: number) => {
     if (indice >= 0 && indice < SUBTABS.length) {
@@ -268,243 +295,263 @@ export const RecuperaModule: React.FC<Props> = ({ initialSubTab }) => {
   const irParaAreas = () => setActiveTab('areas');
 
   return (
-    <div className="min-h-screen bg-slate-50/60 dark:bg-slate-950 p-4 sm:p-6 lg:p-8 space-y-6">
-      {/* Painel de Controle Unificado e Profissional (Header + Contexto + Menu Suspenso) */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 sm:p-4 border border-slate-200 dark:border-slate-800 shadow-sm relative z-30 space-y-3">
-        {/* Linha 1: Identidade da Solução & Seletores de Propriedade/Talhão */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-emerald-600 rounded-xl text-white shadow-md shadow-emerald-600/30 shrink-0">
-              <Sprout className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                  GeaAgro • Recuperação de Áreas Degradadas
-                </span>
-                <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
-                  RAD / PRAD
-                </span>
+    <div className="max-w-7xl mx-auto space-y-5">
+      {/* Painel de Controle Unificado */}
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-slate-200/80 dark:border-zinc-800 relative z-30">
+        <div className="p-3.5 sm:p-4 space-y-3">
+          {/* Linha 1: Identidade e Seletores de Contexto */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/70 dark:border-emerald-800/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                <Sprout className="w-4 h-4" />
               </div>
-              <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white leading-tight">
-                Recupera
-              </h1>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 truncate">
+                    Recuperação de Áreas Degradadas
+                  </span>
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border border-slate-200/70 dark:border-zinc-700/70 shrink-0">
+                    RAD / PRAD
+                  </span>
+                </div>
+                <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-zinc-100 leading-tight truncate">
+                  Recupera
+                </h1>
+              </div>
+            </div>
+
+            {/* Seletores de Contexto + Reset Inline */}
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+              <select
+                value={propriedadeAtivaId}
+                onChange={e => handleTrocarPropriedade(e.target.value)}
+                className="h-8 px-2.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 text-slate-900 dark:text-zinc-100 max-w-[200px] sm:max-w-[220px] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 truncate"
+                title="Selecionar Fazenda"
+              >
+                <option value="">Selecione uma fazenda...</option>
+                {propriedades.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.nome || 'Sem nome'}{p.municipio ? ` (${p.municipio}/${p.estado})` : ''}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={areaAtivaId}
+                onChange={e => handleSelecionarArea(e.target.value)}
+                className="h-8 px-2.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 text-slate-900 dark:text-zinc-100 max-w-[200px] sm:max-w-[230px] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 truncate"
+                title="Selecionar Talhão"
+              >
+                <option value="">Nenhum talhão selecionado</option>
+                {areas.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.nomeTalhao} ({a.areaHa} ha)
+                  </option>
+                ))}
+              </select>
+
+              {confirmandoReset ? (
+                <div className="inline-flex items-center gap-1 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-lg px-2 h-8 shrink-0">
+                  <span className="text-[11px] font-medium text-rose-700 dark:text-rose-300 whitespace-nowrap">
+                    Limpar dados?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleConfirmarResetGeral}
+                    className="px-1.5 py-0.5 text-[11px] font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded transition whitespace-nowrap"
+                  >
+                    Sim
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmandoReset(false)}
+                    className="px-1.5 py-0.5 text-[11px] font-medium text-slate-600 dark:text-zinc-300 hover:bg-slate-200/70 dark:hover:bg-zinc-800 rounded transition whitespace-nowrap"
+                  >
+                    Não
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmandoReset(true)}
+                  className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-slate-500 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-200 dark:hover:border-rose-900/60 hover:bg-rose-50/50 dark:hover:bg-rose-950/30 transition shrink-0"
+                  title="Limpar todos os dados do módulo Recupera"
+                  aria-label="Limpar todos os dados do módulo Recupera"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Seletores de Contexto: Propriedade & Área Degradada */}
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            <select
-              value={propriedadeAtivaId}
-              onChange={e => handleTrocarPropriedade(e.target.value)}
-              className="px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white max-w-[210px] sm:max-w-xs focus:ring-2 focus:ring-emerald-500 truncate"
-              title="Selecionar Fazenda"
-            >
-              <option value="">Selecione uma fazenda...</option>
-              {propriedades.map(p => (
-                <option key={p.id} value={p.id}>
-                  Fazenda: {p.nome || 'Sem nome'}{p.municipio ? ` (${p.municipio}/${p.estado})` : ''}
-                </option>
-              ))}
-            </select>
+          {/* Linha 2: Seletor de Etapa e Navegação Sequencial */}
+          <div className="pt-2.5 border-t border-slate-200/70 dark:border-zinc-800 flex items-center justify-between gap-2">
+            <div className="relative flex-1 min-w-0" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() => setIsMenuAberto(prev => !prev)}
+                className="w-full h-9 px-2.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 hover:bg-slate-100/80 dark:hover:bg-zinc-800/80 flex items-center justify-between gap-2 text-left transition"
+                aria-expanded={isMenuAberto}
+                aria-haspopup="true"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-6 h-6 rounded-md bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                    <CurrentIcon className="w-3.5 h-3.5" />
+                  </span>
+                  <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100 truncate">
+                    {currentTabItem.label}
+                  </span>
+                  <span className="hidden sm:inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60 shrink-0">
+                    {currentTabItem.fase.split('•')[0].trim()}
+                  </span>
+                  <span className="text-[11px] text-slate-400 dark:text-zinc-500 tabular-nums shrink-0">
+                    {currentIndex + 1}/{SUBTABS.length}
+                  </span>
+                </div>
 
-            <select
-              value={areaAtivaId}
-              onChange={e => handleSelecionarArea(e.target.value)}
-              className="px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white max-w-[210px] sm:max-w-xs focus:ring-2 focus:ring-emerald-500 truncate"
-              title="Selecionar Talhão"
-            >
-              <option value="">Nenhum talhão selecionado</option>
-              {areas.map(a => (
-                <option key={a.id} value={a.id}>
-                  Talhão: {a.nomeTalhao} ({a.areaHa} ha - {a.grauSeveridade})
-                </option>
-              ))}
-            </select>
+                <div className="flex items-center gap-1 shrink-0 text-slate-400 dark:text-zinc-500">
+                  <span className="text-[11px] font-medium hidden md:inline">Etapas</span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isMenuAberto ? 'rotate-180 text-emerald-600 dark:text-emerald-400' : ''}`} />
+                </div>
+              </button>
 
-            <button
-              type="button"
-              onClick={handleResetarGeral}
-              className="p-1.5 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 rounded-xl transition shrink-0"
-              title="Limpar todos os dados do módulo Recupera"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
+              {isMenuAberto && (
+                <div className="absolute left-0 top-full mt-1.5 w-full sm:w-[440px] md:w-[500px] bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-700 shadow-md z-50 overflow-hidden">
+                  <div className="p-2 border-b border-slate-200/80 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/60 flex items-center gap-1.5">
+                    <Search className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 shrink-0 ml-1" />
+                    <input
+                      type="text"
+                      value={filtroBusca}
+                      onChange={e => setFiltroBusca(e.target.value)}
+                      placeholder="Filtrar etapas..."
+                      className="w-full bg-transparent text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none py-0.5"
+                      autoFocus
+                    />
+                    {filtroBusca && (
+                      <button
+                        type="button"
+                        onClick={() => setFiltroBusca('')}
+                        className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-[60vh] sm:max-h-[380px] overflow-y-auto p-2 space-y-2.5">
+                    {Object.entries(fasesAgrupadas).map(([fase, tabs]) => (
+                      <div key={fase} className="space-y-1">
+                        <div className="px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-wider flex items-center justify-between border-b border-slate-100 dark:border-zinc-800">
+                          <span>{fase}</span>
+                          <span className="tabular-nums">{tabs.length}</span>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-0.5">
+                          {tabs.map(tab => {
+                            const Icon = tab.icon;
+                            const isSelected = activeTab === tab.key;
+                            return (
+                              <button
+                                key={tab.key}
+                                type="button"
+                                onClick={() => {
+                                  setActiveTab(tab.key);
+                                  setIsMenuAberto(false);
+                                  setFiltroBusca('');
+                                }}
+                                className={`w-full py-1.5 px-2 rounded-lg text-left text-xs transition flex items-center justify-between gap-2 ${
+                                  isSelected
+                                    ? 'bg-emerald-600 text-white font-semibold'
+                                    : 'hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span
+                                    className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
+                                      isSelected
+                                        ? 'bg-emerald-700 text-white'
+                                        : 'bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400'
+                                    }`}
+                                  >
+                                    <Icon className="w-3.5 h-3.5" />
+                                  </span>
+                                  <div className="min-w-0">
+                                    <p className="font-medium truncate leading-tight">{tab.label}</p>
+                                    <p className={`text-[10px] truncate ${isSelected ? 'text-emerald-100' : 'text-slate-400 dark:text-zinc-500'}`}>
+                                      {tab.descricao}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {isSelected && <Check className="w-3.5 h-3.5 text-white shrink-0" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+
+                    {Object.keys(fasesAgrupadas).length === 0 && (
+                      <div className="p-4 text-center text-slate-400 dark:text-zinc-500 text-xs">
+                        Nenhuma etapa encontrada para "{filtroBusca}".
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="px-2.5 py-1.5 border-t border-slate-200/80 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/60 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400 dark:text-zinc-500 tabular-nums">{SUBTABS.length} etapas</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsMenuAberto(false)}
+                      className="px-2 py-0.5 text-slate-600 dark:text-zinc-300 hover:bg-slate-200/70 dark:hover:bg-zinc-800 rounded font-medium transition"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => irParaEtapa(currentIndex - 1)}
+                disabled={currentIndex <= 0}
+                className={`h-9 px-2.5 rounded-lg text-xs font-medium border transition inline-flex items-center gap-1 whitespace-nowrap ${
+                  currentIndex <= 0
+                    ? 'opacity-40 cursor-not-allowed border-slate-200 dark:border-zinc-800 text-slate-400 dark:text-zinc-600'
+                    : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-800'
+                }`}
+                title="Ir para etapa anterior"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Anterior</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => irParaEtapa(currentIndex + 1)}
+                disabled={currentIndex >= SUBTABS.length - 1}
+                className={`h-9 px-3 rounded-lg text-xs font-medium border transition inline-flex items-center gap-1 whitespace-nowrap ${
+                  currentIndex >= SUBTABS.length - 1
+                    ? 'opacity-40 cursor-not-allowed border-slate-200 dark:border-zinc-800 text-slate-400 dark:text-zinc-600'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
+                }`}
+                title="Avançar para próxima etapa"
+              >
+                <span className="hidden sm:inline">Próxima</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Linha 2: Menu Suspenso Compacto e Controles Sequenciais */}
-        <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-          <div className="relative flex-1 min-w-0" ref={menuRef}>
-            <button
-              type="button"
-              onClick={() => setIsMenuAberto(prev => !prev)}
-              className="w-full flex items-center justify-between gap-2 py-1.5 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/90 dark:bg-slate-800/90 hover:bg-slate-100 dark:hover:bg-slate-800 text-left transition shadow-xs group"
-              aria-expanded={isMenuAberto}
-              aria-haspopup="true"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="p-1 rounded-md bg-emerald-600 text-white shadow-xs shrink-0">
-                  <CurrentIcon className="w-3.5 h-3.5" />
-                </div>
-                <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                  {currentTabItem.label}
-                </span>
-                <span className="hidden sm:inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60 shrink-0">
-                  {currentTabItem.fase.split('•')[0].trim()}
-                </span>
-                <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 shrink-0">
-                  ({currentIndex + 1}/{SUBTABS.length})
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1 shrink-0 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200">
-                <span className="text-[11px] font-medium hidden md:inline text-slate-400">Etapas</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isMenuAberto ? 'rotate-180 text-emerald-600' : ''}`} />
-              </div>
-            </button>
-
-            {isMenuAberto && (
-              <div className="absolute left-0 top-full mt-1.5 w-full sm:w-[440px] md:w-[500px] bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
-                <div className="p-2 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50 flex items-center gap-1.5">
-                  <Search className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
-                  <input
-                    type="text"
-                    value={filtroBusca}
-                    onChange={e => setFiltroBusca(e.target.value)}
-                    placeholder="Filtrar etapas..."
-                    className="w-full bg-transparent text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none font-medium py-0.5"
-                    autoFocus
-                  />
-                  {filtroBusca && (
-                    <button
-                      type="button"
-                      onClick={() => setFiltroBusca('')}
-                      className="p-1 rounded-md text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Lista Agrupada das 17 Sub-Abas Compacta */}
-                <div className="max-h-[60vh] sm:max-h-[380px] overflow-y-auto p-2 space-y-2.5 scrollbar-thin">
-                  {Object.entries(fasesAgrupadas).map(([fase, tabs]) => (
-                    <div key={fase} className="space-y-1">
-                      <div className="px-1.5 py-0.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center justify-between border-b border-slate-100 dark:border-slate-800">
-                        <span>{fase}</span>
-                        <span className="text-[9px] text-slate-400 font-normal">{tabs.length}</span>
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-0.5">
-                        {tabs.map(tab => {
-                          const Icon = tab.icon;
-                          const isSelected = activeTab === tab.key;
-                          return (
-                            <button
-                              key={tab.key}
-                              type="button"
-                              onClick={() => {
-                                setActiveTab(tab.key);
-                                setIsMenuAberto(false);
-                                setFiltroBusca('');
-                              }}
-                              className={`w-full py-1.5 px-2 rounded-lg text-left text-xs transition flex items-center justify-between gap-2 ${
-                                isSelected
-                                  ? 'bg-emerald-600 text-white font-bold shadow-xs'
-                                  : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div
-                                  className={`p-1 rounded shrink-0 ${
-                                    isSelected
-                                      ? 'bg-emerald-700 text-white'
-                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                                  }`}
-                                >
-                                  <Icon className="w-3.5 h-3.5" />
-                                </div>
-                                <span className="font-semibold truncate leading-tight">
-                                  {tab.label}
-                                </span>
-                              </div>
-
-                              {isSelected && (
-                                <Check className="w-3.5 h-3.5 text-white shrink-0 ml-1.5" />
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-
-                  {Object.keys(fasesAgrupadas).length === 0 && (
-                    <div className="p-4 text-center text-slate-400 text-xs">
-                      Nenhuma etapa com "{filtroBusca}".
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-1.5 px-2 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex items-center justify-between text-[10px]">
-                  <span className="text-slate-400">{SUBTABS.length} etapas</span>
-                  <button
-                    type="button"
-                    onClick={() => setIsMenuAberto(false)}
-                    className="px-2 py-0.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded font-semibold transition"
-                  >
-                    Fechar
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            <select
-              value={activeTab}
-              onChange={e => setActiveTab(e.target.value)}
-              className="py-1 px-1.5 text-xs font-semibold rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 sm:hidden"
-              title="Menu suspenso alternativo"
-            >
-              {SUBTABS.map(t => (
-                <option key={t.key} value={t.key}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-
-            <button
-              type="button"
-              onClick={() => irParaEtapa(currentIndex - 1)}
-              disabled={currentIndex <= 0}
-              className={`px-2 py-1.5 rounded-lg text-xs font-medium border transition flex items-center gap-1 ${
-                currentIndex <= 0
-                  ? 'opacity-40 cursor-not-allowed border-slate-200 dark:border-slate-800 text-slate-400'
-                  : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-750 shadow-xs'
-              }`}
-              title="Ir para etapa anterior"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Anterior</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => irParaEtapa(currentIndex + 1)}
-              disabled={currentIndex >= SUBTABS.length - 1}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition flex items-center gap-1 ${
-                currentIndex >= SUBTABS.length - 1
-                  ? 'opacity-40 cursor-not-allowed border-slate-200 dark:border-slate-800 text-slate-400'
-                  : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-xs'
-              }`}
-              title="Avançar para próxima etapa"
-            >
-              <span className="hidden sm:inline">Próxima</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
+        {/* Barra fina de progresso das etapas */}
+        <div className="h-0.5 w-full bg-slate-100 dark:bg-zinc-800 overflow-hidden rounded-b-xl">
+          <div
+            className="h-full bg-emerald-600 transition-all duration-300"
+            style={{ width: `${progressoPct}%` }}
+          />
         </div>
       </div>
 
@@ -516,7 +563,6 @@ export const RecuperaModule: React.FC<Props> = ({ initialSubTab }) => {
             areas={areas}
             projetos={projetos}
             diagnosticos={diagnosticos}
-            statusSync={statusSync}
             onNavigateTab={setActiveTab}
             onSelecionarArea={handleSelecionarArea}
             areaAtivaId={areaAtivaId}

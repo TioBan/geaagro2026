@@ -430,34 +430,34 @@ export const DadosImportacaoView: React.FC<DadosImportacaoViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {msg && (
         <div
-          className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl border text-xs font-medium ${
+          className={`flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-medium ${
             msg.type === 'ok'
               ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-300'
               : 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-300'
           }`}
         >
           <span>{msg.text}</span>
-          <button type="button" onClick={() => setMsg(null)} className="cursor-pointer">
+          <button type="button" onClick={() => setMsg(null)} className="cursor-pointer p-0.5">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
       {/* Barra de Ações de Entrada de Dados */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 truncate">
             Banco Experimental — {experimento.nome}
           </h3>
           <p className="text-xs text-slate-500 dark:text-zinc-400">
-            Importe XLSX/XLS/CSV, cole diretamente do Excel ou crie uma planilha manual editável.
+            Importe XLSX/XLS/CSV, cole do Excel ou crie uma planilha manual editável.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <input
             ref={fileInputRef}
             type="file"
@@ -468,7 +468,7 @@ export const DadosImportacaoView: React.FC<DadosImportacaoViewProps> = ({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+            className="px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
           >
             <Upload className="w-3.5 h-3.5" />
             <span>Importar Excel / CSV</span>
@@ -476,7 +476,7 @@ export const DadosImportacaoView: React.FC<DadosImportacaoViewProps> = ({
           <button
             type="button"
             onClick={() => setShowPasteModal(true)}
-            className="px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-zinc-200 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+            className="px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
           >
             <ClipboardPaste className="w-3.5 h-3.5" />
             <span>Colar do Excel</span>
@@ -484,10 +484,10 @@ export const DadosImportacaoView: React.FC<DadosImportacaoViewProps> = ({
           <button
             type="button"
             onClick={() => setShowManualModal(true)}
-            className="px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-zinc-200 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+            className="px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
           >
             <Table2 className="w-3.5 h-3.5" />
-            <span>Nova Planilha Manual</span>
+            <span>Planilha Manual</span>
           </button>
           {dataset && (
             <button
@@ -496,10 +496,10 @@ export const DadosImportacaoView: React.FC<DadosImportacaoViewProps> = ({
                 setSelectedWideCols([]);
                 setShowConvertModal(true);
               }}
-              className="px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-zinc-200 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+              className="px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
             >
               <ArrowLeftRight className="w-3.5 h-3.5" />
-              <span>Converter Largo / Longo</span>
+              <span>Largo / Longo</span>
             </button>
           )}
         </div>
@@ -507,110 +507,117 @@ export const DadosImportacaoView: React.FC<DadosImportacaoViewProps> = ({
 
       {/* Preservação Imutável do Arquivo Original no OPFS */}
       {dataset?.temDadosOriginaisPreservados && (
-        <div className="bg-slate-50 dark:bg-zinc-900/70 border border-slate-200 dark:border-zinc-800 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
           <div className="flex items-center gap-2.5 min-w-0">
             <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <div className="min-w-0">
-              <p className="font-semibold text-slate-800 dark:text-zinc-100 truncate">
-                Arquivo Original Imutável no OPFS: {dataset.rawFileName}
+              <p className="font-medium text-slate-800 dark:text-zinc-100 truncate">
+                Arquivo original preservado: {dataset.rawFileName}
               </p>
               <p className="text-[11px] font-mono tabular-nums text-slate-500 dark:text-zinc-400">
-                Checksum WASM Original: {dataset.rawChecksum} · Versão de trabalho: v{dataset.versao}
+                Checksum {dataset.rawChecksum} · v{dataset.versao}
                 {checksumStatus ? ` · ${checksumStatus}` : ''}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
               onClick={handleVerifyRawOpfs}
-              className="px-3 py-1.5 text-xs font-medium bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer"
+              className="px-2.5 py-1.5 text-xs font-medium bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg hover:bg-slate-50 dark:hover:bg-zinc-800 whitespace-nowrap transition-colors cursor-pointer"
             >
-              Verificar Checksum
+              Verificar
             </button>
             <button
               type="button"
               onClick={handleDownloadRawOpfs}
-              className="px-3 py-1.5 text-xs font-medium bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 flex items-center gap-1 cursor-pointer"
+              className="px-2.5 py-1.5 text-xs font-medium bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg hover:bg-slate-50 dark:hover:bg-zinc-800 flex items-center gap-1 whitespace-nowrap transition-colors cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Baixar Original</span>
+              <span>Original</span>
             </button>
           </div>
         </div>
       )}
 
       {!dataset ? (
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-10 text-center space-y-3">
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl px-6 py-8 text-center space-y-2">
           <p className="text-sm font-semibold text-slate-800 dark:text-zinc-100">
             Nenhuma matriz de dados carregada neste experimento
           </p>
           <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto">
-            Utilize os botões acima para importar uma planilha Excel/CSV, colar células diretamente da
-            sua planilha ou inicializar uma tabela manual em branco.
+            Utilize os botões acima para importar Excel/CSV, colar células ou iniciar uma planilha manual.
           </p>
         </div>
       ) : (
         <>
-          {/* Painel de Validação e Qualidade dos Dados */}
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                Diagnóstico de Qualidade & Compatibilidade ({EXPERIMENTAL_DESIGNS_CATALOG[experimento.delineamento].sigla})
+          {/* Painel de Validação e Qualidade dos Dados (Faixa Única com Divisórias) */}
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2">
+              <h4 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Diagnóstico &amp; Compatibilidade ({EXPERIMENTAL_DESIGNS_CATALOG[experimento.delineamento].sigla})
               </h4>
               <span
-                className={`text-xs font-semibold ${
+                className={`inline-flex items-center gap-1.5 text-xs font-medium ${
                   dataset.validacao.compatibilidadeDelineamento.compativel
                     ? 'text-emerald-700 dark:text-emerald-400'
                     : 'text-rose-700 dark:text-rose-400'
                 }`}
               >
-                {dataset.validacao.compatibilidadeDelineamento.compativel
-                  ? '● Estrutura compatível com o delineamento'
-                  : '✖ Estrutura incompatível ou mapeamento incompleto'}
+                {dataset.validacao.compatibilidadeDelineamento.compativel ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Compatível com o delineamento</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <span>Estrutura incompatível ou mapeamento incompleto</span>
+                  </>
+                )}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
-              <div className="p-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg">
-                <span className="text-slate-500 dark:text-zinc-400 block">Dimensão</span>
-                <span className="text-sm font-bold font-mono tabular-nums text-slate-900 dark:text-white">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-zinc-800 text-xs">
+              <div className="px-4 py-3">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Dimensão</span>
+                <span className="text-sm font-semibold font-mono tabular-nums text-slate-900 dark:text-zinc-100">
                   {dataset.validacao.totalLinhas} × {dataset.validacao.totalColunas}
                 </span>
               </div>
-              <div className="p-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg">
-                <span className="text-slate-500 dark:text-zinc-400 block">Células Vazias</span>
-                <span className="text-sm font-bold font-mono tabular-nums text-slate-900 dark:text-white">
+              <div className="px-4 py-3">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Células Vazias</span>
+                <span className="text-sm font-semibold font-mono tabular-nums text-slate-900 dark:text-zinc-100">
                   {dataset.validacao.celulasVazias}
                 </span>
               </div>
-              <div className="p-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg">
-                <span className="text-slate-500 dark:text-zinc-400 block">N/A Explícitos</span>
-                <span className="text-sm font-bold font-mono tabular-nums text-amber-600 dark:text-amber-400">
+              <div className="px-4 py-3">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">N/A Explícitos</span>
+                <span className="text-sm font-semibold font-mono tabular-nums text-amber-600 dark:text-amber-400">
                   {dataset.validacao.celulasNA}
                 </span>
               </div>
-              <div className="p-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg">
-                <span className="text-slate-500 dark:text-zinc-400 block">Zeros Reais (0)</span>
-                <span className="text-sm font-bold font-mono tabular-nums text-slate-900 dark:text-white">
+              <div className="px-4 py-3">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Zeros Reais (0)</span>
+                <span className="text-sm font-semibold font-mono tabular-nums text-slate-900 dark:text-zinc-100">
                   {dataset.validacao.celulasZero}
                 </span>
               </div>
-              <div className="p-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg">
-                <span className="text-slate-500 dark:text-zinc-400 block">Textos Inválidos</span>
+              <div className="px-4 py-3">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Textos Inválidos</span>
                 <span
-                  className={`text-sm font-bold font-mono tabular-nums ${
+                  className={`text-sm font-semibold font-mono tabular-nums ${
                     dataset.validacao.celulasInvalidasNumericas > 0
                       ? 'text-rose-600'
-                      : 'text-slate-900 dark:text-white'
+                      : 'text-slate-900 dark:text-zinc-100'
                   }`}
                 >
                   {dataset.validacao.celulasInvalidasNumericas}
                 </span>
               </div>
-              <div className="p-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg">
-                <span className="text-slate-500 dark:text-zinc-400 block">Balanceamento</span>
-                <span className="text-sm font-bold text-slate-900 dark:text-white">
+              <div className="px-4 py-3">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Balanceamento</span>
+                <span className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
                   {dataset.validacao.desbalanceado ? 'Desbalanceado' : 'Balanceado'}
                 </span>
               </div>
@@ -618,7 +625,7 @@ export const DadosImportacaoView: React.FC<DadosImportacaoViewProps> = ({
 
             {(!dataset.validacao.compatibilidadeDelineamento.compativel ||
               dataset.validacao.problemas.length > 0) && (
-              <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-lg text-xs space-y-1 text-amber-900 dark:text-amber-200">
+              <div className="px-4 py-3 border-t border-amber-200/70 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/20 text-xs space-y-1 text-amber-900 dark:text-amber-200">
                 {dataset.validacao.compatibilidadeDelineamento.motivos.map((m, i) => (
                   <div key={`m-${i}`} className="flex items-start gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
@@ -865,16 +872,16 @@ export const DadosImportacaoView: React.FC<DadosImportacaoViewProps> = ({
                   setPendingPreview(null);
                   setSelectedFileForSheet(null);
                 }}
-                className="px-4 py-2 text-xs bg-slate-100 dark:bg-zinc-800 rounded-lg cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-lg cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={() => commitImportedPreview(pendingPreview)}
-                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer"
               >
-                Importar Aba Selecionada
+                Importar Aba
               </button>
             </div>
           </div>
@@ -908,16 +915,16 @@ export const DadosImportacaoView: React.FC<DadosImportacaoViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowPasteModal(false)}
-                className="px-4 py-2 text-xs bg-slate-100 dark:bg-zinc-800 rounded-lg cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-lg cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={handleCommitPaste}
-                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer"
               >
-                Processar & Salvar
+                Processar &amp; Salvar
               </button>
             </div>
           </div>
@@ -958,14 +965,14 @@ export const DadosImportacaoView: React.FC<DadosImportacaoViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowManualModal(false)}
-                className="px-4 py-2 text-xs bg-slate-100 dark:bg-zinc-800 rounded-lg cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-lg cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={handleCreateManualGrid}
-                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer"
               >
                 Criar Matriz
               </button>
@@ -1081,14 +1088,14 @@ export const DadosImportacaoView: React.FC<DadosImportacaoViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowConvertModal(false)}
-                className="px-4 py-2 text-xs bg-slate-100 dark:bg-zinc-800 rounded-lg cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-lg cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={handleApplyConvert}
-                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer"
               >
                 Converter Formato
               </button>

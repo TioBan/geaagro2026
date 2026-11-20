@@ -58,7 +58,9 @@ export const AvaliacaoMapaInteligenteView: React.FC<Props> = ({
   );
   const [buscando, setBuscando] = useState(false);
   const [gpsAtivo, setGpsAtivo] = useState(false);
-  const [camadaAtiva, setCamadaAtiva] = useState<'todos' | 'propriedade' | 'talhoes' | 'comparativos'>('todos');
+  const [camadaAtiva, setCamadaAtiva] = useState<
+    'todos' | 'propriedade' | 'talhoes' | 'comparativos'
+  >('todos');
   const [statusMsg, setStatusMsg] = useState<string>('');
   const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchAbortRef = useRef<AbortController | null>(null);
@@ -97,7 +99,6 @@ export const AvaliacaoMapaInteligenteView: React.FC<Props> = ({
     setBuscaCidade(formatCidadeInicial(propriedade.municipio, propriedade.estado));
   }, [propriedade.id, propriedade.municipio, propriedade.estado]);
 
-  // Inicialização do Leaflet Map
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
@@ -131,7 +132,6 @@ export const AvaliacaoMapaInteligenteView: React.FC<Props> = ({
     };
   }, []);
 
-  // Atualiza as camadas e marcadores no mapa (somente com dados reais informados)
   useEffect(() => {
     const map = mapInstanceRef.current;
     const group = layersGroupRef.current;
@@ -143,7 +143,6 @@ export const AvaliacaoMapaInteligenteView: React.FC<Props> = ({
       const centerLat = propriedade.coordenadasGps.latitude;
       const centerLng = propriedade.coordenadasGps.longitude;
 
-      // 1. Marcador da Sede da Propriedade (apenas se houver coordenadas válidas)
       if (camadaAtiva === 'todos' || camadaAtiva === 'propriedade') {
         const sedeIcon = L.divIcon({
           html: `<div style="background-color:#10b981; width:28px; height:28px; border-radius:50%; border:3px solid white; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.3);"><span style="color:white; font-size:14px; font-weight:bold;">S</span></div>`,
@@ -164,7 +163,6 @@ export const AvaliacaoMapaInteligenteView: React.FC<Props> = ({
         `);
         group.addLayer(markerSede);
 
-        // Perímetro estimado apenas quando área total > 0 for informada
         if (propriedade.areaTotalHa > 0) {
           const ladoKm = Math.sqrt(propriedade.areaTotalHa * 0.01);
           const delta = Math.max(0.002, Math.min(0.05, (ladoKm / 111) * 0.5));
@@ -189,7 +187,6 @@ export const AvaliacaoMapaInteligenteView: React.FC<Props> = ({
         }
       }
 
-      // 2. Talhões individuais cadastrados pelo usuário
       if ((camadaAtiva === 'todos' || camadaAtiva === 'talhoes') && glebasValidas.length > 0) {
         glebasValidas.forEach((g, idx) => {
           const offsetLat = (idx % 2 === 0 ? 1 : -1) * 0.005 * (idx + 1);
@@ -219,7 +216,6 @@ export const AvaliacaoMapaInteligenteView: React.FC<Props> = ({
       }
     }
 
-    // 3. Pontos de Interesse da Vistoria (somente coordenadas válidas)
     if (camadaAtiva === 'todos' || camadaAtiva === 'propriedade') {
       pontosValidos.forEach((pt) => {
         const ptIcon = L.divIcon({
@@ -229,7 +225,9 @@ export const AvaliacaoMapaInteligenteView: React.FC<Props> = ({
           iconAnchor: [10, 10]
         });
 
-        const ptMarker = L.marker([pt.coordenadas.latitude, pt.coordenadas.longitude], { icon: ptIcon });
+        const ptMarker = L.marker([pt.coordenadas.latitude, pt.coordenadas.longitude], {
+          icon: ptIcon
+        });
         ptMarker.bindPopup(`
           <strong>${pt.nome}</strong><br/>
           Categoria: ${pt.categoria}<br/>
@@ -240,7 +238,6 @@ export const AvaliacaoMapaInteligenteView: React.FC<Props> = ({
       });
     }
 
-    // 4. Marcadores dos Imóveis Comparativos de Mercado (somente coordenadas válidas)
     if (camadaAtiva === 'todos' || camadaAtiva === 'comparativos') {
       comparativosValidos.forEach((comp) => {
         const isAtivo = comp.statusInclusao === 'incluido';
@@ -253,7 +250,9 @@ export const AvaliacaoMapaInteligenteView: React.FC<Props> = ({
           iconAnchor: [11, 11]
         });
 
-        const compMarker = L.marker([comp.coordenadas.latitude, comp.coordenadas.longitude], { icon: compIcon });
+        const compMarker = L.marker([comp.coordenadas.latitude, comp.coordenadas.longitude], {
+          icon: compIcon
+        });
         const vHomog = comp.fatores?.valorHomogeneizadoPorHaR$ || comp.precoPorHectareR$;
         compMarker.bindPopup(`
           <div style="font-family:sans-serif; font-size:12px;">
@@ -270,7 +269,6 @@ export const AvaliacaoMapaInteligenteView: React.FC<Props> = ({
     }
   }, [propriedade, pontosVistoria, comparativos, camadaAtiva, propTemCoords]);
 
-  // Integração 1: Busca Manual de Cidade no OpenStreetMap (Nominatim API)
   const handleBuscarCidade = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!buscaCidade.trim()) return;
@@ -318,10 +316,9 @@ export const AvaliacaoMapaInteligenteView: React.FC<Props> = ({
     }
   };
 
-  // Integração 2: Pelo GPS do Dispositivo
   const handleUsarGpsLocal = () => {
     if (!navigator.geolocation) {
-      showTempStatus('Geolocalização não é suportada pelo seu navegador.', 4000);
+      showTempStatus('Geolocalização não suportada pelo navegador.', 4000);
       return;
     }
 
@@ -352,13 +349,15 @@ export const AvaliacaoMapaInteligenteView: React.FC<Props> = ({
     );
   };
 
-  // Centralizar na Fazenda
   const handleCentralizarFazenda = () => {
     if (!propTemCoords) {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.flyTo(DEFAULT_BR_CENTER, DEFAULT_BR_ZOOM, { duration: 1.0 });
       }
-      showTempStatus('Nenhuma coordenada cadastrada para a sede. Use "Ir para Cidade", "GPS Atual" ou informe na aba Imóvel Rural.', 4500);
+      showTempStatus(
+        'Nenhuma coordenada cadastrada para a sede. Pesquise o município, capture via GPS ou informe na aba Imóvel Rural.',
+        4500
+      );
       return;
     }
 
@@ -374,55 +373,53 @@ export const AvaliacaoMapaInteligenteView: React.FC<Props> = ({
   return (
     <div className="space-y-4">
       {/* Barra de Controles e Busca */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-slate-200/80 dark:border-zinc-800">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+          <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             Mapa Interativo Territorial & Mercado (OpenStreetMap)
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Georreferenciamento da propriedade, talhões, pontos de vistoria e mercado imobiliário
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+            Georreferenciamento da propriedade, talhões, pontos de vistoria e amostras
           </p>
         </div>
 
-        {/* Formulário de Busca por Cidade */}
-        <form onSubmit={handleBuscarCidade} className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-2 text-slate-400" />
-            <input
-              type="text"
-              value={buscaCidade}
-              onChange={(e) => setBuscaCidade(e.target.value)}
-              placeholder="Digite o Município / UF..."
-              className="pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 w-52 sm:w-64 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={buscando}
-            className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-          >
-            {buscando ? 'Buscando...' : 'Ir para Cidade'}
-          </button>
-        </form>
+        <div className="flex flex-wrap items-center gap-2">
+          <form onSubmit={handleBuscarCidade} className="flex items-center gap-1.5">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={buscaCidade}
+                onChange={(e) => setBuscaCidade(e.target.value)}
+                placeholder="Município / UF..."
+                className="h-8 pl-8 pr-2.5 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 w-44 sm:w-56 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={buscando}
+              className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+            >
+              {buscando ? 'Buscando...' : 'Localizar'}
+            </button>
+          </form>
 
-        {/* Botão de GPS Local */}
-        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleUsarGpsLocal}
             disabled={gpsAtivo}
-            className="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg flex items-center gap-1.5 font-medium transition-colors"
+            className="h-8 px-2.5 text-xs bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60 hover:bg-sky-100/80 dark:hover:bg-sky-950/70 rounded-lg flex items-center gap-1 font-medium transition-colors"
             title="Localizar posição atual pelo GPS"
           >
             <Navigation className="w-3.5 h-3.5" />
-            {gpsAtivo ? 'Capturando GPS...' : 'GPS Atual'}
+            {gpsAtivo ? 'GPS...' : 'GPS Atual'}
           </button>
 
           <button
             type="button"
             onClick={handleCentralizarFazenda}
-            className="px-3 py-1.5 text-xs bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg flex items-center gap-1.5 font-medium transition-colors"
+            className="h-8 px-2.5 text-xs bg-white dark:bg-zinc-950 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 rounded-lg flex items-center gap-1 font-medium transition-colors"
             title="Centralizar na Fazenda"
           >
             <Maximize2 className="w-3.5 h-3.5" /> Sede
@@ -430,95 +427,69 @@ export const AvaliacaoMapaInteligenteView: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Aviso quando não há coordenadas ou talhões cadastrados */}
       {!propTemCoords && glebasValidas.length === 0 && comparativosValidos.length === 0 && !statusMsg && (
-        <div className="p-2.5 text-xs rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 flex items-center gap-2">
-          <Info className="w-4 h-4 text-emerald-500 shrink-0" />
-          Nenhum talhão, sede ou amostra georreferenciada cadastrada. Pesquise o município, capture via GPS ou informe as coordenadas e talhões na aba Imóvel Rural.
+        <div className="p-3 text-xs rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 text-slate-600 dark:text-zinc-300 flex items-center gap-2">
+          <Info className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          Nenhum talhão, sede ou amostra georreferenciada cadastrada. Pesquise o município, capture via GPS ou informe as coordenadas na aba Imóvel Rural.
         </div>
       )}
 
-      {/* Notificação de Status */}
       {statusMsg && (
-        <div className="p-2.5 text-xs rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 flex items-center gap-2 animate-fadeIn">
+        <div className="p-3 text-xs rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
-          {statusMsg}
+          <span>{statusMsg}</span>
         </div>
       )}
 
       {/* Controles de Camadas */}
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
-        <div className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
-          <Layers className="w-4 h-4 text-emerald-500" /> Camadas Exibidas:
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-white dark:bg-zinc-900 p-3 rounded-xl border border-slate-200/80 dark:border-zinc-800 text-xs">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="flex items-center gap-1 font-medium text-slate-600 dark:text-zinc-400 mr-1">
+            <Layers className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Camadas:
+          </span>
+
+          {(
+            [
+              { id: 'todos', label: 'Todos' },
+              { id: 'propriedade', label: 'Sede & Perímetro' },
+              { id: 'talhoes', label: `Talhões (${glebasValidas.length})` },
+              { id: 'comparativos', label: `Mercado (${comparativosValidos.length})` }
+            ] as const
+          ).map((camada) => (
+            <button
+              key={camada.id}
+              type="button"
+              onClick={() => setCamadaAtiva(camada.id)}
+              className={`h-7 px-2.5 rounded-md text-xs font-medium transition-colors tabular-nums ${
+                camadaAtiva === camada.id
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-200/70 dark:hover:bg-zinc-700'
+              }`}
+            >
+              {camada.label}
+            </button>
+          ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setCamadaAtiva('todos')}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-              camadaAtiva === 'todos'
-                ? 'bg-emerald-600 text-white'
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-            }`}
-          >
-            Todos os Elementos
-          </button>
-          <button
-            type="button"
-            onClick={() => setCamadaAtiva('propriedade')}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-              camadaAtiva === 'propriedade'
-                ? 'bg-emerald-600 text-white'
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-            }`}
-          >
-            Sede & Perímetro
-          </button>
-          <button
-            type="button"
-            onClick={() => setCamadaAtiva('talhoes')}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-              camadaAtiva === 'talhoes'
-                ? 'bg-emerald-600 text-white'
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-            }`}
-          >
-            Talhões & Glebas ({glebasValidas.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setCamadaAtiva('comparativos')}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-              camadaAtiva === 'comparativos'
-                ? 'bg-emerald-600 text-white'
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-            }`}
-          >
-            Amostras de Mercado ({comparativosValidos.length})
-          </button>
-        </div>
-
-        {/* Legenda */}
-        <div className="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">
-          <span className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Sede / Limites
+        <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 dark:text-zinc-400">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" /> Sede
           </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 inline-block"></span> Talhões
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-cyan-500 inline-block" /> Talhões
           </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span> Vistoria GPS
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-indigo-500 inline-block" /> Vistoria GPS
           </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> Mercado
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" /> Mercado
           </span>
         </div>
       </div>
 
       {/* Container do Mapa Leaflet */}
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 shadow-inner overflow-hidden relative">
-        <div ref={mapContainerRef} className="w-full h-[520px] z-10" />
+      <div className="rounded-xl border border-slate-200/80 dark:border-zinc-800 overflow-hidden relative">
+        <div ref={mapContainerRef} className="w-full h-[500px] z-10" />
       </div>
     </div>
   );

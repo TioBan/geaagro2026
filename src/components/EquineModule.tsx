@@ -1,77 +1,66 @@
-// @ts-nocheck
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
+  LayoutGrid,
   Sparkles,
-  Award,
   ShieldCheck,
-  Scale,
-  Activity,
-  Heart,
-  Calendar,
-  Clock,
   Dna,
-  Zap,
-  QrCode,
-  FileText,
-  TrendingUp,
-  Stethoscope,
-  Building2,
+  Heart,
+  Scale,
+  Wheat,
+  Syringe,
   Hammer,
+  Award,
+  Activity,
   DollarSign,
-  Package,
-  Layers,
-  Search,
+  Building2,
   BookOpen,
 } from 'lucide-react';
-
 import {
   EquineAnimal,
   EquineBiometricsRecord,
+  EquineReproductionRecord,
   EquineHealthRecord,
-  EquineFarrieryRecord,
   EquineDentalRecord,
+  EquineFarrieryRecord,
   EquineTrainingRecord,
   EquineCompetitionRecord,
-  EquineReproductionRecord,
   EquineNutritionPlan,
-  EquineExpenseRecord,
   EquineFacility,
+  EquineExpenseRecord,
   EquineInventoryItem,
   EquineExamRecord,
 } from '../types/equine';
-
 import {
   loadEquineAnimals,
   saveEquineAnimals,
   loadEquineBiometrics,
   saveEquineBiometrics,
+  loadEquineReproduction,
+  saveEquineReproduction,
   loadEquineHealth,
   saveEquineHealth,
-  loadEquineFarriery,
-  saveEquineFarriery,
   loadEquineDental,
   saveEquineDental,
+  loadEquineFarriery,
+  saveEquineFarriery,
   loadEquineTrainings,
   saveEquineTrainings,
   loadEquineCompetitions,
   saveEquineCompetitions,
-  loadEquineReproduction,
-  saveEquineReproduction,
   loadEquineNutritionPlans,
   saveEquineNutritionPlans,
-  loadEquineExpenses,
-  saveEquineExpenses,
   loadEquineFacilities,
   saveEquineFacilities,
+  loadEquineExpenses,
+  saveEquineExpenses,
   loadEquineInventory,
   saveEquineInventory,
   loadEquineExams,
   saveEquineExams,
 } from '../utils/equineStorage';
-
 import { EquineDashboardView } from './equine/EquineDashboardView';
-import { EquineDigitalTwinView } from './equine/EquineDigitalTwinView';
 import { EquineRegistryView } from './equine/EquineRegistryView';
+import { EquineDigitalTwinView } from './equine/EquineDigitalTwinView';
 import { EquineGenealogyView } from './equine/EquineGenealogyView';
 import { EquineReproductionView } from './equine/EquineReproductionView';
 import { EquineBiometricsView } from './equine/EquineBiometricsView';
@@ -84,72 +73,61 @@ import { EquineFinancialView } from './equine/EquineFinancialView';
 import { EquineFacilitiesInventoryView } from './equine/EquineFacilitiesInventoryView';
 import { EquineDiseasesBankView } from './equine/EquineDiseasesBankView';
 import { EquineDigitalPassportModal } from './equine/EquineDigitalPassportModal';
-import { EquinoIcon } from './icons/EquinoIcon';
 
-interface EquineModuleProps {
+interface Props {
   activeSubTab?: string;
-  setActiveSubTab?: (subTab: string) => void;
+  setActiveSubTab?: (tab: string) => void;
 }
 
-export const EquineModule: React.FC<EquineModuleProps> = ({
-  activeSubTab: propActiveSubTab = 'dashboard',
-  setActiveSubTab: propSetActiveSubTab
+const EQUINE_SUBTABS = [
+  { id: 'dashboard', label: 'Painel', icon: LayoutGrid },
+  { id: 'registry', label: 'Plantel', icon: ShieldCheck },
+  { id: 'digital_twin', label: 'Gêmeo 360°', icon: Sparkles },
+  { id: 'genealogy', label: 'Genealogia', icon: Dna },
+  { id: 'reproduction', label: 'Reprodução', icon: Heart },
+  { id: 'biometrics', label: 'Biometria', icon: Scale },
+  { id: 'nutrition', label: 'Nutrição NRC', icon: Wheat },
+  { id: 'health', label: 'Sanidade', icon: Syringe },
+  { id: 'farriery', label: 'Podologia', icon: Hammer },
+  { id: 'dental', label: 'Odontologia', icon: Activity },
+  { id: 'training', label: 'Treinos & Provas', icon: Award },
+  { id: 'financial', label: 'Custos', icon: DollarSign },
+  { id: 'facilities_inventory', label: 'Haras & Estoque', icon: Building2 },
+  { id: 'diseases_bank', label: 'Enfermidades', icon: BookOpen },
+] as const;
+
+export const EquineModule: React.FC<Props> = ({
+  activeSubTab: externalSubTab,
+  setActiveSubTab: externalSetSubTab,
 }) => {
-  // Navigation tab state
-  const [internalSubTab, setInternalSubTab] = useState<string>(propActiveSubTab || 'dashboard');
-  const [focusedAnimalId, setFocusedAnimalId] = useState<string | undefined>(undefined);
+  const [internalSubTab, setInternalSubTab] = useState<string>('dashboard');
+  const activeSubTab = externalSubTab || internalSubTab;
+  const setActiveSubTab = externalSetSubTab || setInternalSubTab;
 
-  useEffect(() => {
-    if (propActiveSubTab && propActiveSubTab !== internalSubTab) {
-      setInternalSubTab(propActiveSubTab);
-    }
-  }, [propActiveSubTab]);
-
-  const activeSubTab = propActiveSubTab || internalSubTab;
-
-  const setActiveSubTab = (tab: string) => {
-    setInternalSubTab(tab);
-    if (propSetActiveSubTab) {
-      propSetActiveSubTab(tab);
-    }
-  };
-
-  // Passport modal state
-  const [passportAnimal, setPassportAnimal] = useState<EquineAnimal | null>(null);
-
-  // Core Data States
   const [animals, setAnimals] = useState<EquineAnimal[]>(() => loadEquineAnimals());
   const [biometrics, setBiometrics] = useState<EquineBiometricsRecord[]>(() => loadEquineBiometrics());
-  const [health, setHealth] = useState<EquineHealthRecord[]>(() => loadEquineHealth());
-  const [farriery, setFarriery] = useState<EquineFarrieryRecord[]>(() => loadEquineFarriery());
-  const [dental, setDental] = useState<EquineDentalRecord[]>(() => loadEquineDental());
-  const [training, setTraining] = useState<EquineTrainingRecord[]>(() => loadEquineTrainings());
-  const [competitions, setCompetitions] = useState<EquineCompetitionRecord[]>(() => loadEquineCompetitions());
   const [reproduction, setReproduction] = useState<EquineReproductionRecord[]>(() => loadEquineReproduction());
+  const [health, setHealth] = useState<EquineHealthRecord[]>(() => loadEquineHealth());
+  const [dental, setDental] = useState<EquineDentalRecord[]>(() => loadEquineDental());
+  const [farriery, setFarriery] = useState<EquineFarrieryRecord[]>(() => loadEquineFarriery());
+  const [trainings, setTrainings] = useState<EquineTrainingRecord[]>(() => loadEquineTrainings());
+  const [competitions, setCompetitions] = useState<EquineCompetitionRecord[]>(() => loadEquineCompetitions());
   const [nutritionPlans, setNutritionPlans] = useState<EquineNutritionPlan[]>(() => loadEquineNutritionPlans());
-  const [expenses, setExpenses] = useState<EquineExpenseRecord[]>(() => loadEquineExpenses());
   const [facilities, setFacilities] = useState<EquineFacility[]>(() => loadEquineFacilities());
+  const [expenses, setExpenses] = useState<EquineExpenseRecord[]>(() => loadEquineExpenses());
   const [inventory, setInventory] = useState<EquineInventoryItem[]>(() => loadEquineInventory());
   const [exams, setExams] = useState<EquineExamRecord[]>(() => loadEquineExams());
 
-  // Storage Sync
-  useEffect(() => {
-    setAnimals(loadEquineAnimals());
-    setBiometrics(loadEquineBiometrics());
-    setHealth(loadEquineHealth());
-    setFarriery(loadEquineFarriery());
-    setDental(loadEquineDental());
-    setTraining(loadEquineTrainings());
-    setCompetitions(loadEquineCompetitions());
-    setReproduction(loadEquineReproduction());
-    setNutritionPlans(loadEquineNutritionPlans());
-    setExpenses(loadEquineExpenses());
-    setFacilities(loadEquineFacilities());
-    setInventory(loadEquineInventory());
-    setExams(loadEquineExams());
-  }, []);
+  const [selectedAnimalId, setSelectedAnimalId] = useState<string | undefined>(undefined);
+  const [passportAnimal, setPassportAnimal] = useState<EquineAnimal | null>(null);
 
-  // Handler functions with persistence
+  const handleNavigateTab = (tabId: string, animalId?: string) => {
+    if (animalId) {
+      setSelectedAnimalId(animalId);
+    }
+    setActiveSubTab(tabId);
+  };
+
   const handleAddAnimal = (newAnimal: EquineAnimal) => {
     const updated = [newAnimal, ...animals];
     setAnimals(updated);
@@ -163,10 +141,11 @@ export const EquineModule: React.FC<EquineModuleProps> = ({
   };
 
   const handleDeleteAnimal = (id: string) => {
-    if (confirm('Deseja realmente remover o registro deste equino?')) {
-      const updated = animals.filter(a => a.id !== id);
-      setAnimals(updated);
-      saveEquineAnimals(updated);
+    const updated = animals.filter(a => a.id !== id);
+    setAnimals(updated);
+    saveEquineAnimals(updated);
+    if (selectedAnimalId === id) {
+      setSelectedAnimalId(undefined);
     }
   };
 
@@ -174,42 +153,18 @@ export const EquineModule: React.FC<EquineModuleProps> = ({
     const updated = [record, ...biometrics];
     setBiometrics(updated);
     saveEquineBiometrics(updated);
-  };
 
-  const handleAddHealth = (record: EquineHealthRecord) => {
-    const updated = [record, ...health];
-    setHealth(updated);
-    saveEquineHealth(updated);
-  };
-
-  const handleAddExam = (record: EquineExamRecord) => {
-    const updated = [record, ...exams];
-    setExams(updated);
-    saveEquineExams(updated);
-  };
-
-  const handleAddFarriery = (record: EquineFarrieryRecord) => {
-    const updated = [record, ...farriery];
-    setFarriery(updated);
-    saveEquineFarriery(updated);
-  };
-
-  const handleAddDental = (record: EquineDentalRecord) => {
-    const updated = [record, ...dental];
-    setDental(updated);
-    saveEquineDental(updated);
-  };
-
-  const handleAddTraining = (record: EquineTrainingRecord) => {
-    const updated = [record, ...training];
-    setTraining(updated);
-    saveEquineTrainings(updated);
-  };
-
-  const handleAddCompetition = (record: EquineCompetitionRecord) => {
-    const updated = [record, ...competitions];
-    setCompetitions(updated);
-    saveEquineCompetitions(updated);
+    const animal = animals.find(a => a.id === record.animalId);
+    if (animal) {
+      handleUpdateAnimal({
+        ...animal,
+        weightKg: record.weightKg,
+        bodyScore: record.bodyScore,
+        heightM: record.heightM || animal.heightM,
+        chestCircumferenceCm: record.chestCircumferenceCm || animal.chestCircumferenceCm,
+        updatedAt: new Date().toISOString(),
+      });
+    }
   };
 
   const handleAddReproduction = (record: EquineReproductionRecord) => {
@@ -224,26 +179,56 @@ export const EquineModule: React.FC<EquineModuleProps> = ({
     saveEquineReproduction(updated);
   };
 
+  const handleAddHealth = (record: EquineHealthRecord) => {
+    const updated = [record, ...health];
+    setHealth(updated);
+    saveEquineHealth(updated);
+  };
+
+  const handleAddExam = (record: EquineExamRecord) => {
+    const updated = [record, ...exams];
+    setExams(updated);
+    saveEquineExams(updated);
+  };
+
+  const handleAddDental = (record: EquineDentalRecord) => {
+    const updated = [record, ...dental];
+    setDental(updated);
+    saveEquineDental(updated);
+  };
+
+  const handleAddFarriery = (record: EquineFarrieryRecord) => {
+    const updated = [record, ...farriery];
+    setFarriery(updated);
+    saveEquineFarriery(updated);
+  };
+
+  const handleAddTraining = (record: EquineTrainingRecord) => {
+    const updated = [record, ...trainings];
+    setTrainings(updated);
+    saveEquineTrainings(updated);
+  };
+
+  const handleAddCompetition = (record: EquineCompetitionRecord) => {
+    const updated = [record, ...competitions];
+    setCompetitions(updated);
+    saveEquineCompetitions(updated);
+  };
+
   const handleSaveNutritionPlan = (plan: EquineNutritionPlan) => {
     const updated = [plan, ...nutritionPlans];
     setNutritionPlans(updated);
     saveEquineNutritionPlans(updated);
   };
 
-  const handleAddExpense = (record: EquineExpenseRecord) => {
-    const updated = [record, ...expenses];
-    setExpenses(updated);
-    saveEquineExpenses(updated);
-  };
-
-  const handleAddFacility = (fac: EquineFacility) => {
-    const updated = [fac, ...facilities];
+  const handleAddFacility = (facility: EquineFacility) => {
+    const updated = [facility, ...facilities];
     setFacilities(updated);
     saveEquineFacilities(updated);
   };
 
-  const handleUpdateFacility = (fac: EquineFacility) => {
-    const updated = facilities.map(f => (f.id === fac.id ? fac : f));
+  const handleUpdateFacility = (facility: EquineFacility) => {
+    const updated = facilities.map(f => (f.id === facility.id ? facility : f));
     setFacilities(updated);
     saveEquineFacilities(updated);
   };
@@ -260,71 +245,93 @@ export const EquineModule: React.FC<EquineModuleProps> = ({
     saveEquineInventory(updated);
   };
 
-  const handleNavigateTab = (tabId: string, animalId?: string) => {
-    setActiveSubTab(tabId);
-    if (animalId) setFocusedAnimalId(animalId);
+  const handleAddExpense = (expense: EquineExpenseRecord) => {
+    const updated = [expense, ...expenses];
+    setExpenses(updated);
+    saveEquineExpenses(updated);
   };
 
+  const currentTab = activeSubTab || 'dashboard';
+
   return (
-    <div className="min-h-screen bg-stone-100 text-stone-900 pb-16">
-      {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
-        {activeSubTab === 'dashboard' && (
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 pt-3 pb-10 space-y-5 text-slate-900 dark:text-zinc-100">
+      {/* Compact Horizontal Module Sub-Navigation */}
+      <nav
+        aria-label="Seções de Equinos"
+        className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-slate-200 dark:border-zinc-800 no-scrollbar"
+      >
+        {EQUINE_SUBTABS.map(tab => {
+          const Icon = tab.icon;
+          const isActive = currentTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveSubTab(tab.id)}
+              className={`h-8 px-2.5 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+                isActive
+                  ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-950'
+                  : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800/70 hover:text-slate-900 dark:hover:text-zinc-100'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5 shrink-0" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Active Subview Content */}
+      <main>
+        {currentTab === 'dashboard' && (
           <EquineDashboardView
             animals={animals}
-            biometrics={biometrics}
             healthRecords={health}
             farrieryRecords={farriery}
-            dentalRecords={dental}
-            trainingRecords={training}
+            trainingRecords={trainings}
             competitionRecords={competitions}
-            reproductionRecords={reproduction}
             expenses={expenses}
-            facilities={facilities}
-            onOpenPassport={a => setPassportAnimal(a)}
             onNavigateTab={handleNavigateTab}
+            onOpenPassport={animal => setPassportAnimal(animal)}
           />
         )}
 
-        {activeSubTab === 'digital_twin' && (
-          <EquineDigitalTwinView
-            animals={animals}
-            selectedAnimalId={focusedAnimalId}
-            biometricsRecords={biometrics}
-            healthRecords={health}
-            farrieryRecords={farriery}
-            dentalRecords={dental}
-            trainingRecords={training}
-            competitionRecords={competitions}
-            reproductionRecords={reproduction}
-            onOpenPassport={a => setPassportAnimal(a)}
-            onNavigateTab={handleNavigateTab}
-          />
-        )}
-
-        {activeSubTab === 'registry' && (
+        {currentTab === 'registry' && (
           <EquineRegistryView
             animals={animals}
             onAddAnimal={handleAddAnimal}
             onUpdateAnimal={handleUpdateAnimal}
             onDeleteAnimal={handleDeleteAnimal}
-            onOpenPassport={a => setPassportAnimal(a)}
-            onNavigateToTwin={id => {
-              setFocusedAnimalId(id);
-              setActiveSubTab('digital_twin');
-            }}
+            onNavigateTab={handleNavigateTab}
+            onOpenPassport={animal => setPassportAnimal(animal)}
           />
         )}
 
-        {activeSubTab === 'genealogy' && (
+        {currentTab === 'digital_twin' && (
+          <EquineDigitalTwinView
+            animals={animals}
+            selectedAnimalId={selectedAnimalId}
+            healthRecords={health}
+            farrieryRecords={farriery}
+            dentalRecords={dental}
+            trainingRecords={trainings}
+            competitionRecords={competitions}
+            reproductionRecords={reproduction}
+            biometricsRecords={biometrics}
+            onNavigateTab={handleNavigateTab}
+            onOpenPassport={animal => setPassportAnimal(animal)}
+          />
+        )}
+
+        {currentTab === 'genealogy' && (
           <EquineGenealogyView
             animals={animals}
-            selectedAnimalId={focusedAnimalId}
+            selectedAnimalId={selectedAnimalId}
             onUpdateAnimal={handleUpdateAnimal}
           />
         )}
 
-        {activeSubTab === 'reproduction' && (
+        {currentTab === 'reproduction' && (
           <EquineReproductionView
             animals={animals}
             reproductionRecords={reproduction}
@@ -334,26 +341,24 @@ export const EquineModule: React.FC<EquineModuleProps> = ({
           />
         )}
 
-        {activeSubTab === 'biometrics' && (
+        {currentTab === 'biometrics' && (
           <EquineBiometricsView
             animals={animals}
-            selectedAnimalId={focusedAnimalId}
+            selectedAnimalId={selectedAnimalId}
             biometricsRecords={biometrics}
             onAddBiometrics={handleAddBiometrics}
-            onUpdateAnimal={handleUpdateAnimal}
           />
         )}
 
-        {activeSubTab === 'nutrition' && (
+        {currentTab === 'nutrition' && (
           <EquineNutritionView
             animals={animals}
-            selectedAnimalId={focusedAnimalId}
             nutritionPlans={nutritionPlans}
-            onSavePlan={handleSaveNutritionPlan}
+            onSaveNutritionPlan={handleSaveNutritionPlan}
           />
         )}
 
-        {activeSubTab === 'health' && (
+        {currentTab === 'health' && (
           <EquineHealthSanityView
             animals={animals}
             healthRecords={health}
@@ -364,7 +369,7 @@ export const EquineModule: React.FC<EquineModuleProps> = ({
           />
         )}
 
-        {activeSubTab === 'farriery' && (
+        {currentTab === 'farriery' && (
           <EquineFarrieryView
             animals={animals}
             farrieryRecords={farriery}
@@ -372,17 +377,17 @@ export const EquineModule: React.FC<EquineModuleProps> = ({
           />
         )}
 
-        {activeSubTab === 'training' && (
+        {currentTab === 'training' && (
           <EquineTrainingPerformanceView
             animals={animals}
-            trainingRecords={training}
+            trainingRecords={trainings}
             competitionRecords={competitions}
             onAddTraining={handleAddTraining}
             onAddCompetition={handleAddCompetition}
           />
         )}
 
-        {activeSubTab === 'dental' && (
+        {currentTab === 'dental' && (
           <EquineDentalView
             animals={animals}
             dentalRecords={dental}
@@ -390,7 +395,7 @@ export const EquineModule: React.FC<EquineModuleProps> = ({
           />
         )}
 
-        {activeSubTab === 'financial' && (
+        {currentTab === 'financial' && (
           <EquineFinancialView
             animals={animals}
             expenses={expenses}
@@ -398,7 +403,7 @@ export const EquineModule: React.FC<EquineModuleProps> = ({
           />
         )}
 
-        {activeSubTab === 'facilities_inventory' && (
+        {currentTab === 'facilities_inventory' && (
           <EquineFacilitiesInventoryView
             animals={animals}
             facilities={facilities}
@@ -410,21 +415,16 @@ export const EquineModule: React.FC<EquineModuleProps> = ({
           />
         )}
 
-        {activeSubTab === 'diseases_bank' && (
-          <EquineDiseasesBankView onBack={() => setActiveSubTab('health')} />
-        )}
+        {currentTab === 'diseases_bank' && <EquineDiseasesBankView />}
       </main>
 
-      {/* Digital Passport Modal (Digital Twin Passport) */}
+      {/* Official Digital Passport Modal */}
       {passportAnimal && (
         <EquineDigitalPassportModal
           animal={passportAnimal}
-          healthRecords={health}
-          farrieryRecords={farriery}
-          dentalRecords={dental}
-          trainingRecords={training}
-          competitionRecords={competitions}
-          reproductionRecords={reproduction}
+          healthRecords={health.filter(h => h.animalId === passportAnimal.id)}
+          farrieryRecords={farriery.filter(f => f.animalId === passportAnimal.id)}
+          biometricsRecords={biometrics.filter(b => b.animalId === passportAnimal.id)}
           onClose={() => setPassportAnimal(null)}
         />
       )}

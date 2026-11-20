@@ -1,21 +1,5 @@
-// @ts-nocheck
-import React, { useState } from 'react';
-import {
-  Trophy,
-  Activity,
-  Heart,
-  Plus,
-  Calendar,
-  Clock,
-  Award,
-  Zap,
-  Flame,
-  User,
-  X,
-  CheckCircle2,
-  DollarSign,
-  TrendingUp,
-} from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Trophy, Activity, Heart, Plus, X } from 'lucide-react';
 import {
   EquineAnimal,
   EquineTrainingRecord,
@@ -31,6 +15,10 @@ interface Props {
   onAddCompetition: (record: EquineCompetitionRecord) => void;
 }
 
+const inputCls =
+  'w-full h-9 px-3 rounded-lg bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500';
+const labelCls = 'block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1';
+
 export const EquineTrainingPerformanceView: React.FC<Props> = ({
   animals,
   trainingRecords,
@@ -38,452 +26,517 @@ export const EquineTrainingPerformanceView: React.FC<Props> = ({
   onAddTraining,
   onAddCompetition,
 }) => {
+  const safeAnimals = useMemo(() => (animals || []).filter(a => a && a.id), [animals]);
+  const safeTrainings = useMemo(() => (trainingRecords || []).filter(t => t && t.id), [trainingRecords]);
+  const safeCompetitions = useMemo(() => (competitionRecords || []).filter(c => c && c.id), [competitionRecords]);
+
   const [activeTab, setActiveTab] = useState<'trainings' | 'competitions'>('trainings');
   const [selectedAnimalId, setSelectedAnimalFilter] = useState<string>('all');
   const [isTrainingModalOpen, setIsTrainingModalOpen] = useState(false);
   const [isCompetitionModalOpen, setIsCompetitionModalOpen] = useState(false);
 
-  // Training form state
-  const [trainForm, setTrainForm] = useState<Partial<EquineTrainingRecord>>({
-    animalId: animals[0]?.id || '',
+  const [trainForm, setTrainForm] = useState({
+    animalId: safeAnimals[0]?.id || '',
     date: new Date().toISOString().split('T')[0],
-    discipline: 'Três Tambores (Barrel Racing)',
+    discipline: 'Três Tambores (Barrel Racing)' as EquineDiscipline | string,
     durationMinutes: 45,
     distanceKm: 4.2,
-    effortLevel: 'Moderado',
-    riderName: 'Treinador Lucas Mendes',
-    vitals: {
-      restingHeartRateBpm: 34,
-      peakHeartRateBpm: 186,
-      heartRateRec5MinBpm: 68,
-      heartRateRec10MinBpm: 46,
-      temperatureCelsius: 38.1,
-    },
+    effortLevel: 'Moderado' as EquineTrainingRecord['effortLevel'],
+    riderName: '',
+    peakHr: 182,
+    rec5MinHr: 64,
+    rec10MinHr: 46,
     performanceScore: 9,
-    notes: 'Excelente impulsão dos posteriores e contorno limpo dos tambores.',
+    notes: '',
   });
 
-  // Competition form state
-  const [compForm, setCompForm] = useState<Partial<EquineCompetitionRecord>>({
-    animalId: animals[0]?.id || '',
+  const [compForm, setCompForm] = useState({
+    animalId: safeAnimals[0]?.id || '',
     date: new Date().toISOString().split('T')[0],
-    eventName: 'Grande Prêmio Nacional de Velocidade',
-    city: 'Avaré',
+    eventName: '',
+    city: '',
     state: 'SP',
     category: 'Aberta Senior',
-    placement: '1º Lugar (Campeão)',
-    scoreOrTime: '16.742 s',
-    prizeMoneyBrl: 15000,
-    trophyOrMedal: 'Troféu Ouro Campeão Nacional',
-    riderOrHandler: 'Lucas Mendes',
-    notes: 'Recorde da pista na 2ª passada.',
+    placement: '1º Lugar / Campeão',
+    resultTime: '',
+    prizeMoneyBrl: 0,
+    trophyOrRibbon: '',
+    riderOrHandler: '',
+    observations: '',
   });
 
   const handleSaveTraining = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!trainForm.animalId) return;
+    const targetId = trainForm.animalId || safeAnimals[0]?.id;
+    if (!targetId) return;
 
     const newRecord: EquineTrainingRecord = {
-      ...(trainForm as EquineTrainingRecord),
       id: `trn-${Date.now()}`,
+      animalId: targetId,
+      date: trainForm.date,
+      discipline: trainForm.discipline,
+      riderName: trainForm.riderName.trim() || 'Treinador Responsável',
+      durationMinutes: Number(trainForm.durationMinutes) || 45,
+      distanceKm: Number(trainForm.distanceKm) || 0,
+      effortLevel: trainForm.effortLevel,
+      vitals: {
+        heartRateRestBpm: 36,
+        heartRatePeakBpm: Number(trainForm.peakHr) || 180,
+        heartRateRec5MinBpm: Number(trainForm.rec5MinHr) || 64,
+        heartRateRec10MinBpm: Number(trainForm.rec10MinHr) || 46,
+      },
+      performanceScore: Number(trainForm.performanceScore) || 8,
+      notes: trainForm.notes,
     };
+
     onAddTraining(newRecord);
     setIsTrainingModalOpen(false);
   };
 
   const handleSaveCompetition = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!compForm.animalId || !compForm.eventName) return;
+    const targetId = compForm.animalId || safeAnimals[0]?.id;
+    if (!targetId || !compForm.eventName.trim()) return;
 
     const newRecord: EquineCompetitionRecord = {
-      ...(compForm as EquineCompetitionRecord),
       id: `cmp-${Date.now()}`,
+      animalId: targetId,
+      date: compForm.date,
+      eventName: compForm.eventName.trim(),
+      city: compForm.city.trim() || '—',
+      state: compForm.state.trim() || 'BR',
+      category: compForm.category.trim() || 'Geral',
+      placement: compForm.placement.trim() || 'Classificado',
+      resultTime: compForm.resultTime.trim() || undefined,
+      prizeMoneyBrl: Number(compForm.prizeMoneyBrl) || 0,
+      trophyOrRibbon: compForm.trophyOrRibbon.trim() || undefined,
+      riderOrHandler: compForm.riderOrHandler.trim() || 'Apresentador',
+      observations: compForm.observations.trim() || undefined,
     };
+
     onAddCompetition(newRecord);
     setIsCompetitionModalOpen(false);
   };
 
-  const filteredTrainings = trainingRecords.filter(t =>
-    selectedAnimalId === 'all' || t.animalId === selectedAnimalId
+  const filteredTrainings = safeTrainings.filter(
+    t => selectedAnimalId === 'all' || t.animalId === selectedAnimalId
   );
 
-  const filteredCompetitions = competitionRecords.filter(c =>
-    selectedAnimalId === 'all' || c.animalId === selectedAnimalId
+  const filteredCompetitions = safeCompetitions.filter(
+    c => selectedAnimalId === 'all' || c.animalId === selectedAnimalId
   );
 
-  const totalPrizes = competitionRecords.reduce((sum, c) => sum + (c.prizeMoneyBrl || 0), 0);
-  const totalPodiums = competitionRecords.filter(c =>
-    c.placement.includes('1º') || c.placement.includes('2º') || c.placement.includes('3º')
+  const totalPrizes = safeCompetitions.reduce((sum, c) => sum + (c.prizeMoneyBrl || 0), 0);
+  const totalPodiums = safeCompetitions.filter(
+    c => c.placement.includes('1º') || c.placement.includes('2º') || c.placement.includes('3º')
   ).length;
 
+  const avgRec5Min = useMemo(() => {
+    const valid = safeTrainings.filter(t => typeof t.vitals?.heartRateRec5MinBpm === 'number');
+    if (valid.length === 0) return null;
+    return Math.round(
+      valid.reduce((sum, t) => sum + (t.vitals?.heartRateRec5MinBpm || 0), 0) / valid.length
+    );
+  }, [safeTrainings]);
+
   return (
-    <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 shadow-xs">
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <div className="text-[10px] font-black uppercase text-orange-900 tracking-wider flex items-center gap-1">
-            <Trophy className="w-3.5 h-3.5 text-orange-600" /> Centro de Performance, Treinamento & Provas
-          </div>
-          <h2 className="text-xl font-black text-stone-900">
-            Fisiologia do Exercício & Registro de Competições
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+            <Trophy className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span>Performance, Treinamento & Provas</span>
           </h2>
-          <p className="text-xs text-stone-500 mt-0.5">
-            Monitoramento de frequência cardíaca de esforço, índice de recuperação e conquistas em pista
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Fisiologia do esforço, frequência cardíaca de recuperação e histórico de conquistas em pista
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <select
             value={selectedAnimalId}
             onChange={e => setSelectedAnimalFilter(e.target.value)}
-            className="px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
+            className="h-8 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs text-slate-700 dark:text-zinc-200 focus:outline-none focus:border-emerald-500"
           >
-            <option value="all">Todos os Cavalos</option>
-            {animals.map(a => (
+            <option value="all">Todos os cavalos</option>
+            {safeAnimals.map(a => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </select>
 
           {activeTab === 'trainings' ? (
             <button
+              type="button"
               onClick={() => setIsTrainingModalOpen(true)}
-              className="flex items-center gap-1.5 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-black rounded-xl shadow-xs transition-colors cursor-pointer"
+              className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5" />
               <span>Registrar Treino</span>
             </button>
           ) : (
             <button
+              type="button"
               onClick={() => setIsCompetitionModalOpen(true)}
-              className="flex items-center gap-1.5 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-black rounded-xl shadow-xs transition-colors cursor-pointer"
+              className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
-              <span>Registrar Prova / Prêmio</span>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Registrar Prova</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
-          <span className="text-[10px] text-stone-500 font-bold uppercase block">Treinos Realizados</span>
-          <span className="text-2xl font-black text-stone-900">{trainingRecords.length}</span>
-          <span className="text-[11px] text-orange-700 block mt-0.5 font-semibold">Sessões completas</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
-          <span className="text-[10px] text-yellow-800 font-bold uppercase block">Pódios & Títulos</span>
-          <span className="text-2xl font-black text-yellow-900 font-mono">{totalPodiums}</span>
-          <span className="text-[11px] text-emerald-700 block mt-0.5 font-semibold">1º ao 3º lugar</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
-          <span className="text-[10px] text-stone-500 font-bold uppercase block">Premiação Acumulada</span>
-          <span className="text-2xl font-black text-emerald-800 font-mono">
-            R$ {totalPrizes.toLocaleString('pt-BR')}
-          </span>
-          <span className="text-[11px] text-stone-500 block mt-0.5">Prêmios oficiais ganhos</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
-          <span className="text-[10px] text-stone-500 font-bold uppercase block">FC Recuperação Média (5m)</span>
-          <span className="text-2xl font-black text-blue-900 font-mono">68 bpm</span>
-          <span className="text-[11px] text-emerald-700 block mt-0.5 font-semibold">Excelente condicionamento</span>
+      {/* Hairline KPI Strip */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-zinc-800">
+          <div className="p-3.5">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Treinos Registrados</span>
+            <span className="mt-1 text-lg font-semibold text-slate-900 dark:text-zinc-100 tabular-nums block">
+              {safeTrainings.length}
+            </span>
+          </div>
+          <div className="p-3.5">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Pódios (1º–3º)</span>
+            <span className="mt-1 text-lg font-semibold text-amber-600 dark:text-amber-400 tabular-nums block">
+              {totalPodiums}
+            </span>
+          </div>
+          <div className="p-3.5">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Premiação Acumulada</span>
+            <span className="mt-1 text-lg font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums block">
+              R$ {totalPrizes.toLocaleString('pt-BR')}
+            </span>
+          </div>
+          <div className="p-3.5">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">FC Recup. Média (5m)</span>
+            <span className="mt-1 text-lg font-semibold text-slate-900 dark:text-zinc-100 tabular-nums block">
+              {avgRec5Min !== null ? `${avgRec5Min} bpm` : '—'}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Switcher Tabs */}
-      <div className="flex items-center gap-2 border-b border-stone-200 pb-2 text-xs font-bold">
+      {/* Switcher */}
+      <div className="flex items-center gap-1.5">
         <button
+          type="button"
           onClick={() => setActiveTab('trainings')}
-          className={`px-4 py-2 rounded-xl transition-colors cursor-pointer flex items-center gap-2 ${
-            activeTab === 'trainings' ? 'bg-orange-900 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+          className={`h-8 px-3 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+            activeTab === 'trainings'
+              ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-950'
+              : 'bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800'
           }`}
         >
-          <Activity className="w-4 h-4" />
-          <span>Sessões de Treino & Fisiologia ({filteredTrainings.length})</span>
+          <Activity className="w-3.5 h-3.5" />
+          <span>Sessões de Treino ({filteredTrainings.length})</span>
         </button>
 
         <button
+          type="button"
           onClick={() => setActiveTab('competitions')}
-          className={`px-4 py-2 rounded-xl transition-colors cursor-pointer flex items-center gap-2 ${
-            activeTab === 'competitions' ? 'bg-orange-900 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+          className={`h-8 px-3 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+            activeTab === 'competitions'
+              ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-950'
+              : 'bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800'
           }`}
         >
-          <Trophy className="w-4 h-4" />
-          <span>Histórico de Provas & Campeonatos ({filteredCompetitions.length})</span>
+          <Trophy className="w-3.5 h-3.5" />
+          <span>Provas & Campeonatos ({filteredCompetitions.length})</span>
         </button>
       </div>
 
-      {/* View 1: Trainings */}
+      {/* Trainings List */}
       {activeTab === 'trainings' && (
-        <div className="space-y-4">
-          {(filteredTrainings || []).filter(t => t && t.id).map(t => {
-            const animal = (animals || []).find(a => a?.id === t?.animalId);
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+          {filteredTrainings.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-500 dark:text-zinc-400">
+              Nenhuma sessão de treino registrada.
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-200 dark:divide-zinc-800">
+              {filteredTrainings.map(t => {
+                const animal = safeAnimals.find(a => a.id === t.animalId);
+                const peakHr = t.vitals?.heartRatePeakBpm ?? t.vitals?.peakHeartRateBpm;
+                const rec5 = t.vitals?.heartRateRec5MinBpm;
+                const rec10 = t.vitals?.heartRateRec10MinBpm;
 
-            return (
-              <div
-                key={t.id}
-                className="bg-white rounded-2xl border border-stone-200 p-5 shadow-xs hover:border-orange-300 transition-all space-y-3"
-              >
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-stone-100 pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-800 flex items-center justify-center text-xl font-bold">
-                      🏃
+                return (
+                  <div key={t.id} className="p-4 space-y-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <Activity className="w-4 h-4 mt-0.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                            {animal?.name || 'Cavalo'} — {t.discipline}
+                          </div>
+                          <div className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+                            {new Date(t.date).toLocaleDateString('pt-BR')} · Treinador: {t.riderName} · Esforço: {t.effortLevel}
+                          </div>
+                        </div>
+                      </div>
+                      {t.performanceScore !== undefined && (
+                        <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100 tabular-nums shrink-0">
+                          Nota {t.performanceScore}/10
+                        </span>
+                      )}
                     </div>
-                    <div>
-                      <h3 className="font-black text-stone-900 text-sm">{t.discipline}</h3>
-                      <div className="text-xs text-stone-500 font-medium">
-                        Cavalo: <strong className="text-stone-800">{animal?.name || 'Cavalo'}</strong> • Data: {new Date(t.date).toLocaleDateString('pt-BR')} • Treinador: {t.riderName}
+
+                    <div className="pl-6.5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs tabular-nums">
+                      <div>
+                        <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Duração / Distância</span>
+                        <span className="font-medium text-slate-900 dark:text-zinc-100">
+                          {t.durationMinutes} min{t.distanceKm ? ` (${t.distanceKm} km)` : ''}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 dark:text-zinc-400 flex items-center gap-1">
+                          <Heart className="w-3 h-3 text-rose-500" /> FC Pico
+                        </span>
+                        <span className="font-medium text-rose-600 dark:text-rose-400">
+                          {peakHr ? `${peakHr} bpm` : '—'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">FC Recup. 5 min</span>
+                        <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                          {rec5 ? `${rec5} bpm` : '—'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">FC Recup. 10 min</span>
+                        <span className="font-medium text-slate-900 dark:text-zinc-100">
+                          {rec10 ? `${rec10} bpm` : '—'}
+                        </span>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold bg-orange-50 text-orange-900 border border-orange-200 px-3 py-1 rounded-full">
-                      Esforço: {t.effortLevel}
-                    </span>
-                    <span className="text-xs font-black bg-stone-900 text-white px-2.5 py-1 rounded-lg">
-                      Nota {t.performanceScore}/10
-                    </span>
+                    {t.notes && (
+                      <div className="pl-6.5 text-xs text-slate-600 dark:text-zinc-400">
+                        {t.notes}
+                      </div>
+                    )}
                   </div>
-                </div>
-
-                {/* Physiology Metrics */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                  <div className="p-3 bg-stone-50 rounded-xl">
-                    <span className="text-[10px] text-stone-500 font-bold uppercase block">Duração & Distância</span>
-                    <strong className="text-sm font-black text-stone-900 block font-mono mt-0.5">
-                      {t.durationMinutes} min ({t.distanceKm} km)
-                    </strong>
-                  </div>
-
-                  <div className="p-3 bg-red-50/60 rounded-xl border border-red-100">
-                    <span className="text-[10px] text-red-700 font-bold uppercase block flex items-center gap-1">
-                      <Heart className="w-3 h-3" /> FC Pico (Esforço Máx)
-                    </span>
-                    <strong className="text-sm font-black text-red-900 block font-mono mt-0.5">
-                      {t.vitals.peakHeartRateBpm} bpm
-                    </strong>
-                  </div>
-
-                  <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-100">
-                    <span className="text-[10px] text-emerald-700 font-bold uppercase block">FC Recup. (5 min)</span>
-                    <strong className="text-sm font-black text-emerald-900 block font-mono mt-0.5">
-                      {t.vitals.heartRateRec5MinBpm} bpm
-                    </strong>
-                  </div>
-
-                  <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100">
-                    <span className="text-[10px] text-blue-700 font-bold uppercase block">FC Recup. (10 min)</span>
-                    <strong className="text-sm font-black text-blue-900 block font-mono mt-0.5">
-                      {t.vitals.heartRateRec10MinBpm} bpm
-                    </strong>
-                  </div>
-                </div>
-
-                {t.notes && (
-                  <div className="text-xs text-stone-600 bg-stone-50 p-2.5 rounded-lg border border-stone-100">
-                    <strong>Parecer do Treinador:</strong> {t.notes}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
-      {/* View 2: Competitions */}
+      {/* Competitions List */}
       {activeTab === 'competitions' && (
-        <div className="space-y-4">
-          {(filteredCompetitions || []).filter(c => c && c.id).map(c => {
-            const animal = (animals || []).find(a => a?.id === c?.animalId);
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+          {filteredCompetitions.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-500 dark:text-zinc-400">
+              Nenhuma prova ou competição registrada.
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-200 dark:divide-zinc-800">
+              {filteredCompetitions.map(c => {
+                const animal = safeAnimals.find(a => a.id === c.animalId);
+                const timeScore = c.resultTime || c.scoreOrTime || c.scoreOrFaults || '—';
+                const trophy = c.trophyOrRibbon || c.trophyOrMedal || '—';
+                const notes = c.observations || c.notes;
 
-            return (
-              <div
-                key={c.id}
-                className="bg-white rounded-2xl border border-stone-200 p-5 shadow-xs hover:border-yellow-400 transition-all space-y-3"
-              >
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-stone-100 pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-yellow-100 text-yellow-800 flex items-center justify-center text-xl font-bold">
-                      🏆
-                    </div>
-                    <div>
-                      <h3 className="font-black text-stone-900 text-sm">{c.eventName}</h3>
-                      <div className="text-xs text-stone-500 font-medium">
-                        Cavalo: <strong className="text-stone-800">{animal?.name || 'Cavalo'}</strong> • Local: {c.city}/{c.state} • Data: {new Date(c.date).toLocaleDateString('pt-BR')}
+                return (
+                  <div key={c.id} className="p-4 space-y-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <Trophy className="w-4 h-4 mt-0.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                            {c.eventName}
+                          </div>
+                          <div className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+                            {animal?.name || 'Cavalo'} · {c.city}/{c.state} · {new Date(c.date).toLocaleDateString('pt-BR')}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0 text-xs tabular-nums">
+                        <span className="font-semibold text-amber-700 dark:text-amber-400">
+                          {c.placement}
+                        </span>
+                        {c.prizeMoneyBrl > 0 && (
+                          <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                            R$ {c.prizeMoneyBrl.toLocaleString('pt-BR')}
+                          </span>
+                        )}
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black bg-yellow-500 text-stone-950 px-3 py-1 rounded-full shadow-xs">
-                      {c.placement}
-                    </span>
-                    {c.prizeMoneyBrl > 0 && (
-                      <span className="text-xs font-mono font-black text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
-                        R$ {c.prizeMoneyBrl.toLocaleString('pt-BR')}
-                      </span>
+                    <div className="pl-6.5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Categoria</span>
+                        <span className="font-medium text-slate-900 dark:text-zinc-100">{c.category}</span>
+                      </div>
+                      <div className="tabular-nums">
+                        <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Tempo / Nota</span>
+                        <span className="font-medium text-slate-900 dark:text-zinc-100">{timeScore}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Cavaleiro</span>
+                        <span className="font-medium text-slate-900 dark:text-zinc-100">{c.riderOrHandler}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Troféu / Prêmio</span>
+                        <span className="font-medium text-slate-900 dark:text-zinc-100 truncate block">{trophy}</span>
+                      </div>
+                    </div>
+
+                    {notes && (
+                      <div className="pl-6.5 text-xs text-slate-600 dark:text-zinc-400">{notes}</div>
                     )}
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                  <div className="p-3 bg-stone-50 rounded-xl">
-                    <span className="text-[10px] text-stone-500 font-bold uppercase block">Categoria</span>
-                    <strong className="text-stone-900 block mt-0.5">{c.category}</strong>
-                  </div>
-
-                  <div className="p-3 bg-stone-50 rounded-xl">
-                    <span className="text-[10px] text-stone-500 font-bold uppercase block">Tempo / Pontuação</span>
-                    <strong className="text-stone-900 block font-mono mt-0.5">{c.scoreOrTime}</strong>
-                  </div>
-
-                  <div className="p-3 bg-stone-50 rounded-xl">
-                    <span className="text-[10px] text-stone-500 font-bold uppercase block">Cavaleiro / Apresentador</span>
-                    <strong className="text-stone-900 block mt-0.5">{c.riderOrHandler}</strong>
-                  </div>
-
-                  <div className="p-3 bg-stone-50 rounded-xl">
-                    <span className="text-[10px] text-stone-500 font-bold uppercase block">Premiação / Troféu</span>
-                    <strong className="text-amber-900 block mt-0.5 truncate">{c.trophyOrMedal || 'Certificado'}</strong>
-                  </div>
-                </div>
-
-                {c.notes && (
-                  <div className="text-xs text-stone-600 bg-stone-50 p-2.5 rounded-lg border border-stone-100">
-                    <strong>Resenha da Prova:</strong> {c.notes}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
       {/* Modal: New Training */}
       {isTrainingModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl border border-stone-200 max-w-lg w-full">
-            <div className="bg-orange-950 text-white px-6 py-4 flex items-center justify-between rounded-t-2xl">
-              <div className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-orange-400" />
-                <h3 className="font-black text-sm">Registrar Sessão de Treino</h3>
-              </div>
-              <button onClick={() => setIsTrainingModalOpen(false)} className="text-stone-300 hover:text-white cursor-pointer">
-                <X className="w-5 h-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl max-w-lg w-full">
+            <div className="px-5 py-3.5 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Registrar Sessão de Treino
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsTrainingModalOpen(false)}
+                className="h-7 w-7 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-500 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveTraining} className="p-6 space-y-4 text-xs text-stone-800">
+            <form onSubmit={handleSaveTraining} className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="font-bold text-stone-700 block mb-1">Cavalo *</label>
+                  <label className={labelCls}>Cavalo *</label>
                   <select
-                    value={trainForm.animalId}
+                    value={trainForm.animalId || safeAnimals[0]?.id || ''}
                     onChange={e => setTrainForm({ ...trainForm, animalId: e.target.value })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-bold"
+                    className={inputCls}
                   >
-                    {animals.map(a => (
+                    {safeAnimals.map(a => (
                       <option key={a.id} value={a.id}>{a.name} ({a.discipline})</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Modalidade</label>
+                  <label className={labelCls}>Modalidade</label>
                   <input
                     type="text"
-                    value={trainForm.discipline || ''}
-                    onChange={e => setTrainForm({ ...trainForm, discipline: e.target.value as EquineDiscipline })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl"
+                    value={trainForm.discipline}
+                    onChange={e => setTrainForm({ ...trainForm, discipline: e.target.value })}
+                    className={inputCls}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Data do Treino</label>
+                  <label className={labelCls}>Data do Treino</label>
                   <input
                     type="date"
                     value={trainForm.date}
                     onChange={e => setTrainForm({ ...trainForm, date: e.target.value })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl"
+                    className={inputCls}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Duração (minutos)</label>
+                  <label className={labelCls}>Duração (min)</label>
                   <input
                     type="number"
                     value={trainForm.durationMinutes}
-                    onChange={e => setTrainForm({ ...trainForm, durationMinutes: parseInt(e.target.value) || 45 })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-mono"
+                    onChange={e => setTrainForm({ ...trainForm, durationMinutes: Number(e.target.value) || 0 })}
+                    className={`${inputCls} tabular-nums`}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Nível de Esforço</label>
+                  <label className={labelCls}>Nível de Esforço</label>
                   <select
                     value={trainForm.effortLevel}
-                    onChange={e => setTrainForm({ ...trainForm, effortLevel: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-bold"
+                    onChange={e => setTrainForm({ ...trainForm, effortLevel: e.target.value as EquineTrainingRecord['effortLevel'] })}
+                    className={inputCls}
                   >
-                    <option value="Leve">Leve (Aquecimento / Passo)</option>
-                    <option value="Moderado">Moderado (Trote / Galope ritmado)</option>
-                    <option value="Intenso">Intenso (Passadas em pista de prova)</option>
-                    <option value="Máximo / Competição">Máximo / Simulação de Prova</option>
+                    <option value="Leve">Leve</option>
+                    <option value="Moderado">Moderado</option>
+                    <option value="Intenso">Intenso</option>
+                    <option value="Máximo / Competição">Máximo / Competição</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">FC Pico Esforço (bpm)</label>
+                  <label className={labelCls}>FC Pico (bpm)</label>
                   <input
                     type="number"
-                    value={trainForm.vitals?.peakHeartRateBpm}
-                    onChange={e => setTrainForm({
-                      ...trainForm,
-                      vitals: { ...trainForm.vitals!, peakHeartRateBpm: parseInt(e.target.value) || 180 }
-                    })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-mono"
+                    value={trainForm.peakHr}
+                    onChange={e => setTrainForm({ ...trainForm, peakHr: Number(e.target.value) || 0 })}
+                    className={`${inputCls} tabular-nums`}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">FC Recup. 5 Min (bpm)</label>
+                  <label className={labelCls}>FC Recup. 5 min (bpm)</label>
                   <input
                     type="number"
-                    value={trainForm.vitals?.heartRateRec5MinBpm}
-                    onChange={e => setTrainForm({
-                      ...trainForm,
-                      vitals: { ...trainForm.vitals!, heartRateRec5MinBpm: parseInt(e.target.value) || 65 }
-                    })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-mono"
+                    value={trainForm.rec5MinHr}
+                    onChange={e => setTrainForm({ ...trainForm, rec5MinHr: Number(e.target.value) || 0 })}
+                    className={`${inputCls} tabular-nums`}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelCls}>Treinador / Cavaleiro</label>
+                  <input
+                    type="text"
+                    value={trainForm.riderName}
+                    onChange={e => setTrainForm({ ...trainForm, riderName: e.target.value })}
+                    placeholder="Nome do treinador"
+                    className={inputCls}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelCls}>Nota de Performance (1–10)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={trainForm.performanceScore}
+                    onChange={e => setTrainForm({ ...trainForm, performanceScore: Number(e.target.value) || 8 })}
+                    className={`${inputCls} tabular-nums`}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="font-bold text-stone-700 block mb-1">Observações do Treinador</label>
+                <label className={labelCls}>Observações do Treinador</label>
                 <textarea
                   rows={2}
-                  value={trainForm.notes || ''}
+                  value={trainForm.notes}
                   onChange={e => setTrainForm({ ...trainForm, notes: e.target.value })}
-                  className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl"
+                  className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
-              <div className="pt-3 border-t flex justify-end gap-3">
+              <div className="pt-3 border-t border-slate-200 dark:border-zinc-800 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsTrainingModalOpen(false)}
-                  className="px-4 py-2 bg-stone-100 text-stone-700 font-bold rounded-xl cursor-pointer"
+                  className="h-8 px-3.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-600 dark:text-zinc-300 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-xl shadow-md cursor-pointer"
+                  className="h-8 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium cursor-pointer"
                 >
                   Salvar Treino
                 </button>
@@ -495,101 +548,124 @@ export const EquineTrainingPerformanceView: React.FC<Props> = ({
 
       {/* Modal: New Competition */}
       {isCompetitionModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl border border-stone-200 max-w-lg w-full">
-            <div className="bg-yellow-950 text-white px-6 py-4 flex items-center justify-between rounded-t-2xl">
-              <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-yellow-400" />
-                <h3 className="font-black text-sm">Registrar Prova / Título</h3>
-              </div>
-              <button onClick={() => setIsCompetitionModalOpen(false)} className="text-stone-300 hover:text-white cursor-pointer">
-                <X className="w-5 h-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl max-w-lg w-full">
+            <div className="px-5 py-3.5 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Registrar Prova / Competição
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsCompetitionModalOpen(false)}
+                className="h-7 w-7 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-500 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveCompetition} className="p-6 space-y-4 text-xs text-stone-800">
+            <form onSubmit={handleSaveCompetition} className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="font-bold text-stone-700 block mb-1">Cavalo *</label>
+                  <label className={labelCls}>Cavalo *</label>
                   <select
-                    value={compForm.animalId}
+                    value={compForm.animalId || safeAnimals[0]?.id || ''}
                     onChange={e => setCompForm({ ...compForm, animalId: e.target.value })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-bold"
+                    className={inputCls}
                   >
-                    {animals.map(a => (
+                    {safeAnimals.map(a => (
                       <option key={a.id} value={a.id}>{a.name} ({a.registrationNumber})</option>
                     ))}
                   </select>
                 </div>
 
                 <div className="col-span-2">
-                  <label className="font-bold text-stone-700 block mb-1">Nome do Evento / Prova *</label>
+                  <label className={labelCls}>Nome do Evento / Prova *</label>
                   <input
                     type="text"
                     required
-                    value={compForm.eventName || ''}
+                    value={compForm.eventName}
                     onChange={e => setCompForm({ ...compForm, eventName: e.target.value })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl"
+                    placeholder="Ex: Campeonato Nacional ABQM"
+                    className={inputCls}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Colocação / Resultado</label>
+                  <label className={labelCls}>Data</label>
+                  <input
+                    type="date"
+                    value={compForm.date}
+                    onChange={e => setCompForm({ ...compForm, date: e.target.value })}
+                    className={inputCls}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelCls}>Colocação</label>
                   <input
                     type="text"
-                    value={compForm.placement || ''}
+                    value={compForm.placement}
                     onChange={e => setCompForm({ ...compForm, placement: e.target.value })}
-                    placeholder="Ex: 1º Lugar (Campeão)"
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-bold"
+                    placeholder="Ex: 1º Lugar / Campeão"
+                    className={inputCls}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Tempo / Pontuação</label>
+                  <label className={labelCls}>Tempo / Pontuação</label>
                   <input
                     type="text"
-                    value={compForm.scoreOrTime || ''}
-                    onChange={e => setCompForm({ ...compForm, scoreOrTime: e.target.value })}
+                    value={compForm.resultTime}
+                    onChange={e => setCompForm({ ...compForm, resultTime: e.target.value })}
                     placeholder="Ex: 16.742 s"
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-mono font-bold"
+                    className={`${inputCls} tabular-nums`}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Cidade / UF</label>
-                  <input
-                    type="text"
-                    value={`${compForm.city || ''} / ${compForm.state || ''}`}
-                    onChange={e => {
-                      const [city, state] = e.target.value.split('/');
-                      setCompForm({ ...compForm, city: city?.trim(), state: state?.trim() || 'SP' });
-                    }}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-stone-700 block mb-1">Premiação em Dinheiro (R$)</label>
+                  <label className={labelCls}>Premiação (R$)</label>
                   <input
                     type="number"
                     value={compForm.prizeMoneyBrl}
-                    onChange={e => setCompForm({ ...compForm, prizeMoneyBrl: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-mono font-bold"
+                    onChange={e => setCompForm({ ...compForm, prizeMoneyBrl: Number(e.target.value) || 0 })}
+                    className={`${inputCls} tabular-nums`}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelCls}>Cidade</label>
+                  <input
+                    type="text"
+                    value={compForm.city}
+                    onChange={e => setCompForm({ ...compForm, city: e.target.value })}
+                    placeholder="Ex: Avaré"
+                    className={inputCls}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelCls}>UF</label>
+                  <input
+                    type="text"
+                    value={compForm.state}
+                    onChange={e => setCompForm({ ...compForm, state: e.target.value })}
+                    placeholder="SP"
+                    className={inputCls}
                   />
                 </div>
               </div>
 
-              <div className="pt-3 border-t flex justify-end gap-3">
+              <div className="pt-3 border-t border-slate-200 dark:border-zinc-800 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsCompetitionModalOpen(false)}
-                  className="px-4 py-2 bg-stone-100 text-stone-700 font-bold rounded-xl cursor-pointer"
+                  className="h-8 px-3.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-600 dark:text-zinc-300 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-yellow-600 hover:bg-yellow-700 text-white font-black rounded-xl shadow-md cursor-pointer"
+                  className="h-8 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium cursor-pointer"
                 >
                   Salvar Conquista
                 </button>

@@ -99,6 +99,19 @@ export interface PoultryDisease {
   incubation?: string;
 }
 
+export interface PoultryBiosecurityCheck {
+  id: string;
+  date: string;
+  area: string;
+  inspector: string;
+  status: 'Conforme' | 'Pendente' | 'Não Conforme';
+  sanitaryVoidDays: number;
+  footbathChecked: boolean;
+  meshIntegrityChecked: boolean;
+  vehicleDisinfected: boolean;
+  notes?: string;
+}
+
 export interface IEA_Result {
   score: number;
   feedConversion: number;

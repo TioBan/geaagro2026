@@ -1,21 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
-  Plus,
   Search,
-  Filter,
-  Award,
-  Sparkles,
-  Edit2,
+  Plus,
+  Edit3,
   Trash2,
-  QrCode,
-  CheckCircle2,
-  Scale,
-  Calendar,
+  FileCheck,
+  Sparkles,
+  Camera,
   X,
-  Upload,
-  User,
-  ShieldCheck,
-  Dna,
 } from 'lucide-react';
 import {
   EquineAnimal,
@@ -23,27 +15,29 @@ import {
   EquineCoatColor,
   EquineSex,
   EquineCategory,
-  EquineStatus,
   EquineDiscipline,
+  EquineStatus,
+  EquineSpecies,
 } from '../../types/equine';
+import { EquinoIcon } from '../icons/EquinoIcon';
 
 interface Props {
   animals: EquineAnimal[];
   onAddAnimal: (animal: EquineAnimal) => void;
   onUpdateAnimal: (animal: EquineAnimal) => void;
-  onDeleteAnimal: (animalId: string) => void;
-  onOpenPassport: (animal: EquineAnimal) => void;
+  onDeleteAnimal: (id: string) => void;
   onNavigateTab: (tabId: string, animalId?: string) => void;
+  onOpenPassport: (animal: EquineAnimal) => void;
 }
 
-const BREEDS: EquineBreed[] = [
+const BREED_OPTIONS: EquineBreed[] = [
   'Mangalarga Marchador',
   'Quarto de Milha',
   'Crioulo',
+  'Campolina',
   'Puro Sangue Inglês (PSI)',
   'Puro Sangue Árabe',
   'Brasileiro de Hipismo (BH)',
-  'Campolina',
   'Paint Horse',
   'Appaloosa',
   'Lusitano',
@@ -54,7 +48,7 @@ const BREEDS: EquineBreed[] = [
   'Outra',
 ];
 
-const COAT_COLORS: EquineCoatColor[] = [
+const COAT_OPTIONS: EquineCoatColor[] = [
   'Alazã',
   'Castanha',
   'Tordilha',
@@ -71,7 +65,7 @@ const COAT_COLORS: EquineCoatColor[] = [
   'Outra',
 ];
 
-const CATEGORIES: EquineCategory[] = [
+const CATEGORY_OPTIONS: EquineCategory[] = [
   'Garanhão',
   'Matriz',
   'Doadora de Embrião',
@@ -84,7 +78,7 @@ const CATEGORIES: EquineCategory[] = [
   'Aposentado / Lazer',
 ];
 
-const DISCIPLINES: EquineDiscipline[] = [
+const DISCIPLINE_OPTIONS: EquineDiscipline[] = [
   'Mangalarga Marchador / Concurso de Marcha',
   'Três Tambores',
   'Seis Balizas',
@@ -101,596 +95,698 @@ const DISCIPLINES: EquineDiscipline[] = [
   'Cavalgada / Lazer',
 ];
 
+const STATUS_OPTIONS: EquineStatus[] = [
+  'Ativo no Haras',
+  'Em Treinamento Externo',
+  'Em Competição',
+  'Em Tratamento / Hospital',
+  'Em Trânsito',
+  'Vendido',
+  'Baixa / Óbito',
+];
+
+const EMPTY_FORM: Partial<EquineAnimal> = {
+  name: '',
+  registrationNumber: '',
+  microchip: '',
+  passportNumber: '',
+  species: 'Equino',
+  breed: 'Mangalarga Marchador',
+  coatColor: 'Castanha',
+  sex: 'Garanhão',
+  category: 'Treinamento / Esporte',
+  discipline: 'Mangalarga Marchador / Concurso de Marcha',
+  birthDate: '2021-08-15',
+  weightKg: 450,
+  heightM: 1.52,
+  chestCircumferenceCm: 178,
+  bodyScore: 6,
+  status: 'Ativo no Haras',
+  isPregnant: false,
+  owner: '',
+  breeder: '',
+  association: 'ABCCMM',
+  marketValueBrl: 50000,
+  photoUrl: '',
+  notes: '',
+};
+
+const inputCls =
+  'w-full h-9 px-3 rounded-lg bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500';
+const labelCls = 'block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1';
+
 export const EquineRegistryView: React.FC<Props> = ({
   animals,
   onAddAnimal,
   onUpdateAnimal,
   onDeleteAnimal,
-  onOpenPassport,
   onNavigateTab,
+  onOpenPassport,
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedBreed, setSelectedBreed] = useState<string>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedSex, setSelectedSex] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterBreed, setFilterBreed] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAnimal, setEditingAnimal] = useState<EquineAnimal | null>(null);
+  const [formData, setFormData] = useState<Partial<EquineAnimal>>(EMPTY_FORM);
 
-  // Form states
-  const [formData, setFormData] = useState<Partial<EquineAnimal>>({
-    name: '',
-    nickname: '',
-    registrationNumber: '',
-    microchip: '',
-    rfid: '',
-    species: 'Equino',
-    breed: 'Mangalarga Marchador',
-    coatColor: 'Castanha',
-    sex: 'Garanhão',
-    birthDate: new Date().toISOString().split('T')[0],
-    category: 'Garanhão',
-    status: 'Ativo no Haras',
-    weightKg: 450,
-    heightM: 1.52,
-    chestCircumferenceCm: 180,
-    shinCircumferenceCm: 19.5,
-    bodyLengthCm: 152,
-    bodyScore: 6,
-    breeder: 'Haras GeaAgro',
-    owner: 'Lucas Mendes',
-    photoUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800&auto=format&fit=crop&q=80',
-    association: 'ABCCMM',
-    discipline: 'Mangalarga Marchador / Concurso de Marcha',
-    marketValueBrl: 50000,
-    notes: '',
-  });
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const safeAnimals = (animals || []).filter(a => a && a.id);
 
   const handleOpenAdd = () => {
-    const nextId = `eq-${String(animals.length + 1).padStart(3, '0')}`;
-    const nextReg = `REG-${Math.floor(100000 + Math.random() * 900000)}`;
-    const nextChip = `982000${Math.floor(100000000 + Math.random() * 900000000)}`;
     setEditingAnimal(null);
-    setFormData({
-      id: nextId,
-      name: '',
-      nickname: '',
-      registrationNumber: nextReg,
-      microchip: nextChip,
-      rfid: `RFID-${nextId.toUpperCase()}-BR`,
-      qrCode: `GEA-EQUINE-${nextId.toUpperCase()}`,
-      species: 'Equino',
-      breed: 'Mangalarga Marchador',
-      coatColor: 'Castanha',
-      sex: 'Garanhão',
-      birthDate: '2022-01-15',
-      category: 'Garanhão',
-      status: 'Ativo no Haras',
-      weightKg: 450,
-      heightM: 1.52,
-      chestCircumferenceCm: 180,
-      shinCircumferenceCm: 19.5,
-      bodyLengthCm: 152,
-      bodyScore: 6,
-      breeder: 'Haras Fazenda GeaAgro',
-      owner: 'Lucas Mendes',
-      photoUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800&auto=format&fit=crop&q=80',
-      passportNumber: `BR-PASS-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
-      association: 'ABCCMM - Ass. Bras. Criadores do Cavalo Mangalarga Marchador',
-      discipline: 'Mangalarga Marchador / Concurso de Marcha',
-      marketValueBrl: 50000,
-      inbreedingCoefficient: 1.2,
-      pedigree: {
-        sire: { name: 'Pai do Cavalo', breed: 'Mangalarga Marchador' },
-        dam: { name: 'Mãe do Cavalo', breed: 'Mangalarga Marchador' },
-      },
-      notes: '',
-    });
+    setFormData(EMPTY_FORM);
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (animal: EquineAnimal) => {
     setEditingAnimal(animal);
-    setFormData(animal);
+    setFormData({ ...animal });
     setIsModalOpen(true);
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setFormData(prev => ({ ...prev, photoUrl: reader.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name?.trim()) return;
 
+    const now = new Date().toISOString();
     if (editingAnimal) {
-      const updated: EquineAnimal = {
+      onUpdateAnimal({
         ...editingAnimal,
-        ...(formData as EquineAnimal),
-        updatedAt: new Date().toISOString(),
-      };
-      onUpdateAnimal(updated);
+        ...formData,
+        updatedAt: now,
+      } as EquineAnimal);
     } else {
+      const id = `eq-${Date.now()}`;
       const newAnimal: EquineAnimal = {
-        ...(formData as EquineAnimal),
-        id: formData.id || `eq-${Date.now()}`,
-        passportNumber: formData.passportNumber || `BR-PASS-2026-${Math.floor(10000 + Math.random() * 90000)}`,
-        qrCode: formData.qrCode || `GEA-EQ-${Date.now()}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        id,
+        name: formData.name.trim(),
+        registrationNumber:
+          formData.registrationNumber?.trim() || `REG-${Date.now().toString().slice(-5)}`,
+        microchip: formData.microchip?.trim() || `982000${Date.now().toString().slice(-9)}`,
+        qrCode: `EQUINE:${id}`,
+        species: (formData.species as EquineSpecies) || 'Equino',
+        breed: (formData.breed as EquineBreed) || 'Mangalarga Marchador',
+        coatColor: (formData.coatColor as EquineCoatColor) || 'Castanha',
+        sex: (formData.sex as EquineSex) || 'Garanhão',
+        birthDate: formData.birthDate || '2021-08-15',
+        category: (formData.category as EquineCategory) || 'Treinamento / Esporte',
+        status: (formData.status as EquineStatus) || 'Ativo no Haras',
+        weightKg: Number(formData.weightKg) || 450,
+        heightM: Number(formData.heightM) || 1.52,
+        chestCircumferenceCm: Number(formData.chestCircumferenceCm) || 178,
+        bodyScore: Number(formData.bodyScore) || 5,
+        breeder: formData.breeder?.trim() || 'Haras Próprio',
+        owner: formData.owner?.trim() || 'Proprietário',
+        photoUrl: formData.photoUrl || '',
+        passportNumber: formData.passportNumber?.trim() || `BR-${Date.now().toString().slice(-6)}`,
+        association: formData.association?.trim() || 'ABCCMM',
+        pedigree: {},
+        discipline: (formData.discipline as EquineDiscipline) || 'Mangalarga Marchador / Concurso de Marcha',
+        isPregnant: Boolean(formData.isPregnant),
+        marketValueBrl: Number(formData.marketValueBrl) || 0,
+        notes: formData.notes?.trim() || '',
+        createdAt: now,
+        updatedAt: now,
       };
       onAddAnimal(newAnimal);
     }
+
     setIsModalOpen(false);
   };
 
-  // Filtered animals
-  const filteredAnimals = animals.filter(animal => {
-    const matchQuery =
-      animal.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      animal.registrationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      animal.microchip.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      animal.association.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (animal.nickname && animal.nickname.toLowerCase().includes(searchQuery.toLowerCase()));
-
-    const matchBreed = selectedBreed === 'all' || animal.breed === selectedBreed;
-    const matchCategory = selectedCategory === 'all' || animal.category === selectedCategory;
-    const matchSex = selectedSex === 'all' || animal.sex === selectedSex;
-
-    return matchQuery && matchBreed && matchCategory && matchSex;
+  const filteredAnimals = safeAnimals.filter(a => {
+    const q = searchTerm.trim().toLowerCase();
+    const matchSearch =
+      !q ||
+      (a.name || '').toLowerCase().includes(q) ||
+      (a.registrationNumber || '').toLowerCase().includes(q) ||
+      (a.microchip || '').toLowerCase().includes(q);
+    const matchBreed = filterBreed === 'all' || a.breed === filterBreed;
+    const matchStatus = filterStatus === 'all' || a.status === filterStatus;
+    return matchSearch && matchBreed && matchStatus;
   });
 
   return (
-    <div className="space-y-6">
-      {/* Top Header & Search Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-2xl border border-stone-200 shadow-xs">
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-black text-stone-900 flex items-center gap-2">
-            <span>Plantel de Cavalos & Passaportes</span>
-            <span className="bg-amber-100 text-amber-900 text-xs font-black px-2.5 py-0.5 rounded-full">
-              {(filteredAnimals || []).length} de {animals.length}
-            </span>
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-zinc-100">
+            Plantel & Registro Oficial
           </h2>
-          <p className="text-xs text-stone-500 mt-0.5">
-            Cadastro completo com identificação eletrônica, microchip, RFID, genealogia e resenha física
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Cadastro completo com microchip ISO, registro genealógico, biometria e passaporte
           </p>
         </div>
 
         <button
+          type="button"
           onClick={handleOpenAdd}
-          className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-xl shadow-xs transition-colors cursor-pointer"
+          className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-colors cursor-pointer"
         >
-          <Plus className="w-4 h-4" />
-          <span>Cadastrar Novo Cavalo</span>
+          <Plus className="w-3.5 h-3.5" />
+          <span>Cadastrar Cavalo</span>
         </button>
       </div>
 
-      {/* Filters & Search Control Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Buscar por nome, registro, chip..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-800 placeholder-stone-400 focus:outline-hidden focus:border-amber-600 focus:bg-white"
-            />
-          </div>
-
-          {/* Breed Filter */}
-          <select
-            value={selectedBreed}
-            onChange={e => setSelectedBreed(e.target.value)}
-            className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-800 focus:outline-hidden focus:border-amber-600 focus:bg-white"
-          >
-            <option value="all">Todas as Raças</option>
-            {BREEDS.map(b => (
-              <option key={b} value={b}>{b}</option>
-            ))}
-          </select>
-
-          {/* Category Filter */}
-          <select
-            value={selectedCategory}
-            onChange={e => setSelectedCategory(e.target.value)}
-            className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-800 focus:outline-hidden focus:border-amber-600 focus:bg-white"
-          >
-            <option value="all">Todas as Categorias</option>
-            {CATEGORIES.map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-
-          {/* Sex Filter */}
-          <select
-            value={selectedSex}
-            onChange={e => setSelectedSex(e.target.value)}
-            className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-800 focus:outline-hidden focus:border-amber-600 focus:bg-white"
-          >
-            <option value="all">Todos os Sexos</option>
-            <option value="Garanhão">Garanhão (Macho Inteiro)</option>
-            <option value="Égua">Égua (Fêmea)</option>
-            <option value="Castrado">Castrado</option>
-          </select>
+      {/* Filters Toolbar */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+        <div className="relative flex-1">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Buscar por nome, registro ou microchip..."
+            className="w-full h-8 pl-8 pr-3 rounded-lg bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
+          />
         </div>
+
+        <select
+          value={filterBreed}
+          onChange={e => setFilterBreed(e.target.value)}
+          className="h-8 px-2.5 rounded-lg bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs text-slate-700 dark:text-zinc-200 focus:outline-none focus:border-emerald-500"
+        >
+          <option value="all">Todas as raças</option>
+          {BREED_OPTIONS.map(b => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={filterStatus}
+          onChange={e => setFilterStatus(e.target.value)}
+          className="h-8 px-2.5 rounded-lg bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs text-slate-700 dark:text-zinc-200 focus:outline-none focus:border-emerald-500"
+        >
+          <option value="all">Todos os status</option>
+          {STATUS_OPTIONS.map(s => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+
+        <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums px-1 self-center shrink-0">
+          {filteredAnimals.length} de {safeAnimals.length}
+        </span>
       </div>
 
-      {/* Horses Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filteredAnimals.map(animal => (
-          <div
-            key={animal.id}
-            className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-xs hover:shadow-lg transition-all flex flex-col justify-between group"
+      {/* Herd Grid */}
+      {filteredAnimals.length === 0 ? (
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-10 text-center space-y-2.5">
+          <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-400 mx-auto flex items-center justify-center">
+            <EquinoIcon className="w-5 h-5" />
+          </div>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+            Nenhum animal encontrado
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            {safeAnimals.length === 0
+              ? 'Cadastre seu primeiro equino para iniciar o controle do haras.'
+              : 'Ajuste os filtros de busca ou cadastre um novo cavalo.'}
+          </p>
+          <button
+            type="button"
+            onClick={handleOpenAdd}
+            className="h-8 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
           >
-            {/* Top Photo with Badges */}
-            <div className="relative aspect-16/10 bg-stone-200 overflow-hidden">
-              <img
-                src={animal.photoUrl}
-                alt={animal.name}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                referrerPolicy="no-referrer"
-              />
-              <div className="absolute top-2 left-2 bg-stone-900/80 backdrop-blur-xs text-amber-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-amber-400/30">
-                {animal.breed}
+            <Plus className="w-3.5 h-3.5" />
+            <span>Cadastrar Cavalo</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredAnimals.map(animal => (
+            <div
+              key={animal.id}
+              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden flex flex-col"
+            >
+              {/* Photo Banner */}
+              <div className="h-36 bg-slate-100 dark:bg-zinc-800/70 relative flex items-center justify-center overflow-hidden border-b border-slate-200 dark:border-zinc-800">
+                {animal.photoUrl ? (
+                  <img
+                    src={animal.photoUrl}
+                    alt={animal.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <EquinoIcon className="w-10 h-10 text-slate-300 dark:text-zinc-600" />
+                )}
               </div>
-              <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-xs text-stone-900 text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-xs">
-                {animal.category}
-              </div>
-              <div className="absolute bottom-2 left-2 bg-amber-950/80 backdrop-blur-xs text-amber-200 text-[9px] font-mono px-2 py-0.5 rounded-md">
-                Chip: {animal.microchip.slice(-6)}
-              </div>
-            </div>
 
-            {/* Content Details */}
-            <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="font-black text-stone-900 text-base group-hover:text-amber-800 transition-colors">
-                      {animal.name}
-                    </h3>
-                    <div className="text-[11px] text-stone-500 font-mono">
-                      Reg: {animal.registrationNumber} • {animal.association.split('-')[0]}
+              {/* Details */}
+              <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 truncate">
+                        {animal.name}
+                      </h3>
+                      <p className="text-[11px] text-slate-500 dark:text-zinc-400 truncate">
+                        {animal.breed} · {animal.coatColor} · {animal.sex}
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 shrink-0">
+                      {animal.status.split(' /')[0]}
+                    </span>
+                  </div>
+
+                  {/* Key Specs */}
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-zinc-800 grid grid-cols-3 gap-2 text-xs tabular-nums">
+                    <div>
+                      <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Peso</span>
+                      <span className="font-semibold text-slate-900 dark:text-zinc-100">
+                        {animal.weightKg} kg
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Cernelha</span>
+                      <span className="font-semibold text-slate-900 dark:text-zinc-100">
+                        {animal.heightM.toFixed(2)} m
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Henneke</span>
+                      <span className="font-semibold text-slate-900 dark:text-zinc-100">
+                        {animal.bodyScore}/9
+                      </span>
                     </div>
                   </div>
-                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                    animal.sex === 'Garanhão' ? 'bg-blue-100 text-blue-800' :
-                    animal.sex === 'Égua' ? 'bg-rose-100 text-rose-800' : 'bg-stone-100 text-stone-800'
-                  }`}>
-                    {animal.sex}
-                  </span>
+
+                  <div className="mt-2.5 text-[11px] text-slate-500 dark:text-zinc-400 space-y-0.5 tabular-nums">
+                    <div className="truncate">
+                      Registro: <span className="text-slate-700 dark:text-zinc-300 font-medium">{animal.registrationNumber}</span> ({animal.association})
+                    </div>
+                    <div className="truncate">
+                      Microchip: <span className="text-slate-700 dark:text-zinc-300 font-mono">{animal.microchip || 'Não informado'}</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="text-xs text-stone-600 mt-2 line-clamp-1">
-                  <strong>Pelagem:</strong> {animal.coatColor} • <strong>Modalidade:</strong> {animal.discipline.split('/')[0]}
-                </div>
-              </div>
+                {/* Actions */}
+                <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => onNavigateTab('digital_twin', animal.id)}
+                      className="h-7 px-2.5 rounded-md bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950 hover:opacity-90 text-xs font-medium inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>Gêmeo 360°</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onOpenPassport(animal)}
+                      className="h-7 px-2.5 rounded-md border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 text-xs font-medium text-slate-700 dark:text-zinc-200 inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <FileCheck className="w-3 h-3" />
+                      <span>Passaporte</span>
+                    </button>
+                  </div>
 
-              {/* Physical Snapshot */}
-              <div className="grid grid-cols-4 gap-1 py-2 border-y border-stone-100 text-[11px] text-center">
-                <div className="bg-stone-50 p-1 rounded-lg">
-                  <span className="text-[9px] text-stone-400 uppercase font-bold block">Peso</span>
-                  <strong className="text-stone-800 font-mono">{animal.weightKg} kg</strong>
+                  {confirmDeleteId === animal.id ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onDeleteAnimal(animal.id);
+                          setConfirmDeleteId(null);
+                        }}
+                        className="h-7 px-2 rounded-md bg-red-600 hover:bg-red-700 text-white text-[11px] font-medium cursor-pointer"
+                      >
+                        Excluir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="h-7 px-2 rounded-md border border-slate-200 dark:border-zinc-700 text-[11px] text-slate-600 dark:text-zinc-300 cursor-pointer"
+                      >
+                        Não
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(animal)}
+                        title="Editar"
+                        className="h-7 w-7 rounded-md border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 flex items-center justify-center cursor-pointer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(animal.id)}
+                        title="Excluir"
+                        className="h-7 w-7 rounded-md border border-slate-200 dark:border-zinc-700 hover:bg-red-50 dark:hover:bg-red-950/40 text-slate-500 hover:text-red-600 dark:text-zinc-400 dark:hover:text-red-400 flex items-center justify-center cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div className="bg-stone-50 p-1 rounded-lg">
-                  <span className="text-[9px] text-stone-400 uppercase font-bold block">Cernelha</span>
-                  <strong className="text-stone-800 font-mono">{animal.heightM} m</strong>
-                </div>
-                <div className="bg-stone-50 p-1 rounded-lg">
-                  <span className="text-[9px] text-stone-400 uppercase font-bold block">Tórax</span>
-                  <strong className="text-stone-800 font-mono">{animal.chestCircumferenceCm} cm</strong>
-                </div>
-                <div className="bg-stone-50 p-1 rounded-lg">
-                  <span className="text-[9px] text-stone-400 uppercase font-bold block">Escore</span>
-                  <strong className="text-emerald-800 font-mono">{animal.bodyScore}/9</strong>
-                </div>
-              </div>
-
-              {/* Actions Button Row */}
-              <div className="flex items-center gap-1.5 pt-1">
-                <button
-                  onClick={() => onOpenPassport(animal)}
-                  title="Abrir Passaporte Digital"
-                  className="flex-1 py-2 px-2 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold rounded-xl border border-amber-200 flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                >
-                  <Award className="w-3.5 h-3.5 text-amber-700" />
-                  <span>Passaporte</span>
-                </button>
-
-                <button
-                  onClick={() => onNavigateTab('digital_twin', animal.id)}
-                  title="Gêmeo Digital 360°"
-                  className="flex-1 py-2 px-2 bg-stone-900 hover:bg-stone-800 text-amber-300 text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Gêmeo 360°</span>
-                </button>
-
-                <button
-                  onClick={() => handleOpenEdit(animal)}
-                  title="Editar cadastro"
-                  className="p-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl transition-colors cursor-pointer"
-                >
-                  <Edit2 className="w-3.5 h-3.5" />
-                </button>
-
-                <button
-                  onClick={() => {
-                    if (confirm(`Tem certeza que deseja excluir o cadastro de "${animal.name}"?`)) {
-                      onDeleteAnimal(animal.id);
-                    }
-                  }}
-                  title="Excluir"
-                  className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl transition-colors cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {/* Modal Add / Edit Animal */}
+      {/* Modal: Create / Edit Equine */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl border border-stone-200 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 z-10 bg-stone-900 text-white px-6 py-4 flex items-center justify-between border-b border-stone-800">
-              <div className="flex items-center gap-2.5">
-                <span className="text-xl">🐎</span>
-                <h3 className="font-black text-base">
-                  {editingAnimal ? `Editar Ficha: ${editingAnimal.name}` : 'Cadastrar Novo Animal / Passaporte Digital'}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="px-5 py-3.5 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between sticky top-0 bg-white dark:bg-zinc-900 z-10">
+              <div className="flex items-center gap-2">
+                <EquinoIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                  {editingAnimal ? `Editar Animal — ${editingAnimal.name}` : 'Cadastrar Novo Equino'}
                 </h3>
               </div>
               <button
+                type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-1.5 text-stone-400 hover:text-white rounded-lg cursor-pointer"
+                className="h-7 w-7 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-500 dark:text-zinc-400 flex items-center justify-center cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="p-6 space-y-5 text-stone-800">
-              {/* Section 1: Identification */}
-              <div className="space-y-3">
-                <div className="text-xs font-black uppercase text-amber-900 tracking-wider flex items-center gap-1.5 border-b pb-1">
-                  <ShieldCheck className="w-4 h-4 text-amber-700" /> Identificação & Registro Oficial
+            <form onSubmit={handleSave} className="p-5 space-y-5">
+              {/* Photo Upload */}
+              <div className="flex items-center gap-4 pb-4 border-b border-slate-100 dark:border-zinc-800">
+                <div className="w-20 h-20 rounded-lg bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 overflow-hidden flex items-center justify-center shrink-0">
+                  {formData.photoUrl ? (
+                    <img src={formData.photoUrl} alt="Prévia" className="w-full h-full object-cover" />
+                  ) : (
+                    <EquinoIcon className="w-7 h-7 text-slate-400" />
+                  )}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="sm:col-span-2">
-                    <label className="text-xs font-bold text-stone-700 block mb-1">Nome Completo do Animal *</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.name || ''}
-                      onChange={e => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="Ex: El Toro Negro da Serra"
-                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-600"
-                    />
+                <div className="space-y-1.5">
+                  <div className="text-xs font-medium text-slate-900 dark:text-zinc-100">
+                    Fotografia do Animal
                   </div>
-                  <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1">Apelido / Nome de Pista</label>
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                    Utilizada no perfil do plantel, Gêmeo Digital 360° e passaporte impresso.
+                  </p>
+                  <div className="flex items-center gap-2">
                     <input
-                      type="text"
-                      value={formData.nickname || ''}
-                      onChange={e => setFormData({ ...formData, nickname: e.target.value })}
-                      placeholder="Ex: El Toro"
-                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-600"
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
                     />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1">Nº Registro Associação</label>
-                    <input
-                      type="text"
-                      value={formData.registrationNumber || ''}
-                      onChange={e => setFormData({ ...formData, registrationNumber: e.target.value })}
-                      placeholder="Ex: ABCCMM-194820/D"
-                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1">Microchip ISO 11784</label>
-                    <input
-                      type="text"
-                      value={formData.microchip || ''}
-                      onChange={e => setFormData({ ...formData, microchip: e.target.value })}
-                      placeholder="Ex: 982000364910284"
-                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1">Tag RFID / Brinco</label>
-                    <input
-                      type="text"
-                      value={formData.rfid || ''}
-                      onChange={e => setFormData({ ...formData, rfid: e.target.value })}
-                      placeholder="Ex: RFID-EQ-001"
-                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-600"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="h-7 px-2.5 rounded-md border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-xs font-medium text-slate-700 dark:text-zinc-200 inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>Selecionar Foto</span>
+                    </button>
+                    {formData.photoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, photoUrl: '' }))}
+                        className="h-7 px-2.5 rounded-md text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
+                      >
+                        Remover
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Section 2: Breed, Sex, Colors */}
-              <div className="space-y-3">
-                <div className="text-xs font-black uppercase text-amber-900 tracking-wider flex items-center gap-1.5 border-b pb-1">
-                  <Dna className="w-4 h-4 text-amber-700" /> Raça, Categoria & Modalidade
+              {/* Identification */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className={labelCls}>Nome Oficial / de Pista *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name || ''}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Ex: Imperador da Serra"
+                    className={inputCls}
+                  />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1">Raça</label>
-                    <select
-                      value={formData.breed}
-                      onChange={e => setFormData({ ...formData, breed: e.target.value as EquineBreed })}
-                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-600"
-                    >
-                      {BREEDS.map(b => (
-                        <option key={b} value={b}>{b}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1">Pelagem</label>
-                    <select
-                      value={formData.coatColor}
-                      onChange={e => setFormData({ ...formData, coatColor: e.target.value as EquineCoatColor })}
-                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-600"
-                    >
-                      {COAT_COLORS.map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1">Sexo</label>
-                    <select
-                      value={formData.sex}
-                      onChange={e => setFormData({ ...formData, sex: e.target.value as EquineSex })}
-                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-600"
-                    >
-                      <option value="Garanhão">Garanhão</option>
-                      <option value="Égua">Égua</option>
-                      <option value="Castrado">Castrado</option>
-                    </select>
-                  </div>
+                <div>
+                  <label className={labelCls}>Registro (ABCCMM / ABQM)</label>
+                  <input
+                    type="text"
+                    value={formData.registrationNumber || ''}
+                    onChange={e => setFormData({ ...formData, registrationNumber: e.target.value })}
+                    placeholder="Ex: ABCCMM-458210"
+                    className={inputCls}
+                  />
+                </div>
 
-                  <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1">Categoria no Haras</label>
-                    <select
-                      value={formData.category}
-                      onChange={e => setFormData({ ...formData, category: e.target.value as EquineCategory })}
-                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-600"
-                    >
-                      {CATEGORIES.map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1">Data de Nascimento</label>
-                    <input
-                      type="date"
-                      value={formData.birthDate || ''}
-                      onChange={e => setFormData({ ...formData, birthDate: e.target.value })}
-                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1">Modalidade Esportiva</label>
-                    <select
-                      value={formData.discipline}
-                      onChange={e => setFormData({ ...formData, discipline: e.target.value as EquineDiscipline })}
-                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-600"
-                    >
-                      {DISCIPLINES.map(d => (
-                        <option key={d} value={d}>{d}</option>
-                      ))}
-                    </select>
-                  </div>
+                <div>
+                  <label className={labelCls}>Microchip ISO</label>
+                  <input
+                    type="text"
+                    value={formData.microchip || ''}
+                    onChange={e => setFormData({ ...formData, microchip: e.target.value })}
+                    placeholder="15 dígitos ISO 11784"
+                    className={`${inputCls} font-mono`}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Nº Passaporte</label>
+                  <input
+                    type="text"
+                    value={formData.passportNumber || ''}
+                    onChange={e => setFormData({ ...formData, passportNumber: e.target.value })}
+                    placeholder="Ex: BR-CBH-2026-001"
+                    className={`${inputCls} font-mono`}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Data de Nascimento</label>
+                  <input
+                    type="date"
+                    value={formData.birthDate || ''}
+                    onChange={e => setFormData({ ...formData, birthDate: e.target.value })}
+                    className={inputCls}
+                  />
                 </div>
               </div>
 
-              {/* Section 3: Biometrics & Morphology */}
-              <div className="space-y-3">
-                <div className="text-xs font-black uppercase text-amber-900 tracking-wider flex items-center gap-1.5 border-b pb-1">
-                  <Scale className="w-4 h-4 text-amber-700" /> Biometria & Resenha Corporal
+              {/* Breed & Classification */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className={labelCls}>Raça</label>
+                  <select
+                    value={formData.breed}
+                    onChange={e => setFormData({ ...formData, breed: e.target.value as EquineBreed })}
+                    className={inputCls}
+                  >
+                    {BREED_OPTIONS.map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1">Peso (kg)</label>
-                    <input
-                      type="number"
-                      step="1"
-                      value={formData.weightKg || 450}
-                      onChange={e => setFormData({ ...formData, weightKg: parseFloat(e.target.value) || 0 })}
-                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1">Altura Cernelha (m)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.heightM || 1.52}
-                      onChange={e => setFormData({ ...formData, heightM: parseFloat(e.target.value) || 0 })}
-                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1">P. Torácico (cm)</label>
-                    <input
-                      type="number"
-                      value={formData.chestCircumferenceCm || 180}
-                      onChange={e => setFormData({ ...formData, chestCircumferenceCm: parseFloat(e.target.value) || 0 })}
-                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1">Escore Henneke (1-9)</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="9"
-                      step="0.5"
-                      value={formData.bodyScore || 6}
-                      onChange={e => setFormData({ ...formData, bodyScore: parseFloat(e.target.value) || 6 })}
-                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-600"
-                    />
-                  </div>
+                <div>
+                  <label className={labelCls}>Pelagem</label>
+                  <select
+                    value={formData.coatColor}
+                    onChange={e => setFormData({ ...formData, coatColor: e.target.value as EquineCoatColor })}
+                    className={inputCls}
+                  >
+                    {COAT_OPTIONS.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Sexo</label>
+                  <select
+                    value={formData.sex}
+                    onChange={e => setFormData({ ...formData, sex: e.target.value as EquineSex })}
+                    className={inputCls}
+                  >
+                    <option value="Garanhão">Garanhão</option>
+                    <option value="Égua">Égua</option>
+                    <option value="Castrado">Castrado</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className={labelCls}>Categoria</label>
+                  <select
+                    value={formData.category}
+                    onChange={e => setFormData({ ...formData, category: e.target.value as EquineCategory })}
+                    className={inputCls}
+                  >
+                    {CATEGORY_OPTIONS.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Modalidade / Aptidão</label>
+                  <select
+                    value={formData.discipline}
+                    onChange={e => setFormData({ ...formData, discipline: e.target.value as EquineDiscipline })}
+                    className={inputCls}
+                  >
+                    {DISCIPLINE_OPTIONS.map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Status Operacional</label>
+                  <select
+                    value={formData.status}
+                    onChange={e => setFormData({ ...formData, status: e.target.value as EquineStatus })}
+                    className={inputCls}
+                  >
+                    {STATUS_OPTIONS.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              {/* Section 4: Breeder, Owner, Photo URL */}
-              <div className="space-y-3">
-                <div className="text-xs font-black uppercase text-amber-900 tracking-wider flex items-center gap-1.5 border-b pb-1">
-                  <User className="w-4 h-4 text-amber-700" /> Titularidade & Imagem
+              {/* Biometrics & Origin */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className={labelCls}>Peso Atual (kg)</label>
+                  <input
+                    type="number"
+                    value={formData.weightKg ?? 450}
+                    onChange={e => setFormData({ ...formData, weightKg: Number(e.target.value) || 0 })}
+                    className={`${inputCls} tabular-nums`}
+                  />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1">Criador Original</label>
-                    <input
-                      type="text"
-                      value={formData.breeder || ''}
-                      onChange={e => setFormData({ ...formData, breeder: e.target.value })}
-                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1">Proprietário Atual</label>
-                    <input
-                      type="text"
-                      value={formData.owner || ''}
-                      onChange={e => setFormData({ ...formData, owner: e.target.value })}
-                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1">URL da Fotografia</label>
-                    <input
-                      type="text"
-                      value={formData.photoUrl || ''}
-                      onChange={e => setFormData({ ...formData, photoUrl: e.target.value })}
-                      placeholder="https://images.unsplash.com/..."
-                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:outline-hidden focus:border-amber-600"
-                    />
-                  </div>
+                <div>
+                  <label className={labelCls}>Cernelha (m)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.heightM ?? 1.52}
+                    onChange={e => setFormData({ ...formData, heightM: Number(e.target.value) || 0 })}
+                    className={`${inputCls} tabular-nums`}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Perím. Torácico (cm)</label>
+                  <input
+                    type="number"
+                    value={formData.chestCircumferenceCm ?? 178}
+                    onChange={e => setFormData({ ...formData, chestCircumferenceCm: Number(e.target.value) || 0 })}
+                    className={`${inputCls} tabular-nums`}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Escore Henneke (1–9)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={9}
+                    step={0.5}
+                    value={formData.bodyScore ?? 5}
+                    onChange={e => setFormData({ ...formData, bodyScore: Number(e.target.value) || 5 })}
+                    className={`${inputCls} tabular-nums`}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelCls}>Associação</label>
+                  <input
+                    type="text"
+                    value={formData.association || ''}
+                    onChange={e => setFormData({ ...formData, association: e.target.value })}
+                    placeholder="ABCCMM / ABQM"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Criador / Haras</label>
+                  <input
+                    type="text"
+                    value={formData.breeder || ''}
+                    onChange={e => setFormData({ ...formData, breeder: e.target.value })}
+                    placeholder="Haras de origem"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Proprietário</label>
+                  <input
+                    type="text"
+                    value={formData.owner || ''}
+                    onChange={e => setFormData({ ...formData, owner: e.target.value })}
+                    placeholder="Nome do proprietário"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Valor de Mercado (R$)</label>
+                  <input
+                    type="number"
+                    value={formData.marketValueBrl ?? 0}
+                    onChange={e => setFormData({ ...formData, marketValueBrl: Number(e.target.value) || 0 })}
+                    className={`${inputCls} tabular-nums`}
+                  />
                 </div>
               </div>
 
-              {/* Submit Buttons */}
-              <div className="pt-4 border-t flex items-center justify-end gap-3">
+              {formData.sex === 'Égua' && (
+                <label className="inline-flex items-center gap-2 text-xs text-slate-700 dark:text-zinc-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.isPregnant)}
+                    onChange={e => setFormData({ ...formData, isPregnant: e.target.checked })}
+                    className="rounded accent-emerald-600"
+                  />
+                  <span>Égua gestante em acompanhamento</span>
+                </label>
+              )}
+
+              <div>
+                <label className={labelCls}>Observações & Temperamento</label>
+                <textarea
+                  rows={2}
+                  value={formData.notes || ''}
+                  onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Histórico clínico, particularidades de manejo ou premiações relevantes..."
+                  className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-200 dark:border-zinc-800 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl cursor-pointer"
+                  className="h-8 px-3.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-xl shadow-md transition-colors cursor-pointer"
+                  className="h-8 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium cursor-pointer"
                 >
-                  {editingAnimal ? 'Salvar Alterações' : 'Cadastrar Cavalo'}
+                  {editingAnimal ? 'Salvar Alterações' : 'Cadastrar Animal'}
                 </button>
               </div>
             </form>

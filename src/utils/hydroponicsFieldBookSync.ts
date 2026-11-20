@@ -1,5 +1,19 @@
-import { HydroponicBench, NutrientSolutionReservoir, HydroponicAnnotation } from '../types/hydroponics';
+import {
+  HydroponicBench,
+  NutrientSolutionReservoir,
+  HydroponicAnnotation,
+  IrrigationTimerSchedule,
+  HydroponicEnvironmentSensors,
+  HydroponicAlert,
+  HydroponicCustomerOrder,
+  HydroponicFinancialSummary,
+} from '../types/hydroponics';
 import { FieldOperation } from '../types/fieldbook';
+import {
+  initialIrrigationSchedule,
+  initialHydroponicSensors,
+  initialHydroponicFinancials,
+} from '../data/hydroponicsData';
 
 export const STORAGE_KEYS = {
   BENCHES: 'geaagro_hydroponics_benches_v1',
@@ -7,6 +21,10 @@ export const STORAGE_KEYS = {
   ANNOTATIONS: 'geaagro_hydroponics_annotations_v1',
   OPERATIONS: 'geaagro_fieldbook_operations_v1',
   ALERTS: 'geaagro_hydroponics_alerts_v1',
+  SCHEDULE: 'geaagro_hydroponics_schedule_v1',
+  SENSORS: 'geaagro_hydroponics_sensors_v1',
+  ORDERS: 'geaagro_hydroponics_orders_v1',
+  FINANCIALS: 'geaagro_hydroponics_financials_v1',
 };
 
 // Initial Benches for Hydroponics
@@ -64,62 +82,90 @@ export function createFieldOperationFromHydroponicAnnotation(
   };
 }
 
+function readJson<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) return JSON.parse(raw) as T;
+  } catch (e) {
+    console.warn(`Error reading ${key} from localStorage`, e);
+  }
+  return fallback;
+}
+
+function writeJson(key: string, value: unknown, eventName?: string): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    if (eventName) {
+      window.dispatchEvent(new CustomEvent(eventName));
+    }
+  } catch (e) {
+    console.error(`Error saving ${key} to localStorage`, e);
+  }
+}
+
 // Storage helpers
 export function getHydroponicBenches(): HydroponicBench[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.BENCHES);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {
-    console.warn('Error reading hydroponic benches from localStorage', e);
-  }
-  return DEFAULT_HYDROPONIC_BENCHES;
+  return readJson<HydroponicBench[]>(STORAGE_KEYS.BENCHES, DEFAULT_HYDROPONIC_BENCHES);
 }
 
 export function saveHydroponicBenches(benches: HydroponicBench[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEYS.BENCHES, JSON.stringify(benches));
-    window.dispatchEvent(new CustomEvent('geaagro-hydroponics-updated'));
-  } catch (e) {
-    console.error('Error saving hydroponic benches', e);
-  }
+  writeJson(STORAGE_KEYS.BENCHES, benches, 'geaagro-hydroponics-updated');
 }
 
 export function getHydroponicReservoirs(): NutrientSolutionReservoir[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.RESERVOIRS);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {
-    console.warn('Error reading hydroponic reservoirs from localStorage', e);
-  }
-  return DEFAULT_HYDROPONIC_RESERVOIRS;
+  return readJson<NutrientSolutionReservoir[]>(STORAGE_KEYS.RESERVOIRS, DEFAULT_HYDROPONIC_RESERVOIRS);
 }
 
 export function saveHydroponicReservoirs(reservoirs: NutrientSolutionReservoir[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEYS.RESERVOIRS, JSON.stringify(reservoirs));
-    window.dispatchEvent(new CustomEvent('geaagro-hydroponics-updated'));
-  } catch (e) {
-    console.error('Error saving hydroponic reservoirs', e);
-  }
+  writeJson(STORAGE_KEYS.RESERVOIRS, reservoirs, 'geaagro-hydroponics-updated');
 }
 
 export function getHydroponicAnnotations(): HydroponicAnnotation[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.ANNOTATIONS);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {
-    console.warn('Error reading hydroponic annotations from localStorage', e);
-  }
-  return DEFAULT_HYDROPONIC_ANNOTATIONS;
+  return readJson<HydroponicAnnotation[]>(STORAGE_KEYS.ANNOTATIONS, DEFAULT_HYDROPONIC_ANNOTATIONS);
 }
 
 export function saveHydroponicAnnotations(annotations: HydroponicAnnotation[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEYS.ANNOTATIONS, JSON.stringify(annotations));
-    window.dispatchEvent(new CustomEvent('geaagro-hydroponics-annotations-updated'));
-  } catch (e) {
-    console.error('Error saving hydroponic annotations', e);
-  }
+  writeJson(STORAGE_KEYS.ANNOTATIONS, annotations, 'geaagro-hydroponics-annotations-updated');
+}
+
+export function getHydroponicSchedule(): IrrigationTimerSchedule {
+  return readJson<IrrigationTimerSchedule>(STORAGE_KEYS.SCHEDULE, initialIrrigationSchedule);
+}
+
+export function saveHydroponicSchedule(schedule: IrrigationTimerSchedule): void {
+  writeJson(STORAGE_KEYS.SCHEDULE, schedule);
+}
+
+export function getHydroponicSensors(): HydroponicEnvironmentSensors {
+  return readJson<HydroponicEnvironmentSensors>(STORAGE_KEYS.SENSORS, initialHydroponicSensors);
+}
+
+export function saveHydroponicSensors(sensors: HydroponicEnvironmentSensors): void {
+  writeJson(STORAGE_KEYS.SENSORS, sensors);
+}
+
+export function getHydroponicAlerts(): HydroponicAlert[] {
+  return readJson<HydroponicAlert[]>(STORAGE_KEYS.ALERTS, []);
+}
+
+export function saveHydroponicAlerts(alerts: HydroponicAlert[]): void {
+  writeJson(STORAGE_KEYS.ALERTS, alerts);
+}
+
+export function getHydroponicOrders(): HydroponicCustomerOrder[] {
+  return readJson<HydroponicCustomerOrder[]>(STORAGE_KEYS.ORDERS, []);
+}
+
+export function saveHydroponicOrders(orders: HydroponicCustomerOrder[]): void {
+  writeJson(STORAGE_KEYS.ORDERS, orders);
+}
+
+export function getHydroponicFinancials(): HydroponicFinancialSummary {
+  return readJson<HydroponicFinancialSummary>(STORAGE_KEYS.FINANCIALS, initialHydroponicFinancials);
+}
+
+export function saveHydroponicFinancials(financials: HydroponicFinancialSummary): void {
+  writeJson(STORAGE_KEYS.FINANCIALS, financials);
 }
 
 // Add a new annotation and automatically sync it to Caderno de Campo operations
@@ -148,7 +194,7 @@ export function addHydroponicAnnotationAndSync(
   try {
     const opsRaw = localStorage.getItem(STORAGE_KEYS.OPERATIONS);
     const existingOps: FieldOperation[] = opsRaw ? JSON.parse(opsRaw) : [];
-    const updatedOps = [operation, ...existingOps.filter(o => o.id !== opId)];
+    const updatedOps = [operation, ...existingOps.filter((o) => o.id !== opId)];
     localStorage.setItem(STORAGE_KEYS.OPERATIONS, JSON.stringify(updatedOps));
     window.dispatchEvent(new CustomEvent('geaagro-fieldbook-operations-updated', { detail: { operation } }));
   } catch (e) {
@@ -165,7 +211,7 @@ export function ensureInitialHydroponicSync(farmId = 'farm-1'): void {
   try {
     const opsRaw = localStorage.getItem(STORAGE_KEYS.OPERATIONS);
     const existingOps: FieldOperation[] = opsRaw ? JSON.parse(opsRaw) : [];
-    const cleanedOps = existingOps.filter(o => !LEGACY_SEED_OP_IDS.has(o.id));
+    const cleanedOps = existingOps.filter((o) => !LEGACY_SEED_OP_IDS.has(o.id));
     let changed = cleanedOps.length !== existingOps.length;
 
     const initialAnnotations = getHydroponicAnnotations();
@@ -173,7 +219,7 @@ export function ensureInitialHydroponicSync(farmId = 'farm-1'): void {
 
     for (const ann of initialAnnotations) {
       const opId = ann.fieldOperationId || `op-hydro-${ann.id}`;
-      const found = mergedOps.some(o => o.id === opId);
+      const found = mergedOps.some((o) => o.id === opId);
       if (!found) {
         mergedOps.unshift(createFieldOperationFromHydroponicAnnotation(ann, farmId));
         changed = true;
@@ -194,17 +240,19 @@ export function getHydroponicSummaryMetrics() {
   const reservoirs = getHydroponicReservoirs();
   const annotations = getHydroponicAnnotations();
 
-  const activeBenches = benches.filter(b => b.status !== 'vazia');
+  const activeBenches = benches.filter((b) => b.status !== 'vazia');
   const totalPlants = benches.reduce((sum, b) => sum + b.currentPlantsCount, 0);
-  const readyBenches = benches.filter(b => b.status === 'pronto_colheita');
-  
-  const avgPH = reservoirs.length > 0 
-    ? (reservoirs.reduce((sum, r) => sum + r.currentPH, 0) / reservoirs.length).toFixed(2)
-    : '--';
-    
-  const avgEC = reservoirs.length > 0
-    ? (reservoirs.reduce((sum, r) => sum + r.currentEC, 0) / reservoirs.length).toFixed(2)
-    : '--';
+  const readyBenches = benches.filter((b) => b.status === 'pronto_colheita');
+
+  const avgPH =
+    reservoirs.length > 0
+      ? (reservoirs.reduce((sum, r) => sum + r.currentPH, 0) / reservoirs.length).toFixed(2)
+      : '--';
+
+  const avgEC =
+    reservoirs.length > 0
+      ? (reservoirs.reduce((sum, r) => sum + r.currentEC, 0) / reservoirs.length).toFixed(2)
+      : '--';
 
   return {
     totalBenches: benches.length,

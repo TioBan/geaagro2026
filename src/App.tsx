@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense, lazy } from 'react';
 import { SoilCoordinatesProvider } from './context/SoilCoordinatesContext';
 import { Navbar } from './components/Navbar';
 import { LoginScreen } from './components/LoginScreen';
@@ -198,6 +198,25 @@ class ModuleErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBound
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('[ModuleErrorBoundary] Caught component error:', error, errorInfo);
+
+    const msg = error?.message || '';
+    const isStaleReactChunkError =
+      msg.includes("reading 'useState'") ||
+      msg.includes("reading 'useEffect'") ||
+      msg.includes("reading 'useMemo'") ||
+      msg.includes("reading 'useCallback'") ||
+      msg.includes("reading 'useRef'") ||
+      msg.includes("reading 'useContext'") ||
+      msg.includes('Invalid hook call');
+
+    if (isStaleReactChunkError && typeof window !== 'undefined') {
+      const reloadKey = 'geaagro_react_chunk_resync';
+      const lastReload = Number(window.sessionStorage.getItem(reloadKey) || '0');
+      if (Date.now() - lastReload > 15000) {
+        window.sessionStorage.setItem(reloadKey, String(Date.now()));
+        window.location.reload();
+      }
+    }
   }
 
   handleReload = () => {
@@ -467,17 +486,32 @@ export default function App() {
 
   // Theme State: Claro ('light') | Escuro ('dark') | AMOLED 100% ('amoled')
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => getSavedThemeMode());
+  const themeModeRef = useRef<ThemeMode>(themeMode);
   const isDarkMode = themeMode === 'dark' || themeMode === 'amoled';
 
-  const setIsDarkMode: React.Dispatch<React.SetStateAction<boolean>> = (valOrFn) => {
-    setThemeMode(prev => {
-      const prevDark = prev === 'dark' || prev === 'amoled';
+  const handleThemeModeChange = useCallback((nextMode: ThemeMode) => {
+    themeModeRef.current = nextMode;
+    setThemeMode(nextMode);
+    setSystemThemeMode(nextMode);
+  }, []);
+
+  const cycleThemeMode = useCallback(() => {
+    const current = themeModeRef.current;
+    const nextMode: ThemeMode =
+      current === 'light' ? 'dark' : current === 'dark' ? 'amoled' : 'light';
+    handleThemeModeChange(nextMode);
+  }, [handleThemeModeChange]);
+
+  const setIsDarkMode: React.Dispatch<React.SetStateAction<boolean>> = useCallback(
+    (valOrFn) => {
+      const current = themeModeRef.current;
+      const prevDark = current === 'dark' || current === 'amoled';
       const nextDark = typeof valOrFn === 'function' ? valOrFn(prevDark) : valOrFn;
-      const nextMode: ThemeMode = nextDark ? (prev === 'amoled' ? 'amoled' : 'dark') : 'light';
-      setSystemThemeMode(nextMode);
-      return nextMode;
-    });
-  };
+      const nextMode: ThemeMode = nextDark ? 'dark' : 'light';
+      handleThemeModeChange(nextMode);
+    },
+    [handleThemeModeChange]
+  );
 
   // Mobile Drawer State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -514,16 +548,17 @@ export default function App() {
 
   // Sync HTML root element class with theme state & listen for external theme changes
   useEffect(() => {
+    themeModeRef.current = themeMode;
     applyThemeModeToDOM(themeMode);
   }, [themeMode]);
 
   useEffect(() => {
     const handleThemeChanged = (e: Event) => {
-      const customEvent = e as CustomEvent<{ mode?: ThemeMode }>;
-      if (customEvent.detail?.mode) {
-        setThemeMode(customEvent.detail.mode);
-      } else {
-        setThemeMode(getSavedThemeMode());
+      const customEvent = e as CustomEvent<{ theme?: ThemeMode; mode?: ThemeMode }>;
+      const next = customEvent.detail?.theme || customEvent.detail?.mode || getSavedThemeMode();
+      if (next !== themeModeRef.current) {
+        themeModeRef.current = next;
+        setThemeMode(next);
       }
     };
     window.addEventListener('geaagro:theme-changed', handleThemeChanged);
@@ -1010,6 +1045,8 @@ export default function App() {
         setSelectedFarmId={setSelectedFarmId}
         isDarkMode={isDarkMode}
         setIsDarkMode={setIsDarkMode}
+        themeMode={themeMode}
+        onChangeThemeMode={handleThemeModeChange}
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={(openOrFn) => {
           setIsMobileMenuOpen(prev => {
@@ -1038,18 +1075,19 @@ export default function App() {
       {/* Main Content Viewport */}
       <div className={`flex-1 flex flex-col min-w-0 ${isSidebarCollapsed ? '' : 'lg:pl-68'} transition-all duration-300`}>
         {/* Desktop Top Header Bar (Desktop only, mobile/tablet uses Navbar header) */}
-        <header className="hidden lg:flex h-16 bg-white dark:bg-zinc-950 border-b border-slate-200 dark:border-zinc-800/80 px-4 sm:px-6 lg:px-8 items-center justify-between sticky top-0 z-[1200] print:hidden transition-colors shadow-2xs">
-          {/* Left: Sidebar toggle + Dynamic Breadcrumb */}
-          <div className="flex items-center gap-3 min-w-0">
+        <header className="hidden lg:flex h-13 bg-white dark:bg-zinc-950 border-b border-slate-200 dark:border-zinc-800 px-4 sm:px-6 items-center justify-between gap-4 sticky top-0 z-[1200] print:hidden transition-colors">
+          {/* Left: Sidebar toggle + Clean Breadcrumb */}
+          <div className="flex items-center gap-2.5 min-w-0">
             <button
+              type="button"
               onClick={() => setIsSidebarCollapsed(prev => !prev)}
-              className="p-2 rounded-xl text-slate-500 hover:text-emerald-600 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-emerald-400 dark:hover:bg-zinc-900 transition-all cursor-pointer shrink-0"
-              title={isSidebarCollapsed ? "Expandir Menu Lateral" : "Recolher Menu Lateral"}
+              className="h-8 w-8 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-900 inline-flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              title={isSidebarCollapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
+              aria-label={isSidebarCollapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
             >
-              {isSidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+              {isSidebarCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
             </button>
-            
-            {/* Unified Breadcrumb */}
+
             {(() => {
               const meta = TAB_METADATA[activeTab] || {
                 title: activeTab.charAt(0).toUpperCase() + activeTab.slice(1),
@@ -1059,12 +1097,12 @@ export default function App() {
               const IconComp = meta.icon;
 
               return (
-                <div className="flex items-center gap-2 text-xs min-w-0">
-                  <span className="text-slate-400 dark:text-zinc-500 font-semibold truncate hidden xl:inline">
+                <div className="flex items-center gap-1.5 text-xs min-w-0">
+                  <span className="text-slate-400 dark:text-zinc-500 font-medium truncate hidden xl:inline">
                     {meta.category}
                   </span>
                   <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-zinc-700 shrink-0 hidden xl:inline" />
-                  <div className="flex items-center gap-1.5 font-black text-slate-900 dark:text-white bg-slate-100/80 dark:bg-zinc-900 px-2.5 py-1 rounded-lg border border-slate-200/60 dark:border-zinc-800">
+                  <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-zinc-100 min-w-0">
                     <IconComp className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span className="truncate">{meta.title}</span>
                   </div>
@@ -1073,20 +1111,16 @@ export default function App() {
             })()}
           </div>
 
-          {/* Center/Right: Farm Selector + Online Indicator + Company + Notifications + Dark Mode */}
-          <div className="flex items-center gap-3 text-xs">
-            {/* Unified Farm Selector Card */}
-            <div className="flex items-center gap-2 bg-slate-50 dark:bg-zinc-900/90 border border-slate-200 dark:border-zinc-800 rounded-xl px-2.5 py-1 shadow-2xs">
-              <Building2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span className="text-[10px] font-extrabold text-slate-400 dark:text-zinc-500 uppercase tracking-wider hidden sm:inline">
-                Fazenda:
-              </span>
+          {/* Right: Farm Selector + Company + Notifications + Theme Switcher */}
+          <div className="flex items-center gap-2 text-xs shrink-0">
+            <div className="flex items-center gap-1.5 h-8 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg px-2.5">
+              <Building2 className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 shrink-0" />
               <select
                 aria-label="Selecionar fazenda ativa"
                 value={selectedFarmId}
                 onChange={e => setSelectedFarmId(e.target.value)}
                 disabled={(farms || []).length === 0}
-                className="bg-transparent text-xs font-bold text-slate-800 dark:text-zinc-100 focus:outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 max-w-[200px] xl:max-w-xs truncate"
+                className="bg-transparent text-xs font-medium text-slate-800 dark:text-zinc-100 focus:outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 max-w-[200px] xl:max-w-[240px] truncate"
               >
                 {(farms || []).length === 0 ? (
                   <option value="">Nenhuma fazenda cadastrada</option>
@@ -1095,7 +1129,7 @@ export default function App() {
                     const prod = producers.find(p => p?.id === f.producerId);
                     return (
                       <option key={f.id} value={f.id} className="bg-white dark:bg-zinc-900 text-slate-800 dark:text-zinc-100">
-                        {f.name} ({f.city}/{f.state}) - {prod?.name || 'Produtor'}
+                        {f.name} ({f.city}/{f.state}) · {prod?.name || 'Produtor'}
                       </option>
                     );
                   })
@@ -1103,65 +1137,56 @@ export default function App() {
               </select>
             </div>
 
-            {/* Online Status Pill */}
-            <div
-              className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${
-                isOnline
-                  ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200/80 dark:border-emerald-800/40'
-                  : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200/80 dark:border-amber-800/40'
-              }`}
-              title={isOnline ? 'Conexão ativa' : 'Modo offline local ativo (IndexedDB)'}
-            >
+            {!isOnline && (
               <span
-                className={`w-2 h-2 rounded-full ${
-                  isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
-                }`}
-              />
-              <span>{isOnline ? 'Online' : 'Local DB'}</span>
-            </div>
-
-
-
-            {/* Desktop Right Header: Company Name */}
-            {currentCompany && (currentCompany.tradingName || currentCompany.name) && (
-              <div className="hidden 2xl:flex items-center gap-2 bg-slate-100/60 dark:bg-zinc-900 px-2.5 py-1 rounded-lg border border-slate-200/40 dark:border-zinc-800">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                <span className="text-slate-600 dark:text-zinc-300 font-semibold truncate max-w-[180px]">
-                  {currentCompany.tradingName || currentCompany.name}
-                </span>
-              </div>
+                className="text-[11px] font-medium text-amber-700 dark:text-amber-400 whitespace-nowrap"
+                title="Modo offline local ativo"
+              >
+                Offline local
+              </span>
             )}
 
-            {/* Notification Bell in Top Bar */}
+            {currentCompany && (currentCompany.tradingName || currentCompany.name) && (
+              <span className="hidden 2xl:inline text-xs text-slate-500 dark:text-zinc-400 truncate max-w-[160px]">
+                {currentCompany.tradingName || currentCompany.name}
+              </span>
+            )}
+
             <button
+              type="button"
               onClick={() => {
                 setIsMobileMenuOpen(false);
                 setIsNotificationCenterOpen(true);
               }}
               aria-label="Central de notificações"
-              className="p-2 rounded-xl text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-900 transition-colors cursor-pointer relative border border-transparent hover:border-slate-200 dark:hover:border-zinc-800"
+              className="h-8 w-8 rounded-lg text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-900 border border-slate-200 dark:border-zinc-800 inline-flex items-center justify-center transition-colors cursor-pointer relative shrink-0"
               title="Notificações"
             >
-              <Bell className="w-4 h-4 text-slate-700 dark:text-zinc-200" />
+              <Bell className="w-4 h-4" />
               {unreadNotifications > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow-xs ring-2 ring-white dark:ring-zinc-950 animate-pulse">
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-rose-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center px-1 tabular-nums">
                   {unreadNotifications}
                 </span>
               )}
             </button>
 
-            {/* Dark Mode Switcher */}
             <button
-              onClick={() => setIsDarkMode(prev => !prev)}
-              aria-label="Alternar modo escuro"
-              className="p-2 rounded-xl text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-900 transition-colors cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-zinc-800"
-              title={isDarkMode ? 'Mudar para Modo Claro' : 'Ativar Modo Escuro'}
+              type="button"
+              onClick={cycleThemeMode}
+              aria-label="Alternar tema (Claro, Escuro, AMOLED)"
+              className="h-8 px-2.5 rounded-lg text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-900 border border-slate-200 dark:border-zinc-800 inline-flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+              title={`Tema atual: ${themeMode === 'amoled' ? 'AMOLED' : themeMode === 'dark' ? 'Escuro' : 'Claro'} — clique para alternar`}
             >
-              {isDarkMode ? (
-                <Sun className="w-4 h-4 text-amber-400" />
+              {themeMode === 'light' ? (
+                <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              ) : themeMode === 'dark' ? (
+                <Moon className="w-3.5 h-3.5 text-sky-400 shrink-0" />
               ) : (
-                <Moon className="w-4 h-4 text-slate-700" />
+                <Smartphone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               )}
+              <span className="text-xs font-medium">
+                {themeMode === 'amoled' ? 'AMOLED' : themeMode === 'dark' ? 'Escuro' : 'Claro'}
+              </span>
             </button>
           </div>
         </header>

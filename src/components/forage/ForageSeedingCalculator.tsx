@@ -1,209 +1,328 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { FORAGES_CATALOG } from '../../data/foragesCatalogData';
-import { Calculator, Sprout } from 'lucide-react';
+import { Sprout, Info, CheckCircle2 } from 'lucide-react';
+
+type PlantingMethod = 'drill' | 'broadcast' | 'aerial' | 'ilpfIntercrop';
+
+const METHOD_CONFIG: Record<
+  PlantingMethod,
+  { multiplier: number; label: string; shortNote: string }
+> = {
+  drill: { multiplier: 1.0, label: 'Em Linha (Plantadeira)', shortNote: '1,0×' },
+  broadcast: { multiplier: 1.25, label: 'A Lanço (Incorporado)', shortNote: '+25%' },
+  aerial: { multiplier: 1.5, label: 'Aéreo / Sobressemeadura', shortNote: '+50%' },
+  ilpfIntercrop: { multiplier: 0.9, label: 'Consórcio ILPF (Milho/Soja)', shortNote: '0,9×' },
+};
 
 export const ForageSeedingCalculator: React.FC = () => {
   const [selectedForageId, setSelectedForageId] = useState<string>(FORAGES_CATALOG[0].id);
-  const [plantingMethod, setPlantingMethod] = useState<'broadcast' | 'drill' | 'aerial' | 'ilpf'>('broadcast');
   const [areaHa, setAreaHa] = useState<number>(20);
-  const [culturalValueVC, setCulturalValueVC] = useState<number>(76); // VC% do lote comercial
-  const [seedPricePerKg, setSeedPricePerKg] = useState<number>(35); // R$/kg
+  const [vcPercent, setVcPercent] = useState<number>(60);
+  const [method, setMethod] = useState<PlantingMethod>('broadcast');
+  const [seedPriceKg, setSeedPriceKg] = useState<number>(28);
 
-  const selectedForage = FORAGES_CATALOG.find(f => f.id === selectedForageId) || FORAGES_CATALOG[0];
+  const selectedForage = useMemo(
+    () => FORAGES_CATALOG.find(f => f.id === selectedForageId) || FORAGES_CATALOG[0],
+    [selectedForageId]
+  );
 
-  // Calculation formulas:
-  // Taxa de semeadura (kg/ha) = (Pontos de VC recomendados) / (% VC da semente)
-  const basePointsVC = selectedForage.seeding.pureLiveSeedPointsVC || 300;
+  const isVegetative =
+    selectedForage.seeding.pureLiveSeedPointsVC === 0 &&
+    selectedForage.seeding.seedingRateKgHa.broadcast.max === 0;
 
-  let methodFactor = 1.0;
-  if (plantingMethod === 'drill') methodFactor = 0.75; // Em linha exige ~25% menos semente
-  if (plantingMethod === 'aerial') methodFactor = 1.25; // Aérea exige ~25% a mais
-  if (plantingMethod === 'ilpf') methodFactor = 0.50; // Consórcio safrinha usa dose reduzida
+  const calculation = useMemo(() => {
+    const basePointsVC = selectedForage.seeding.pureLiveSeedPointsVC;
+    const multiplier = METHOD_CONFIG[method].multiplier;
+    const effectiveVc = Math.max(10, Math.min(100, vcPercent || 10));
 
-  const calculatedKgPerHa = Math.max(1, Math.round(((basePointsVC * methodFactor) / Math.max(10, culturalValueVC)) * 10) / 10);
-  const totalKgNeeded = Math.round(calculatedKgPerHa * areaHa);
-  const totalCost = Math.round(totalKgNeeded * seedPricePerKg);
-  const costPerHa = Math.round(calculatedKgPerHa * seedPricePerKg);
+    const adjustedPoints = Math.round(basePointsVC * multiplier);
+    const kgPerHa = isVegetative ? 0 : adjustedPoints / effectiveVc;
+    const totalKg = kgPerHa * Math.max(0, areaHa);
+    const sacks20kg = Math.ceil(totalKg / 20);
+    const totalCost = totalKg * Math.max(0, seedPriceKg);
+    const costPerHa = kgPerHa * Math.max(0, seedPriceKg);
+
+    const methodRange = selectedForage.seeding.seedingRateKgHa[method];
+
+    return {
+      adjustedPoints,
+      kgPerHa: Math.round(kgPerHa * 10) / 10,
+      totalKg: Math.round(totalKg),
+      sacks20kg,
+      totalCost,
+      costPerHa,
+      methodRange,
+    };
+  }, [selectedForage, areaHa, vcPercent, method, seedPriceKg, isVegetative]);
+
+  const formatBRL = (value: number) =>
+    value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 sm:p-6 shadow-xs space-y-5">
-        <div className="flex items-center gap-3 border-b border-slate-200 dark:border-zinc-800 pb-4">
-          <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center font-bold">
-            <Calculator className="w-5 h-5" />
-          </div>
+    <div className="space-y-4">
+      {/* Parameter Input Panel */}
+      <section className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-4 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
-              Calculadora de Taxa de Semeadura & Valor Cultural (VC%)
-            </h3>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+              Calculadora de Semeadura por Valor Cultural (VC%)
+            </h2>
             <p className="text-xs text-slate-500 dark:text-zinc-400">
-              Cálculo agronômico oficial: <strong>kg/ha = Pontos de VC &divide; % VC do Lote</strong> com ajuste de método de plantio.
+              Dimensione a taxa de sementes (kg/ha), volume de sacas de 20 kg e investimento estimado.
             </p>
           </div>
+          <span className="text-xs text-slate-500 dark:text-zinc-400 tabular-nums">
+            Pontos VC base:{' '}
+            <strong className="font-semibold text-slate-800 dark:text-zinc-200">
+              {isVegetative ? 'Mudas (vegetativo)' : `${selectedForage.seeding.pureLiveSeedPointsVC} pts`}
+            </strong>
+          </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Forage Selection */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-              Forrageira Selecionada:
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-3 border-t border-slate-100 dark:border-zinc-800">
+          <div className="sm:col-span-2 lg:col-span-2">
+            <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">
+              Espécie / Cultivar
             </label>
             <select
               value={selectedForageId}
               onChange={e => setSelectedForageId(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-medium text-slate-800 dark:text-zinc-200 focus:outline-emerald-500"
+              className="w-full h-9 px-2.5 rounded-lg bg-slate-50 dark:bg-zinc-950/60 border border-slate-200/90 dark:border-zinc-800 text-xs text-slate-800 dark:text-zinc-100 focus:outline-none focus:border-emerald-500 transition-colors"
             >
               {FORAGES_CATALOG.map(f => (
                 <option key={f.id} value={f.id}>
-                  {f.commonName}
+                  {f.commonName} ({f.cultivar})
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Planting Method */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-              Método de Semeadura:
-            </label>
-            <select
-              value={plantingMethod}
-              onChange={e => setPlantingMethod(e.target.value as any)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-medium text-slate-800 dark:text-zinc-200 focus:outline-emerald-500"
-            >
-              <option value="broadcast">A Lanço com Incorporação (Grade niveladora)</option>
-              <option value="drill">Em Linha com Semeadora / Plantadeira</option>
-              <option value="aerial">Semeadura Aérea (Avião / Drone)</option>
-              <option value="ilpf">Consórcio ILPF / Safrinha com Milho</option>
-            </select>
-          </div>
-
-          {/* Area Ha */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-              Área de Plantio (Hectares):
+          <div>
+            <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">
+              Área de Plantio (ha)
             </label>
             <input
               type="number"
-              min="0.1"
-              step="0.5"
+              min={0.5}
+              max={100000}
+              step={1}
               value={areaHa}
-              onChange={e => setAreaHa(Math.max(0.1, parseFloat(e.target.value) || 1))}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-medium text-slate-800 dark:text-zinc-200 focus:outline-emerald-500"
+              onChange={e => setAreaHa(Math.max(0, Number(e.target.value)))}
+              className="w-full h-9 px-2.5 rounded-lg bg-slate-50 dark:bg-zinc-950/60 border border-slate-200/90 dark:border-zinc-800 text-xs text-slate-800 dark:text-zinc-100 tabular-nums focus:outline-none focus:border-emerald-500 transition-colors"
             />
           </div>
 
-          {/* Cultural Value VC% */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-              Valor Cultural da Semente (% VC):
+          <div>
+            <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">
+              Valor Cultural (VC%)
             </label>
             <input
               type="number"
-              min="10"
-              max="100"
-              value={culturalValueVC}
-              onChange={e => setCulturalValueVC(Math.max(10, Math.min(100, parseFloat(e.target.value) || 50)))}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-medium text-slate-800 dark:text-zinc-200 focus:outline-emerald-500"
+              min={20}
+              max={100}
+              step={1}
+              disabled={isVegetative}
+              value={vcPercent}
+              onChange={e =>
+                setVcPercent(Math.min(100, Math.max(10, Number(e.target.value) || 10)))
+              }
+              className="w-full h-9 px-2.5 rounded-lg bg-slate-50 dark:bg-zinc-950/60 border border-slate-200/90 dark:border-zinc-800 text-xs text-slate-800 dark:text-zinc-100 tabular-nums disabled:opacity-50 focus:outline-none focus:border-emerald-500 transition-colors"
             />
           </div>
-        </div>
 
-        {/* Seed Price / kg */}
-        <div className="max-w-xs space-y-1.5">
-          <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-            Preço Estimado da Semente (R$/kg):
-          </label>
-          <div className="relative">
-            <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">R$</span>
+          <div>
+            <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">
+              Preço Semente (R$/kg)
+            </label>
             <input
               type="number"
-              min="0"
-              step="1"
-              value={seedPricePerKg}
-              onChange={e => setSeedPricePerKg(Math.max(0, parseFloat(e.target.value) || 0))}
-              className="w-full pl-8 pr-3 py-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-medium text-slate-800 dark:text-zinc-200 focus:outline-emerald-500"
+              min={0}
+              step={1}
+              disabled={isVegetative}
+              value={seedPriceKg}
+              onChange={e => setSeedPriceKg(Math.max(0, Number(e.target.value)))}
+              className="w-full h-9 px-2.5 rounded-lg bg-slate-50 dark:bg-zinc-950/60 border border-slate-200/90 dark:border-zinc-800 text-xs text-slate-800 dark:text-zinc-100 tabular-nums disabled:opacity-50 focus:outline-none focus:border-emerald-500 transition-colors"
             />
           </div>
         </div>
-      </div>
 
-      {/* Calculated Results Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-emerald-50 dark:bg-emerald-950/40 p-5 rounded-2xl border border-emerald-200 dark:border-emerald-800 shadow-xs">
-          <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase block">
-            Taxa de Semeadura Recomendada
-          </span>
-          <span className="text-3xl font-black text-emerald-700 dark:text-emerald-400 my-1 block">
-            {calculatedKgPerHa} <span className="text-sm font-normal">kg/ha</span>
-          </span>
-          <span className="text-[10px] text-slate-500 dark:text-zinc-400">
-            Pontos de VC base: {basePointsVC}
-          </span>
-        </div>
-
-        <div className="bg-blue-50 dark:bg-blue-950/40 p-5 rounded-2xl border border-blue-200 dark:border-blue-800 shadow-xs">
-          <span className="text-[11px] font-bold text-blue-800 dark:text-blue-300 uppercase block">
-            Volume Total de Sementes
-          </span>
-          <span className="text-3xl font-black text-blue-700 dark:text-blue-400 my-1 block">
-            {totalKgNeeded.toLocaleString()} <span className="text-sm font-normal">kg</span>
-          </span>
-          <span className="text-[10px] text-slate-500 dark:text-zinc-400">
-            Equivale a {Math.ceil(totalKgNeeded / 20)} sacas de 20 kg
-          </span>
-        </div>
-
-        <div className="bg-purple-50 dark:bg-purple-950/40 p-5 rounded-2xl border border-purple-200 dark:border-purple-800 shadow-xs">
-          <span className="text-[11px] font-bold text-purple-800 dark:text-purple-300 uppercase block">
-            Custo por Hectare
-          </span>
-          <span className="text-3xl font-black text-purple-700 dark:text-purple-400 my-1 block">
-            R$ {costPerHa.toLocaleString()}
-          </span>
-          <span className="text-[10px] text-slate-500 dark:text-zinc-400">
-            Com semente a R$ {seedPricePerKg}/kg
-          </span>
-        </div>
-
-        <div className="bg-amber-50 dark:bg-amber-950/40 p-5 rounded-2xl border border-amber-200 dark:border-amber-800 shadow-xs">
-          <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 uppercase block">
-            Investimento Total em Sementes
-          </span>
-          <span className="text-3xl font-black text-amber-700 dark:text-amber-400 my-1 block">
-            R$ {totalCost.toLocaleString()}
-          </span>
-          <span className="text-[10px] text-slate-500 dark:text-zinc-400">
-            Para área total de {areaHa} ha
-          </span>
-        </div>
-      </div>
-
-      {/* Practical Planting Rules */}
-      <div className="bg-slate-50 dark:bg-zinc-800/40 p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 space-y-3">
-        <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-          <Sprout className="w-4 h-4 text-emerald-600" />
-          Recomendações Práticas de Calibração & Profundidade
-        </h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-          <div className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800">
-            <span className="font-bold text-emerald-700 dark:text-emerald-400 block mb-1">
-              Profundidade de Incorporação:
+        {/* Planting Method Segmented Row */}
+        {!isVegetative && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-zinc-800">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 mr-1">
+              Método de Semeadura:
             </span>
-            <p className="text-slate-700 dark:text-zinc-300">
-              Semear a <strong>{selectedForage.seeding.seedPlantingDepthCm.min} a {selectedForage.seeding.seedPlantingDepthCm.max} cm</strong>. Sementes miúdas (como Panicuns) não devem ser enterradas a mais de 2 cm sob risco de asfixia e falhas na germinação.
+            {(Object.keys(METHOD_CONFIG) as PlantingMethod[]).map(key => {
+              const active = method === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setMethod(key)}
+                  className={`h-8 px-3 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    active
+                      ? 'bg-emerald-600 text-white'
+                      : 'border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800'
+                  }`}
+                >
+                  {METHOD_CONFIG[key].label}{' '}
+                  <span className={active ? 'text-emerald-100' : 'text-slate-400 dark:text-zinc-500'}>
+                    ({METHOD_CONFIG[key].shortNote})
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Vegetative Notice OR Hairline 4-KPI Result Strip */}
+      {isVegetative ? (
+        <section className="bg-white dark:bg-zinc-900 border border-amber-500/40 dark:border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
+          <Sprout className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <div className="space-y-1 text-xs">
+            <h3 className="font-semibold text-slate-900 dark:text-zinc-100">
+              {selectedForage.commonName} ({selectedForage.cultivar}) utiliza propagação vegetativa por mudas
+            </h3>
+            <p className="text-slate-600 dark:text-zinc-300 leading-relaxed">
+              Esta cultivar não é implantada por semente comercial (VC%). O estabelecimento ocorre via mudas, estolões ou colmos maduros distribuídos em sulcos adubados.
+            </p>
+            <p className="text-slate-700 dark:text-zinc-200 font-medium pt-0.5 tabular-nums">
+              Estabelecimento estimado: {selectedForage.phenology.establishmentDays.min} a{' '}
+              {selectedForage.phenology.establishmentDays.max} dias até o primeiro corte/pastejo.
             </p>
           </div>
+        </section>
+      ) : (
+        <section className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl overflow-hidden">
+          <div className="grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-slate-100 dark:divide-zinc-800">
+            <div className="p-4">
+              <span className="block text-[11px] text-slate-500 dark:text-zinc-400">
+                Taxa Recomendada
+              </span>
+              <span className="block text-xl font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums mt-1">
+                {calculation.kgPerHa.toFixed(1)} <span className="text-xs font-medium">kg/ha</span>
+              </span>
+              <span className="block text-[11px] text-slate-400 dark:text-zinc-500 tabular-nums mt-0.5">
+                {calculation.adjustedPoints} pts VC ÷ {vcPercent}%
+              </span>
+            </div>
 
-          <div className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800">
-            <span className="font-bold text-emerald-700 dark:text-emerald-400 block mb-1">
-              Adubação Fosfatada no Plantio:
-            </span>
-            <p className="text-slate-700 dark:text-zinc-300">
-              {selectedForage.fertilization.establishmentFertilizerNPK}. O contato direto da semente com cloreto de potássio ou ureia pode queimar o embrião.
-            </p>
+            <div className="p-4">
+              <span className="block text-[11px] text-slate-500 dark:text-zinc-400">
+                Volume Total ({areaHa} ha)
+              </span>
+              <span className="block text-xl font-semibold text-slate-900 dark:text-zinc-100 tabular-nums mt-1">
+                {calculation.totalKg.toLocaleString('pt-BR')}{' '}
+                <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">kg</span>
+              </span>
+              <span className="block text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5">
+                Semente comercial necessária
+              </span>
+            </div>
+
+            <div className="p-4">
+              <span className="block text-[11px] text-slate-500 dark:text-zinc-400">
+                Embalagens (20 kg)
+              </span>
+              <span className="block text-xl font-semibold text-slate-900 dark:text-zinc-100 tabular-nums mt-1">
+                {calculation.sacks20kg}{' '}
+                <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">sacas</span>
+              </span>
+              <span className="block text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5">
+                Arredondamento operacional
+              </span>
+            </div>
+
+            <div className="p-4">
+              <span className="block text-[11px] text-slate-500 dark:text-zinc-400">
+                Investimento Estimado
+              </span>
+              <span className="block text-xl font-semibold text-slate-900 dark:text-zinc-100 tabular-nums mt-1">
+                {formatBRL(calculation.totalCost)}
+              </span>
+              <span className="block text-[11px] text-slate-400 dark:text-zinc-500 tabular-nums mt-0.5">
+                {formatBRL(calculation.costPerHa)} / ha
+              </span>
+            </div>
           </div>
-        </div>
+        </section>
+      )}
+
+      {/* Technical Guidelines (2-Column Single Elevation) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        <section className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-4 space-y-2.5">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-900 dark:text-zinc-100">
+            <Info className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>Parâmetros Técnicos de {selectedForage.commonName}</span>
+          </div>
+
+          <dl className="divide-y divide-slate-100 dark:divide-zinc-800 text-xs">
+            <div className="py-1.5 flex items-center justify-between gap-2">
+              <dt className="text-slate-500 dark:text-zinc-400">Profundidade de Plantio</dt>
+              <dd className="font-medium text-slate-800 dark:text-zinc-200 tabular-nums">
+                {selectedForage.seeding.seedPlantingDepthCm.min} a{' '}
+                {selectedForage.seeding.seedPlantingDepthCm.max} cm
+              </dd>
+            </div>
+            <div className="py-1.5 flex items-center justify-between gap-2">
+              <dt className="text-slate-500 dark:text-zinc-400">Faixa Referência ({METHOD_CONFIG[method].label})</dt>
+              <dd className="font-medium text-slate-800 dark:text-zinc-200 tabular-nums">
+                {calculation.methodRange.max > 0
+                  ? `${calculation.methodRange.min} a ${calculation.methodRange.max} kg/ha`
+                  : 'Plantio por mudas'}
+              </dd>
+            </div>
+            <div className="py-1.5 flex items-center justify-between gap-2">
+              <dt className="text-slate-500 dark:text-zinc-400">Estabelecimento (1º Pastejo)</dt>
+              <dd className="font-medium text-slate-800 dark:text-zinc-200 tabular-nums">
+                {selectedForage.phenology.establishmentDays.min} a{' '}
+                {selectedForage.phenology.establishmentDays.max} dias
+              </dd>
+            </div>
+            <div className="py-1.5 flex items-center justify-between gap-2">
+              <dt className="text-slate-500 dark:text-zinc-400">Sementes por Grama (aprox.)</dt>
+              <dd className="font-medium text-slate-800 dark:text-zinc-200 tabular-nums">
+                {selectedForage.seeding.seedsPerGramApprox > 0
+                  ? selectedForage.seeding.seedsPerGramApprox.toLocaleString('pt-BR')
+                  : 'N/A (vegetativo)'}
+              </dd>
+            </div>
+          </dl>
+
+          <p className="text-[11px] text-slate-600 dark:text-zinc-400 pt-1 leading-relaxed">
+            <strong className="text-slate-800 dark:text-zinc-200">Adubação de formação:</strong>{' '}
+            {selectedForage.fertilization.establishmentFertilizerNPK}
+          </p>
+        </section>
+
+        <section className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-4 space-y-2.5">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-900 dark:text-zinc-100">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>Boas Práticas de Formação</span>
+          </div>
+
+          <ul className="space-y-2 text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
+            <li className="flex items-start gap-2">
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">1.</span>
+              <span>
+                <strong>Cálculo do VC%:</strong> VC = (% Pureza × % Germinação) ÷ 100. Conferir o boletim de análise do lote antes de regular a semeadora.
+              </span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">2.</span>
+              <span>
+                <strong>Profundidade rasa:</strong> sementes forrageiras pequenas perdem vigor acima de 2–3 cm. Prefira incorporação leve com grade fechada ou rolo compactador.
+              </span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">3.</span>
+              <span>
+                <strong>Pastejo de uniformização:</strong> realize o primeiro pastejo leve com animais jovens para estimular o perfilhamento basal sem arrancar touceiras.
+              </span>
+            </li>
+          </ul>
+        </section>
       </div>
     </div>
   );

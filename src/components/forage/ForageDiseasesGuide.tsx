@@ -1,180 +1,259 @@
 import React, { useState, useMemo } from 'react';
 import { FORAGES_CATALOG } from '../../data/foragesCatalogData';
 import { ForageDisease, ForageItem } from '../../types/forage';
-import { Bug, Search, ArrowRight } from 'lucide-react';
+import { Search, Eye, X, ShieldCheck } from 'lucide-react';
 
 interface ForageDiseasesGuideProps {
   onSelectForage: (forage: ForageItem) => void;
 }
 
+const AGENT_FILTERS: Array<{ id: 'todos' | ForageDisease['agentType']; label: string }> = [
+  { id: 'todos', label: 'Todos' },
+  { id: 'fungo', label: 'Fungos' },
+  { id: 'inseto_praga', label: 'Pragas / Insetos' },
+  { id: 'nematoide', label: 'Nematoides' },
+  { id: 'bacteria', label: 'Bactérias' },
+  { id: 'virus', label: 'Vírus' },
+  { id: 'disturbio_fisiologico', label: 'Fisiológico / Solo' },
+];
+
+const AGENT_LABELS: Record<ForageDisease['agentType'], string> = {
+  fungo: 'Fungo',
+  inseto_praga: 'Praga / Inseto',
+  nematoide: 'Nematoide',
+  bacteria: 'Bactéria',
+  virus: 'Vírus',
+  disturbio_fisiologico: 'Distúrbio Fisiológico',
+};
+
+const SUSCEPTIBILITY_LABELS: Record<ForageDisease['susceptibilityLevel'], string> = {
+  alta: 'Alta',
+  moderada: 'Moderada',
+  tolerante: 'Tolerante',
+  resistente: 'Resistente',
+};
+
 export const ForageDiseasesGuide: React.FC<ForageDiseasesGuideProps> = ({ onSelectForage }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [agentFilter, setAgentFilter] = useState<string>('todos');
+  const [agentFilter, setAgentFilter] = useState<'todos' | ForageDisease['agentType']>('todos');
 
-  // Extract all distinct diseases across the forages catalog
-  const diseaseEntries = useMemo(() => {
-    const entries: { disease: ForageDisease; forage: ForageItem }[] = [];
-    FORAGES_CATALOG.forEach(forage => {
-      forage.diseasesAndPests.forEach(disease => {
-        entries.push({ disease, forage });
-      });
-    });
-    return entries;
+  const allDiseases = useMemo(() => {
+    const list: Array<{
+      disease: ForageDisease;
+      forage: ForageItem;
+    }> = [];
+
+    for (const forage of FORAGES_CATALOG) {
+      for (const disease of forage.diseasesAndPests) {
+        list.push({ disease, forage });
+      }
+    }
+    return list;
   }, []);
 
   const filtered = useMemo(() => {
-    const q = searchTerm.toLowerCase();
-    return diseaseEntries.filter(({ disease, forage }) => {
-      const matchesSearch =
-        disease.name.toLowerCase().includes(q) ||
-        disease.symptoms.toLowerCase().includes(q) ||
-        forage.commonName.toLowerCase().includes(q) ||
-        Boolean(disease.scientificName && disease.scientificName.toLowerCase().includes(q));
-
+    const q = searchTerm.toLowerCase().trim();
+    return allDiseases.filter(({ disease, forage }) => {
       const matchesAgent = agentFilter === 'todos' || disease.agentType === agentFilter;
-
-      return matchesSearch && matchesAgent;
+      if (!matchesAgent) return false;
+      if (!q) return true;
+      return (
+        disease.name.toLowerCase().includes(q) ||
+        (disease.scientificName?.toLowerCase().includes(q) ?? false) ||
+        disease.symptoms.toLowerCase().includes(q) ||
+        disease.controlAndManagement.toLowerCase().includes(q) ||
+        forage.commonName.toLowerCase().includes(q) ||
+        forage.cultivar.toLowerCase().includes(q)
+      );
     });
-  }, [diseaseEntries, searchTerm, agentFilter]);
+  }, [allDiseases, searchTerm, agentFilter]);
+
+  const hasFilters = searchTerm.trim() !== '' || agentFilter !== 'todos';
+
+  const getSusceptibilityStyle = (level: ForageDisease['susceptibilityLevel']) => {
+    switch (level) {
+      case 'alta':
+        return 'text-rose-700 dark:text-rose-400';
+      case 'moderada':
+        return 'text-amber-700 dark:text-amber-400';
+      case 'resistente':
+      case 'tolerante':
+        return 'text-emerald-700 dark:text-emerald-400';
+    }
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Search and Filters Header */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
-        <div className="flex items-center gap-3 border-b border-slate-200 dark:border-zinc-800 pb-4">
-          <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 flex items-center justify-center font-bold">
-            <Bug className="w-5 h-5" />
-          </div>
+    <div className="space-y-4">
+      {/* Filter Header */}
+      <section className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
-              Guia Fitossanitário: Sanidade, Doenças e Pragas de Pastagens
-            </h3>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+              Guia de Sanidade, Pragas & Doenças
+            </h2>
             <p className="text-xs text-slate-500 dark:text-zinc-400">
-              Atlas completo de diagnóstico a campo, sintomas visuais, nível de suscetibilidade e medidas de controle e manejo agronômico.
+              Diagnóstico de sintomas, suscetibilidade por cultivar e protocolos de controle integrado.
             </p>
           </div>
+          <span className="text-xs text-slate-500 dark:text-zinc-400 tabular-nums">
+            <strong className="font-semibold text-slate-800 dark:text-zinc-200">{filtered.length}</strong>{' '}
+            de {allDiseases.length} registros
+          </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center pt-2.5 border-t border-slate-100 dark:border-zinc-800">
+          <div className="md:col-span-5 relative">
+            <Search className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
-              placeholder="Buscar por doença, sintoma, cigarrinha, fungo ou forrageira..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-medium text-slate-800 dark:text-zinc-200 focus:outline-emerald-500"
+              placeholder="Buscar cigarrinha, morte súbita, ferrugem, cultivar..."
+              className="w-full h-9 pl-8 pr-8 rounded-lg bg-slate-50 dark:bg-zinc-950/60 border border-slate-200/90 dark:border-zinc-800 text-xs text-slate-800 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors"
             />
-          </div>
-
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-thin">
-            {['todos', 'inseto_praga', 'fungo', 'disturbio_fisiologico'].map(type => (
+            {searchTerm && (
               <button
-                key={type}
                 type="button"
-                onClick={() => setAgentFilter(type)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap capitalize ${
-                  agentFilter === type
-                    ? 'bg-rose-600 text-white shadow-xs'
-                    : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-700'
-                }`}
+                onClick={() => setSearchTerm('')}
+                aria-label="Limpar busca"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-300 cursor-pointer"
               >
-                {type === 'todos' ? 'Todos os Agentes' : type === 'inseto_praga' ? 'Insetos & Cigarrinhas' : type === 'fungo' ? 'Fungos & Ferrugens' : 'Distúrbios / Fisiologia'}
+                <X className="w-3.5 h-3.5" />
               </button>
-            ))}
+            )}
           </div>
-        </div>
-      </div>
 
-      {/* Disease Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filtered.map(({ disease, forage }, idx) => (
-          <div
-            key={idx}
-            className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
-          >
-            <div>
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div>
-                  <h4 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-rose-500" />
-                    {disease.name}
-                  </h4>
-                  {disease.scientificName && (
-                    <p className="text-[11px] text-slate-400 italic">
-                      Agente: {disease.scientificName}
-                    </p>
-                  )}
-                </div>
-
-                <span
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider shrink-0 ${
-                    disease.susceptibilityLevel === 'alta'
-                      ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                      : disease.susceptibilityLevel === 'moderada'
-                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                      : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+          <div className="md:col-span-7 flex items-center gap-1 overflow-x-auto">
+            {AGENT_FILTERS.map(item => {
+              const active = agentFilter === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setAgentFilter(item.id)}
+                  className={`h-8 px-2.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                    active
+                      ? 'bg-emerald-600 text-white'
+                      : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 hover:text-slate-900 dark:hover:text-zinc-200'
                   }`}
                 >
-                  {disease.susceptibilityLevel}
-                </span>
-              </div>
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
 
-              <div className="p-2.5 bg-slate-50 dark:bg-zinc-800/60 rounded-xl border border-slate-200 dark:border-zinc-800 text-xs mb-3">
-                <span className="text-slate-500 dark:text-zinc-400 block text-[10px] font-bold uppercase">
-                  Forrageira Hospedeira:
-                </span>
-                <span className="font-bold text-emerald-700 dark:text-emerald-400">
-                  {forage.commonName} ({forage.cultivar})
-                </span>
-              </div>
-
-              <div className="space-y-2 text-xs">
-                <div>
-                  <strong className="text-rose-700 dark:text-rose-400 block mb-0.5">
-                    Sintomas Visuais no Pasto:
-                  </strong>
-                  <p className="text-slate-700 dark:text-zinc-300 leading-relaxed text-[11.5px]">
-                    {disease.symptoms}
-                  </p>
-                </div>
-
-                <div>
-                  <strong className="text-amber-700 dark:text-amber-400 block mb-0.5">
-                    Impacto & Prejuízo:
-                  </strong>
-                  <p className="text-slate-700 dark:text-zinc-300 leading-relaxed text-[11.5px]">
-                    {disease.damageImpact}
-                  </p>
-                </div>
-
-                <div className="p-3 bg-emerald-50/70 dark:bg-emerald-950/20 rounded-xl border border-emerald-200 dark:border-emerald-800/40">
-                  <strong className="text-emerald-900 dark:text-emerald-300 block mb-0.5">
-                    Controle & Manejo Agronômico:
-                  </strong>
-                  <p className="text-emerald-950 dark:text-emerald-200 text-[11px] leading-relaxed">
-                    {disease.controlAndManagement}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between">
-              <span className="text-[10px] text-slate-400 italic">
-                {disease.favorableConditions}
-              </span>
+      {/* Disease Cards Grid */}
+      {filtered.length === 0 ? (
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-10 text-center space-y-2.5">
+          <p className="text-sm font-medium text-slate-800 dark:text-zinc-200">
+            Nenhum registro fitossanitário encontrado.
+          </p>
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Tente outro termo ou altere o filtro de agente causador.
+          </p>
+          {hasFilters && (
+            <div className="pt-1">
               <button
                 type="button"
-                onClick={() => onSelectForage(forage)}
-                className="px-3 py-1.5 bg-slate-900 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                onClick={() => {
+                  setSearchTerm('');
+                  setAgentFilter('todos');
+                }}
+                className="h-8 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium transition-colors cursor-pointer"
               >
-                <span>Ficha da Espécie</span>
-                <ArrowRight className="w-3 h-3" />
+                Limpar Filtros
               </button>
             </div>
-          </div>
-        ))}
-      </div>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          {filtered.map(({ disease, forage }, idx) => (
+            <article
+              key={`${forage.id}-${disease.id}-${idx}`}
+              className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-4 flex flex-col justify-between gap-3 hover:border-slate-300 dark:hover:border-zinc-700 transition-colors"
+            >
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 leading-snug">
+                      {disease.name}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+                      Agente:{' '}
+                      <strong className="font-medium text-slate-700 dark:text-zinc-300">
+                        {AGENT_LABELS[disease.agentType]}
+                      </strong>
+                      {disease.scientificName && (
+                        <span className="italic"> · {disease.scientificName}</span>
+                      )}
+                    </p>
+                  </div>
+                  <span
+                    className={`text-[11px] font-semibold shrink-0 ${getSusceptibilityStyle(
+                      disease.susceptibilityLevel
+                    )}`}
+                  >
+                    {SUSCEPTIBILITY_LABELS[disease.susceptibilityLevel]}
+                  </span>
+                </div>
+
+                <div className="space-y-2.5 pt-2.5 border-t border-slate-100 dark:border-zinc-800 text-xs">
+                  <div>
+                    <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-0.5">
+                      Sintomas & Impacto
+                    </span>
+                    <p className="text-slate-700 dark:text-zinc-300 leading-relaxed">
+                      {disease.symptoms}
+                    </p>
+                    {disease.favorableConditions && (
+                      <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-1">
+                        Condições favoráveis: {disease.favorableConditions}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80">
+                    <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-0.5">
+                      <ShieldCheck className="w-3 h-3" />
+                      Controle & Manejo
+                    </span>
+                    <p className="text-slate-700 dark:text-zinc-300 leading-relaxed">
+                      {disease.controlAndManagement}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-slate-100 dark:border-zinc-800">
+                <div className="min-w-0">
+                  <span className="block text-[10px] uppercase tracking-wider text-slate-400 dark:text-zinc-500">
+                    Hospedeiro
+                  </span>
+                  <span className="block text-xs font-medium text-slate-800 dark:text-zinc-200 truncate">
+                    {forage.commonName}{' '}
+                    <span className="text-slate-400 dark:text-zinc-500 font-normal">
+                      ({forage.cultivar})
+                    </span>
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onSelectForage(forage)}
+                  className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Ficha da Espécie</span>
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

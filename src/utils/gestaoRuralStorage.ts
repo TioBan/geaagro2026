@@ -163,16 +163,3 @@ export function saveGestaoRuralStorage(data: Partial<GestaoRuralDataset>) {
     console.error('[GestaoRuralStorage] Error writing to offline storage:', e);
   }
 }
-
-export function getCropEmoji(cultura?: string): string {
-  const c = (cultura || '').toLowerCase();
-  if (c.includes('banana')) return '🍌';
-  if (c.includes('soja')) return '🌱';
-  if (c.includes('milho')) return '🌽';
-  if (c.includes('café')) return '☕';
-  if (c.includes('citros') || c.includes('laranja')) return '🍊';
-  if (c.includes('tomate')) return '🍅';
-  if (c.includes('uva')) return '🍇';
-  if (c.includes('mandioca')) return '🥔';
-  return '🌾';
-}

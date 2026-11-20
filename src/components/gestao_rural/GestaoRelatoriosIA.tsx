@@ -21,6 +21,15 @@ interface GestaoRelatoriosIAProps {
   financeiro: ContaFinanceiraRecord[];
 }
 
+const REPORT_TYPES = [
+  { title: 'Caderno de Campo & Operações', desc: 'Resumo consolidado de área e atividades' },
+  { title: 'Custos da Safra & DRE', desc: 'Receitas, despesas, margem e lucro líquido' },
+  { title: 'Estoque e Almoxarifado', desc: 'Inventário técnico e posição patrimonial' },
+  { title: 'Comercialização & Vendas', desc: 'Contratos, faturamento e escoamento' },
+  { title: 'Máquinas & Manutenções', desc: 'Frota ativa e histórico de revisões' },
+  { title: 'Relatório de Irrigação & Clima', desc: 'Balanço hídrico e condições meteorológicas' },
+] as const;
+
 export const GestaoRelatoriosIA: React.FC<GestaoRelatoriosIAProps> = ({
   propriedade,
   talhoes,
@@ -66,7 +75,7 @@ export const GestaoRelatoriosIA: React.FC<GestaoRelatoriosIAProps> = ({
     {
       id: 'm-01',
       remetente: 'ia',
-      texto: `Olá! Sou o Assistente Técnico GeaAgro de Gestão Rural 360°. Analisei os dados reais da fazenda **${propriedade.nome}**.\n\nReceita acumulada: **R$ ${metrics.receitaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}** | Despesas: **R$ ${metrics.despesaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}** | Lucro líquido: **R$ ${metrics.lucroLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}** (margem de **${metrics.margemPct.toFixed(1)}%**).\n\nComo posso ajudar você hoje no planejamento ou na auditoria dos relatórios?`,
+      texto: `Olá! Analisei os registros locais de ${propriedade.nome || 'sua propriedade'}.\nReceita acumulada: R$ ${metrics.receitaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Despesas: R$ ${metrics.despesaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Lucro líquido: R$ ${metrics.lucroLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (margem ${metrics.margemPct.toFixed(1)}%).\n\nO que deseja consultar?`,
       timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       sugestoesAcao: [
         'Resumir composição de custos da safra',
@@ -107,11 +116,11 @@ export const GestaoRelatoriosIA: React.FC<GestaoRelatoriosIAProps> = ({
       const tLower = texto.toLowerCase();
 
       if (tLower.includes('custo') || tLower.includes('composição')) {
-        respostaIA = `Análise de Custos da Fazenda ${propriedade.nome}:\n- Despesas totais lançadas: **R$ ${metrics.despesaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**\n- Área de referência: **${metrics.areaReferencia} ha**\n- Custo médio por hectare: **R$ ${metrics.custoPorHa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / ha**\n- Lançamentos financeiros avaliados: **${financeiro.length}**.`;
+        respostaIA = `Análise de Custos — ${propriedade.nome}:\n• Despesas lançadas: R$ ${metrics.despesaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n• Área de referência: ${metrics.areaReferencia} ha\n• Custo médio/ha: R$ ${metrics.custoPorHa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/ha\n• Lançamentos avaliados: ${financeiro.length}.`;
       } else if (tLower.includes('lucro') || tLower.includes('margem') || tLower.includes('roi')) {
-        respostaIA = `Resumo de Rentabilidade (${propriedade.nome}):\n- Receita bruta: **R$ ${metrics.receitaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**\n- Lucro líquido: **R$ ${metrics.lucroLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}**\n- Margem de lucro: **${metrics.margemPct.toFixed(1)}%** | ROI: **${metrics.roiPct.toFixed(1)}%**.`;
+        respostaIA = `Resumo de Rentabilidade — ${propriedade.nome}:\n• Receita bruta: R$ ${metrics.receitaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n• Lucro líquido: R$ ${metrics.lucroLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n• Margem: ${metrics.margemPct.toFixed(1)}% | ROI: ${metrics.roiPct.toFixed(1)}%.`;
       } else {
-        respostaIA = `Com base no cadastro atual de **${talhoes.length} talhão(ões)** e **${safras.length} safra(s)**, a propriedade **${propriedade.nome}** opera com rastreabilidade offline local.`;
+        respostaIA = `Cadastro atual: ${talhoes.length} talhão(ões) e ${safras.length} safra(s) na propriedade ${propriedade.nome}, com rastreabilidade local ativa.`;
       }
 
       const novaRespostaIA: MensagemAssistenteIARural = {
@@ -123,7 +132,7 @@ export const GestaoRelatoriosIA: React.FC<GestaoRelatoriosIAProps> = ({
 
       setMensagensChat(prev => [...prev, novaRespostaIA]);
       replyTimerRef.current = null;
-    }, 350);
+    }, 300);
   };
 
   const gerarPDFRelatorioOficial = async (tipo: string) => {
@@ -184,159 +193,129 @@ export const GestaoRelatoriosIA: React.FC<GestaoRelatoriosIAProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-fade-in text-xs">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 shadow-2xs">
-        <div>
-          <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-extrabold uppercase text-[10px] tracking-wider">
-            <FileText className="w-4 h-4" />
-            Módulos 13 & 14 • Relatórios Oficiais & Assistente IA GeaAgro
+    <div className="space-y-5 animate-fade-in">
+      {/* HEADER + TABS */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl overflow-hidden">
+        <div className="px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Relatórios PDF &amp; Consulta Técnica</span>
+            </h2>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+              Emissão de relatórios oficiais timbrados e análise instantânea baseada nos dados registrados
+            </p>
           </div>
-          <h2 className="text-xl font-black text-slate-900 dark:text-white">
-            Relatórios Auditáveis PDF/Excel & Assistente IA
-          </h2>
-          <p className="text-slate-500">
-            Exportação com cabeçalho oficial GeaAgro e consulta técnica offline sem invenção de dados
-          </p>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setActiveTab('relatorios')}
-            className={`px-4 py-2.5 font-bold rounded-xl cursor-pointer flex items-center gap-2 ${
-              activeTab === 'relatorios' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 dark:bg-zinc-800'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            <span>Relatórios PDF</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('ia')}
-            className={`px-4 py-2.5 font-bold rounded-xl cursor-pointer flex items-center gap-2 ${
-              activeTab === 'ia' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-700 dark:bg-zinc-800'
-            }`}
-          >
-            <Bot className="w-4 h-4" />
-            <span>Assistente IA GeaAgro</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('relatorios')}
+              className={`h-8 px-3 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                activeTab === 'relatorios'
+                  ? 'bg-emerald-600 text-white'
+                  : 'border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800'
+              }`}
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Relatórios PDF</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('ia')}
+              className={`h-8 px-3 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                activeTab === 'ia'
+                  ? 'bg-emerald-600 text-white'
+                  : 'border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800'
+              }`}
+            >
+              <Bot className="w-3.5 h-3.5" />
+              <span>Consulta Técnica</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* RELATÓRIOS TAB */}
       {activeTab === 'relatorios' && (
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-2xs space-y-4">
-          <h3 className="font-black text-sm text-slate-900 dark:text-white flex items-center gap-2 border-b pb-3">
-            <Printer className="w-4 h-4 text-emerald-600" />
-            Emissão de Relatórios Oficiais com Timbrado GeaAgro
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              'Caderno de Campo & Operações',
-              'Custos da Safra & DRE',
-              'Estoque e Almoxarifado',
-              'Comercialização & Vendas',
-              'Máquinas & Manutenções',
-              'Relatório de Irrigação & Clima',
-            ].map(tipo => (
-              <div
-                key={tipo}
-                className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-2xl border border-slate-200 dark:border-zinc-800 flex items-center justify-between gap-2"
-              >
-                <div>
-                  <h4 className="font-bold text-slate-900 dark:text-white text-xs">{tipo}</h4>
-                  <span className="text-[10px] text-slate-400 block">Formato PDF</span>
-                </div>
-                <button
-                  onClick={() => void gerarPDFRelatorioOficial(tipo)}
-                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-[10px] cursor-pointer flex items-center gap-1 shrink-0"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Baixar PDF</span>
-                </button>
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl divide-y divide-slate-100 dark:divide-zinc-800/80">
+          {REPORT_TYPES.map(rep => (
+            <div key={rep.title} className="px-5 py-3.5 flex items-center justify-between gap-4 hover:bg-slate-50/70 dark:hover:bg-zinc-800/30 transition-colors">
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-slate-900 dark:text-zinc-100">{rep.title}</div>
+                <div className="text-[11px] text-slate-500 dark:text-zinc-400">{rep.desc}</div>
               </div>
-            ))}
-          </div>
+              <button
+                type="button"
+                onClick={() => void gerarPDFRelatorioOficial(rep.title)}
+                className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-200 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Baixar PDF</span>
+              </button>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* IA ASSISTANT TAB */}
+      {/* CONSULTA TÉCNICA OFFLINE TAB */}
       {activeTab === 'ia' && (
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between border-b pb-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-purple-100 dark:bg-purple-950 text-purple-600 rounded-xl">
-                <Bot className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-black text-sm text-slate-900 dark:text-white">
-                  Assistente Técnico GeaAgro (Offline AI)
-                </h3>
-                <p className="text-[10px] text-slate-400">
-                  Interpretação de dados financeiros e agronômicos sem dados fictícios
-                </p>
-              </div>
-            </div>
-            <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 font-extrabold text-[10px] rounded-full">
-              Auditável & Offline
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-200/80 dark:border-zinc-800 flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+              Assistente Técnico Local (Baseado nos registros da fazenda)
+            </span>
+            <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+              Offline &amp; Auditável
             </span>
           </div>
 
-          {/* CHAT MESSAGES */}
-          <div className="h-80 overflow-y-auto space-y-3 p-4 bg-slate-50 dark:bg-zinc-800/30 rounded-2xl border">
+          <div className="h-80 overflow-y-auto p-4 space-y-3 bg-slate-50/50 dark:bg-zinc-950/30">
             {mensagensChat.map(m => (
-              <div
-                key={m.id}
-                className={`flex flex-col ${m.remetente === 'usuario' ? 'items-end' : 'items-start'}`}
-              >
+              <div key={m.id} className={`flex flex-col ${m.remetente === 'usuario' ? 'items-end' : 'items-start'}`}>
                 <div
-                  className={`max-w-xl p-3.5 rounded-2xl space-y-2 text-xs leading-relaxed ${
+                  className={`max-w-xl px-3.5 py-2.5 rounded-xl text-xs leading-relaxed space-y-2 ${
                     m.remetente === 'usuario'
-                      ? 'bg-emerald-600 text-white rounded-tr-none'
-                      : 'bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 border shadow-2xs rounded-tl-none'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 text-slate-800 dark:text-zinc-200'
                   }`}
                 >
                   <p className="whitespace-pre-line">{m.texto}</p>
-
                   {m.sugestoesAcao && (
-                    <div className="pt-2 border-t border-slate-200/60 dark:border-zinc-700/60 space-y-1">
-                      <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase block">
-                        Sugestões Rápidas:
-                      </span>
-                      <div className="flex flex-wrap gap-1">
-                        {m.sugestoesAcao.map((sug, i) => (
-                          <button
-                            key={i}
-                            onClick={() => handleEnviarMensagem(sug)}
-                            className="px-2 py-1 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 rounded-lg text-[10px] font-bold hover:bg-purple-100 cursor-pointer"
-                          >
-                            {sug}
-                          </button>
-                        ))}
-                      </div>
+                    <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex flex-wrap gap-1.5">
+                      {m.sugestoesAcao.map((sug, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => handleEnviarMensagem(sug)}
+                          className="px-2.5 py-1 rounded-md border border-slate-200 dark:border-zinc-700 hover:border-emerald-500 text-slate-700 dark:text-zinc-300 hover:text-emerald-700 dark:hover:text-emerald-400 text-[11px] font-medium cursor-pointer transition-colors"
+                        >
+                          {sug}
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
-                <span className="text-[9px] text-slate-400 mt-0.5 px-1">{m.timestamp}</span>
+                <span className="text-[10px] text-slate-400 dark:text-zinc-500 mt-1 px-1 tabular-nums">{m.timestamp}</span>
               </div>
             ))}
           </div>
 
-          {/* CHAT INPUT */}
-          <div className="flex items-center gap-2">
+          <div className="p-3.5 border-t border-slate-200/80 dark:border-zinc-800 flex items-center gap-2">
             <input
               type="text"
-              placeholder="Pergunte sobre custos, ROI, talhões ou produtividade..."
+              placeholder="Pergunte sobre custos, ROI, margem ou talhões..."
               value={mensagemInput}
               onChange={e => setMensagemInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleEnviarMensagem()}
-              className="flex-1 px-4 py-2.5 border rounded-xl bg-slate-50 dark:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+              className="flex-1 h-9 px-3 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950/60 text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
             />
             <button
+              type="button"
               onClick={() => handleEnviarMensagem()}
-              className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl cursor-pointer flex items-center gap-2"
+              className="h-9 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer shrink-0"
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-3.5 h-3.5" />
               <span>Enviar</span>
             </button>
           </div>

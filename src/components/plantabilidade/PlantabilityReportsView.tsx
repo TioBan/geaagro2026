@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   PropertyField,
   PlanterEquipment,
@@ -7,7 +7,7 @@ import {
   PlantabilitySamplingPoint
 } from '../../types/plantability';
 import { calculatePlantabilityMetrics, simulateEconomicLoss } from '../../utils/plantabilityCalculations';
-import { FileText, Download, Printer, Filter, CheckCircle2, AlertTriangle, Sparkles, Building2, Tractor } from 'lucide-react';
+import { FileText, Download, Printer, Sprout } from 'lucide-react';
 
 interface Props {
   fields: PropertyField[];
@@ -17,6 +17,14 @@ interface Props {
   samplings: PlantabilitySamplingPoint[];
 }
 
+const escapeCsvCell = (value: string | number): string => {
+  const str = String(value ?? '');
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+};
+
 export const PlantabilityReportsView: React.FC<Props> = ({
   fields,
   planters,
@@ -24,9 +32,16 @@ export const PlantabilityReportsView: React.FC<Props> = ({
   configs,
   samplings
 }) => {
-  const [selectedFieldId, setSelectedFieldId] = useState<string>(fields?.[0]?.id || '');
+  const safeFields = (fields || []).filter(f => f && f.id);
+  const [selectedFieldId, setSelectedFieldId] = useState<string>(safeFields[0]?.id || '');
 
-  const activeField = (fields || []).find(f => f?.id === selectedFieldId) || fields?.[0];
+  useEffect(() => {
+    if (safeFields.length > 0 && !safeFields.some(f => f.id === selectedFieldId)) {
+      setSelectedFieldId(safeFields[0].id);
+    }
+  }, [safeFields, selectedFieldId]);
+
+  const activeField = safeFields.find(f => f.id === selectedFieldId) || safeFields[0];
   const fieldSamplings = (samplings || []).filter(s => s?.fieldId === activeField?.id);
   const activeConfig = (configs || []).find(c => c?.fieldId === activeField?.id);
   const activePlanter = (planters || []).find(p => p?.id === activeConfig?.planterId) || planters?.[0];
@@ -40,38 +55,64 @@ export const PlantabilityReportsView: React.FC<Props> = ({
   };
 
   const handleExportCSV = () => {
-    let csvContent = 'data:text/csv;charset=utf-8,';
-    csvContent += 'Talhao,Cultura,Area_ha,IGP_Score,CV_Pct,Aceitaveis_Pct,Falhas_Pct,Duplos_Pct,Pop_Real_ha,Perda_R_ha\n';
+    const header = [
+      'Talhao',
+      'Cultura',
+      'Area_ha',
+      'IGP_Score',
+      'CV_Pct',
+      'Aceitaveis_Pct',
+      'Falhas_Pct',
+      'Duplos_Pct',
+      'Pop_Real_ha',
+      'Perda_R_ha'
+    ].join(',');
 
-    (fields || []).filter(f => f && f.id).forEach(f => {
+    const rows = safeFields.map(f => {
       const fSamplings = (samplings || []).filter(s => s?.fieldId === f.id);
       const fConfig = (configs || []).find(c => c?.fieldId === f.id);
       const fMetrics = calculatePlantabilityMetrics(fSamplings, fConfig);
       const fLoss = simulateEconomicLoss(fMetrics, f.areaHa);
 
-      csvContent += `${f.fieldCode},${f.crop},${f.areaHa},${fMetrics.igpScore},${fMetrics.cvPercent},${fMetrics.acceptablePercent},${fMetrics.skipsPercent},${fMetrics.doublesPercent},${fMetrics.realPopulationPerHa},${fLoss.financialLossPerHa}\n`;
+      return [
+        f.fieldCode,
+        f.crop,
+        f.areaHa,
+        fMetrics.igpScore,
+        fMetrics.cvPercent,
+        fMetrics.acceptablePercent,
+        fMetrics.skipsPercent,
+        fMetrics.doublesPercent,
+        fMetrics.realPopulationPerHa,
+        fLoss.financialLossPerHa
+      ]
+        .map(escapeCsvCell)
+        .join(',');
     });
 
-    const encodedUri = encodeURI(csvContent);
+    const csvString = `\uFEFF${[header, ...rows].join('\n')}`;
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `GeaAgro_Relatorio_Plantabilidade_${new Date().toISOString().split('T')[0]}.csv`);
+    link.href = url;
+    link.download = `GeaAgro_Relatorio_Plantabilidade_${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
-    <div className="space-y-6 print:p-0">
+    <div className="space-y-4 print:p-0">
       {/* Header & Export Controls */}
-      <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-stone-200 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-slate-200/80 dark:border-zinc-800 p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 print:hidden">
         <div>
-          <h2 className="text-xl font-black text-stone-900 dark:text-white flex items-center gap-2">
-            <FileText className="w-6 h-6 text-emerald-600" />
-            Relatórios Técnicos & Exportação
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+            <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span>Relatórios Técnicos & Exportação</span>
           </h2>
-          <p className="text-xs text-stone-500 mt-1">
-            Gere laudos técnicos de plantabilidade formatados para impressão em PDF ou exporte a planilha CSV completa de dados técnicos.
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+            Emita laudos de plantabilidade formatados para impressão/PDF ou exporte a planilha CSV consolidada.
           </p>
         </div>
 
@@ -79,148 +120,212 @@ export const PlantabilityReportsView: React.FC<Props> = ({
           <select
             value={selectedFieldId}
             onChange={e => setSelectedFieldId(e.target.value)}
-            className="p-2.5 rounded-xl border border-stone-300 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 text-stone-900 dark:text-white font-bold text-xs"
+            disabled={safeFields.length === 0}
+            className="h-9 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 text-slate-900 dark:text-white text-xs font-medium outline-none focus:border-emerald-500"
           >
-            {fields.map(f => (
-              <option key={f.id} value={f.id}>
-                {f.fieldCode} - {f.crop}
-              </option>
-            ))}
+            {safeFields.length === 0 ? (
+              <option value="">Nenhum talhão</option>
+            ) : (
+              safeFields.map(f => (
+                <option key={f.id} value={f.id}>
+                  {f.fieldCode} - {f.crop}
+                </option>
+              ))
+            )}
           </select>
 
           <button
+            type="button"
             onClick={handleExportCSV}
-            className="px-4 py-2.5 bg-stone-100 hover:bg-stone-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-stone-800 dark:text-stone-200 font-bold text-xs rounded-xl border border-stone-200 dark:border-zinc-700 flex items-center gap-2"
+            disabled={safeFields.length === 0}
+            className="h-9 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
           >
-            <Download className="w-4 h-4 text-emerald-600" />
-            Exportar CSV
+            <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>Exportar CSV</span>
           </button>
 
           <button
+            type="button"
             onClick={handlePrint}
-            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-2"
+            disabled={safeFields.length === 0}
+            className="h-9 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
           >
-            <Printer className="w-4 h-4" />
-            Imprimir Laudo (PDF)
+            <Printer className="w-3.5 h-3.5" />
+            <span>Imprimir Laudo (PDF)</span>
           </button>
         </div>
       </div>
 
       {/* Printable Official Report Document or Empty State */}
-      {(fields || []).length === 0 ? (
-        <div className="p-12 text-center bg-white dark:bg-zinc-900 rounded-3xl border border-stone-200 dark:border-zinc-800 shadow-sm space-y-4">
-          <div className="w-16 h-16 rounded-3xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 flex items-center justify-center mx-auto">
-            <FileText className="w-8 h-8" />
+      {safeFields.length === 0 ? (
+        <div className="p-10 text-center bg-white dark:bg-zinc-900 rounded-xl border border-slate-200/80 dark:border-zinc-800 space-y-3">
+          <div className="w-11 h-11 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/70 dark:border-emerald-900/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
+            <FileText className="w-5 h-5" />
           </div>
           <div className="max-w-md mx-auto space-y-1">
-            <h3 className="text-base font-black text-stone-900 dark:text-white">Nenhum laudo disponível para exportação</h3>
-            <p className="text-xs text-stone-500">
-              Cadastre seus talhões e registre amostragens em campo para gerar relatórios técnicos e exportar planilhas.
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+              Nenhum laudo disponível para exportação
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Cadastre talhões e registre amostragens em campo para emitir relatórios técnicos e planilhas.
             </p>
           </div>
         </div>
       ) : (
-        <div className="bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-stone-200 dark:border-zinc-800 shadow-lg space-y-6 print:border-none print:shadow-none print:p-0">
-        {/* Document Letterhead */}
-        <div className="flex justify-between items-start border-b-2 border-stone-900 dark:border-stone-100 pb-4">
-          <div>
-            <h1 className="text-2xl font-black text-stone-900 dark:text-white flex items-center gap-2">
-              🌱 GeaAgro — Laudo Técnico de Plantabilidade
-            </h1>
-            <p className="text-xs text-stone-500 font-mono mt-1">
-              Avaliação Agronômica da Qualidade de Semeadura | Certificado Offline GeaAgro
-            </p>
+        <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-slate-200/80 dark:border-zinc-800 space-y-5 print:border-none print:p-0">
+          {/* Document Letterhead */}
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 border-b border-slate-300 dark:border-zinc-700 pb-4">
+            <div className="flex items-start gap-2.5">
+              <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/70 dark:border-emerald-900/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                <Sprout className="w-4 h-4" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-slate-900 dark:text-white">
+                  GeaAgro — Laudo Técnico de Plantabilidade
+                </h1>
+                <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                  Avaliação Agronômica da Qualidade de Semeadura • Registro Técnico Local
+                </p>
+              </div>
+            </div>
+            <div className="text-left sm:text-right text-xs text-slate-600 dark:text-zinc-300 tabular-nums">
+              <p className="font-semibold text-slate-900 dark:text-white">
+                Data do Laudo: {new Date().toLocaleDateString('pt-BR')}
+              </p>
+              <p>Fazenda: {activeField?.farmName}</p>
+            </div>
           </div>
-          <div className="text-right text-xs font-mono text-stone-600 dark:text-stone-300">
-            <p className="font-bold">Data do Laudo: {new Date().toLocaleDateString('pt-BR')}</p>
-            <p>Fazenda: {activeField?.farmName}</p>
+
+          {/* Executive Summary */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50/70 dark:bg-zinc-950/60 p-4 rounded-lg border border-slate-200/70 dark:border-zinc-800 text-xs tabular-nums">
+            <div>
+              <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-semibold block uppercase">
+                Talhão / Área
+              </span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">
+                {activeField?.fieldCode} ({activeField?.areaHa} ha)
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-semibold block uppercase">
+                Cultura / Híbrido
+              </span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">
+                {activeField?.crop} ({activeField?.cultivar})
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-semibold block uppercase">
+                Índice IGP GeaAgro
+              </span>
+              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                {metrics.igpScore} / 100 ({metrics.igpClassification})
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-semibold block uppercase">
+                Prejuízo Est. Talhão
+              </span>
+              <span className="text-sm font-bold text-rose-600 dark:text-rose-400">
+                R$ {lossSim.totalFinancialLoss.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+
+          {/* Detailed KPI Section */}
+          <div className="space-y-2.5">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-800 dark:text-zinc-200 border-b border-slate-200 dark:border-zinc-800 pb-1.5">
+              1. Indicadores de Qualidade de Distribuição de Sementes
+            </h3>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs tabular-nums">
+              <div className="p-3 rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800">
+                <span className="text-[10px] text-slate-400 dark:text-zinc-500 block">Coef. Variação (CV%)</span>
+                <span className="text-lg font-bold text-slate-900 dark:text-white">{metrics.cvPercent}%</span>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800">
+                <span className="text-[10px] text-slate-400 dark:text-zinc-500 block">Espaçamentos Aceitáveis</span>
+                <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                  {metrics.acceptablePercent}%
+                </span>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800">
+                <span className="text-[10px] text-slate-400 dark:text-zinc-500 block">Percentual de Falhas</span>
+                <span className="text-lg font-bold text-amber-600 dark:text-amber-400">
+                  {metrics.skipsPercent}%
+                </span>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800">
+                <span className="text-[10px] text-slate-400 dark:text-zinc-500 block">Percentual de Duplos</span>
+                <span className="text-lg font-bold text-sky-600 dark:text-sky-400">
+                  {metrics.doublesPercent}%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Machine & Operations Specs */}
+          <div className="space-y-2.5">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-800 dark:text-zinc-200 border-b border-slate-200 dark:border-zinc-800 pb-1.5">
+              2. Especificações de Máquina & Operação
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 text-xs text-slate-600 dark:text-zinc-300 tabular-nums">
+              <p>
+                <strong className="text-slate-900 dark:text-white">Semeadora:</strong>{' '}
+                {activePlanter ? `${activePlanter.brand} ${activePlanter.model}` : 'Não informada'}
+              </p>
+              <p>
+                <strong className="text-slate-900 dark:text-white">Dosador:</strong>{' '}
+                {activePlanter?.meterType || '—'}
+              </p>
+              <p>
+                <strong className="text-slate-900 dark:text-white">Disco Utilizado:</strong>{' '}
+                {activePlanter?.discSpecification || '—'}
+              </p>
+              <p>
+                <strong className="text-slate-900 dark:text-white">Lote Sementes:</strong>{' '}
+                {activeSeed
+                  ? `${activeSeed.batchNumber} (Germ.: ${activeSeed.germinationRate}%)`
+                  : 'Não informado'}
+              </p>
+              <p>
+                <strong className="text-slate-900 dark:text-white">Velocidade Média:</strong>{' '}
+                {activeConfig ? activeConfig.targetSpeedKmH : 6.5} km/h
+              </p>
+              <p>
+                <strong className="text-slate-900 dark:text-white">População Alvo × Real:</strong>{' '}
+                {metrics.targetPopulationPerHa.toLocaleString('pt-BR')} ×{' '}
+                {metrics.realPopulationPerHa.toLocaleString('pt-BR')} p/ha
+              </p>
+            </div>
+          </div>
+
+          {/* Technical Conclusion & Signatures */}
+          <div className="pt-4 border-t border-slate-200 dark:border-zinc-800 space-y-8">
+            <div className="space-y-1">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-900 dark:text-white">
+                Parecer Agronômico
+              </h4>
+              <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
+                A semeadura efetuada no talhão {activeField?.fieldCode} obteve índice IGP de {metrics.igpScore} (
+                {metrics.igpClassification}). Recomenda-se acompanhamento da emergência de plântulas aos 7 e 14 dias
+                pós-plantio e ajuste fino do vácuo pneumático em velocidades acima de 7,0 km/h.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 text-center text-xs pt-4">
+              <div className="border-t border-slate-400 dark:border-zinc-600 pt-2">
+                <p className="font-semibold text-slate-900 dark:text-white">Eng. Agrônomo Responsável</p>
+                <p className="text-[10px] text-slate-500 dark:text-zinc-400">CREA / Registro Técnico</p>
+              </div>
+              <div className="border-t border-slate-400 dark:border-zinc-600 pt-2">
+                <p className="font-semibold text-slate-900 dark:text-white">Gerente Agrícola / Proprietário</p>
+                <p className="text-[10px] text-slate-500 dark:text-zinc-400">{activeField?.farmName}</p>
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* Executive Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-stone-50 dark:bg-zinc-800/60 p-5 rounded-2xl border border-stone-200 dark:border-zinc-700 text-xs font-mono">
-          <div>
-            <span className="text-[10px] text-stone-400 font-bold block uppercase">Talhão / Área</span>
-            <span className="text-sm font-black text-stone-900 dark:text-white">{activeField?.fieldCode} ({activeField?.areaHa} ha)</span>
-          </div>
-          <div>
-            <span className="text-[10px] text-stone-400 font-bold block uppercase">Cultura / Híbrido</span>
-            <span className="text-sm font-black text-stone-900 dark:text-white">{activeField?.crop} ({activeField?.cultivar})</span>
-          </div>
-          <div>
-            <span className="text-[10px] text-stone-400 font-bold block uppercase">Índice IGP GeaAgro</span>
-            <span className="text-sm font-black text-emerald-600">{metrics.igpScore} / 100 ({metrics.igpClassification})</span>
-          </div>
-          <div>
-            <span className="text-[10px] text-stone-400 font-bold block uppercase">Prejuízo Est. Talhão</span>
-            <span className="text-sm font-black text-rose-600">R$ {lossSim.totalFinancialLoss.toLocaleString('pt-BR')}</span>
-          </div>
-        </div>
-
-        {/* Detailed KPI Table */}
-        <div className="space-y-3">
-          <h3 className="text-sm font-black uppercase text-stone-900 dark:text-white border-b border-stone-200 dark:border-zinc-700 pb-1">
-            1. Indicadores de Qualidade de Distribuição de Sementes
-          </h3>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
-            <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl border border-stone-200 dark:border-zinc-700">
-              <span className="text-[10px] text-stone-400 block">Coef. Variação (CV%)</span>
-              <span className="text-lg font-bold text-stone-900 dark:text-white">{metrics.cvPercent}%</span>
-            </div>
-            <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl border border-stone-200 dark:border-zinc-700">
-              <span className="text-[10px] text-stone-400 block">Espaçamentos Aceitáveis</span>
-              <span className="text-lg font-bold text-emerald-600">{metrics.acceptablePercent}%</span>
-            </div>
-            <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl border border-stone-200 dark:border-zinc-700">
-              <span className="text-[10px] text-stone-400 block">Percentual de Falhas</span>
-              <span className="text-lg font-bold text-amber-600">{metrics.skipsPercent}%</span>
-            </div>
-            <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl border border-stone-200 dark:border-zinc-700">
-              <span className="text-[10px] text-stone-400 block">Percentual de Duplos</span>
-              <span className="text-lg font-bold text-sky-600">{metrics.doublesPercent}%</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Machine & Operations Specs */}
-        <div className="space-y-3">
-          <h3 className="text-sm font-black uppercase text-stone-900 dark:text-white border-b border-stone-200 dark:border-zinc-700 pb-1">
-            2. Especificações de Máquina & Operação
-          </h3>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs font-medium text-stone-700 dark:text-stone-300">
-            <p><strong>Semeadora:</strong> {activePlanter?.brand} {activePlanter?.model}</p>
-            <p><strong>Dosador:</strong> {activePlanter?.meterType}</p>
-            <p><strong>Disco Utilizado:</strong> {activePlanter?.discSpecification}</p>
-            <p><strong>Lote Sementes:</strong> {activeSeed?.batchNumber} (Germinação: {activeSeed?.germinationRate}%)</p>
-            <p><strong>Velocidade Média:</strong> {activeConfig ? activeConfig.targetSpeedKmH : 6.5} km/h</p>
-            <p><strong>População Alvo x Real:</strong> {metrics.targetPopulationPerHa.toLocaleString('pt-BR')} x {metrics.realPopulationPerHa.toLocaleString('pt-BR')} p/ha</p>
-          </div>
-        </div>
-
-        {/* Technical Conclusion & Signatures */}
-        <div className="pt-6 border-t border-stone-200 dark:border-zinc-800 space-y-8">
-          <div className="space-y-1">
-            <h4 className="text-xs font-bold uppercase text-stone-900 dark:text-white">Parecer Agronômico:</h4>
-            <p className="text-xs text-stone-600 dark:text-stone-300 italic">
-              A semeadura efetuada no talhão {activeField?.fieldCode} obteve índice IGP de {metrics.igpScore} ({metrics.igpClassification}).
-              Recomenda-se acompanhamento constante da emergência de plântulas aos 7 e 14 dias pós-plantio e ajuste fino do vácuo pneumático em velocidades acima de 7.0 km/h.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-8 text-center text-xs font-mono pt-4">
-            <div className="border-t border-stone-400 pt-2">
-              <p className="font-bold text-stone-900 dark:text-white">Engº Agrônomo Responsável</p>
-              <p className="text-[10px] text-stone-500">CREA / Registro Técnico</p>
-            </div>
-            <div className="border-t border-stone-400 pt-2">
-              <p className="font-bold text-stone-900 dark:text-white">Gerente Agrícola / Proprietário</p>
-              <p className="text-[10px] text-stone-500">{activeField?.farmName}</p>
-            </div>
-          </div>
-        </div>
-      </div>
       )}
     </div>
   );

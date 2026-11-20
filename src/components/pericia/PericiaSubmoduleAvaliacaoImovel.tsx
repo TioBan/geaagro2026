@@ -270,10 +270,11 @@ export const PericiaSubmoduleAvaliacaoImovel: React.FC<PericiaSubmoduleAvaliacao
 
   // Success Notification banner
   const [notification, setNotification] = useState<string | null>(null);
+  const [pendingDeleteAmostraId, setPendingDeleteAmostraId] = useState<string | null>(null);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
-    setTimeout(() => setNotification(null), 3500);
+    setTimeout(() => setNotification((prev) => (prev === msg ? null : prev)), 4000);
   };
 
   // Helper to update avaliacao in pericia
@@ -360,7 +361,7 @@ export const PericiaSubmoduleAvaliacaoImovel: React.FC<PericiaSubmoduleAvaliacao
     const total = parseFloat(newAmostra.valorBrl);
 
     if (!newAmostra.amostra.trim() || isNaN(area) || area <= 0 || isNaN(total) || total <= 0) {
-      alert('Por favor, preencha a identificação da Amostra, Área (ha) e Valor Total válidos.');
+      showNotification('Preencha a identificação da amostra, área (ha) e valor total válidos.');
       return;
     }
 
@@ -409,13 +410,18 @@ export const PericiaSubmoduleAvaliacaoImovel: React.FC<PericiaSubmoduleAvaliacao
   const handleRemoveAmostra = (id: string) => {
     const target = avaliacao.precificacaoTerraNua?.find(item => item.id === id);
     if (!target) return;
-    if (window.confirm(`Deseja realmente excluir a amostra "${target.amostra}"?`)) {
-      updateAvaliacao({
-        ...avaliacao,
-        precificacaoTerraNua: (avaliacao.precificacaoTerraNua || []).filter(item => item.id !== id),
-      });
-      showNotification(`Amostra "${target.amostra}" removida.`);
+    if (pendingDeleteAmostraId !== id) {
+      setPendingDeleteAmostraId(id);
+      showNotification(`Clique novamente em excluir para remover a amostra "${target.amostra}".`);
+      setTimeout(() => setPendingDeleteAmostraId((prev) => (prev === id ? null : prev)), 4000);
+      return;
     }
+    updateAvaliacao({
+      ...avaliacao,
+      precificacaoTerraNua: (avaliacao.precificacaoTerraNua || []).filter(item => item.id !== id),
+    });
+    setPendingDeleteAmostraId(null);
+    showNotification(`Amostra "${target.amostra}" removida.`);
   };
 
   // Duplicate Sample
@@ -589,7 +595,7 @@ export const PericiaSubmoduleAvaliacaoImovel: React.FC<PericiaSubmoduleAvaliacao
   const handleExportCSV = () => {
     const list = avaliacao.precificacaoTerraNua || [];
     if (list.length === 0) {
-      alert('Nenhuma amostra para exportar.');
+      showNotification('Nenhuma amostra disponível para exportar.');
       return;
     }
 
@@ -833,112 +839,112 @@ export const PericiaSubmoduleAvaliacaoImovel: React.FC<PericiaSubmoduleAvaliacao
         </div>
       )}
 
-      {/* Main Header / Card Banner */}
-      <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-slate-900 text-white p-6 rounded-3xl border border-blue-800/40 shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 border border-blue-400/30 rounded-full text-blue-300 text-xs font-bold">
-              <Landmark className="w-3.5 h-3.5 text-blue-400" />
+      {/* Main Header & KPI Strip */}
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-slate-200/80 dark:border-zinc-800 overflow-hidden">
+        <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/80 dark:border-zinc-800">
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+              <Landmark className="w-3.5 h-3.5" />
               <span>Engenharia de Avaliações Rurais • ABNT NBR 14653-3</span>
             </div>
-            <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
-              Submódulo: Avaliação do Imóvel e Precificação da Terra Nua
+            <h2 className="text-base sm:text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+              Avaliação do Imóvel e Precificação da Terra Nua
             </h2>
-            <p className="text-slate-300 text-xs max-w-2xl">
-              Coleta de dados de mercado, homogeneização de amostras imobiliárias rurais, cálculo
-              automático do valor médio do hectare e valoração pericial do imóvel periciado.
+            <p className="text-slate-500 dark:text-zinc-400 text-xs max-w-2xl">
+              Coleta de dados de mercado, homogeneização de amostras rurais, valor médio do hectare e valoração patrimonial.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
+              type="button"
               onClick={handleLoadMarketSamples}
-              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+              className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              Carregar Amostras Típicas
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Carregar Amostras Típicas</span>
             </button>
             <button
+              type="button"
               onClick={handleExportCSV}
               disabled={!avaliacao.precificacaoTerraNua || avaliacao.precificacaoTerraNua.length === 0}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-2 border border-slate-700 transition-all cursor-pointer"
+              className="h-8 px-3 bg-slate-50 hover:bg-slate-100 dark:bg-zinc-800 dark:hover:bg-zinc-700 disabled:opacity-50 text-slate-700 dark:text-zinc-200 rounded-lg text-xs font-medium flex items-center gap-1.5 border border-slate-200 dark:border-zinc-700 transition-colors cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
-              Exportar CSV
+              <span>Exportar CSV</span>
             </button>
           </div>
         </div>
 
-        {/* Dynamic Metric Highlights */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-6 mt-4 border-t border-slate-800/80">
-          <div className="bg-slate-900/70 border border-slate-800 p-3.5 rounded-2xl">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+        {/* Hairline KPI Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80 dark:divide-zinc-800 bg-slate-50/40 dark:bg-zinc-950/30">
+          <div className="p-3.5">
+            <span className="text-[10px] uppercase font-semibold text-slate-500 dark:text-zinc-400 block tracking-wider">
               Preço Médio da Terra
             </span>
-            <div className="text-xl font-bold font-mono text-emerald-400 mt-1">
+            <div className="text-lg font-bold text-slate-900 dark:text-white mt-0.5 tabular-nums">
               {stats.mediaSimplesPorHa.toLocaleString('pt-BR', {
                 style: 'currency',
                 currency: 'BRL',
               })}
-              <span className="text-xs font-normal text-slate-400">/ha</span>
+              <span className="text-xs font-normal text-slate-500 dark:text-zinc-400">/ha</span>
             </div>
-            <span className="text-[10px] text-slate-400 mt-0.5 block">
+            <span className="text-[10px] text-slate-500 dark:text-zinc-400 mt-0.5 block tabular-nums">
               Média simples de {stats.totalAmostras} amostras
             </span>
           </div>
 
-          <div className="bg-slate-900/70 border border-slate-800 p-3.5 rounded-2xl">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+          <div className="p-3.5">
+            <span className="text-[10px] uppercase font-semibold text-slate-500 dark:text-zinc-400 block tracking-wider">
               Média Ponderada
             </span>
-            <div className="text-xl font-bold font-mono text-blue-400 mt-1">
+            <div className="text-lg font-bold text-slate-900 dark:text-white mt-0.5 tabular-nums">
               {stats.mediaPonderadaPorHa.toLocaleString('pt-BR', {
                 style: 'currency',
                 currency: 'BRL',
               })}
-              <span className="text-xs font-normal text-slate-400">/ha</span>
+              <span className="text-xs font-normal text-slate-500 dark:text-zinc-400">/ha</span>
             </div>
-            <span className="text-[10px] text-slate-400 mt-0.5 block">
+            <span className="text-[10px] text-slate-500 dark:text-zinc-400 mt-0.5 block tabular-nums">
               Ponderado por {stats.areaTotalAmostrada.toLocaleString('pt-BR')} ha
             </span>
           </div>
 
-          <div className="bg-slate-900/70 border border-slate-800 p-3.5 rounded-2xl">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+          <div className="p-3.5">
+            <span className="text-[10px] uppercase font-semibold text-slate-500 dark:text-zinc-400 block tracking-wider">
               Homogeneidade (CV %)
             </span>
-            <div className="text-xl font-bold font-mono text-amber-300 mt-1 flex items-center gap-2">
+            <div className="text-lg font-bold text-slate-900 dark:text-white mt-0.5 flex items-center gap-2 tabular-nums">
               {stats.coeficienteVariacao.toFixed(1)}%
               {stats.totalAmostras > 1 && (
                 <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                  className={`text-[10px] px-1.5 py-0.5 rounded font-medium uppercase ${
                     stats.isHomogeneo
-                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                      : 'bg-amber-950 text-amber-300 border border-amber-800'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60'
+                      : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60'
                   }`}
                 >
                   {stats.isHomogeneo ? 'Homogêneo' : 'Disperso'}
                 </span>
               )}
             </div>
-            <span className="text-[10px] text-slate-400 mt-0.5 block">
+            <span className="text-[10px] text-slate-500 dark:text-zinc-400 mt-0.5 block tabular-nums">
               Desvio Padrão: {stats.desvioPadrao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </span>
           </div>
 
-          <div className="bg-gradient-to-br from-emerald-950/80 to-blue-950/80 border border-emerald-600/40 p-3.5 rounded-2xl">
-            <span className="text-[10px] uppercase font-bold text-emerald-300 block tracking-wider">
-              Valor da Propriedade Periciada
+          <div className="p-3.5 bg-emerald-50/40 dark:bg-emerald-950/20">
+            <span className="text-[10px] uppercase font-semibold text-emerald-700 dark:text-emerald-400 block tracking-wider">
+              Valor da Propriedade
             </span>
-            <div className="text-xl font-bold font-mono text-emerald-300 mt-1">
+            <div className="text-lg font-bold text-emerald-700 dark:text-emerald-400 mt-0.5 tabular-nums">
               {stats.valorTotalImovelEstimado.toLocaleString('pt-BR', {
                 style: 'currency',
                 currency: 'BRL',
                 maximumFractionDigits: 0,
               })}
             </div>
-            <span className="text-[10px] text-emerald-200/80 mt-0.5 block">
+            <span className="text-[10px] text-slate-600 dark:text-zinc-400 mt-0.5 block tabular-nums">
               Para {simulatedPropertyArea.toLocaleString('pt-BR')} ha de terra nua
             </span>
           </div>
@@ -946,201 +952,77 @@ export const PericiaSubmoduleAvaliacaoImovel: React.FC<PericiaSubmoduleAvaliacao
       </div>
 
       {/* SUBMODULE NAVIGATION TABS */}
-      <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-slate-100 dark:bg-zinc-800/80 rounded-2xl border border-slate-200 dark:border-zinc-700 text-xs overflow-x-auto">
-        <button
-          type="button"
-          onClick={() => setActiveTab('resumo_global')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'resumo_global'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs border border-emerald-200 dark:border-emerald-800/60'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <LayoutGrid className="w-4 h-4 text-emerald-600" />
-          <span>Resumo Global</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('inventario_ativos')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'inventario_ativos'
-              ? 'bg-emerald-600 text-white shadow-md'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <Layers className="w-4 h-4 text-amber-300" />
-          <span>Inventário de Ativos</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-mono font-bold">
-            {pericia.inventarioAtivos?.length ||
-              (avaliacao.maquinasEquipamentos?.length || 0) + (avaliacao.veiculos?.length || 0) ||
-              13}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('terra_nua')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'terra_nua'
-              ? 'bg-white dark:bg-zinc-900 text-blue-700 dark:text-blue-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <Landmark className="w-4 h-4" />
-          <span>5.2.1 Terra Nua</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('classes_aproveitamento')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'classes_aproveitamento'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <Layers className="w-4 h-4 text-emerald-600" />
-          <span>5.2.2 Capacidade & Uso</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('benfeitorias')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'benfeitorias'
-              ? 'bg-white dark:bg-zinc-900 text-amber-700 dark:text-amber-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <Building className="w-4 h-4 text-amber-500" />
-          <span>5.2.3 Benfeitorias</span>
-          {(avaliacao.benfeitorias?.length || 0) > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-mono">
-              {avaliacao.benfeitorias?.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('maquinas')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'maquinas'
-              ? 'bg-white dark:bg-zinc-900 text-blue-700 dark:text-blue-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <Tractor className="w-4 h-4 text-blue-500" />
-          <span>5.2.4 Máquinas</span>
-          {(avaliacao.maquinasEquipamentos?.length || 0) > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 font-mono">
-              {avaliacao.maquinasEquipamentos?.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('veiculos')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'veiculos'
-              ? 'bg-white dark:bg-zinc-900 text-indigo-700 dark:text-indigo-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <Truck className="w-4 h-4 text-indigo-500" />
-          <span>5.2.5 Veículos</span>
-          {(avaliacao.veiculos?.length || 0) > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 font-mono">
-              {avaliacao.veiculos?.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('semoventes')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'semoventes'
-              ? 'bg-white dark:bg-zinc-900 text-amber-700 dark:text-amber-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <Tag className="w-4 h-4 text-amber-600" />
-          <span>5.2.6 Semoventes</span>
-          {(avaliacao.semoventes?.length || 0) > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-mono">
-              {avaliacao.semoventes?.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('recursos')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'recursos'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <Trees className="w-4 h-4 text-emerald-600" />
-          <span>5.2.7 Rec. Naturais</span>
-          {(avaliacao.recursosNaturais?.length || 0) > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-mono">
-              {avaliacao.recursosNaturais?.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('frutos')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'frutos'
-              ? 'bg-white dark:bg-zinc-900 text-lime-700 dark:text-lime-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <Sprout className="w-4 h-4 text-lime-600" />
-          <span>5.2.8 Frutos</span>
-          {(avaliacao.frutos?.length || 0) > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-lime-100 dark:bg-lime-950 text-lime-800 dark:text-lime-300 font-mono">
-              {avaliacao.frutos?.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('direitos')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'direitos'
-              ? 'bg-white dark:bg-zinc-900 text-purple-700 dark:text-purple-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <Scale className="w-4 h-4 text-purple-600" />
-          <span>5.2.9 Direitos</span>
-          {(avaliacao.direitos?.length || 0) > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300 font-mono">
-              {avaliacao.direitos?.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('fundamentacao')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'fundamentacao'
-              ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <span>Parecer & Fundamentação</span>
-        </button>
+      <div className="border-b border-slate-200/80 dark:border-zinc-800 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-1 min-w-max">
+          {[
+            { id: 'resumo_global' as const, label: 'Resumo Global', icon: LayoutGrid },
+            {
+              id: 'inventario_ativos' as const,
+              label: `Inventário (${
+                pericia.inventarioAtivos?.length ||
+                (avaliacao.maquinasEquipamentos?.length || 0) + (avaliacao.veiculos?.length || 0) ||
+                13
+              })`,
+              icon: Layers,
+            },
+            { id: 'terra_nua' as const, label: '5.2.1 Terra Nua', icon: Landmark },
+            { id: 'classes_aproveitamento' as const, label: '5.2.2 Uso & Capacidade', icon: Layers },
+            {
+              id: 'benfeitorias' as const,
+              label: `5.2.3 Benfeitorias${(avaliacao.benfeitorias?.length || 0) > 0 ? ` (${avaliacao.benfeitorias?.length})` : ''}`,
+              icon: Building,
+            },
+            {
+              id: 'maquinas' as const,
+              label: `5.2.4 Máquinas${(avaliacao.maquinasEquipamentos?.length || 0) > 0 ? ` (${avaliacao.maquinasEquipamentos?.length})` : ''}`,
+              icon: Tractor,
+            },
+            {
+              id: 'veiculos' as const,
+              label: `5.2.5 Veículos${(avaliacao.veiculos?.length || 0) > 0 ? ` (${avaliacao.veiculos?.length})` : ''}`,
+              icon: Truck,
+            },
+            {
+              id: 'semoventes' as const,
+              label: `5.2.6 Semoventes${(avaliacao.semoventes?.length || 0) > 0 ? ` (${avaliacao.semoventes?.length})` : ''}`,
+              icon: Tag,
+            },
+            {
+              id: 'recursos' as const,
+              label: `5.2.7 Rec. Naturais${(avaliacao.recursosNaturais?.length || 0) > 0 ? ` (${avaliacao.recursosNaturais?.length})` : ''}`,
+              icon: Trees,
+            },
+            {
+              id: 'frutos' as const,
+              label: `5.2.8 Frutos${(avaliacao.frutos?.length || 0) > 0 ? ` (${avaliacao.frutos?.length})` : ''}`,
+              icon: Sprout,
+            },
+            {
+              id: 'direitos' as const,
+              label: `5.2.9 Direitos${(avaliacao.direitos?.length || 0) > 0 ? ` (${avaliacao.direitos?.length})` : ''}`,
+              icon: Scale,
+            },
+            { id: 'fundamentacao' as const, label: 'Parecer & Fundamentação', icon: null },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3 py-2.5 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
+                  active
+                    ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400 dark:border-emerald-500'
+                    : 'border-transparent text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:border-slate-300 dark:hover:border-zinc-700'
+                }`}
+              >
+                {Icon && <Icon className="w-3.5 h-3.5 shrink-0" />}
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* TAB: RESUMO GLOBAL */}
@@ -1158,7 +1040,7 @@ export const PericiaSubmoduleAvaliacaoImovel: React.FC<PericiaSubmoduleAvaliacao
       {activeTab === 'terra_nua' && (
         <div className="space-y-6">
           {/* FORMULÁRIO DE CADASTRO DE AMOSTRA DE TERRA NUA */}
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-xs space-y-5">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-5 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-150 dark:border-zinc-800 pb-3">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-400 flex items-center justify-center font-bold">
@@ -1391,7 +1273,7 @@ export const PericiaSubmoduleAvaliacaoImovel: React.FC<PericiaSubmoduleAvaliacao
       </div>
 
       {/* TABELA EDITÁVEL DE PRECIFICAÇÃO DA TERRA NUA */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-xs space-y-4">
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-5 space-y-4">
         {/* Table Header & Controls */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-150 dark:border-zinc-800 pb-4">
           <div className="space-y-1">
@@ -1789,7 +1671,7 @@ export const PericiaSubmoduleAvaliacaoImovel: React.FC<PericiaSubmoduleAvaliacao
   {activeTab === 'classes_aproveitamento' && (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-xs space-y-4">
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-5 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-150 dark:border-zinc-800 pb-4">
           <div>
             <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 mb-1.5">
@@ -1867,19 +1749,19 @@ export const PericiaSubmoduleAvaliacaoImovel: React.FC<PericiaSubmoduleAvaliacao
             </span>
           </div>
 
-          <div className="p-3 rounded-xl border border-emerald-500/40 bg-gradient-to-br from-emerald-950 to-slate-900 text-white flex flex-col justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+          <div className="p-3 rounded-lg border border-emerald-200/80 dark:border-emerald-800/50 bg-emerald-50/60 dark:bg-emerald-950/30 flex flex-col justify-between">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
               Valor Ponderado pelas Classes
             </span>
             <div className="mt-1">
-              <span className="text-lg font-black font-mono text-emerald-300 block">
+              <span className="text-base font-bold font-mono text-emerald-800 dark:text-emerald-300 block tabular-nums">
                 {valorTotalPonderadoTerras.toLocaleString('pt-BR', {
                   style: 'currency',
                   currency: 'BRL',
                   maximumFractionDigits: 0,
                 })}
               </span>
-              <span className="text-[10px] text-emerald-200/80 block mt-0.5">
+              <span className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80 block mt-0.5 tabular-nums">
                 Média: {(somaAreaClasses > 0 ? valorTotalPonderadoTerras / somaAreaClasses : baseLandPrice).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}/ha
               </span>
             </div>
@@ -1888,7 +1770,7 @@ export const PericiaSubmoduleAvaliacaoImovel: React.FC<PericiaSubmoduleAvaliacao
       </div>
 
       {/* SEÇÃO 1: BALANÇO DE OCUPAÇÃO E APROVEITAMENTO DO IMÓVEL */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-xs space-y-4">
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-5 space-y-4">
         <div className="flex items-center justify-between border-b border-slate-150 dark:border-zinc-800 pb-3">
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-zinc-200 flex items-center gap-2">
             <PieChart className="w-4 h-4 text-emerald-600" />
@@ -2013,7 +1895,7 @@ export const PericiaSubmoduleAvaliacaoImovel: React.FC<PericiaSubmoduleAvaliacao
       </div>
 
       {/* SEÇÃO 2: CLASSIFICAÇÃO DA CAPACIDADE DE USO DAS TERRAS (CLASSES I A VIII) */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-xs space-y-4">
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-5 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-150 dark:border-zinc-800 pb-3">
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-zinc-200 flex items-center gap-2">
@@ -2160,7 +2042,7 @@ export const PericiaSubmoduleAvaliacaoImovel: React.FC<PericiaSubmoduleAvaliacao
       </div>
 
       {/* SEÇÃO 3: PARECER TÉCNICO PERICIAL DE APTIDÃO E APROVEITAMENTO */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-xs space-y-3">
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-5 space-y-3">
         <div className="flex items-center justify-between border-b border-slate-150 dark:border-zinc-800 pb-2.5">
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-zinc-200 flex items-center gap-2">
             <Info className="w-4 h-4 text-emerald-600" />
@@ -2184,7 +2066,7 @@ export const PericiaSubmoduleAvaliacaoImovel: React.FC<PericiaSubmoduleAvaliacao
 
   {/* TAB 3: PARECER TÉCNICO E FUNDAMENTAÇÃO JUDICIAL */}
   {activeTab === 'fundamentacao' && (
-    <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-xs space-y-5">
+    <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-5 space-y-5">
       <div className="flex items-center gap-2 border-b border-slate-150 dark:border-zinc-800 pb-3">
         <Scale className="w-5 h-5 text-blue-600" />
         <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">

@@ -1,671 +1,942 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Tractor, Activity, Scale, HeartPulse, Dna,
-  Syringe, Milk, Beef, PieChart, Info, MapPin, Sprout,
-  ArrowRight, ShieldAlert, ArrowDownRight, ArrowUpRight,
-  Database, RefreshCw, CheckCircle2, AlertTriangle, Plus, Trash2
+  Activity,
+  Beef,
+  Droplets,
+  Heart,
+  LayoutGrid,
+  Leaf,
+  Plus,
+  Printer,
+  Search,
+  ShieldCheck,
+  Syringe,
+  Trash2,
 } from 'lucide-react';
-import { LivestockTab, Animal, Paddock } from '../types/livestock';
-import { INITIAL_ANIMALS, INITIAL_PADDOCKS, analyzeISPA } from '../data/livestockData';
-import { offlineDB, SyncItem } from '../utils/indexedDB';
+import { Animal, AnimalPurpose, Paddock } from '../types/livestock';
+import { INITIAL_ANIMALS, INITIAL_PADDOCKS } from '../data/livestockData';
+import { offlineDB } from '../utils/indexedDB';
+import { AddAnimalModal, AddPaddockModal } from './livestock/LivestockFormsModal';
+import {
+  BeefWeightView,
+  DairyMilkView,
+  HealthSanitationView,
+  ReproductionView,
+} from './livestock/LivestockRecordsViews';
+import {
+  IspaSimulatorView,
+  PastureTwinView,
+} from './livestock/LivestockPastureAndIspaViews';
+
+type CanonicalLivestockTab =
+  | 'dashboard'
+  | 'rebanho'
+  | 'corte'
+  | 'leite'
+  | 'reproducao'
+  | 'sanidade'
+  | 'pastagens'
+  | 'ispa';
 
 interface LivestockModuleProps {
   activeSubTab?: string;
-  setActiveSubTab?: (tab: LivestockTab) => void;
+  setActiveSubTab?: (tab: string) => void;
 }
 
-export const LivestockModule: React.FC<LivestockModuleProps> = ({ activeSubTab, setActiveSubTab }) => {
-  const [internalTab, setInternalTab] = useState<LivestockTab>('dashboard');
-  const activeTab = (activeSubTab as LivestockTab) || internalTab;
-  const setActiveTab = (tab: LivestockTab) => {
+const TABS: Array<{
+  id: CanonicalLivestockTab;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  { id: 'dashboard', label: 'Visão Geral', icon: LayoutGrid },
+  { id: 'rebanho', label: 'Rebanho & Gêmeo', icon: ShieldCheck },
+  { id: 'corte', label: 'Corte & Pesagens', icon: Beef },
+  { id: 'leite', label: 'Leite & Tanque', icon: Droplets },
+  { id: 'reproducao', label: 'Reprodução & IATF', icon: Heart },
+  { id: 'sanidade', label: 'Sanidade & Vacinas', icon: Syringe },
+  { id: 'pastagens', label: 'Pastagens & Piquetes', icon: Leaf },
+  { id: 'ispa', label: 'Simulador ISPA', icon: Activity },
+];
+
+function normalizeLivestockTab(tab?: string): CanonicalLivestockTab {
+  switch (tab) {
+    case 'rebanho':
+    case 'animal_twin':
+      return 'rebanho';
+    case 'corte':
+    case 'weight':
+    case 'beef':
+      return 'corte';
+    case 'leite':
+    case 'milk':
+      return 'leite';
+    case 'reproducao':
+    case 'reproduction':
+      return 'reproducao';
+    case 'sanidade':
+    case 'health':
+    case 'pharmacy':
+    case 'guia_doencas':
+      return 'sanidade';
+    case 'pastagens':
+    case 'pasture_twin':
+      return 'pastagens';
+    case 'ispa':
+    case 'nutricao':
+    case 'nutrition':
+    case 'analytics':
+    case 'relatorios':
+    case 'genetics':
+      return 'ispa';
+    case 'dashboard':
+    default:
+      return 'dashboard';
+  }
+}
+
+export const LivestockModule: React.FC<LivestockModuleProps> = ({
+  activeSubTab,
+  setActiveSubTab,
+}) => {
+  const [internalTab, setInternalTab] = useState<CanonicalLivestockTab>('dashboard');
+  const activeTab: CanonicalLivestockTab = activeSubTab
+    ? normalizeLivestockTab(activeSubTab)
+    : internalTab;
+
+  const navigateTab = (tab: CanonicalLivestockTab) => {
     setInternalTab(tab);
     if (setActiveSubTab) {
       setActiveSubTab(tab);
     }
   };
+
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [paddocks, setPaddocks] = useState<Paddock[]>([]);
-  const [syncQueue, setSyncQueue] = useState<SyncItem[]>([]);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [selectedAnimalId, setSelectedAnimalId] = useState<string>('');
+  const [selectedPaddockId, setSelectedPaddockId] = useState<string>('');
 
-  // Form states for new animal
   const [showAddAnimal, setShowAddAnimal] = useState(false);
-  const [newAnimalNum, setNewAnimalNum] = useState('');
-  const [newAnimalName, setNewAnimalName] = useState('');
-  const [newAnimalBreed, setNewAnimalBreed] = useState('Nelore');
-  const [newAnimalCategory, setNewAnimalCategory] = useState<any>('Novilha');
-  const [newAnimalWeight, setNewAnimalWeight] = useState(350);
-
-  // Form states for new paddock
   const [showAddPaddock, setShowAddPaddock] = useState(false);
-  const [newPaddockName, setNewPaddockName] = useState('');
-  const [newPaddockArea, setNewPaddockArea] = useState(20);
-  const [newPaddockForage, setNewPaddockForage] = useState('Brachiaria brizantha');
 
-  useEffect(() => {
-    loadOfflineData();
-    // Listen to network changes
-    window.addEventListener('online', handleOnlineSync);
-    // Listen to Service Worker message
-    const handleSWMessage = (e: MessageEvent) => {
-      if (e.data && e.data.type === 'SYNC_OFFLINE_DATA') {
-        handleOnlineSync();
-      }
-    };
-    navigator.serviceWorker?.addEventListener('message', handleSWMessage);
-
-    return () => {
-      window.removeEventListener('online', handleOnlineSync);
-      navigator.serviceWorker?.removeEventListener('message', handleSWMessage);
-    };
-  }, []);
+  const [herdSearch, setHerdSearch] = useState('');
+  const [purposeFilter, setPurposeFilter] = useState<'Todas' | AnimalPurpose>('Todas');
+  const [confirmDeleteAnimalId, setConfirmDeleteAnimalId] = useState<string | null>(null);
 
   const loadOfflineData = async () => {
     try {
-      const dbAnimals = await offlineDB.getAll<Animal>('animals');
-      const dbPaddocks = await offlineDB.getAll<Paddock>('paddocks');
-      const dbSync = await offlineDB.getSyncQueue();
-      
-      setAnimals(dbAnimals.length > 0 ? dbAnimals : INITIAL_ANIMALS);
-      setPaddocks(dbPaddocks.length > 0 ? dbPaddocks : INITIAL_PADDOCKS);
-      setSyncQueue(dbSync);
+      const [dbAnimals, dbPaddocks] = await Promise.all([
+        offlineDB.getAll<Animal>('animals'),
+        offlineDB.getAll<Paddock>('paddocks'),
+      ]);
+      const nextAnimals = dbAnimals.length > 0 ? dbAnimals : INITIAL_ANIMALS;
+      const nextPaddocks = dbPaddocks.length > 0 ? dbPaddocks : INITIAL_PADDOCKS;
+      setAnimals(nextAnimals);
+      setPaddocks(nextPaddocks);
+      setSelectedAnimalId((prev) =>
+        nextAnimals.some((a) => a.id === prev) ? prev : nextAnimals[0]?.id || ''
+      );
+      setSelectedPaddockId((prev) =>
+        nextPaddocks.some((p) => p.id === prev) ? prev : nextPaddocks[0]?.id || ''
+      );
     } catch (err) {
-      console.warn('Could not load offline livestock data, using initial data:', err);
+      console.warn('Não foi possível carregar dados locais da bovinocultura:', err);
       setAnimals(INITIAL_ANIMALS);
       setPaddocks(INITIAL_PADDOCKS);
     }
   };
 
-  const handleOnlineSync = async () => {
-    setIsSyncing(true);
-    try {
-      const queue = await offlineDB.getSyncQueue();
-      if (queue.length > 0) {
-        // Simulate synchronization delay
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        await offlineDB.clearSyncQueue();
-        console.log('[Sync] Synchronization with remote cloud server completed!');
-      }
-      await loadOfflineData();
-    } catch (err) {
-      console.error('Sync failed:', err);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
+  useEffect(() => {
+    loadOfflineData();
+  }, []);
 
-  const handleAddAnimalSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newAnimalNum || !newAnimalName) return;
-
-    const newAnimal: Animal = {
-      id: `anim-${Date.now()}`,
-      rfid: `840003${Math.floor(100000000 + Math.random() * 900000000)}`,
-      name: newAnimalName,
-      number: newAnimalNum,
-      species: 'Bovina',
-      breed: newAnimalBreed,
-      sex: 'F',
-      birthDate: new Date().toISOString().split('T')[0],
-      category: newAnimalCategory,
-      purpose: 'Corte',
-      batch: 'Lote Recria 1',
-      origin: 'Nascida na Fazenda',
-      paddockId: paddocks[0]?.id || 'piquete-01',
-      bloodDegree: 'PO',
-      birthWeight: 30,
-      currentWeight: Number(newAnimalWeight),
-      photos: [],
-      weightHistory: [{ id: `w-${Date.now()}`, date: new Date().toISOString().split('T')[0], weight: Number(newAnimalWeight), bodyConditionScore: 3.5 }],
-      healthHistory: [],
-      reproHistory: []
-    };
-
+  const handleAddAnimal = async (newAnimal: Animal) => {
     await offlineDB.add('animals', newAnimal);
-    setShowAddAnimal(false);
-    setNewAnimalNum('');
-    setNewAnimalName('');
     await loadOfflineData();
+    setSelectedAnimalId(newAnimal.id);
   };
 
-  const handleAddPaddockSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPaddockName) return;
-
-    const newPaddock: Paddock = {
-      id: `piquete-${Date.now()}`,
-      name: newPaddockName,
-      areaHa: Number(newPaddockArea),
-      forageSpecies: newPaddockForage,
-      cultivar: 'Marandu',
-      currentHeightCm: 25,
-      targetHeightCm: 30,
-      currentBiomassKgHa: 2500,
-      stockingRateAU: 1.5,
-      restDays: 15,
-      occupationDays: 5,
-      history: []
-    };
-
-    await offlineDB.add('paddocks', newPaddock);
-    setShowAddPaddock(false);
-    setNewPaddockName('');
+  const handleUpdateAnimal = async (updated: Animal) => {
+    await offlineDB.put('animals', updated);
     await loadOfflineData();
   };
 
   const handleDeleteAnimal = async (id: string) => {
-    if (confirm('Deseja realmente remover este animal offline?')) {
-      await offlineDB.delete('animals', id);
-      await loadOfflineData();
-    }
+    await offlineDB.delete('animals', id);
+    setConfirmDeleteAnimalId(null);
+    await loadOfflineData();
   };
 
-  const [selectedAnimalId, setSelectedAnimalId] = useState<string>('');
+  const handleAddPaddock = async (newPaddock: Paddock) => {
+    await offlineDB.add('paddocks', newPaddock);
+    await loadOfflineData();
+    setSelectedPaddockId(newPaddock.id);
+  };
+
+  const handleUpdatePaddock = async (updated: Paddock) => {
+    await offlineDB.put('paddocks', updated);
+    await loadOfflineData();
+  };
+
+  const handleDeletePaddock = async (id: string) => {
+    await offlineDB.delete('paddocks', id);
+    await loadOfflineData();
+  };
+
+  // Dynamic KPIs computed exclusively from real stored herd & pasture records
+  const kpis = useMemo(() => {
+    const totalAnimals = animals.length;
+    const beefCount = animals.filter((a) => a.purpose === 'Corte').length;
+    const dairyMixedCount = totalAnimals - beefCount;
+
+    const avgWeight =
+      totalAnimals > 0
+        ? animals.reduce((sum, a) => sum + (a.currentWeight || 0), 0) / totalAnimals
+        : 0;
+    const totalArrobas = animals.reduce(
+      (sum, a) => sum + ((a.currentWeight || 0) * 0.5) / 15,
+      0
+    );
+
+    const gmds: number[] = [];
+    let diagTotal = 0;
+    let diagPos = 0;
+    let activeGraceCount = 0;
+    const now = Date.now();
+
+    animals.forEach((a) => {
+      (a.weightHistory || []).forEach((w) => {
+        if (typeof w.gmd === 'number') gmds.push(w.gmd);
+      });
+      (a.reproHistory || []).forEach((r) => {
+        if (r.type === 'Diagnóstico Gestação') {
+          diagTotal += 1;
+          if ((r.result || '').toLowerCase().includes('prenh')) {
+            diagPos += 1;
+          }
+        }
+      });
+      (a.healthHistory || []).forEach((h) => {
+        if (h.gracePeriodDays && h.gracePeriodDays > 0) {
+          const end = new Date(h.date).getTime() + h.gracePeriodDays * 86400000;
+          if (end > now) activeGraceCount += 1;
+        }
+      });
+    });
+
+    const avgGmd = gmds.length > 0 ? gmds.reduce((s, v) => s + v, 0) / gmds.length : null;
+    const pregnancyRate = diagTotal > 0 ? Math.round((diagPos / diagTotal) * 100) : null;
+
+    const totalAreaHa = paddocks.reduce((s, p) => s + (p.areaHa || 0), 0);
+    const avgStockingAU =
+      paddocks.length > 0
+        ? paddocks.reduce((s, p) => s + (p.stockingRateAU || 0), 0) / paddocks.length
+        : 0;
+
+    return {
+      totalAnimals,
+      beefCount,
+      dairyMixedCount,
+      avgWeight,
+      totalArrobas,
+      avgGmd,
+      diagTotal,
+      pregnancyRate,
+      activeGraceCount,
+      totalAreaHa,
+      avgStockingAU,
+    };
+  }, [animals, paddocks]);
+
+  const filteredAnimals = useMemo(() => {
+    const query = herdSearch.trim().toLowerCase();
+    return animals.filter((a) => {
+      if (purposeFilter !== 'Todas' && a.purpose !== purposeFilter) return false;
+      if (!query) return true;
+      return (
+        a.number.toLowerCase().includes(query) ||
+        a.name.toLowerCase().includes(query) ||
+        a.breed.toLowerCase().includes(query) ||
+        a.batch.toLowerCase().includes(query) ||
+        a.category.toLowerCase().includes(query)
+      );
+    });
+  }, [animals, herdSearch, purposeFilter]);
+
   const currentAnimal = useMemo(() => {
-    if (!animals || animals.length === 0) return null;
-    return animals.find(a => a?.id === selectedAnimalId) || animals[0] || null;
-  }, [animals, selectedAnimalId]);
+    return (
+      filteredAnimals.find((a) => a.id === selectedAnimalId) ||
+      filteredAnimals[0] ||
+      null
+    );
+  }, [filteredAnimals, selectedAnimalId]);
 
-  // Set default selected animal once loaded
-  useEffect(() => {
-    if (animals && animals.length > 0 && !selectedAnimalId && animals[0]?.id) {
-      setSelectedAnimalId(animals[0].id);
-    }
-  }, [animals, selectedAnimalId]);
+  const currentAnimalPaddockName = useMemo(() => {
+    if (!currentAnimal) return '—';
+    const found = paddocks.find((p) => p.id === currentAnimal.paddockId);
+    return found ? `${found.name} (${found.areaHa} ha)` : currentAnimal.paddockId || 'Não alocado';
+  }, [currentAnimal, paddocks]);
 
-  const [selectedPaddockId, setSelectedPaddockId] = useState<string>('');
-  const currentPaddock = useMemo(() => {
-    if (!paddocks || paddocks.length === 0) return null;
-    return paddocks.find(p => p?.id === selectedPaddockId) || paddocks[0] || null;
-  }, [paddocks, selectedPaddockId]);
+  const currentAnimalTimeline = useMemo(() => {
+    if (!currentAnimal) return [];
+    const items: Array<{
+      id: string;
+      date: string;
+      category: 'Pesagem' | 'Reprodução' | 'Sanidade' | 'Leite';
+      title: string;
+      detail: string;
+    }> = [];
 
-  useEffect(() => {
-    if (paddocks && paddocks.length > 0 && !selectedPaddockId && paddocks[0]?.id) {
-      setSelectedPaddockId(paddocks[0].id);
-    }
-  }, [paddocks, selectedPaddockId]);
+    (currentAnimal.weightHistory || []).forEach((w) => {
+      items.push({
+        id: w.id,
+        date: w.date,
+        category: 'Pesagem',
+        title: `${w.weight} kg`,
+        detail: `${w.gmd !== undefined ? `GMD ${w.gmd >= 0 ? '+' : ''}${w.gmd.toFixed(2)} kg/d · ` : ''}ECC ${w.bodyConditionScore.toFixed(2)}`,
+      });
+    });
+    (currentAnimal.reproHistory || []).forEach((r) => {
+      items.push({
+        id: r.id,
+        date: r.date,
+        category: 'Reprodução',
+        title: r.type,
+        detail: [r.result, r.bullId ? `Touro: ${r.bullId}` : '', r.notes]
+          .filter(Boolean)
+          .join(' · ') || 'Registrado',
+      });
+    });
+    (currentAnimal.healthHistory || []).forEach((h) => {
+      items.push({
+        id: h.id,
+        date: h.date,
+        category: 'Sanidade',
+        title: `${h.type}${h.product ? ` · ${h.product}` : ''}`,
+        detail: `${h.description}${h.gracePeriodDays ? ` · Carência ${h.gracePeriodDays}d` : ''}`,
+      });
+    });
+    (currentAnimal.milkHistory || []).forEach((m) => {
+      items.push({
+        id: m.id,
+        date: m.date,
+        category: 'Leite',
+        title: `${m.volume.toFixed(1)} L`,
+        detail: [
+          m.fatPercentage !== undefined ? `Gord ${m.fatPercentage.toFixed(1)}%` : '',
+          m.proteinPercentage !== undefined ? `Prot ${m.proteinPercentage.toFixed(1)}%` : '',
+          m.ccs !== undefined ? `CCS ${m.ccs} mil` : '',
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      });
+    });
 
-  // ISPA Mock inputs for offline calculation
-  const [soilP, setSoilP] = useState(8); // mg/dm3 (Baixo)
-  const [pastureGrowth, setPastureGrowth] = useState(25); // kg MS/ha/dia (Degradada)
-  const [animalGmd, setAnimalGmd] = useState(0.4); // kg/dia (Abaixo)
-
-  const ispaResult = useMemo(() => analyzeISPA(soilP, pastureGrowth, animalGmd), [soilP, pastureGrowth, animalGmd]);
+    return items.sort((a, b) => b.date.localeCompare(a.date));
+  }, [currentAnimal]);
 
   return (
-    <div className="space-y-6">
-      {/* Banner Principal */}
-      <div className="bg-gradient-to-r from-amber-950 via-orange-900 to-stone-900 text-white rounded-2xl p-5 sm:p-6 shadow-sm border border-amber-800">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full tracking-wider flex items-center gap-1">
-                <Tractor className="w-3 h-3" />
-                Pecuária de Decisão
-              </span>
-              <span className="text-amber-200/80 text-xs font-semibold">• Sistema Integrado Solo-Planta-Animal</span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
-              <Beef className="w-6 h-6 text-amber-400" />
-              Gestão Zootécnica & Digital Twins
-            </h2>
-            <p className="text-xs sm:text-sm text-amber-100/80 mt-1 max-w-4xl">
-              Acompanhe a vida produtiva do rebanho, controle de pastagens e descubra como a fertilidade do solo impacta no seu custo por arroba.
-            </p>
-          </div>
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-5 space-y-4">
+      {/* Compact Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-white tracking-tight">
+            Bovinocultura & Gestão Zootécnica
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Controle de rebanho, pesagens GMD, produção leiteira, reprodução IATF, sanidade e pastagens
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap print:hidden">
+          <button
+            type="button"
+            onClick={() => setShowAddAnimal(true)}
+            className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-md inline-flex items-center gap-1.5 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Novo Animal
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAddPaddock(true)}
+            className="h-8 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-md inline-flex items-center gap-1.5 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Novo Piquete
+          </button>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            title="Imprimir resumo zootécnico"
+            className="h-8 px-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium rounded-md inline-flex items-center gap-1.5 transition-colors"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Imprimir</span>
+          </button>
         </div>
       </div>
 
-      {/* Status da Sincronização Local / Offline */}
-      <div className="bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 flex flex-col md:flex-row justify-between items-center gap-3 shadow-2xs">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-500/10 text-indigo-500 rounded-lg">
-            <Database className="w-5 h-5" />
+      {/* Horizontal Hairline Navigation Tabs */}
+      <div className="border-b border-slate-200 dark:border-slate-800 overflow-x-auto print:hidden">
+        <nav className="flex items-center gap-1 min-w-max" aria-label="Submódulos de Bovinocultura">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => navigateTab(tab.id)}
+                className={`h-9 px-3 text-xs font-medium inline-flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap ${
+                  isActive
+                    ? 'border-emerald-600 text-emerald-700 dark:border-emerald-400 dark:text-emerald-400'
+                    : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* ==================== 1. DASHBOARD ==================== */}
+      {activeTab === 'dashboard' && (
+        <div className="space-y-4">
+          {/* Unified 4-KPI Hairline Strip */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg divide-y lg:divide-y-0 lg:divide-x divide-slate-200 dark:divide-slate-800">
+            <div className="p-4">
+              <span className="text-xs text-slate-500 dark:text-slate-400">Rebanho Ativo</span>
+              <strong className="text-xl font-bold text-slate-900 dark:text-white block mt-1 tabular-nums">
+                {kpis.totalAnimals}
+              </strong>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
+                Corte: {kpis.beefCount} · Leite/Misto: {kpis.dairyMixedCount}
+              </span>
+            </div>
+
+            <div className="p-4">
+              <span className="text-xs text-slate-500 dark:text-slate-400">Lotação Média</span>
+              <strong className="text-xl font-bold text-slate-900 dark:text-white block mt-1 tabular-nums">
+                {paddocks.length > 0 ? `${kpis.avgStockingAU.toFixed(2)} UA/ha` : '—'}
+              </strong>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
+                {paddocks.length} piquetes · {kpis.totalAreaHa.toFixed(1)} ha
+              </span>
+            </div>
+
+            <div className="p-4">
+              <span className="text-xs text-slate-500 dark:text-slate-400">Peso Médio & Estoque</span>
+              <strong className="text-xl font-bold text-emerald-700 dark:text-emerald-400 block mt-1 tabular-nums">
+                {kpis.totalAnimals > 0 ? `${kpis.avgWeight.toFixed(1)} kg` : '—'}
+              </strong>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
+                GMD {kpis.avgGmd !== null ? `${kpis.avgGmd.toFixed(2)} kg/d` : '—'} ·{' '}
+                {kpis.totalArrobas.toFixed(1)} @
+              </span>
+            </div>
+
+            <div className="p-4">
+              <span className="text-xs text-slate-500 dark:text-slate-400">Taxa de Prenhez (DG)</span>
+              <strong className="text-xl font-bold text-slate-900 dark:text-white block mt-1 tabular-nums">
+                {kpis.pregnancyRate !== null ? `${kpis.pregnancyRate}%` : '—'}
+              </strong>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
+                {kpis.diagTotal} diagnósticos · {kpis.activeGraceCount} carência(s)
+              </span>
+            </div>
           </div>
-          <div>
-            <span className="text-[10px] uppercase font-bold text-slate-500 block">Banco de Dados Local (IndexedDB)</span>
-            <div className="flex items-center gap-2 mt-0.5">
-              {syncQueue.length === 0 ? (
-                <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> 100% Sincronizado & Disponível Offline
-                </span>
+
+          {/* Two-Column Operational Overview */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Recent Herd */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <h2 className="text-xs font-semibold text-slate-900 dark:text-white">
+                  Animais Cadastrados
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => navigateTab('rebanho')}
+                  className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 hover:underline"
+                >
+                  Abrir Rebanho
+                </button>
+              </div>
+
+              {animals.length === 0 ? (
+                <div className="p-6 text-center">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Nenhum bovino cadastrado no rebanho.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddAnimal(true)}
+                    className="mt-3 h-7 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-md inline-flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Cadastrar Animal
+                  </button>
+                </div>
               ) : (
-                <span className="text-xs font-bold text-amber-500 flex items-center gap-1 animate-pulse">
-                  <AlertTriangle className="w-3.5 h-3.5" /> {syncQueue.length} registro(s) aguardando conexão
-                </span>
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {animals.slice(0, 6).map((animal) => (
+                    <button
+                      key={animal.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedAnimalId(animal.id);
+                        navigateTab('rebanho');
+                      }}
+                      className="w-full px-4 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 flex items-center justify-between gap-3 transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-slate-900 dark:text-white truncate">
+                          #{animal.number} · {animal.name}
+                        </p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                          {animal.breed} · {animal.category} · {animal.purpose} · {animal.batch}
+                        </p>
+                      </div>
+                      <span className="text-xs font-semibold text-slate-900 dark:text-white tabular-nums shrink-0">
+                        {animal.currentWeight} kg
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Paddocks Overview */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <h2 className="text-xs font-semibold text-slate-900 dark:text-white">
+                  Situação das Pastagens
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => navigateTab('pastagens')}
+                  className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 hover:underline"
+                >
+                  Gerenciar Piquetes
+                </button>
+              </div>
+
+              {paddocks.length === 0 ? (
+                <div className="p-6 text-center">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Nenhum piquete registrado na propriedade.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddPaddock(true)}
+                    className="mt-3 h-7 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-md inline-flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Cadastrar Piquete
+                  </button>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {paddocks.slice(0, 6).map((paddock) => {
+                    const lowHeight = paddock.currentHeightCm < paddock.targetHeightCm * 0.85;
+                    return (
+                      <button
+                        key={paddock.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedPaddockId(paddock.id);
+                          navigateTab('pastagens');
+                        }}
+                        className="w-full px-4 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 flex items-center justify-between gap-3 transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-slate-900 dark:text-white truncate">
+                            {paddock.name}
+                          </p>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                            {paddock.forageSpecies} ({paddock.cultivar}) · {paddock.areaHa} ha
+                          </p>
+                        </div>
+                        <div className="text-right tabular-nums shrink-0">
+                          <p
+                            className={`text-xs font-semibold ${
+                              lowHeight
+                                ? 'text-rose-600 dark:text-rose-400'
+                                : 'text-emerald-700 dark:text-emerald-400'
+                            }`}
+                          >
+                            {paddock.currentHeightCm} / {paddock.targetHeightCm} cm
+                          </p>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            {paddock.stockingRateAU} UA/ha
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowAddAnimal(!showAddAnimal)}
-            className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> Novo Animal
-          </button>
-          <button
-            onClick={() => setShowAddPaddock(!showAddPaddock)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> Novo Piquete
-          </button>
-          <button
-            onClick={handleOnlineSync}
-            disabled={isSyncing}
-            className="border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-900 text-slate-700 dark:text-zinc-300 font-bold text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
-          </button>
-        </div>
-      </div>
-
-      {/* Form Cadastro de Novo Animal (Offline-First) */}
-      {showAddAnimal && (
-        <form onSubmit={handleAddAnimalSubmit} className="bg-white dark:bg-black border border-amber-200 dark:border-amber-900/30 rounded-2xl p-5 shadow-xs space-y-4 animate-fade-in">
-          <h3 className="font-black text-sm text-amber-700 flex items-center gap-2">
-            <Plus className="w-4 h-4" /> Cadastrar Novo Animal (Persistência Offline)
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 block">Número do Brinco</label>
-              <input
-                type="text"
-                required
-                value={newAnimalNum}
-                onChange={e => setNewAnimalNum(e.target.value)}
-                placeholder="Ex: 5020"
-                className="w-full mt-1 bg-slate-50 dark:bg-zinc-900 border rounded-lg px-3 py-2 text-xs"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 block">Nome do Animal</label>
-              <input
-                type="text"
-                required
-                value={newAnimalName}
-                onChange={e => setNewAnimalName(e.target.value)}
-                placeholder="Ex: Mimosa"
-                className="w-full mt-1 bg-slate-50 dark:bg-zinc-900 border rounded-lg px-3 py-2 text-xs"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 block">Raça</label>
-              <select
-                value={newAnimalBreed}
-                onChange={e => setNewAnimalBreed(e.target.value)}
-                className="w-full mt-1 bg-slate-50 dark:bg-zinc-900 border rounded-lg px-3 py-2 text-xs"
-              >
-                <option value="Nelore">Nelore</option>
-                <option value="Angus">Angus</option>
-                <option value="Senepol">Senepol</option>
-                <option value="Girolando">Girolando</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 block">Categoria</label>
-              <select
-                value={newAnimalCategory}
-                onChange={e => setNewAnimalCategory(e.target.value as any)}
-                className="w-full mt-1 bg-slate-50 dark:bg-zinc-900 border rounded-lg px-3 py-2 text-xs"
-              >
-                <option value="Novilha">Novilha</option>
-                <option value="Garrote">Garrote</option>
-                <option value="Vaca">Vaca</option>
-                <option value="Boi Gordo">Boi Gordo</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 block">Peso Inicial (kg)</label>
-              <input
-                type="number"
-                value={newAnimalWeight}
-                onChange={e => setNewAnimalWeight(Number(e.target.value))}
-                className="w-full mt-1 bg-slate-50 dark:bg-zinc-900 border rounded-lg px-3 py-2 text-xs"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setShowAddAnimal(false)}
-              className="px-3 py-2 border rounded-lg text-xs font-bold cursor-pointer"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="bg-amber-600 text-white px-4 py-2 rounded-lg text-xs font-bold cursor-pointer"
-            >
-              Confirmar e Gravar Offline
-            </button>
-          </div>
-        </form>
       )}
 
-      {/* Form Cadastro de Novo Piquete (Offline-First) */}
-      {showAddPaddock && (
-        <form onSubmit={handleAddPaddockSubmit} className="bg-white dark:bg-black border border-emerald-200 dark:border-emerald-900/30 rounded-2xl p-5 shadow-xs space-y-4 animate-fade-in">
-          <h3 className="font-black text-sm text-emerald-700 flex items-center gap-2">
-            <Plus className="w-4 h-4" /> Cadastrar Novo Piquete (Persistência Offline)
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 block">Identificação do Piquete</label>
+      {/* ==================== 2. REBANHO & GÊMEO DIGITAL ==================== */}
+      {activeTab === 'rebanho' && (
+        <div className="space-y-4">
+          {/* Search & Purpose Filter Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                required
-                value={newPaddockName}
-                onChange={e => setNewPaddockName(e.target.value)}
-                placeholder="Ex: Piquete 04 - Rotacionado"
-                className="w-full mt-1 bg-slate-50 dark:bg-zinc-900 border rounded-lg px-3 py-2 text-xs"
+                value={herdSearch}
+                onChange={(e) => setHerdSearch(e.target.value)}
+                placeholder="Buscar por brinco, nome, raça, categoria ou lote..."
+                className="w-full h-8 pl-8 pr-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-emerald-500"
               />
             </div>
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 block">Área (ha)</label>
-              <input
-                type="number"
-                value={newPaddockArea}
-                onChange={e => setNewPaddockArea(Number(e.target.value))}
-                className="w-full mt-1 bg-slate-50 dark:bg-zinc-900 border rounded-lg px-3 py-2 text-xs"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 block">Espécie Forrageira</label>
-              <input
-                type="text"
-                value={newPaddockForage}
-                onChange={e => setNewPaddockForage(e.target.value)}
-                className="w-full mt-1 bg-slate-50 dark:bg-zinc-900 border rounded-lg px-3 py-2 text-xs"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setShowAddPaddock(false)}
-              className="px-3 py-2 border rounded-lg text-xs font-bold cursor-pointer"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-xs font-bold cursor-pointer"
-            >
-              Confirmar e Gravar Offline
-            </button>
-          </div>
-        </form>
-      )}
 
-
-
-      {/* ========================================================= */}
-      {/* 1. DASHBOARD EXECUTIVO                                      */}
-      {/* ========================================================= */}
-      {activeTab === 'dashboard' && (
-        <div className="space-y-4 animate-fade-in">
-           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-             <div className="p-4 bg-white dark:bg-black border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xs">
-               <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Total de Animais</span>
-               <strong className="text-2xl text-slate-900 dark:text-white">{animals.length}</strong>
-             </div>
-             <div className="p-4 bg-white dark:bg-black border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xs">
-               <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Lotação Média</span>
-               <strong className="text-2xl text-amber-600">1.8 UA/ha</strong>
-             </div>
-             <div className="p-4 bg-white dark:bg-black border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xs">
-               <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Ganho Médio Diário</span>
-               <strong className="text-2xl text-emerald-600">0.65 kg</strong>
-             </div>
-             <div className="p-4 bg-white dark:bg-black border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xs">
-               <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Taxa de Prenhez</span>
-               <strong className="text-2xl text-blue-600">85%</strong>
-             </div>
-           </div>
-        </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* 2. GÊMEO DIGITAL DO ANIMAL                                  */}
-      {/* ========================================================= */}
-      {activeTab === 'animal_twin' && currentAnimal && (
-        <div className="space-y-6 animate-fade-in bg-white dark:bg-black border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-2xs">
-           <div className="border-b border-slate-200 dark:border-zinc-800 pb-4 flex flex-col sm:flex-row justify-between sm:items-end gap-4">
-              <div>
-                <h3 className="font-black text-lg text-amber-700 dark:text-amber-500 flex items-center gap-2">
-                  <Dna className="w-5 h-5"/> Gêmeo Digital do Animal
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">Identidade completa, histórico produtivo e rastreabilidade viva.</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <select
-                  value={selectedAnimalId}
-                  onChange={e => setSelectedAnimalId(e.target.value)}
-                  className="bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 font-bold text-xs max-w-[200px]"
-                >
-                  {animals.map(a => (
-                    <option key={a.id} value={a.id}>{a.number} - {a.name} ({a.category})</option>
-                  ))}
-                </select>
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-0.5 rounded-md w-fit">
+              {(['Todas', 'Corte', 'Leite', 'Misto'] as const).map((purpose) => (
                 <button
-                  onClick={() => handleDeleteAnimal(currentAnimal.id)}
-                  className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
-                  title="Remover Animal"
+                  key={purpose}
+                  type="button"
+                  onClick={() => setPurposeFilter(purpose)}
+                  className={`h-7 px-2.5 text-xs font-medium rounded transition-colors ${
+                    purposeFilter === purpose
+                      ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                  }`}
                 >
-                  <Trash2 className="w-4 h-4" />
+                  {purpose}
                 </button>
-              </div>
-           </div>
+              ))}
+            </div>
+          </div>
 
-           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-             {/* Info Básica */}
-             <div className="space-y-4">
-                <div className="bg-slate-50 dark:bg-zinc-900 rounded-xl p-4 border border-slate-200 dark:border-zinc-800">
-                  <div className="w-full h-32 bg-slate-200 dark:bg-zinc-800 rounded-lg flex items-center justify-center mb-4">
-                    <Beef className="w-12 h-12 text-slate-400" />
-                  </div>
-                  <h4 className="font-black text-xl">{currentAnimal.name} <span className="text-sm font-bold text-slate-500">#{currentAnimal.number}</span></h4>
-                  <p className="text-xs text-amber-600 font-bold mb-3">RFID: {currentAnimal.rfid}</p>
-                  
-                  <div className="space-y-2 text-xs">
-                    <div className="flex justify-between"><span className="text-slate-500">Categoria</span><strong className="dark:text-white">{currentAnimal.category}</strong></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Raça</span><strong className="dark:text-white">{currentAnimal.breed} ({currentAnimal.bloodDegree})</strong></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Nascimento</span><strong className="dark:text-white">{currentAnimal.birthDate}</strong></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Peso Atual</span><strong className="dark:text-white">{currentAnimal.currentWeight} kg</strong></div>
-                  </div>
-                </div>
-             </div>
-
-             {/* Linha do Tempo e Eventos */}
-             <div className="lg:col-span-2 space-y-4">
-                <h4 className="font-bold text-sm">Linha do Tempo Produtiva</h4>
-                <div className="space-y-3">
-                  {/* Evento Repro */}
-                  {currentAnimal?.reproHistory && currentAnimal.reproHistory.length > 0 && (
-                    <div className="p-3 border rounded-xl bg-pink-50 dark:bg-pink-950/20 border-pink-200 dark:border-pink-900 flex items-start gap-3">
-                      <HeartPulse className="w-5 h-5 text-pink-500 mt-0.5" />
-                      <div>
-                        <strong className="text-xs text-pink-700 dark:text-pink-400 block">Último Evento Reprodutivo ({currentAnimal.reproHistory[0]?.date})</strong>
-                        <p className="text-xs text-pink-600 dark:text-pink-300 mt-1">{currentAnimal.reproHistory[0]?.type} (Touro: {currentAnimal.reproHistory[0]?.bullId}) - {currentAnimal.reproHistory[0]?.notes}</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Evento Peso */}
-                  {currentAnimal?.weightHistory && currentAnimal.weightHistory.length > 0 && (
-                    <div className="p-3 border rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900 flex items-start gap-3">
-                      <Scale className="w-5 h-5 text-emerald-500 mt-0.5" />
-                      <div>
-                        <strong className="text-xs text-emerald-700 dark:text-emerald-400 block">Última Pesagem ({currentAnimal.weightHistory[currentAnimal.weightHistory.length - 1]?.date})</strong>
-                        <p className="text-xs text-emerald-600 dark:text-emerald-300 mt-1">Peso: {currentAnimal.weightHistory[currentAnimal.weightHistory.length - 1]?.weight} kg | GMD: {currentAnimal.weightHistory[currentAnimal.weightHistory.length - 1]?.gmd || '0.6'} kg/dia</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Evento Sanidade */}
-                  {currentAnimal?.healthHistory && currentAnimal.healthHistory.length > 0 && (
-                    <div className="p-3 border rounded-xl bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900 flex items-start gap-3">
-                      <Syringe className="w-5 h-5 text-blue-500 mt-0.5" />
-                      <div>
-                        <strong className="text-xs text-blue-700 dark:text-blue-400 block">Sanidade ({currentAnimal.healthHistory[0]?.date})</strong>
-                        <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">{currentAnimal.healthHistory[0]?.type}: {currentAnimal.healthHistory[0]?.description} ({currentAnimal.healthHistory[0]?.product})</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {(!currentAnimal.reproHistory?.length && !currentAnimal.weightHistory?.length && !currentAnimal.healthHistory?.length) && (
-                    <p className="text-xs text-slate-500 italic">Sem eventos registrados para este animal.</p>
-                  )}
-                </div>
-             </div>
-           </div>
-        </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* 3. GÊMEO DIGITAL DO PIQUETE                                 */}
-      {/* ========================================================= */}
-      {activeTab === 'pasture_twin' && currentPaddock && (
-        <div className="space-y-6 animate-fade-in bg-white dark:bg-black border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-2xs">
-           <div className="border-b border-slate-200 dark:border-zinc-800 pb-4 flex flex-col sm:flex-row justify-between sm:items-end gap-4">
-              <div>
-                <h3 className="font-black text-lg text-emerald-700 dark:text-emerald-500 flex items-center gap-2">
-                  <Sprout className="w-5 h-5"/> Gêmeo Digital do Piquete
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">Gestão de forragem, taxa de lotação e histórico de pastejo.</p>
-              </div>
-              <select
-                value={selectedPaddockId}
-                onChange={e => setSelectedPaddockId(e.target.value)}
-                className="bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 font-bold text-xs max-w-[200px]"
-              >
-                {paddocks.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-           </div>
-
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-4 border rounded-xl bg-slate-50 dark:bg-zinc-900">
-                <span className="text-[10px] font-bold text-slate-500 uppercase block">Altura do Pasto</span>
-                <div className="flex items-end gap-2 mt-1">
-                  <strong className="text-2xl font-black text-slate-900 dark:text-white">{currentPaddock.currentHeightCm} cm</strong>
-                  <span className="text-xs font-bold text-red-500 mb-1">(Meta: {currentPaddock.targetHeightCm} cm)</span>
-                </div>
-              </div>
-              <div className="p-4 border rounded-xl bg-slate-50 dark:bg-zinc-900">
-                <span className="text-[10px] font-bold text-slate-500 uppercase block">Massa de Forragem</span>
-                <strong className="text-2xl font-black text-slate-900 dark:text-white mt-1 block">{currentPaddock.currentBiomassKgHa} kg MS/ha</strong>
-              </div>
-              <div className="p-4 border rounded-xl bg-slate-50 dark:bg-zinc-900">
-                <span className="text-[10px] font-bold text-slate-500 uppercase block">Taxa de Lotação Atual</span>
-                <strong className="text-2xl font-black text-slate-900 dark:text-white mt-1 block">{currentPaddock.stockingRateAU} UA/ha</strong>
-              </div>
-              <div className="p-4 border rounded-xl bg-slate-50 dark:bg-zinc-900">
-                <span className="text-[10px] font-bold text-slate-500 uppercase block">Dias de Descanso / Ocup.</span>
-                <strong className="text-2xl font-black text-slate-900 dark:text-white mt-1 block">{currentPaddock.restDays} / {currentPaddock.occupationDays}</strong>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* 4. ISPA (SISTEMA INTEGRADO SOLO-PLANTA-ANIMAL) O GRANDE DIFERENCIAL */}
-      {/* ========================================================= */}
-      {activeTab === 'ispa' && (
-        <div className="space-y-6 animate-fade-in bg-white dark:bg-black border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-2xs">
-           <div className="border-b border-slate-200 dark:border-zinc-800 pb-4">
-              <h3 className="font-black text-lg text-indigo-700 dark:text-indigo-400 flex items-center gap-2">
-                <Activity className="w-5 h-5"/> Sistema Integrado Solo-Planta-Animal (ISPA)
-              </h3>
-              <p className="text-xs text-slate-500 mt-1 max-w-3xl">
-                O grande diferencial da plataforma. Descubra como a fertilidade do solo impacta o crescimento do pasto, que por sua vez reflete no ganho de peso do animal e altera seu Custo por Arroba Produzida.
+          {animals.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 rounded-lg py-10 px-4 text-center">
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Nenhum bovino cadastrado no rebanho
               </p>
-           </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
+                Adicione os animais com brinco, raça, categoria e peso inicial para habilitar o Gêmeo Digital e a rastreabilidade completa.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowAddAnimal(true)}
+                className="mt-4 h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-md inline-flex items-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Cadastrar Primeiro Animal
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+              {/* Left: Herd List */}
+              <div className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-900 dark:text-white">
+                    Lista do Rebanho
+                  </span>
+                  <span className="text-slate-500 dark:text-slate-400 tabular-nums">
+                    {filteredAnimals.length} de {animals.length}
+                  </span>
+                </div>
 
-           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Controles (Simulação Offline) */}
-              <div className="lg:col-span-3 space-y-4">
-                 <strong className="text-xs block text-slate-700 dark:text-slate-300 uppercase">Simulador ISPA</strong>
-                 <div>
-                   <label className="text-[10px] font-bold text-slate-500 block">Fósforo no Solo (mg/dm³)</label>
-                   <input type="range" min="1" max="30" value={soilP} onChange={e => setSoilP(Number(e.target.value))} className="w-full mt-1" />
-                   <span className="text-xs font-bold text-indigo-600">{soilP} mg/dm³</span>
-                 </div>
-                 <div>
-                   <label className="text-[10px] font-bold text-slate-500 block">Crescimento Pastagem (kg MS/ha/dia)</label>
-                   <input type="range" min="10" max="80" value={pastureGrowth} onChange={e => setPastureGrowth(Number(e.target.value))} className="w-full mt-1" />
-                   <span className="text-xs font-bold text-emerald-600">{pastureGrowth} kg/dia</span>
-                 </div>
-                 <div>
-                   <label className="text-[10px] font-bold text-slate-500 block">Ganho Médio Diário (GMD kg/dia)</label>
-                   <input type="range" min="0.1" max="1.5" step="0.1" value={animalGmd} onChange={e => setAnimalGmd(Number(e.target.value))} className="w-full mt-1" />
-                   <span className="text-xs font-bold text-amber-600">{animalGmd} kg/dia</span>
-                 </div>
+                {filteredAnimals.length === 0 ? (
+                  <p className="p-6 text-center text-xs text-slate-500 dark:text-slate-400">
+                    Nenhum animal corresponde aos filtros selecionados.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-[540px] overflow-y-auto">
+                    {filteredAnimals.map((animal) => {
+                      const isSelected = currentAnimal?.id === animal.id;
+                      return (
+                        <button
+                          key={animal.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedAnimalId(animal.id);
+                            setConfirmDeleteAnimalId(null);
+                          }}
+                          className={`w-full px-4 py-2.5 text-left flex items-center justify-between gap-2 transition-colors border-l-2 ${
+                            isSelected
+                              ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-600 dark:border-emerald-400'
+                              : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-slate-900 dark:text-white truncate">
+                              #{animal.number} · {animal.name}
+                            </p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                              {animal.breed} · {animal.category} · {animal.batch}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0 tabular-nums">
+                            <p className="text-xs font-semibold text-slate-900 dark:text-white">
+                              {animal.currentWeight} kg
+                            </p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                              {animal.purpose}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
-              {/* Fluxo Visual da Cadeia */}
-              <div className="lg:col-span-9 bg-slate-50 dark:bg-zinc-900 rounded-xl p-6 border flex flex-col items-center justify-center space-y-6">
-                 
-                 <div className="flex flex-col md:flex-row items-center gap-4 w-full justify-between relative">
-                    
-                    {/* Solo */}
-                    <div className={`w-32 h-32 rounded-full border-4 flex flex-col items-center justify-center text-center p-2 z-10 bg-white dark:bg-black ${ispaResult.soilStatus === 'Baixo' ? 'border-red-500' : ispaResult.soilStatus === 'Médio' ? 'border-yellow-500' : 'border-emerald-500'}`}>
-                      <MapPin className="w-6 h-6 mb-1 text-slate-400" />
-                      <strong className="text-xs">Solo</strong>
-                      <span className="text-[10px] font-bold mt-1 text-slate-500">Fósforo: {ispaResult.soilStatus}</span>
+              {/* Right: Animal Digital Twin Detail */}
+              <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 sm:p-5 space-y-4">
+                {currentAnimal ? (
+                  <>
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+                            #{currentAnimal.number} · {currentAnimal.name}
+                          </h2>
+                          <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                            {currentAnimal.purpose}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 tabular-nums">
+                          {currentAnimal.breed} ({currentAnimal.bloodDegree}) ·{' '}
+                          {currentAnimal.sex === 'F' ? 'Fêmea' : 'Macho'} · {currentAnimal.category} · RFID{' '}
+                          {currentAnimal.rfid}
+                        </p>
+                      </div>
+
+                      <div className="shrink-0">
+                        {confirmDeleteAnimalId === currentAnimal.id ? (
+                          <div className="flex items-center gap-1 text-xs">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAnimal(currentAnimal.id)}
+                              className="h-7 px-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-md font-medium"
+                            >
+                              Confirmar exclusão
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteAnimalId(null)}
+                              className="h-7 px-2 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-md"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteAnimalId(currentAnimal.id)}
+                            title="Remover animal"
+                            className="h-7 w-7 inline-flex items-center justify-center border border-slate-200 dark:border-slate-700 hover:border-rose-300 dark:hover:border-rose-800 hover:text-rose-600 dark:hover:text-rose-400 text-slate-500 dark:text-slate-400 rounded-md transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    <ArrowRight className="text-slate-300 hidden md:block" />
+                    {/* Key Animal Attributes */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs tabular-nums">
+                      <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-md p-3">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
+                          Peso Atual
+                        </span>
+                        <strong className="text-sm font-bold text-slate-900 dark:text-white block mt-0.5">
+                          {currentAnimal.currentWeight} kg
+                        </strong>
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {((currentAnimal.currentWeight * 0.5) / 15).toFixed(1)} @ (50% RC)
+                        </span>
+                      </div>
 
-                    {/* Planta */}
-                    <div className={`w-32 h-32 rounded-full border-4 flex flex-col items-center justify-center text-center p-2 z-10 bg-white dark:bg-black ${ispaResult.pastureStatus === 'Degradada' ? 'border-red-500' : ispaResult.pastureStatus === 'Recuperação' ? 'border-yellow-500' : 'border-emerald-500'}`}>
-                      <Sprout className="w-6 h-6 mb-1 text-slate-400" />
-                      <strong className="text-xs">Pastagem</strong>
-                      <span className="text-[10px] font-bold mt-1 text-slate-500">{ispaResult.pastureStatus}</span>
+                      <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-md p-3">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
+                          Lote & Origem
+                        </span>
+                        <strong className="text-sm font-semibold text-slate-900 dark:text-white block mt-0.5 truncate">
+                          {currentAnimal.batch}
+                        </strong>
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate block">
+                          {currentAnimal.origin}
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-md p-3">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
+                          Piquete Atual
+                        </span>
+                        <strong className="text-sm font-semibold text-slate-900 dark:text-white block mt-0.5 truncate">
+                          {currentAnimalPaddockName}
+                        </strong>
+                      </div>
+
+                      <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-md p-3">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
+                          Nascimento
+                        </span>
+                        <strong className="text-sm font-semibold text-slate-900 dark:text-white block mt-0.5">
+                          {currentAnimal.birthDate}
+                        </strong>
+                      </div>
                     </div>
 
-                    <ArrowRight className="text-slate-300 hidden md:block" />
-
-                    {/* Animal */}
-                    <div className={`w-32 h-32 rounded-full border-4 flex flex-col items-center justify-center text-center p-2 z-10 bg-white dark:bg-black ${ispaResult.animalStatus === 'Abaixo' ? 'border-red-500' : ispaResult.animalStatus === 'Meta' ? 'border-yellow-500' : 'border-emerald-500'}`}>
-                      <Beef className="w-6 h-6 mb-1 text-slate-400" />
-                      <strong className="text-xs">Animal</strong>
-                      <span className="text-[10px] font-bold mt-1 text-slate-500">GMD: {ispaResult.animalStatus}</span>
+                    {/* Quick Action Shortcuts */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1 print:hidden">
+                      <button
+                        type="button"
+                        onClick={() => navigateTab('corte')}
+                        className="h-7 px-2.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-md transition-colors"
+                      >
+                        + Pesagem
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigateTab('leite')}
+                        className="h-7 px-2.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-md transition-colors"
+                      >
+                        + Controle Leiteiro
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigateTab('reproducao')}
+                        className="h-7 px-2.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-md transition-colors"
+                      >
+                        + Reprodução
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigateTab('sanidade')}
+                        className="h-7 px-2.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-md transition-colors"
+                      >
+                        + Sanidade
+                      </button>
                     </div>
 
-                 </div>
-
-                 {/* Resultado Econômico */}
-                 <div className="w-full mt-6 pt-6 border-t border-slate-200 dark:border-zinc-800 text-center">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Resultado Econômico (Custo / Arroba)</span>
-                    <div className="mt-2 flex items-center justify-center gap-3">
-                      <strong className={`text-4xl font-black ${ispaResult.profitabilityImpact === 'Negativo' ? 'text-red-500' : ispaResult.profitabilityImpact === 'Positivo' ? 'text-emerald-500' : 'text-slate-700 dark:text-white'}`}>
-                        R$ {ispaResult.costPerArroba}
-                      </strong>
-                      {ispaResult.profitabilityImpact === 'Negativo' && <ShieldAlert className="w-6 h-6 text-red-500" />}
+                    {/* Unified Event Timeline */}
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                      <h3 className="text-xs font-semibold text-slate-900 dark:text-white">
+                        Histórico Unificado do Animal ({currentAnimalTimeline.length})
+                      </h3>
+                      {currentAnimalTimeline.length === 0 ? (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 py-4 text-center">
+                          Nenhum evento registrado para este animal.
+                        </p>
+                      ) : (
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-72 overflow-y-auto text-xs">
+                          {currentAnimalTimeline.map((item) => (
+                            <div
+                              key={item.id}
+                              className="py-2 flex items-start justify-between gap-3"
+                            >
+                              <div className="min-w-0">
+                                <span className="text-slate-500 dark:text-slate-400 tabular-nums">
+                                  {item.date}
+                                </span>
+                                <span className="mx-1.5 text-slate-300 dark:text-slate-700">·</span>
+                                <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                                  {item.category}
+                                </span>
+                                <span className="mx-1.5 text-slate-300 dark:text-slate-700">·</span>
+                                <strong className="text-slate-900 dark:text-white">
+                                  {item.title}
+                                </strong>
+                                {item.detail && (
+                                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                    {item.detail}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    {ispaResult.profitabilityImpact === 'Negativo' && (
-                      <p className="text-xs text-red-600 mt-3 max-w-lg mx-auto bg-red-100 p-2 rounded-lg font-bold">
-                        Alerta ISPA: A baixa fertilidade do solo (Fósforo) está reduzindo a oferta de matéria seca. Os animais estão gastando energia para buscar alimento (GMD abaixo da meta), o que aumenta a permanência no pasto e eleva o custo da arroba produzida para R$ {ispaResult.costPerArroba}. Recomendado calagem e adubação fosfatada via Módulo de Solos.
-                      </p>
-                    )}
-                 </div>
-
+                  </>
+                ) : (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 py-8 text-center">
+                    Selecione um animal na lista ao lado para inspecionar o Gêmeo Digital.
+                  </p>
+                )}
               </div>
-           </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* PLACHOLDER GERAL OUTRAS ABAS */}
-      {(activeTab === 'weight' || activeTab === 'reproduction' || activeTab === 'health' || activeTab === 'milk') && (
-        <div className="p-8 text-center border-2 border-dashed border-slate-200 dark:border-zinc-800 rounded-2xl bg-slate-50 dark:bg-zinc-900/50 text-slate-500">
-           <Info className="w-10 h-10 mx-auto mb-3 text-amber-300" />
-           <strong className="block text-sm">O módulo de {activeTab === 'reproduction' ? 'reprodução' : activeTab === 'weight' ? 'pesagem' : activeTab === 'health' ? 'sanidade' : 'produção de leite'} está sincronizado ao Gêmeo Animal.</strong>
-           <p className="text-xs mt-2 max-w-lg mx-auto">Os registros de pesagens, manejo sanitário e reprodutivo alimentam a ficha do animal e são processados pelo ISPA.</p>
-        </div>
+      {/* ==================== 3. CORTE & PESAGENS ==================== */}
+      {activeTab === 'corte' && (
+        <BeefWeightView
+          animals={animals}
+          onUpdateAnimal={handleUpdateAnimal}
+          onOpenAddAnimal={() => setShowAddAnimal(true)}
+        />
+      )}
+
+      {/* ==================== 4. LEITE & TANQUE ==================== */}
+      {activeTab === 'leite' && (
+        <DairyMilkView
+          animals={animals}
+          onUpdateAnimal={handleUpdateAnimal}
+          onOpenAddAnimal={() => setShowAddAnimal(true)}
+        />
+      )}
+
+      {/* ==================== 5. REPRODUÇÃO & IATF ==================== */}
+      {activeTab === 'reproducao' && (
+        <ReproductionView
+          animals={animals}
+          onUpdateAnimal={handleUpdateAnimal}
+          onOpenAddAnimal={() => setShowAddAnimal(true)}
+        />
+      )}
+
+      {/* ==================== 6. SANIDADE & VACINAS ==================== */}
+      {activeTab === 'sanidade' && (
+        <HealthSanitationView
+          animals={animals}
+          onUpdateAnimal={handleUpdateAnimal}
+          onOpenAddAnimal={() => setShowAddAnimal(true)}
+        />
+      )}
+
+      {/* ==================== 7. PASTAGENS & PIQUETES ==================== */}
+      {activeTab === 'pastagens' && (
+        <PastureTwinView
+          paddocks={paddocks}
+          selectedPaddockId={selectedPaddockId}
+          onSelectPaddock={setSelectedPaddockId}
+          onUpdatePaddock={handleUpdatePaddock}
+          onDeletePaddock={handleDeletePaddock}
+          onOpenAddPaddock={() => setShowAddPaddock(true)}
+        />
+      )}
+
+      {/* ==================== 8. SIMULADOR ISPA ==================== */}
+      {activeTab === 'ispa' && <IspaSimulatorView />}
+
+      {/* Modals */}
+      {showAddAnimal && (
+        <AddAnimalModal
+          paddocks={paddocks}
+          onClose={() => setShowAddAnimal(false)}
+          onSave={handleAddAnimal}
+        />
+      )}
+
+      {showAddPaddock && (
+        <AddPaddockModal
+          onClose={() => setShowAddPaddock(false)}
+          onSave={handleAddPaddock}
+        />
       )}
     </div>
   );

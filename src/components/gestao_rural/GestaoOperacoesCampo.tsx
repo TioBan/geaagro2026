@@ -1,18 +1,33 @@
-import React, { useState } from 'react';
-import {
-  Tractor,
-  Plus,
-  FileText,
-  Search,
-} from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Tractor, Plus, Search, X } from 'lucide-react';
 import { OperacaoCampoRecord, TalhaoRural, SafraAgragricola } from '../../types/gestaoRural';
 
 interface GestaoOperacoesCampoProps {
   operacoes: OperacaoCampoRecord[];
   talhoes: TalhaoRural[];
   safras: SafraAgragricola[];
-  onAddOperacao: (operacao: OperacaoCampoRecord) => void;
+  onAddOperacao: (op: OperacaoCampoRecord) => void;
 }
+
+const INPUT_CLASS =
+  'w-full h-9 px-3 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950/60 text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500';
+const LABEL_CLASS = 'block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1';
+
+const OPERATION_TYPES: OperacaoCampoRecord['tipoOperacao'][] = [
+  'Preparo do solo',
+  'Subsolagem',
+  'Escarificação',
+  'Plantio',
+  'Adubação',
+  'Fertirrigação',
+  'Pulverização',
+  'Capina',
+  'Poda',
+  'Tutoramento',
+  'Irrigação',
+  'Colheita',
+  'Transporte',
+];
 
 export const GestaoOperacoesCampo: React.FC<GestaoOperacoesCampoProps> = ({
   operacoes,
@@ -20,224 +35,242 @@ export const GestaoOperacoesCampo: React.FC<GestaoOperacoesCampoProps> = ({
   safras,
   onAddOperacao,
 }) => {
-  const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterTipo, setFilterTipo] = useState<string>('Todas');
+  const [showModal, setShowModal] = useState(false);
 
-  const [form, setForm] = useState<Partial<OperacaoCampoRecord>>({
+  const [newOp, setNewOp] = useState<Partial<OperacaoCampoRecord>>({
     tipoOperacao: 'Pulverização',
     talhaoId: talhoes[0]?.id || '',
     safraId: safras[0]?.id || '',
-    operadorNome: '',
-    maquinaNome: '',
+    areaAplicadaHa: talhoes[0]?.areaHa || 50,
     produtoUtilizado: '',
     dosePorHa: 0,
     unidadeDose: 'L/ha',
-    areaAplicadaHa: 0,
-    temperaturaC: 25,
-    umidadeArPct: 60,
-    velocidadeVentoKmH: 5,
-    consumoCombustivelLiters: 0,
+    maquinaNome: '',
+    operadorNome: '',
     custoTotalOperacaoR$: 0,
     observacoes: '',
   });
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    const talhao = talhoes.find(t => t.id === form.talhaoId) || talhoes[0];
-    const dose = Number(form.dosePorHa) || 0;
-    const area = Number(form.areaAplicadaHa) || 1;
-
-    const created: OperacaoCampoRecord = {
-      id: `op-${Date.now()}`,
-      safraId: form.safraId || safras[0]?.id || 'safra-01',
-      talhaoId: talhao?.id || 'tal-01',
-      talhaoNome: talhao?.nome || 'Talhão 01',
-      tipoOperacao: (form.tipoOperacao as any) || 'Pulverização',
-      dataHoraInicio: new Date().toISOString(),
-      dataHoraFim: new Date().toISOString(),
-      maquinaNome: form.maquinaNome || 'Máquina Agrícola',
-      operadorNome: form.operadorNome || 'Operador Responsável',
-      produtoUtilizado: form.produtoUtilizado || 'Nenhum',
-      dosePorHa: dose,
-      unidadeDose: form.unidadeDose || 'kg/ha',
-      quantidadeTotalProduto: dose * area,
-      areaAplicadaHa: area,
-      temperaturaC: Number(form.temperaturaC) || 25,
-      umidadeArPct: Number(form.umidadeArPct) || 60,
-      velocidadeVentoKmH: Number(form.velocidadeVentoKmH) || 5,
-      consumoCombustivelLiters: Number(form.consumoCombustivelLiters) || 0,
-      custoTotalOperacaoR$: Number(form.custoTotalOperacaoR$) || 0,
-      observacoes: form.observacoes || '',
+  useEffect(() => {
+    if (!showModal) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowModal(false);
     };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showModal]);
 
-    onAddOperacao(created);
-    setShowAddModal(false);
-    setForm({
-      tipoOperacao: 'Pulverização',
-      talhaoId: talhoes[0]?.id || '',
-      safraId: safras[0]?.id || '',
-      operadorNome: '',
-      maquinaNome: '',
-      produtoUtilizado: '',
-      dosePorHa: 0,
-      unidadeDose: 'L/ha',
-      areaAplicadaHa: 0,
-      temperaturaC: 25,
-      umidadeArPct: 60,
-      velocidadeVentoKmH: 5,
-      consumoCombustivelLiters: 0,
-      custoTotalOperacaoR$: 0,
-      observacoes: '',
+  const filteredOperacoes = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    return operacoes.filter(op => {
+      const matchTipo = filterTipo === 'Todas' || op.tipoOperacao === filterTipo;
+      const matchSearch =
+        !q ||
+        op.tipoOperacao.toLowerCase().includes(q) ||
+        op.talhaoNome.toLowerCase().includes(q) ||
+        (op.produtoUtilizado || '').toLowerCase().includes(q) ||
+        (op.operadorNome || '').toLowerCase().includes(q);
+      return matchTipo && matchSearch;
     });
-  };
+  }, [operacoes, searchTerm, filterTipo]);
 
-  const filteredOps = operacoes.filter(
-    op =>
-      op.tipoOperacao.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      op.talhaoNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (op.produtoUtilizado && op.produtoUtilizado.toLowerCase().includes(searchTerm.toLowerCase()))
+  const totalCustoFiltrado = useMemo(
+    () => filteredOperacoes.reduce((acc, op) => acc + op.custoTotalOperacaoR$, 0),
+    [filteredOperacoes]
   );
 
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    const talhao = talhoes.find(t => t.id === newOp.talhaoId);
+    const now = new Date().toISOString();
+    const created: OperacaoCampoRecord = {
+      id: `op-${Date.now()}`,
+      safraId: newOp.safraId || safras[0]?.id || '',
+      talhaoId: talhao?.id || 'geral',
+      talhaoNome: talhao?.nome || 'Área Geral',
+      tipoOperacao: newOp.tipoOperacao || 'Pulverização',
+      dataHoraInicio: now,
+      dataHoraFim: now,
+      maquinaNome: newOp.maquinaNome?.trim() || undefined,
+      operadorNome: newOp.operadorNome?.trim() || undefined,
+      produtoUtilizado: newOp.produtoUtilizado?.trim() || undefined,
+      dosePorHa: Number(newOp.dosePorHa) || undefined,
+      unidadeDose: newOp.unidadeDose || 'L/ha',
+      areaAplicadaHa: Number(newOp.areaAplicadaHa) || 0,
+      custoTotalOperacaoR$: Number(newOp.custoTotalOperacaoR$) || 0,
+      observacoes: newOp.observacoes?.trim() || '',
+    };
+    onAddOperacao(created);
+    setShowModal(false);
+    setNewOp(prev => ({ ...prev, produtoUtilizado: '', custoTotalOperacaoR$: 0, observacoes: '' }));
+  };
+
   return (
-    <div className="space-y-6 animate-fade-in text-xs">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 shadow-2xs">
-        <div>
-          <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-extrabold uppercase text-[10px] tracking-wider">
-            <Tractor className="w-4 h-4" />
-            Módulo 3 • Registro & Rastreabilidade de Operações de Campo
+    <div className="space-y-5 animate-fade-in">
+      {/* HEADER + FILTERS */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+              <Tractor className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Operações de Campo &amp; Caderno Agrícola</span>
+            </h2>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 tabular-nums">
+              {filteredOperacoes.length} apontamento(s) · Custo acumulado R${' '}
+              {totalCustoFiltrado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </p>
           </div>
-          <h2 className="text-xl font-black text-slate-900 dark:text-white">
-            Operações Agrícolas & Histórico de Manejo
-          </h2>
-          <p className="text-slate-500">
-            Preparo do solo, plantio, adubação, fertirrigação, pulverizações e colheita com telemetria
-          </p>
+          <button
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Lançar Operação</span>
+          </button>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl cursor-pointer flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Lançar Operação de Campo</span>
-        </button>
-      </div>
-
-      {/* SEARCH & LIST */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-2xs space-y-4">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-b pb-3">
-          <h3 className="font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
-            <FileText className="w-4 h-4 text-emerald-600" />
-            Diário Eletrônico de Atividades de Campo ({filteredOps.length})
-          </h3>
-
-          <div className="relative w-full sm:w-64">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+        <div className="px-5 py-3 border-t border-slate-200/80 dark:border-zinc-800 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 bg-slate-50/50 dark:bg-zinc-950/30">
+          <div className="relative flex-1">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Buscar por talhão, operação ou produto..."
+              placeholder="Buscar por operação, talhão, produto ou operador..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 border rounded-xl bg-slate-50 dark:bg-zinc-800"
+              className="w-full h-8 pl-8 pr-3 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
             />
           </div>
-        </div>
-
-        <div className="space-y-3">
-          {filteredOps.map(op => (
-            <div
-              key={op.id}
-              className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-2xl border border-slate-200 dark:border-zinc-800 space-y-3"
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/80 pb-2">
-                <div>
-                  <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md">
-                    {op.tipoOperacao}
-                  </span>
-                  <h4 className="font-black text-sm text-slate-900 dark:text-white mt-1">
-                    {op.talhaoNome} • {op.areaAplicadaHa} ha Aplicados
-                  </h4>
-                </div>
-                <div className="text-right">
-                  <span className="font-bold text-emerald-600 text-sm block">
-                    R$ {op.custoTotalOperacaoR$.toLocaleString('pt-BR')}
-                  </span>
-                  <span className="text-[10px] text-slate-400 block">
-                    {new Date(op.dataHoraInicio).toLocaleString('pt-BR')}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] text-slate-700 dark:text-zinc-300">
-                <div>
-                  <span className="block text-slate-400 font-bold">Máquina / Implemento:</span>
-                  <span className="font-bold">{op.maquinaNome || 'N/I'}</span>
-                </div>
-                <div>
-                  <span className="block text-slate-400 font-bold">Operador Responsável:</span>
-                  <span className="font-bold">{op.operadorNome || 'N/I'}</span>
-                </div>
-                <div>
-                  <span className="block text-slate-400 font-bold">Produto & Dose:</span>
-                  <span className="font-bold text-blue-600 dark:text-blue-400">
-                    {op.produtoUtilizado} ({op.dosePorHa} {op.unidadeDose})
-                  </span>
-                </div>
-                <div>
-                  <span className="block text-slate-400 font-bold">Condição Climática:</span>
-                  <span>
-                    {op.temperaturaC}°C | UR {op.umidadeArPct}% | Vento {op.velocidadeVentoKmH} km/h
-                  </span>
-                </div>
-              </div>
-
-              {op.observacoes && (
-                <p className="text-[10px] text-slate-500 italic bg-white dark:bg-black/30 p-2 rounded-lg">
-                  &ldquo;{op.observacoes}&rdquo;
-                </p>
-              )}
-            </div>
-          ))}
-          {filteredOps.length === 0 && (
-            <div className="p-8 text-center bg-slate-50 dark:bg-zinc-800/20 rounded-2xl border border-dashed border-slate-300 dark:border-zinc-700 text-slate-500 dark:text-zinc-400">
-              Nenhuma operação de campo encontrada. Clique em &ldquo;Lançar Operação de Campo&rdquo; acima para lançar uma atividade.
-            </div>
-          )}
+          <select
+            value={filterTipo}
+            onChange={e => setFilterTipo(e.target.value)}
+            className="h-8 px-2.5 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-200 focus:outline-none"
+          >
+            <option value="Todas">Todas as operações</option>
+            {OPERATION_TYPES.map(t => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* ADD OPERATION MODAL */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 max-w-xl w-full space-y-4">
-            <h3 className="font-black text-base border-b pb-2">Lançar Nova Operação de Campo</h3>
+      {/* OPERATIONS TABLE */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl overflow-hidden">
+        {filteredOperacoes.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-200/80 dark:border-zinc-800 text-[11px] font-medium text-slate-500 dark:text-zinc-400 bg-slate-50/70 dark:bg-zinc-950/40">
+                  <th className="py-2.5 px-4">Data</th>
+                  <th className="py-2.5 px-4">Operação &amp; Talhão</th>
+                  <th className="py-2.5 px-4">Insumo / Dose</th>
+                  <th className="py-2.5 px-4">Máquina / Operador</th>
+                  <th className="py-2.5 px-4 text-right">Área</th>
+                  <th className="py-2.5 px-4 text-right">Custo Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/80">
+                {filteredOperacoes.map(op => (
+                  <tr key={op.id} className="hover:bg-slate-50/70 dark:hover:bg-zinc-800/30 transition-colors">
+                    <td className="py-3 px-4 text-slate-500 dark:text-zinc-400 tabular-nums whitespace-nowrap">
+                      {new Date(op.dataHoraInicio).toLocaleDateString('pt-BR')}
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="font-semibold text-slate-900 dark:text-zinc-100">{op.tipoOperacao}</div>
+                      <div className="text-[11px] text-slate-500 dark:text-zinc-400">{op.talhaoNome}</div>
+                      {op.observacoes && (
+                        <div className="text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5 line-clamp-1">
+                          {op.observacoes}
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-slate-700 dark:text-zinc-300 tabular-nums">
+                      {op.produtoUtilizado ? (
+                        <>
+                          <div>{op.produtoUtilizado}</div>
+                          {op.dosePorHa ? (
+                            <div className="text-[11px] text-slate-400 dark:text-zinc-500">
+                              {op.dosePorHa} {op.unidadeDose || 'L/ha'}
+                            </div>
+                          ) : null}
+                        </>
+                      ) : (
+                        <span className="text-slate-400 dark:text-zinc-500">—</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-slate-600 dark:text-zinc-300">
+                      <div>{op.maquinaNome || '—'}</div>
+                      {op.operadorNome && (
+                        <div className="text-[11px] text-slate-400 dark:text-zinc-500">{op.operadorNome}</div>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-right font-medium text-slate-800 dark:text-zinc-200 tabular-nums">
+                      {op.areaAplicadaHa} ha
+                    </td>
+                    <td className="py-3 px-4 text-right font-semibold text-slate-900 dark:text-zinc-100 tabular-nums whitespace-nowrap">
+                      R$ {op.custoTotalOperacaoR$.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center text-xs text-slate-500 dark:text-zinc-400">
+            Nenhuma operação encontrada. Clique em <strong className="font-medium text-slate-700 dark:text-zinc-200">Lançar Operação</strong> para registrar o apontamento de campo.
+          </div>
+        )}
+      </div>
 
-            <form onSubmit={handleSave} className="grid grid-cols-2 gap-3">
+      {/* ADD OPERAÇÃO MODAL */}
+      {showModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={e => {
+            if (e.target === e.currentTarget) setShowModal(false);
+          }}
+        >
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl">
+            <div className="px-5 py-3.5 border-b border-slate-200/80 dark:border-zinc-800 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Novo Apontamento de Campo</h3>
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleSave} className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="block font-bold mb-1">Tipo de Operação</label>
+                <label className={LABEL_CLASS}>Tipo de Operação</label>
                 <select
-                  value={form.tipoOperacao}
-                  onChange={e => setForm({ ...form, tipoOperacao: e.target.value as any })}
-                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                  value={newOp.tipoOperacao}
+                  onChange={e => setNewOp({ ...newOp, tipoOperacao: e.target.value as OperacaoCampoRecord['tipoOperacao'] })}
+                  className={INPUT_CLASS}
                 >
-                  <option value="Preparo do solo">Preparo do Solo</option>
-                  <option value="Plantio">Plantio / Semeadura</option>
-                  <option value="Adubação">Adubação Soló / Folhar</option>
-                  <option value="Fertirrigação">Fertirrigação</option>
-                  <option value="Pulverização">Pulverização Defensivo</option>
-                  <option value="Irrigação">Irrigação</option>
-                  <option value="Colheita">Colheita & Transporte</option>
+                  {OPERATION_TYPES.map(t => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
                 </select>
               </div>
-
               <div>
-                <label className="block font-bold mb-1">Talhão</label>
+                <label className={LABEL_CLASS}>Talhão</label>
                 <select
-                  value={form.talhaoId}
-                  onChange={e => setForm({ ...form, talhaoId: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                  value={newOp.talhaoId}
+                  onChange={e => {
+                    const t = talhoes.find(item => item.id === e.target.value);
+                    setNewOp({ ...newOp, talhaoId: e.target.value, areaAplicadaHa: t?.areaHa ?? newOp.areaAplicadaHa });
+                  }}
+                  className={INPUT_CLASS}
                 >
+                  <option value="">Área Geral</option>
                   {talhoes.map(t => (
                     <option key={t.id} value={t.id}>
                       {t.nome} ({t.areaHa} ha)
@@ -245,63 +278,102 @@ export const GestaoOperacoesCampo: React.FC<GestaoOperacoesCampoProps> = ({
                   ))}
                 </select>
               </div>
-
               <div>
-                <label className="block font-bold mb-1">Produto Utilizado</label>
+                <label className={LABEL_CLASS}>Área Aplicada (ha)</label>
                 <input
-                  type="text"
-                  value={form.produtoUtilizado}
-                  onChange={e => setForm({ ...form, produtoUtilizado: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                  type="number"
+                  step="0.1"
+                  value={newOp.areaAplicadaHa}
+                  onChange={e => setNewOp({ ...newOp, areaAplicadaHa: Number(e.target.value) })}
+                  className={`${INPUT_CLASS} tabular-nums`}
+                  required
                 />
               </div>
-
               <div>
-                <label className="block font-bold mb-1">Dose / ha</label>
+                <label className={LABEL_CLASS}>Custo Total (R$)</label>
                 <input
                   type="number"
                   step="0.01"
-                  value={form.dosePorHa}
-                  onChange={e => setForm({ ...form, dosePorHa: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                  value={newOp.custoTotalOperacaoR$}
+                  onChange={e => setNewOp({ ...newOp, custoTotalOperacaoR$: Number(e.target.value) })}
+                  className={`${INPUT_CLASS} tabular-nums`}
+                  required
                 />
               </div>
-
               <div>
-                <label className="block font-bold mb-1">Área Aplicada (ha)</label>
+                <label className={LABEL_CLASS}>Produto / Insumo (opcional)</label>
                 <input
-                  type="number"
-                  value={form.areaAplicadaHa}
-                  onChange={e => setForm({ ...form, areaAplicadaHa: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                  type="text"
+                  placeholder="Ex: NPK 08-28-16 ou Glifosato"
+                  value={newOp.produtoUtilizado}
+                  onChange={e => setNewOp({ ...newOp, produtoUtilizado: e.target.value })}
+                  className={INPUT_CLASS}
                 />
               </div>
-
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className={LABEL_CLASS}>Dose/ha</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={newOp.dosePorHa}
+                    onChange={e => setNewOp({ ...newOp, dosePorHa: Number(e.target.value) })}
+                    className={`${INPUT_CLASS} tabular-nums`}
+                  />
+                </div>
+                <div>
+                  <label className={LABEL_CLASS}>Unidade</label>
+                  <input
+                    type="text"
+                    value={newOp.unidadeDose}
+                    onChange={e => setNewOp({ ...newOp, unidadeDose: e.target.value })}
+                    className={INPUT_CLASS}
+                  />
+                </div>
+              </div>
               <div>
-                <label className="block font-bold mb-1">Custo Total (R$)</label>
+                <label className={LABEL_CLASS}>Máquina / Equipamento</label>
                 <input
-                  type="number"
-                  value={form.custoTotalOperacaoR$}
-                  onChange={e =>
-                    setForm({ ...form, custoTotalOperacaoR$: Number(e.target.value) })
-                  }
-                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                  type="text"
+                  placeholder="Ex: Pulverizador Jacto"
+                  value={newOp.maquinaNome}
+                  onChange={e => setNewOp({ ...newOp, maquinaNome: e.target.value })}
+                  className={INPUT_CLASS}
                 />
               </div>
-
-              <div className="col-span-2 flex justify-end gap-2 border-t pt-3">
+              <div>
+                <label className={LABEL_CLASS}>Operador</label>
+                <input
+                  type="text"
+                  placeholder="Nome do operador"
+                  value={newOp.operadorNome}
+                  onChange={e => setNewOp({ ...newOp, operadorNome: e.target.value })}
+                  className={INPUT_CLASS}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={LABEL_CLASS}>Observações de Campo</label>
+                <input
+                  type="text"
+                  placeholder="Condições climáticas, regulagem ou anotações técnicas"
+                  value={newOp.observacoes}
+                  onChange={e => setNewOp({ ...newOp, observacoes: e.target.value })}
+                  className={INPUT_CLASS}
+                />
+              </div>
+              <div className="sm:col-span-2 flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-zinc-800">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 bg-slate-200 rounded-xl font-bold"
+                  onClick={() => setShowModal(false)}
+                  className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-600 dark:text-zinc-300 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700"
+                  className="h-8 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium cursor-pointer"
                 >
-                  Registrar Operação
+                  Salvar Apontamento
                 </button>
               </div>
             </form>

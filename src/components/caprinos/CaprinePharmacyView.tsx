@@ -1,259 +1,503 @@
-// @ts-nocheck
 import React, { useState } from 'react';
-import { CaprinePharmacyItem } from '../../types/caprine';
-import { Package, Plus, AlertTriangle, CheckCircle2, Clock, DollarSign, X } from 'lucide-react';
+import { CaprinePharmacyItem, CaprinePharmacyCategory } from '../../types/caprine';
+import { Package, Plus, Minus, AlertTriangle, CheckCircle2, X } from 'lucide-react';
 
 interface Props {
   pharmacy: CaprinePharmacyItem[];
   onSavePharmacyItem: (item: CaprinePharmacyItem) => void;
 }
 
+const PHARMACY_CATEGORIES: CaprinePharmacyCategory[] = [
+  'Vermífugo',
+  'Vacina',
+  'Antibiótico',
+  'Anti-inflamatório',
+  'Vitamina/Mineral',
+  'Material Cirúrgico'
+];
+
+function getQty(item: CaprinePharmacyItem): number {
+  return item.currentQuantity ?? item.quantity ?? 0;
+}
+
+function getMinAlert(item: CaprinePharmacyItem): number {
+  return item.minQuantityAlert ?? item.minStock ?? 0;
+}
+
+function getExpiry(item: CaprinePharmacyItem): string {
+  return item.expirationDate || item.expiryDate || '';
+}
+
 export const CaprinePharmacyView: React.FC<Props> = ({ pharmacy, onSavePharmacyItem }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newItem, setNewItem] = useState<Partial<CaprinePharmacyItem>>({
-    id: `phm-${Date.now()}`,
-    name: '',
-    category: 'Vermífugo',
-    currentQuantity: 10,
-    minQuantityAlert: 3,
-    unit: 'Frascos 500mL',
-    expirationDate: '2027-12-31',
-    costPerUnitBrl: 120.0,
-    withdrawalMilkDays: 0,
-    withdrawalMeatDays: 14
+  const [formError, setFormError] = useState('');
+  const [newItem, setNewItem] = useState<Partial<CaprinePharmacyItem>>({});
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const totalValueBrl = pharmacy.reduce(
+    (acc, item) => acc + getQty(item) * (item.costPerUnitBrl || 0),
+    0
+  );
+  const lowStockItems = pharmacy.filter(item => getQty(item) <= getMinAlert(item));
+  const expiredItems = pharmacy.filter(item => {
+    const exp = getExpiry(item);
+    return exp !== '' && exp < todayStr;
   });
 
-  const totalValueBrl = pharmacy.reduce((acc, item) => acc + item.currentQuantity * item.costPerUnitBrl, 0);
-  const lowStockItems = pharmacy.filter(item => item.currentQuantity <= item.minQuantityAlert);
+  const handleOpenModal = () => {
+    setFormError('');
+    setNewItem({
+      id: `phm-${Date.now()}`,
+      name: '',
+      category: 'Vermífugo',
+      currentQuantity: 10,
+      minQuantityAlert: 3,
+      unit: 'Frascos 500mL',
+      batchNumber: '',
+      expirationDate: '2027-12-31',
+      costPerUnitBrl: 120.0,
+      withdrawalMilkDays: 0,
+      withdrawalMeatDays: 14
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleAdjustStock = (item: CaprinePharmacyItem, delta: number) => {
+    const nextQty = Math.max(0, getQty(item) + delta);
+    onSavePharmacyItem({
+      ...item,
+      currentQuantity: nextQty,
+      quantity: nextQty
+    });
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItem.name) {
-      alert('Informe o nome do medicamento.');
+    if (!newItem.name?.trim()) {
+      setFormError('Informe o nome do medicamento ou vacina.');
       return;
     }
-    onSavePharmacyItem(newItem as CaprinePharmacyItem);
+    const qty = newItem.currentQuantity ?? 0;
+    const minAlert = newItem.minQuantityAlert ?? 3;
+    const exp = newItem.expirationDate || '2027-12-31';
+
+    onSavePharmacyItem({
+      id: newItem.id || `phm-${Date.now()}`,
+      name: newItem.name.trim(),
+      category: (newItem.category as CaprinePharmacyCategory) || 'Vermífugo',
+      currentQuantity: qty,
+      quantity: qty,
+      minQuantityAlert: minAlert,
+      minStock: minAlert,
+      unit: newItem.unit || 'Frascos',
+      batchNumber: newItem.batchNumber || undefined,
+      expirationDate: exp,
+      expiryDate: exp,
+      costPerUnitBrl: newItem.costPerUnitBrl ?? 0,
+      withdrawalMilkDays: newItem.withdrawalMilkDays ?? 0,
+      withdrawalMeatDays: newItem.withdrawalMeatDays ?? 0
+    });
     setIsModalOpen(false);
+    setFormError('');
   };
 
+  const inputCls =
+    'w-full h-8 px-2.5 bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 rounded-lg border border-slate-200 dark:border-zinc-800 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500';
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-stone-200 dark:border-zinc-800 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-black text-stone-900 dark:text-white flex items-center gap-2">
-            <Package className="w-6 h-6 text-purple-600" />
-            Farmácia Caprina & Almoxarifado Veterinário
+          <h1 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+            <Package className="w-4 h-4 text-violet-600 dark:text-violet-400 shrink-0" />
+            Farmácia Caprina &amp; Almoxarifado
           </h1>
-          <p className="text-xs text-stone-500 mt-1">
-            Controle de frascos, vacinas, vermífugos, prazos de validade, lotes e alertas de estoque mínimo.
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+            Controle de frascos, vacinas, vermífugos, lotes, validade e alertas de estoque mínimo.
           </p>
         </div>
 
         <button
-          onClick={() => setIsModalOpen(true)}
-          className="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold rounded-xl transition-all shadow-md flex items-center gap-2"
+          type="button"
+          onClick={handleOpenModal}
+          className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-colors cursor-pointer"
         >
-          <Plus className="w-4 h-4" />
-          Novo Medicamento / Vacina
+          <Plus className="w-3.5 h-3.5" />
+          Novo Item
         </button>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-stone-200 dark:border-zinc-800 shadow-sm">
-          <span className="text-xs font-bold text-stone-400 block uppercase">Valor Total em Estoque</span>
-          <div className="text-2xl font-black text-emerald-600">R$ {totalValueBrl.toFixed(2)}</div>
-          <p className="text-[10px] text-stone-500 mt-0.5">{pharmacy.length} itens cadastrados</p>
-        </div>
-
-        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-stone-200 dark:border-zinc-800 shadow-sm">
-          <span className="text-xs font-bold text-stone-400 block uppercase">Estoque Crítico / Baixo</span>
-          <div className={`text-2xl font-black ${(lowStockItems || []).length > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-            {(lowStockItems || []).length} itens
+      {/* Unified Hairline KPI Strip */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-zinc-800 overflow-hidden">
+        <div className="p-3.5">
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+            Valor em Estoque
+          </span>
+          <div className="text-lg font-semibold tabular-nums text-emerald-600 dark:text-emerald-400 mt-0.5">
+            R$ {totalValueBrl.toFixed(2)}
           </div>
-          <p className="text-[10px] text-stone-500 mt-0.5">Necessitam reposição imediata</p>
+          <p className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+            {pharmacy.length} item(ns) cadastrado(s)
+          </p>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-stone-200 dark:border-zinc-800 shadow-sm">
-          <span className="text-xs font-bold text-stone-400 block uppercase">Conformidade de Validade</span>
-          <div className="text-2xl font-black text-emerald-600">100% Ok</div>
-          <p className="text-[10px] text-stone-500 mt-0.5">Nenhum produto vencido no estoque</p>
+        <div className="p-3.5">
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+            Estoque Baixo
+          </span>
+          <div
+            className={`text-lg font-semibold tabular-nums mt-0.5 ${
+              lowStockItems.length > 0
+                ? 'text-amber-600 dark:text-amber-400'
+                : 'text-emerald-600 dark:text-emerald-400'
+            }`}
+          >
+            {lowStockItems.length}{' '}
+            <span className="text-[11px] font-normal text-slate-500 dark:text-zinc-400">
+              item(ns)
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+            Abaixo ou no limite mínimo
+          </p>
+        </div>
+
+        <div className="p-3.5">
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+            Validade do Estoque
+          </span>
+          <div
+            className={`text-lg font-semibold tabular-nums mt-0.5 ${
+              expiredItems.length > 0
+                ? 'text-rose-600 dark:text-rose-400'
+                : 'text-emerald-600 dark:text-emerald-400'
+            }`}
+          >
+            {expiredItems.length > 0 ? `${expiredItems.length} vencido(s)` : 'Em conformidade'}
+          </div>
+          <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+            Verificação automática por data
+          </p>
         </div>
       </div>
 
-      {/* Pharmacy Stock Table */}
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-stone-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-stone-100 dark:border-zinc-800">
-          <h2 className="font-bold text-sm text-stone-900 dark:text-white">Estoque Veterinário Caprino</h2>
+      {/* Table */}
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800 overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+            Estoque Veterinário
+          </h2>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-stone-50 dark:bg-zinc-800/80 text-stone-500 uppercase font-bold text-[10px]">
-              <tr>
-                <th className="p-3">Medicamento / Vacina</th>
-                <th className="p-3">Categoria</th>
-                <th className="p-3">Quantidade Atual</th>
-                <th className="p-3">Lote / Validade</th>
-                <th className="p-3">Custo Unitário</th>
-                <th className="p-3">Carência Leite/Carne</th>
-                <th className="p-3">Status Estoque</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100 dark:divide-zinc-800 font-medium">
-              {pharmacy.map(item => {
-                const isLow = item.currentQuantity <= item.minQuantityAlert;
-                return (
-                  <tr key={item.id} className="hover:bg-stone-50 dark:hover:bg-zinc-800/50">
-                    <td className="p-3 font-bold text-stone-900 dark:text-white">{item.name}</td>
-                    <td className="p-3">
-                      <span className="bg-purple-100 text-purple-800 font-bold px-2 py-0.5 rounded-full text-[10px]">
+        {pharmacy.length === 0 ? (
+          <div className="p-8 text-center text-xs text-slate-500 dark:text-zinc-400">
+            Nenhum medicamento ou vacina cadastrado na farmácia.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 dark:bg-zinc-950/60 text-slate-500 dark:text-zinc-400 border-b border-slate-200 dark:border-zinc-800 text-[11px] font-medium">
+                <tr>
+                  <th className="px-4 py-2.5">Produto</th>
+                  <th className="px-4 py-2.5">Categoria</th>
+                  <th className="px-4 py-2.5">Quantidade</th>
+                  <th className="px-4 py-2.5">Lote / Validade</th>
+                  <th className="px-4 py-2.5 text-right">Custo Unit.</th>
+                  <th className="px-4 py-2.5">Carência</th>
+                  <th className="px-4 py-2.5">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
+                {pharmacy.map(item => {
+                  const qty = getQty(item);
+                  const isLow = qty <= getMinAlert(item);
+                  const exp = getExpiry(item);
+                  const isExpired = exp !== '' && exp < todayStr;
+                  return (
+                    <tr
+                      key={item.id}
+                      className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-colors"
+                    >
+                      <td className="px-4 py-2.5 font-medium text-slate-900 dark:text-zinc-100">
+                        {item.name}
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-600 dark:text-zinc-400">
                         {item.category}
-                      </span>
-                    </td>
-                    <td className="p-3 font-bold text-stone-800 dark:text-stone-200">
-                      {item.currentQuantity} {item.unit}
-                    </td>
-                    <td className="p-3 text-stone-600 dark:text-stone-300">
-                      Lote: {item.batchNumber || '2026-A'} • Exp: <span className="font-mono">{item.expirationDate}</span>
-                    </td>
-                    <td className="p-3 font-mono font-bold text-emerald-600">
-                      R$ {item.costPerUnitBrl.toFixed(2)}
-                    </td>
-                    <td className="p-3 text-stone-600 dark:text-stone-300">
-                      Leite: {item.withdrawalMilkDays}d | Carne: {item.withdrawalMeatDays}d
-                    </td>
-                    <td className="p-3">
-                      {isLow ? (
-                        <span className="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded text-[10px]">
-                          ⚠️ Baixo
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <div className="inline-flex items-center gap-1.5 tabular-nums">
+                          <button
+                            type="button"
+                            onClick={() => handleAdjustStock(item, -1)}
+                            className="w-6 h-6 rounded border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 inline-flex items-center justify-center text-slate-600 dark:text-zinc-300 cursor-pointer"
+                            title="Reduzir 1"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="font-medium text-slate-900 dark:text-zinc-100 min-w-[2.5rem] text-center">
+                            {qty}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleAdjustStock(item, 1)}
+                            className="w-6 h-6 rounded border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 inline-flex items-center justify-center text-slate-600 dark:text-zinc-300 cursor-pointer"
+                            title="Adicionar 1"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                          <span className="text-[11px] text-slate-500 dark:text-zinc-400">
+                            {item.unit}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-600 dark:text-zinc-400 whitespace-nowrap">
+                        {item.batchNumber ? `Lote ${item.batchNumber} · ` : ''}
+                        <span className={`font-mono ${isExpired ? 'text-rose-600 dark:text-rose-400 font-medium' : ''}`}>
+                          {exp || '--'}
                         </span>
-                      ) : (
-                        <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px]">
-                          ✅ Normal
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-mono tabular-nums font-medium text-slate-900 dark:text-zinc-100">
+                        R$ {(item.costPerUnitBrl || 0).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-600 dark:text-zinc-400 whitespace-nowrap tabular-nums">
+                        L: {item.withdrawalMilkDays}d · C: {item.withdrawalMeatDays}d
+                      </td>
+                      <td className="px-4 py-2.5 whitespace-nowrap">
+                        {isExpired ? (
+                          <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-medium">
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                            Vencido
+                          </span>
+                        ) : isLow ? (
+                          <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                            Baixo
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Normal
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Modal Add Item */}
+      {/* Add Item Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-stone-950/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl max-w-md w-full p-6 space-y-4 border border-stone-200 dark:border-zinc-800 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-stone-200 dark:border-zinc-800 pb-3">
-              <h3 className="font-bold text-stone-900 dark:text-white flex items-center gap-2">
-                <Package className="w-5 h-5 text-purple-600" />
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl max-w-md w-full border border-slate-200 dark:border-zinc-800 shadow-xl overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-slate-200 dark:border-zinc-800 flex justify-between items-center">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+                <Package className="w-4 h-4 text-violet-600 dark:text-violet-400" />
                 Novo Item de Farmácia
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-stone-400 hover:text-stone-600">
-                <X className="w-5 h-5" />
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-3 text-xs">
+            <form onSubmit={handleSave} className="p-5 space-y-3 text-xs">
+              {formError && (
+                <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-300">
+                  {formError}
+                </div>
+              )}
+
               <div>
-                <label className="block font-bold text-stone-700 dark:text-stone-300 mb-1">Nome do Produto *</label>
+                <label className="block text-[11px] font-medium text-slate-700 dark:text-zinc-300 mb-1">
+                  Nome do Produto *
+                </label>
                 <input
                   type="text"
                   required
                   value={newItem.name || ''}
                   onChange={e => setNewItem({ ...newItem, name: e.target.value })}
-                  className="w-full p-2.5 bg-stone-50 dark:bg-zinc-800 rounded-xl border border-stone-200 dark:border-zinc-700"
+                  className={inputCls}
                   placeholder="Ex: Moxidectina 1% Caprinos"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-stone-700 dark:text-stone-300 mb-1">Categoria *</label>
+                  <label className="block text-[11px] font-medium text-slate-700 dark:text-zinc-300 mb-1">
+                    Categoria *
+                  </label>
                   <select
                     value={newItem.category || 'Vermífugo'}
-                    onChange={e => setNewItem({ ...newItem, category: e.target.value as any })}
-                    className="w-full p-2.5 bg-stone-50 dark:bg-zinc-800 rounded-xl border border-stone-200 dark:border-zinc-700"
+                    onChange={e =>
+                      setNewItem({
+                        ...newItem,
+                        category: e.target.value as CaprinePharmacyCategory
+                      })
+                    }
+                    className={inputCls}
                   >
-                    <option value="Vermífugo">Vermífugo</option>
-                    <option value="Vacina">Vacina</option>
-                    <option value="Antibiótico">Antibiótico</option>
-                    <option value="Anti-inflamatório">Anti-inflamatório</option>
-                    <option value="Vitamina/Mineral">Vitamina/Mineral</option>
-                    <option value="Material Cirúrgico">Material Cirúrgico</option>
+                    {PHARMACY_CATEGORIES.map(cat => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block font-bold text-stone-700 dark:text-stone-300 mb-1">Qtd Atual em Estoque *</label>
+                  <label className="block text-[11px] font-medium text-slate-700 dark:text-zinc-300 mb-1">
+                    Qtd Atual *
+                  </label>
                   <input
                     type="number"
-                    value={newItem.currentQuantity || 10}
-                    onChange={e => setNewItem({ ...newItem, currentQuantity: parseInt(e.target.value) })}
-                    className="w-full p-2.5 bg-stone-50 dark:bg-zinc-800 rounded-xl border border-stone-200 dark:border-zinc-700 font-bold"
+                    min="0"
+                    value={newItem.currentQuantity ?? 10}
+                    onChange={e =>
+                      setNewItem({
+                        ...newItem,
+                        currentQuantity: parseInt(e.target.value, 10) || 0
+                      })
+                    }
+                    className={`${inputCls} tabular-nums`}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-stone-700 dark:text-stone-300 mb-1">Unidade de Medida</label>
+                  <label className="block text-[11px] font-medium text-slate-700 dark:text-zinc-300 mb-1">
+                    Unidade
+                  </label>
                   <input
                     type="text"
-                    value={newItem.unit || 'Frascos'}
+                    value={newItem.unit || ''}
                     onChange={e => setNewItem({ ...newItem, unit: e.target.value })}
-                    className="w-full p-2.5 bg-stone-50 dark:bg-zinc-800 rounded-xl border border-stone-200 dark:border-zinc-700"
+                    className={inputCls}
+                    placeholder="Frascos 500mL"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-stone-700 dark:text-stone-300 mb-1">Custo por Unidade (R$)</label>
+                  <label className="block text-[11px] font-medium text-slate-700 dark:text-zinc-300 mb-1">
+                    Custo Unit. (R$)
+                  </label>
                   <input
                     type="number"
                     step="0.01"
-                    value={newItem.costPerUnitBrl || 100.0}
-                    onChange={e => setNewItem({ ...newItem, costPerUnitBrl: parseFloat(e.target.value) })}
-                    className="w-full p-2.5 bg-stone-50 dark:bg-zinc-800 rounded-xl border border-stone-200 dark:border-zinc-700 font-bold"
+                    min="0"
+                    value={newItem.costPerUnitBrl ?? 0}
+                    onChange={e =>
+                      setNewItem({
+                        ...newItem,
+                        costPerUnitBrl: parseFloat(e.target.value) || 0
+                      })
+                    }
+                    className={`${inputCls} tabular-nums`}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-stone-700 dark:text-stone-300 mb-1">Data de Validade</label>
+                  <label className="block text-[11px] font-medium text-slate-700 dark:text-zinc-300 mb-1">
+                    Validade
+                  </label>
                   <input
                     type="date"
                     value={newItem.expirationDate || ''}
                     onChange={e => setNewItem({ ...newItem, expirationDate: e.target.value })}
-                    className="w-full p-2.5 bg-stone-50 dark:bg-zinc-800 rounded-xl border border-stone-200 dark:border-zinc-700"
+                    className={inputCls}
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-stone-700 dark:text-stone-300 mb-1">Alerta Estoque Mínimo</label>
+                  <label className="block text-[11px] font-medium text-slate-700 dark:text-zinc-300 mb-1">
+                    Estoque Mínimo
+                  </label>
                   <input
                     type="number"
-                    value={newItem.minQuantityAlert || 3}
-                    onChange={e => setNewItem({ ...newItem, minQuantityAlert: parseInt(e.target.value) })}
-                    className="w-full p-2.5 bg-stone-50 dark:bg-zinc-800 rounded-xl border border-stone-200 dark:border-zinc-700"
+                    min="0"
+                    value={newItem.minQuantityAlert ?? 3}
+                    onChange={e =>
+                      setNewItem({
+                        ...newItem,
+                        minQuantityAlert: parseInt(e.target.value, 10) || 0
+                      })
+                    }
+                    className={`${inputCls} tabular-nums`}
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="grid grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-700 dark:text-zinc-300 mb-1">
+                    Lote
+                  </label>
+                  <input
+                    type="text"
+                    value={newItem.batchNumber || ''}
+                    onChange={e => setNewItem({ ...newItem, batchNumber: e.target.value })}
+                    className={`${inputCls} font-mono`}
+                    placeholder="2026-A"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-700 dark:text-zinc-300 mb-1">
+                    Car. Leite (d)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={newItem.withdrawalMilkDays ?? 0}
+                    onChange={e =>
+                      setNewItem({
+                        ...newItem,
+                        withdrawalMilkDays: parseInt(e.target.value, 10) || 0
+                      })
+                    }
+                    className={`${inputCls} tabular-nums`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-700 dark:text-zinc-300 mb-1">
+                    Car. Carne (d)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={newItem.withdrawalMeatDays ?? 0}
+                    onChange={e =>
+                      setNewItem({
+                        ...newItem,
+                        withdrawalMeatDays: parseInt(e.target.value, 10) || 0
+                      })
+                    }
+                    className={`${inputCls} tabular-nums`}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-stone-100 hover:bg-stone-200 dark:bg-zinc-800 text-stone-700 dark:text-stone-200 rounded-xl font-bold"
+                  className="h-8 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 rounded-lg text-xs font-medium cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold"
+                  className="h-8 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium cursor-pointer"
                 >
                   Salvar Item
                 </button>

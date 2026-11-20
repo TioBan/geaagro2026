@@ -27,6 +27,7 @@ export const AvaliacaoSemoventesTab: React.FC<AvaliacaoSemoventesTabProps> = ({
   const items: PericiaAvaliacaoSemovente[] = avaliacao.semoventes || [];
 
   const [showForm, setShowForm] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<PericiaAvaliacaoSemovente>>({
     especie: 'Bovino de Corte',
     categoria: 'Matrizes / Vacas Nelore Paridas',
@@ -78,7 +79,7 @@ export const AvaliacaoSemoventesTab: React.FC<AvaliacaoSemoventesTabProps> = ({
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.categoria?.trim() || !formData.quantidadeCabecas) {
-      alert('Informe a categoria e a quantidade de cabeças.');
+      onShowNotification('Informe a categoria e a quantidade de cabeças.');
       return;
     }
 
@@ -115,14 +116,19 @@ export const AvaliacaoSemoventesTab: React.FC<AvaliacaoSemoventesTabProps> = ({
   };
 
   const handleDeleteItem = (id: string) => {
-    if (confirm('Deseja excluir este lote de semoventes?')) {
-      const updated = items.filter(item => item.id !== id);
-      onUpdateAvaliacao({
-        ...avaliacao,
-        semoventes: updated,
-      });
-      onShowNotification('Lote de semoventes removido.');
+    if (pendingDeleteId !== id) {
+      setPendingDeleteId(id);
+      onShowNotification('Clique novamente em excluir para confirmar a remoção do lote.');
+      setTimeout(() => setPendingDeleteId((prev) => (prev === id ? null : prev)), 4000);
+      return;
     }
+    const updated = items.filter(item => item.id !== id);
+    onUpdateAvaliacao({
+      ...avaliacao,
+      semoventes: updated,
+    });
+    setPendingDeleteId(null);
+    onShowNotification('Lote de semoventes removido.');
   };
 
   const handleExportCSV = () => {

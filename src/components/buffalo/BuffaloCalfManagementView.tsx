@@ -1,18 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { BuffaloAnimal } from '../../types/buffalo';
-import {
-  Baby,
-  ShieldCheck,
-  Scale,
-  Milk,
-  AlertTriangle,
-  Award,
-  Sparkles,
-  CheckCircle2,
-  Calendar,
-  Activity,
-  Plus
-} from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 
 interface BuffaloCalfManagementViewProps {
   animals: BuffaloAnimal[];
@@ -23,129 +11,182 @@ export const BuffaloCalfManagementView: React.FC<BuffaloCalfManagementViewProps>
   animals,
   onOpenDigitalTwin
 }) => {
-  const calves = animals.filter(a => a.category === 'Bezerra (0-6m)' || a.category === 'Bezerro (0-6m)');
+  const calves = animals.filter(
+    a => a.category === 'Bezerra (0-6m)' || a.category === 'Bezerro (0-6m)'
+  );
   const heifers = animals.filter(a => a.category === 'Novilha em Recria (7-24m)');
 
+  const calvesWithBirthWeight = calves.filter(c => c.birthWeightKg > 0);
+  const avgBirthWeight =
+    calvesWithBirthWeight.length > 0
+      ? (
+          calvesWithBirthWeight.reduce((acc, c) => acc + c.birthWeightKg, 0) /
+          calvesWithBirthWeight.length
+        ).toFixed(1)
+      : '—';
+
+  const avgCurrentWeight =
+    calves.length > 0
+      ? Math.round(calves.reduce((acc, c) => acc + (c.currentWeightKg || 0), 0) / calves.length)
+      : 0;
+
+  const calfGmds = calves
+    .flatMap(c => c.weighings || [])
+    .map(w => w.dailyGainKg)
+    .filter((v): v is number => typeof v === 'number' && v > 0);
+  const avgGmd =
+    calfGmds.length > 0
+      ? (calfGmds.reduce((acc, v) => acc + v, 0) / calfGmds.length).toFixed(2)
+      : '—';
+
+  const neonatalPop = [
+    {
+      step: '01',
+      title: 'Colostragem imediata (< 6h)',
+      desc: 'Fornecer 3,5 a 4,0 L de colostro de primeira ordenha aferido em refratômetro (> 22° Brix) nas primeiras 6 horas.'
+    },
+    {
+      step: '02',
+      title: 'Cura do umbigo com iodo 10%',
+      desc: 'Imersão completa do coto umbilical em solução de iodo 10% duas vezes ao dia por 4 a 5 dias até mumificação.'
+    },
+    {
+      step: '03',
+      title: 'Anti-helmíntico (10º ao 15º dia)',
+      desc: 'Controle profilático precoce contra Toxocara vitulorum transmitido via colostro, com reforço aos 30 dias.'
+    }
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Top Banner de Métricas Neonatais */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xs space-y-2">
-          <span className="text-[10px] uppercase font-bold text-slate-400">Total no Bezerreiro</span>
-          <div className="text-3xl font-black text-slate-900 dark:text-white">{calves.length}</div>
-          <span className="text-xs text-teal-600 font-bold">{calves.length > 0 ? '100% com desmame assistido' : 'Sem bezerros'}</span>
-        </div>
+    <div className="space-y-4">
+      {/* Faixa unificada de KPIs */}
+      <section className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+        <div className="grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 dark:divide-zinc-800">
+          <div className="p-3.5">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+              Bezerros (0-6m)
+            </span>
+            <div className="text-xl font-semibold text-slate-900 dark:text-white tabular-nums mt-0.5">
+              {calves.length}
+            </div>
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+              {heifers.length} novilhas em recria
+            </span>
+          </div>
 
-        <div className="p-5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xs space-y-2">
-          <span className="text-[10px] uppercase font-bold text-slate-400">Taxa de Sobrevivência Neonatal</span>
-          <div className="text-3xl font-black text-emerald-600">{calves.length > 0 ? '98.8%' : '-'}</div>
-          <span className="text-xs text-slate-500">Mortalidade &lt; 1.2% (Padrão Ouro)</span>
-        </div>
+          <div className="p-3.5">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+              Peso Médio Atual
+            </span>
+            <div className="text-xl font-semibold text-slate-900 dark:text-white tabular-nums mt-0.5">
+              {calves.length > 0 ? `${avgCurrentWeight} kg` : '—'}
+            </div>
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+              Nascer: {avgBirthWeight !== '—' ? `${avgBirthWeight} kg` : '—'}
+            </span>
+          </div>
 
-        <div className="p-5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xs space-y-2">
-          <span className="text-[10px] uppercase font-bold text-slate-400">GMD Neonatal Médio</span>
-          <div className="text-3xl font-black text-blue-600">{calves.length > 0 ? '0.68' : '0.00'} <span className="text-sm font-bold text-slate-400">kg/dia</span></div>
-          <span className="text-xs text-slate-500">{calves.length > 0 ? 'Peso médio ao nascer: 38.5 kg' : 'Sem nascimentos'}</span>
-        </div>
+          <div className="p-3.5">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+              GMD Neonatal
+            </span>
+            <div className="text-xl font-semibold text-teal-600 dark:text-teal-400 tabular-nums mt-0.5">
+              {avgGmd !== '—' ? `${avgGmd} kg/dia` : '—'}
+            </div>
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400">Calculado das pesagens</span>
+          </div>
 
-        <div className="p-5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xs space-y-2">
-          <span className="text-[10px] uppercase font-bold text-slate-400">Qualidade da Colostragem</span>
-          <div className="text-3xl font-black text-amber-600">{calves.length > 0 ? '> 23° Brix' : '-'}</div>
-          <span className="text-xs text-teal-600 font-bold">Transferência de Imunidade Passiva</span>
+          <div className="p-3.5">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+              Meta Colostragem
+            </span>
+            <div className="text-xl font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums mt-0.5">
+              &gt; 22° Brix
+            </div>
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400">Imunidade passiva</span>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* Protocolo Neonatal de Sucesso (Checklist Obrigatório) */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-5">
+      {/* POP Neonatal */}
+      <section className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-3">
         <div>
-          <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-emerald-600" />
-            <span>Protocolo Operacional Padrão (POP) Neonatal de Búfalos</span>
-          </h3>
-          <p className="text-xs text-slate-500">
-            Cuidados cruciais nas primeiras horas e semanas para garantir longevidade e robustez imunológica.
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+            <span>Protocolo Operacional Padrão (POP) Neonatal</span>
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Cuidados essenciais nas primeiras horas e semanas de vida do bezerro bubalino
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Passo 1 */}
-          <div className="p-4 bg-teal-50/60 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900 rounded-2xl space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-teal-600 text-white font-bold text-xs flex items-center justify-center">1</span>
-              <h4 className="font-extrabold text-xs text-teal-950 dark:text-teal-200">Colostragem Imediata (&lt; 6h)</h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {neonatalPop.map(item => (
+            <div
+              key={item.step}
+              className="p-3.5 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/40 space-y-1"
+            >
+              <div className="flex items-center gap-2 text-xs">
+                <span className="font-semibold text-teal-600 dark:text-teal-400 tabular-nums">{item.step}.</span>
+                <h3 className="font-semibold text-slate-900 dark:text-white">{item.title}</h3>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">{item.desc}</p>
             </div>
-            <p className="text-xs text-teal-900 dark:text-teal-300 leading-relaxed">
-              Fornecer <strong>3.5 a 4.0 Litros</strong> de colostro de primeira ordenha com densidade aferida no refratômetro (&gt; 22° Brix) nas primeiras 6 horas de vida.
-            </p>
-          </div>
-
-          {/* Passo 2 */}
-          <div className="p-4 bg-blue-50/60 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-2xl space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center">2</span>
-              <h4 className="font-extrabold text-xs text-blue-950 dark:text-blue-200">Cura de Umbigo com Iodo 10%</h4>
-            </div>
-            <p className="text-xs text-blue-900 dark:text-blue-300 leading-relaxed">
-              Imersão completa do cordão umbilical em solução de <strong>Iodo 10% Puro</strong> 2x ao dia durante 4 a 5 dias até a secagem total, prevenindo onfaloflebite.
-            </p>
-          </div>
-
-          {/* Passo 3 */}
-          <div className="p-4 bg-amber-50/60 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-2xl space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-amber-600 text-white font-bold text-xs flex items-center justify-center">3</span>
-              <h4 className="font-extrabold text-xs text-amber-950 dark:text-amber-200">Anti-helmíntico (10º-15º dia)</h4>
-            </div>
-            <p className="text-xs text-amber-900 dark:text-amber-300 leading-relaxed">
-              Desverminação profilática precoce contra <em>Toxocara vitulorum</em> (nematóide transmitido via leite materno), evitando timpanismo e diarreia neonatal.
-            </p>
-          </div>
+          ))}
         </div>
-      </div>
+      </section>
 
-      {/* Lista de Bezerros Cadastrados no Rebanho */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-4">
-        <h4 className="font-extrabold text-sm text-slate-900 dark:text-white uppercase tracking-wider">
-          Bezerras &amp; Bezerros no Bezerreiro
-        </h4>
+      {/* Lista de Bezerros */}
+      <section className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-3">
+        <h3 className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+          Bezerras &amp; Bezerros Cadastrados ({calves.length})
+        </h3>
 
-        <div className="divide-y divide-slate-100 dark:divide-zinc-800">
-          {calves.length === 0 ? (
-            <div className="text-center py-8 text-slate-500 text-xs">
-              Nenhum bezerro ou novilha jovem cadastrado no bezerreiro.
-            </div>
-          ) : (
-            calves.map((calf) => (
-              <div key={calf.id} className="py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-black text-sm text-slate-900 dark:text-white">{calf.identificationNumber}</span>
-                    <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">{calf.name}</span>
-                    <span className="px-2 py-0.5 bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 font-bold text-[10px] rounded">
+        {calves.length === 0 ? (
+          <p className="text-xs text-slate-500 dark:text-zinc-400 py-8 text-center">
+            Nenhum bezerro cadastrado na categoria 0-6 meses. Utilize a aba Cadastro para incluir nascimentos.
+          </p>
+        ) : (
+          <div className="divide-y divide-slate-100 dark:divide-zinc-800">
+            {calves.map(calf => (
+              <div
+                key={calf.id}
+                className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs"
+              >
+                <div className="space-y-0.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="font-semibold text-slate-900 dark:text-white tabular-nums">
+                      {calf.identificationNumber}
+                    </span>
+                    <span className="font-medium text-slate-700 dark:text-zinc-300">{calf.name}</span>
+                    <span className="text-slate-300 dark:text-zinc-700">·</span>
+                    <span className="text-teal-600 dark:text-teal-400">
                       {calf.breed} ({calf.sex})
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500">
-                    Nascimento: {calf.birthDate} • Peso Atual: <strong>{calf.currentWeightKg} kg</strong> (Nasceu com {calf.birthWeightKg || 38} kg)
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+                    Nasc.: {calf.birthDate || '—'} · Atual: {calf.currentWeightKg} kg
+                    {calf.birthWeightKg ? ` (Nascer: ${calf.birthWeightKg} kg)` : ''}
                   </p>
-                  {calf.damName && (
-                    <span className="text-[11px] text-teal-600 font-semibold block">
-                      Mãe: {calf.damName} • Pai: {calf.sireName || 'Touro PO'}
-                    </span>
+                  {(calf.damName || calf.sireName) && (
+                    <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                      Mãe: {calf.damName || '—'} · Pai: {calf.sireName || '—'}
+                    </p>
                   )}
                 </div>
 
                 <button
+                  type="button"
                   onClick={() => onOpenDigitalTwin(calf.id)}
-                  className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer transition-all"
+                  className="h-7 px-2.5 rounded-md border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 text-xs font-medium text-slate-700 dark:text-zinc-200 cursor-pointer self-start sm:self-auto shrink-0 transition-colors"
                 >
-                  Acompanhar Curva de Crescimento
+                  Curva de Crescimento
                 </button>
               </div>
-            ))
-          )}
-        </div>
-      </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 };

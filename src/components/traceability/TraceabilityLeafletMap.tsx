@@ -5,12 +5,9 @@ import {
   MapPin,
   Layers,
   Sparkles,
-  ShieldCheck,
   AlertTriangle,
   Boxes,
-  Droplets,
   Sun,
-  Moon,
   Eye,
   EyeOff,
   CheckCircle2,
@@ -22,10 +19,7 @@ import {
   Layers3,
   Map as MapIcon,
   Compass,
-  FileSpreadsheet,
   RefreshCw,
-  Info,
-  Sliders,
   SlidersHorizontal,
   Check,
   Tag,
@@ -34,26 +28,18 @@ import {
   Navigation,
   Activity,
   Leaf,
-  Flame,
   BarChart3,
   Calendar,
   Zap,
-  Maximize2,
   Calculator,
-  Image as ImageIcon,
   FileImage,
-  Percent,
   ChevronDown,
   ChevronUp,
-  Edit3,
   Pencil,
   X,
   Send,
-  Bot,
   Brain,
   BookOpen,
-  HelpCircle,
-  Filter,
 } from 'lucide-react';
 import {
   TraceabilityPlot,
@@ -388,7 +374,8 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
   const [mapLayer, setMapLayer] = useState<'osm' | 'satellite' | 'topography' | 'hot'>('satellite');
 
   // Selected Plot & Lot for inspection
-  const [selectedPlot, setSelectedPlot] = useState<TraceabilityPlot>(plots[0]);
+  const [selectedPlot, setSelectedPlot] = useState<TraceabilityPlot | null>(plots[0] || null);
+  const [confirmingDeletePlotId, setConfirmingDeletePlotId] = useState<string | null>(null);
   const [activeTabInternal, setActiveTabInternal] = useState<'list' | 'draw' | 'pois' | 'ndvi' | 'layers'>('list');
 
   // Multi-layer Overlay Management (Persistence + Drag-and-drop visual priority)
@@ -1445,7 +1432,7 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
     if (e) e.preventDefault();
     if (!editingPlot) return;
     if (!plotFormData.code.trim() || !plotFormData.name.trim()) {
-      alert('Por favor, preencha o código e o nome do talhão.');
+      showMapToast('Por favor, preencha o código e o nome do talhão.', 'error');
       return;
     }
 
@@ -1475,15 +1462,12 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
     }
 
     setEditingPlot(null);
-    notifyExportSuccess(`Talhão ${plotFormData.code} atualizado com sucesso!`);
+    notifyExportSuccess(`Talhão ${plotFormData.code} atualizado com sucesso.`);
   };
 
-  // Delete Plot
+  // Delete Plot (inline confirmed)
   const handleDeletePlot = (plotToDelete: TraceabilityPlot, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-
-    const confirmMsg = `Tem certeza que deseja excluir o talhão "${plotToDelete.code} - ${plotToDelete.name}"?\nEsta ação removerá o polígono do mapa.`;
-    if (!window.confirm(confirmMsg)) return;
 
     const updatedPlots = plots.filter(p => p.id !== plotToDelete.id);
     setPlots(updatedPlots);
@@ -1493,6 +1477,7 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
       setSelectedPlot(updatedPlots[0] || null);
     }
 
+    setConfirmingDeletePlotId(null);
     notifyExportSuccess(`Talhão ${plotToDelete.code} excluído com sucesso.`);
   };
 
@@ -1621,9 +1606,9 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
         `talhoes-sig-${(property?.farmName || 'propriedade').toLowerCase().replace(/\s+/g, '-')}-${new Date().getTime()}.geojson`,
         'application/geo+json'
       );
-      notifyExportSuccess('GeoJSON com todos os talhões exportado com sucesso!');
+      notifyExportSuccess('GeoJSON com todos os talhões exportado com sucesso.');
     } catch (err: any) {
-      alert(`Erro ao exportar GeoJSON: ${err.message}`);
+      showMapToast(`Erro ao exportar GeoJSON: ${err.message}`, 'error');
     }
   };
 
@@ -1636,9 +1621,9 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
         `talhoes-drones-${(property?.farmName || 'fazenda').toLowerCase().replace(/\s+/g, '-')}-${new Date().getTime()}.kml`,
         'application/vnd.google-earth.kml+xml'
       );
-      notifyExportSuccess('KML compatível com Google Earth e Drones exportado com sucesso!');
+      notifyExportSuccess('KML compatível com Google Earth e Drones exportado com sucesso.');
     } catch (err: any) {
-      alert(`Erro ao exportar KML: ${err.message}`);
+      showMapToast(`Erro ao exportar KML: ${err.message}`, 'error');
     }
   };
 
@@ -1653,9 +1638,9 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
         `talhao-${plot.code.toLowerCase()}-${new Date().getTime()}.geojson`,
         'application/geo+json'
       );
-      notifyExportSuccess(`GeoJSON do Talhão ${plot.code} exportado com sucesso!`);
+      notifyExportSuccess(`GeoJSON do Talhão ${plot.code} exportado com sucesso.`);
     } catch (err: any) {
-      alert(`Erro ao exportar GeoJSON do talhão: ${err.message}`);
+      showMapToast(`Erro ao exportar GeoJSON do talhão: ${err.message}`, 'error');
     }
   };
 
@@ -1670,9 +1655,9 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
         `talhao-${plot.code.toLowerCase()}-${new Date().getTime()}.kml`,
         'application/vnd.google-earth.kml+xml'
       );
-      notifyExportSuccess(`KML do Talhão ${plot.code} exportado com sucesso!`);
+      notifyExportSuccess(`KML do Talhão ${plot.code} exportado com sucesso.`);
     } catch (err: any) {
-      alert(`Erro ao exportar KML do talhão: ${err.message}`);
+      showMapToast(`Erro ao exportar KML do talhão: ${err.message}`, 'error');
     }
   };
 
@@ -1687,9 +1672,9 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
         `talhao-desenhado-${target?.code || 'delimitacao'}-${new Date().getTime()}.geojson`,
         'application/geo+json'
       );
-      notifyExportSuccess('Polígono desenhado exportado em GeoJSON!');
+      notifyExportSuccess('Polígono desenhado exportado em GeoJSON.');
     } catch (err: any) {
-      alert(`Erro ao exportar polígono desenhado: ${err.message}`);
+      showMapToast(`Erro ao exportar polígono desenhado: ${err.message}`, 'error');
     }
   };
 
@@ -1704,16 +1689,16 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
         `talhao-desenhado-${target?.code || 'delimitacao'}-${new Date().getTime()}.kml`,
         'application/vnd.google-earth.kml+xml'
       );
-      notifyExportSuccess('Polígono desenhado exportado em KML para drones!');
+      notifyExportSuccess('Polígono desenhado exportado em KML para drones.');
     } catch (err: any) {
-      alert(`Erro ao exportar polígono desenhado em KML: ${err.message}`);
+      showMapToast(`Erro ao exportar polígono desenhado em KML: ${err.message}`, 'error');
     }
   };
 
   // GPS Auto-Locate with Accuracy Circle
   const handleAutoLocate = () => {
     if (!navigator.geolocation) {
-      alert('Seu dispositivo ou navegador não suporta geolocalização por GPS.');
+      showMapToast('Seu dispositivo ou navegador não suporta geolocalização por GPS.', 'error');
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -1727,8 +1712,8 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
               className: 'bg-transparent border-none',
               html: `
                 <div class="relative flex items-center justify-center">
-                  <div class="absolute w-5 h-5 bg-blue-500 rounded-full animate-ping opacity-75"></div>
-                  <div class="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-md"></div>
+                  <div class="absolute w-5 h-5 bg-blue-500 rounded-full opacity-40"></div>
+                  <div class="w-4 h-4 bg-blue-600 rounded-full border-2 border-white"></div>
                 </div>
               `,
               iconSize: [20, 20],
@@ -1752,7 +1737,7 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
         }
       },
       (error) => {
-        alert(`Não foi possível obter o GPS: ${error.message}`);
+        showMapToast(`Não foi possível obter o GPS: ${error.message}`, 'error');
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
@@ -2352,7 +2337,7 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
       const plotCode = `TAL-0${nextNum}`;
 
       const newPlot: TraceabilityPlot = {
-        id: `plot-${Date.now()}`,
+        id: `talhao-${Date.now()}`,
         code: plotCode,
         name: plotName,
         farmId: property?.id || (plots[0]?.farmId) || 'farm-1',
@@ -2443,128 +2428,144 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
   const selectedPlotLots = lots.filter(l => l.plotId === selectedPlot?.id || l.plotCode === selectedPlot?.code);
 
   return (
-    <div className="space-y-6 relative">
+    <div className="space-y-4 relative">
       {/* Toast Notification */}
       {mapToast && (
-        <div className={`fixed top-6 right-6 z-[9999] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs font-bold text-white transition-all animate-bounce ${
-          mapToast.type === 'error' ? 'bg-rose-600' : mapToast.type === 'info' ? 'bg-sky-600' : 'bg-emerald-600'
-        }`}>
-          {mapToast.type === 'error' ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+        <div
+          role="status"
+          className={`fixed top-5 right-5 z-[9999] px-3.5 py-2.5 rounded-lg border flex items-center gap-2 text-xs font-medium text-white transition-all ${
+            mapToast.type === 'error'
+              ? 'bg-rose-600 border-rose-500'
+              : mapToast.type === 'info'
+                ? 'bg-sky-600 border-sky-500'
+                : 'bg-emerald-600 border-emerald-500'
+          }`}
+        >
+          {mapToast.type === 'error' ? <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> : <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />}
           <span>{mapToast.message}</span>
         </div>
       )}
 
       {/* Top Header Card */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm flex flex-col gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="p-1.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-600 rounded-xl">
-              <Layers className="w-5 h-5" />
-            </span>
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              Módulo de Geoprocessamento & NDVI
-            </span>
-          </div>
-          <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-            Sensoriamento Orbital & Delimitação SIG
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
-            Índices de vegetação multiespectrais (NDVI, SAVI, EVI, NDRE), importação de imagens raster e controle de opacidade.
-          </p>
-        </div>
-
-        {/* Divider */}
-        <div className="border-t border-slate-100 dark:border-zinc-800/60 my-0.5" />
-
-        {/* Base Layer & NDVI quick controls (Positioned below) */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Map Base Layer Picker */}
-            <div className="flex flex-wrap items-center bg-slate-100 dark:bg-zinc-800/60 p-1 rounded-xl border border-slate-200/80 dark:border-zinc-700/50">
-              <button
-                onClick={() => setMapLayer('satellite')}
-                className={`px-3.5 py-1.5 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
-                  mapLayer === 'satellite' ? 'bg-white dark:bg-zinc-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-500 dark:text-zinc-400 hover:text-slate-700'
-                }`}
-              >
-                <Sun className="w-3.5 h-3.5 text-emerald-500" /> Satélite Esri
-              </button>
-              <button
-                onClick={() => setMapLayer('osm')}
-                className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
-                  mapLayer === 'osm' ? 'bg-white dark:bg-zinc-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-500'
-                }`}
-              >
-                <MapIcon className="w-3.5 h-3.5 text-blue-500" /> OSM Padrão
-              </button>
-              <button
-                onClick={() => setMapLayer('topography')}
-                className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
-                  mapLayer === 'topography' ? 'bg-white dark:bg-zinc-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-500'
-                }`}
-              >
-                <Compass className="w-3.5 h-3.5 text-amber-500" /> Topo Relevo
-              </button>
-              <button
-                onClick={() => setMapLayer('hot')}
-                className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
-                  mapLayer === 'hot' ? 'bg-white dark:bg-zinc-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-500'
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5 text-rose-500" /> Terreno HOT
-              </button>
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-4 sm:p-5 flex flex-col gap-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              <Layers className="w-3.5 h-3.5 shrink-0" />
+              <span>Geoprocessamento & Sensoriamento Orbital</span>
             </div>
+            <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-zinc-100 tracking-tight mt-0.5">
+              Sensoriamento Orbital & Delimitação SIG
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+              Índices de vegetação multiespectrais (NDVI, SAVI, EVI, NDRE), importação de imagens raster e controle de opacidade.
+            </p>
           </div>
-
-          {/* NDVI Direct Quick Toggle */}
           <button
+            type="button"
             onClick={() => setShowNdvi(!showNdvi)}
-            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-xs border ${
+            className={`h-9 px-3.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-2 cursor-pointer border whitespace-nowrap shrink-0 ${
               showNdvi
-                ? 'bg-emerald-600 text-white border-emerald-500 shadow-emerald-500/20'
-                : 'bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700'
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
+                : 'bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 border-slate-200 dark:border-zinc-700'
             }`}
           >
-            <Activity className={`w-4 h-4 ${showNdvi ? 'animate-pulse text-white' : 'text-emerald-500'}`} />
-            <span>Camada {ndviIndexType.toUpperCase()} {showNdvi ? 'Ativa' : 'Desativada'}</span>
+            <Activity className={`w-3.5 h-3.5 ${showNdvi ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}`} />
+            <span>Camada {ndviIndexType.toUpperCase()} {showNdvi ? 'Ativa' : 'Inativa'}</span>
           </button>
+        </div>
+
+        <div className="border-t border-slate-100 dark:border-zinc-800" />
+
+        {/* Base Layer quick controls */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="inline-flex flex-wrap items-center bg-slate-100/80 dark:bg-zinc-950/60 p-1 rounded-lg border border-slate-200/80 dark:border-zinc-800 gap-0.5">
+            <button
+              type="button"
+              onClick={() => setMapLayer('satellite')}
+              className={`h-7 px-2.5 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                mapLayer === 'satellite'
+                  ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 border border-slate-200/80 dark:border-zinc-700'
+                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200 border border-transparent'
+              }`}
+            >
+              <Sun className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Satélite Esri</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMapLayer('osm')}
+              className={`h-7 px-2.5 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                mapLayer === 'osm'
+                  ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 border border-slate-200/80 dark:border-zinc-700'
+                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200 border border-transparent'
+              }`}
+            >
+              <MapIcon className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+              <span>OSM Padrão</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMapLayer('topography')}
+              className={`h-7 px-2.5 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                mapLayer === 'topography'
+                  ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 border border-slate-200/80 dark:border-zinc-700'
+                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200 border border-transparent'
+              }`}
+            >
+              <Compass className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <span>Topo Relevo</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMapLayer('hot')}
+              className={`h-7 px-2.5 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                mapLayer === 'hot'
+                  ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 border border-slate-200/80 dark:border-zinc-700'
+                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200 border border-transparent'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+              <span>Terreno HOT</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Grid Control Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Interactive GIS Map Canvas */}
         <div className="lg:col-span-8 flex flex-col space-y-3 relative">
           {/* Floating Search & GPS Autolocate Bar */}
-          <div className="flex flex-col sm:flex-row gap-2 w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 p-3 rounded-2xl shadow-sm">
+          <div className="flex flex-col sm:flex-row gap-2 w-full bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 p-2.5 rounded-xl">
             {/* Nominatim Search Input */}
             <form onSubmit={handleSearchAddress} className="flex-1 relative flex gap-1.5">
               <div className="relative flex-1">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Buscar cidades, municípios agrícolas ou endereços no Brasil..."
-                  className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-zinc-850 text-xs text-slate-800 dark:text-zinc-100 border border-slate-200 dark:border-zinc-700/60 rounded-xl outline-none focus:ring-1 focus:ring-emerald-500"
+                  placeholder="Buscar cidades, municípios agrícolas ou endereços..."
+                  className="w-full h-9 pl-8 pr-3 bg-slate-50/70 dark:bg-zinc-950/60 text-xs text-slate-800 dark:text-zinc-100 border border-slate-200 dark:border-zinc-700 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
                 />
               </div>
               <button
                 type="submit"
                 disabled={searchLoading}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
+                className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
               >
                 {searchLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : 'Buscar'}
               </button>
 
               {/* Autocomplete suggestions dropdown */}
               {searchResults.length > 0 && (
-                <div className="absolute left-0 right-0 top-full mt-1.5 z-40 max-h-56 overflow-y-auto bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl divide-y divide-slate-100 dark:divide-zinc-800 text-xs">
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-40 max-h-56 overflow-y-auto bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-sm divide-y divide-slate-100 dark:divide-zinc-800 text-xs">
                   {searchResults.map((r, i) => (
                     <div
                       key={i}
                       onClick={() => handleSelectSearchResult(r)}
-                      className="p-3 hover:bg-slate-50 dark:hover:bg-zinc-900 cursor-pointer text-slate-700 dark:text-zinc-300 transition-colors"
+                      className="px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-zinc-900 cursor-pointer text-slate-700 dark:text-zinc-300 transition-colors"
                     >
                       {r.display_name}
                     </div>
@@ -2578,10 +2579,10 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
               <button
                 type="button"
                 onClick={handleAutoLocate}
-                className="px-3.5 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                className="h-9 px-3 border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                 title="Sua localização atual por GPS"
               >
-                <Navigation className="w-3.5 h-3.5 fill-white animate-pulse" />
+                <Navigation className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
                 <span>GPS Atual</span>
               </button>
 
@@ -2590,63 +2591,62 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowExportModal(!showExportModal)}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-                  title="Exportar polígonos dos talhões em KML e GeoJSON para agricultura de precisão"
+                  className="h-9 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                  title="Exportar polígonos dos talhões em KML e GeoJSON"
                 >
-                  <Download className="w-3.5 h-3.5 text-white" />
-                  <span>Exportar SIG & Drones</span>
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Exportar SIG</span>
                 </button>
 
-                {/* Dropdown Menu Modal Popover */}
+                {/* Dropdown Menu Popover */}
                 {showExportModal && (
-                  <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-40 p-3 text-xs space-y-2 animate-fade-in">
+                  <div className="absolute right-0 top-full mt-1.5 w-72 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-sm z-40 p-3 text-xs space-y-2">
                     <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-zinc-800">
-                      <span className="font-black text-slate-800 dark:text-zinc-100 flex items-center gap-1.5">
-                        <Layers3 className="w-4 h-4 text-emerald-600" />
+                      <span className="font-semibold text-slate-800 dark:text-zinc-100 flex items-center gap-1.5">
+                        <Layers3 className="w-3.5 h-3.5 text-emerald-600" />
                         Interoperabilidade SIG
                       </span>
                       <button
+                        type="button"
                         onClick={() => setShowExportModal(false)}
-                        className="text-slate-400 hover:text-slate-600 p-0.5"
+                        className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 p-0.5 cursor-pointer"
                       >
-                        ✕
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
 
                     <div className="space-y-1 text-slate-600 dark:text-zinc-400 text-[11px]">
-                      <span className="font-bold text-slate-400 block uppercase text-[9px]">Todos os Talhões ({plots.length}):</span>
+                      <span className="font-semibold text-slate-400 block uppercase text-[9px] tabular-nums">Todos os Talhões ({plots.length})</span>
                       
-                      {/* Export All GeoJSON */}
                       <button
                         type="button"
                         onClick={() => { handleExportAllGeoJSON(); setShowExportModal(false); }}
-                        className="w-full text-left p-2 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-800 dark:text-zinc-200 flex items-center justify-between group transition cursor-pointer"
+                        className="w-full text-left p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-800 dark:text-zinc-200 flex items-center justify-between group transition-colors cursor-pointer"
                       >
                         <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 flex items-center justify-center font-mono font-black text-[10px]">
+                          <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 font-mono font-semibold text-[10px]">
                             GEO
                           </span>
                           <div>
-                            <strong className="block group-hover:text-emerald-600">GeoJSON Geral (OGC)</strong>
+                            <strong className="block font-medium group-hover:text-emerald-600">GeoJSON Geral (OGC)</strong>
                             <span className="text-[10px] text-slate-400">QGIS, ArcGIS, Agrosmart</span>
                           </div>
                         </div>
                         <Download className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600" />
                       </button>
 
-                      {/* Export All KML */}
                       <button
                         type="button"
                         onClick={() => { handleExportAllKML(); setShowExportModal(false); }}
-                        className="w-full text-left p-2 rounded-xl hover:bg-amber-50 dark:hover:bg-amber-950/40 text-slate-800 dark:text-zinc-200 flex items-center justify-between group transition cursor-pointer"
+                        className="w-full text-left p-2 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-950/40 text-slate-800 dark:text-zinc-200 flex items-center justify-between group transition-colors cursor-pointer"
                       >
                         <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-600 flex items-center justify-center font-mono font-black text-[10px]">
+                          <span className="px-1.5 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60 font-mono font-semibold text-[10px]">
                             KML
                           </span>
                           <div>
-                            <strong className="block group-hover:text-amber-600">KML Geral + POIs</strong>
-                            <span className="text-[10px] text-slate-400">Google Earth & Drones DJI/Trimble</span>
+                            <strong className="block font-medium group-hover:text-amber-600">KML Geral + POIs</strong>
+                            <span className="text-[10px] text-slate-400">Google Earth & Drones</span>
                           </div>
                         </div>
                         <Download className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-600" />
@@ -2654,23 +2654,23 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                     </div>
 
                     {selectedPlot && (
-                      <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 space-y-1 text-slate-600 dark:text-zinc-400 text-[11px]">
-                        <span className="font-bold text-slate-400 block uppercase text-[9px]">
-                          Talhão Selecionado ({selectedPlot.code}):
+                      <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 space-y-1.5 text-slate-600 dark:text-zinc-400 text-[11px]">
+                        <span className="font-semibold text-slate-400 block uppercase text-[9px]">
+                          Talhão Selecionado ({selectedPlot.code})
                         </span>
                         
                         <div className="grid grid-cols-2 gap-1.5">
                           <button
                             type="button"
                             onClick={() => { handleExportSelectedPlotGeoJSON(selectedPlot); setShowExportModal(false); }}
-                            className="p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 hover:bg-emerald-50 text-slate-800 dark:text-zinc-200 font-bold text-[10px] flex items-center justify-center gap-1 transition cursor-pointer"
+                            className="h-8 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-950 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-800 dark:text-zinc-200 font-medium text-[11px] flex items-center justify-center gap-1 transition-colors cursor-pointer"
                           >
                             <Download className="w-3 h-3 text-emerald-600" /> GeoJSON
                           </button>
                           <button
                             type="button"
                             onClick={() => { handleExportSelectedPlotKML(selectedPlot); setShowExportModal(false); }}
-                            className="p-2 rounded-xl bg-slate-50 dark:bg-zinc-800 hover:bg-amber-50 text-slate-800 dark:text-zinc-200 font-bold text-[10px] flex items-center justify-center gap-1 transition cursor-pointer"
+                            className="h-8 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-950 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-slate-800 dark:text-zinc-200 font-medium text-[11px] flex items-center justify-center gap-1 transition-colors cursor-pointer"
                           >
                             <Download className="w-3 h-3 text-amber-600" /> KML
                           </button>
@@ -2685,17 +2685,19 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
           {/* Export Success Feedback Notification */}
           {exportFeedback && (
-            <div className="bg-emerald-600 text-white text-xs font-bold px-4 py-2.5 rounded-2xl shadow-lg flex items-center justify-between animate-fade-in">
+            <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 text-xs font-medium px-3.5 py-2 rounded-lg flex items-center justify-between">
               <span className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4" />
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                 {exportFeedback}
               </span>
-              <button onClick={() => setExportFeedback(null)} className="p-0.5 hover:opacity-80 cursor-pointer">✕</button>
+              <button type="button" onClick={() => setExportFeedback(null)} className="p-0.5 hover:opacity-80 cursor-pointer">
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
           )}
 
           {/* Map wrapper container */}
-          <div className="relative isolate z-0 w-full h-[540px] rounded-3xl overflow-hidden border border-slate-200 dark:border-zinc-800 shadow-sm bg-slate-100 dark:bg-zinc-950">
+          <div className="relative isolate z-0 w-full h-[540px] rounded-xl overflow-hidden border border-slate-200/80 dark:border-zinc-800 bg-slate-100 dark:bg-zinc-950">
             <div ref={containerRef} className="w-full h-full" style={{ minHeight: '480px' }} />
 
             {/* Floating Top In-Map Quick Raster Controller ("Ajustar Camada") */}
@@ -2706,22 +2708,21 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                     <button
                       type="button"
                       onClick={() => setIsNdviPanelExpanded(true)}
-                      className="flex items-center gap-2 px-3.5 py-2 bg-slate-900/90 hover:bg-slate-900 text-white dark:bg-zinc-900/95 dark:hover:bg-zinc-900 backdrop-blur-md font-bold rounded-2xl shadow-xl transition-all hover:scale-[1.02] active:scale-95 cursor-pointer text-xs border border-emerald-500/40"
+                      className="flex items-center gap-2 h-8 px-3 bg-zinc-900/90 hover:bg-zinc-900 text-white backdrop-blur-sm font-medium rounded-lg transition-colors cursor-pointer text-xs border border-emerald-500/40"
                     >
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                       <Activity className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Ajustar Camada: <strong className="text-emerald-300 font-mono">{ndviIndexType.toUpperCase()}</strong> ({Math.round(ndviOpacity * 100)}%)</span>
-                      <SlidersHorizontal className="w-3.5 h-3.5 ml-1 text-emerald-400" />
+                      <span className="tabular-nums">Camada: <strong className="text-emerald-300 font-mono">{ndviIndexType.toUpperCase()}</strong> ({Math.round(ndviOpacity * 100)}%)</span>
+                      <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400" />
                     </button>
 
                     {/* Quick opacity stepper presets while collapsed */}
-                    <div className="hidden sm:flex items-center gap-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md px-1.5 py-1 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-md">
+                    <div className="hidden sm:flex items-center gap-0.5 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm px-1 py-0.5 rounded-lg border border-slate-200/80 dark:border-zinc-800">
                       {[0.3, 0.6, 0.85, 1.0].map(val => (
                         <button
                           key={val}
                           type="button"
                           onClick={() => setNdviOpacity(val)}
-                          className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-lg transition cursor-pointer ${
+                          className={`px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded-md transition-colors cursor-pointer tabular-nums ${
                             Math.abs(ndviOpacity - val) < 0.08
                               ? 'bg-emerald-600 text-white'
                               : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800'
@@ -2734,7 +2735,7 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl p-3 sm:p-3.5 rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-zinc-700/80 shadow-2xl flex flex-col gap-2.5 animate-fade-in text-xs w-full max-h-[85vh] overflow-y-auto">
+                  <div className="bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md p-3 rounded-xl border border-slate-200/90 dark:border-zinc-700/80 flex flex-col gap-2.5 text-xs w-full max-h-[85vh] overflow-y-auto">
                     {/* Header Row */}
                     <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-zinc-800">
                       <div className="flex items-center gap-2">
@@ -2870,29 +2871,29 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
             {/* Mouse coords badge absolute overlay */}
             {mouseCoords && (
-              <div className="absolute bottom-4 left-24 sm:left-28 z-40 bg-slate-900/85 backdrop-blur-md text-[10px] sm:text-xs text-white px-3 py-1.5 rounded-xl border border-white/20 font-mono font-bold flex items-center gap-2 shadow-md">
-                <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-                Lat: {mouseCoords.lat.toFixed(6)} | Lng: {mouseCoords.lng.toFixed(6)}
+              <div className="absolute bottom-3 left-24 sm:left-28 z-40 bg-zinc-900/90 text-[10px] sm:text-xs text-white px-2.5 py-1 rounded-lg border border-zinc-700 font-mono font-medium flex items-center gap-1.5 tabular-nums">
+                <MapPin className="w-3 h-3 text-emerald-400" />
+                {mouseCoords.lat.toFixed(6)}, {mouseCoords.lng.toFixed(6)}
               </div>
             )}
 
-            {/* Standard NDVI/SAVI/EVI Color Legend (Escala de Cores Padrão -1 a 1) */}
+            {/* Standard NDVI/SAVI/EVI Color Legend */}
             {showNdvi && (
               showLegend ? (
-                <div className="absolute bottom-4 right-4 z-40 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md p-3.5 rounded-2xl border border-slate-200 dark:border-zinc-700/80 shadow-xl max-w-[280px] text-xs animate-fade-in">
+                <div className="absolute bottom-3 right-3 z-40 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm p-3 rounded-xl border border-slate-200 dark:border-zinc-700/80 max-w-[272px] text-xs">
                   <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-zinc-800">
-                    <div className="flex items-center gap-1.5 font-black text-[11px] text-slate-800 dark:text-zinc-100">
-                      <Leaf className="w-3.5 h-3.5 text-emerald-500" />
-                      <span>Legenda de Cores {ndviIndexType.toUpperCase()}</span>
+                    <div className="flex items-center gap-1.5 font-semibold text-[11px] text-slate-800 dark:text-zinc-100">
+                      <Leaf className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Legenda {ndviIndexType.toUpperCase()}</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] font-mono bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 font-bold px-1.5 py-0.5 rounded">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9px] font-mono bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-semibold px-1.5 py-0.5 rounded-md border border-emerald-200/80 dark:border-emerald-800/60 tabular-nums">
                         -1.0 a +1.0
                       </span>
                       <button
                         type="button"
                         onClick={() => setShowLegend(false)}
-                        className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition cursor-pointer rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800"
+                        className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition-colors cursor-pointer rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800"
                         title="Ocultar Legenda"
                       >
                         <EyeOff className="w-3.5 h-3.5" />
@@ -2901,9 +2902,9 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                   </div>
 
                   {/* Continuous Gradient Color Ramp Bar */}
-                  <div className="mt-2.5">
+                  <div className="mt-2">
                     <div
-                      className="h-3.5 w-full rounded-md shadow-inner border border-black/10"
+                      className="h-3 w-full rounded-md border border-black/10"
                       style={{
                         background:
                           ndviIndexType === 'ndwi'
@@ -2927,7 +2928,7 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                             : 'linear-gradient(to right, #d73027 0%, #f46d43 15%, #fdae61 30%, #a6d96a 50%, #66bd63 70%, #1a9850 100%)'
                       }}
                     />
-                    <div className="flex justify-between text-[9px] font-mono font-bold text-slate-500 dark:text-zinc-400 mt-1">
+                    <div className="flex justify-between text-[9px] font-mono font-semibold text-slate-500 dark:text-zinc-400 mt-1 tabular-nums">
                       <span>&lt;0.10</span>
                       <span>0.30</span>
                       <span>0.50</span>
@@ -2937,40 +2938,40 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                   </div>
 
                   {/* Legend Reference Categories */}
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-1 mt-2 text-[10px] text-slate-600 dark:text-zinc-300">
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-1 mt-2 text-[10px] text-slate-600 dark:text-zinc-300 tabular-nums">
                     <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#1a9850] shrink-0" />
-                      <span>Alta Atividade (0.7-1.0)</span>
+                      <span className="w-2.5 h-2.5 rounded-sm bg-[#1a9850] shrink-0" />
+                      <span>Alta (0.7-1.0)</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#66bd63] shrink-0" />
-                      <span>Veg. Densa (0.5-0.7)</span>
+                      <span className="w-2.5 h-2.5 rounded-sm bg-[#66bd63] shrink-0" />
+                      <span>Densa (0.5-0.7)</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#a6d96a] shrink-0" />
-                      <span>Veg. Moderada (0.3-0.5)</span>
+                      <span className="w-2.5 h-2.5 rounded-sm bg-[#a6d96a] shrink-0" />
+                      <span>Moderada (0.3-0.5)</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#fdae61] shrink-0" />
-                      <span>Veg. Fraca (0.1-0.3)</span>
+                      <span className="w-2.5 h-2.5 rounded-sm bg-[#fdae61] shrink-0" />
+                      <span>Fraca (0.1-0.3)</span>
                     </div>
                     <div className="flex items-center gap-1.5 col-span-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#d73027] shrink-0" />
+                      <span className="w-2.5 h-2.5 rounded-sm bg-[#d73027] shrink-0" />
                       <span>Solo Exposto / Não Vegetado (&lt;0.10)</span>
                     </div>
                   </div>
 
-                  <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-zinc-800 space-y-2">
+                  <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-zinc-800 space-y-1.5">
                     <button
                       type="button"
                       onClick={() => handleRunNdviAiAnalysis()}
-                      className="w-full py-1.5 px-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-700 hover:to-indigo-700 text-white font-bold rounded-xl transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer text-[10px]"
+                      className="w-full h-8 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer text-[11px]"
                     >
-                      <Sparkles className="w-3 h-3 text-amber-300 animate-pulse" />
-                      <span>Analisar Tomada de Decisão com a Nema</span>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Analisar Decisão com a Nema</span>
                     </button>
-                    <div className="flex items-center justify-between text-[9px] text-slate-400">
-                      <span>{customRasters[selectedPlot?.id] ? 'Raster: Drone / Ortomosaico' : `Satélite: ${activePass.satellite.split(' ')[0]}`}</span>
+                    <div className="flex items-center justify-between text-[9px] text-slate-400 tabular-nums">
+                      <span>{selectedPlot && customRasters[selectedPlot.id] ? 'Raster: Drone / Ortomosaico' : `Satélite: ${activePass.satellite.split(' ')[0]}`}</span>
                       <span>Opacidade: {Math.round(ndviOpacity * 100)}%</span>
                     </div>
                   </div>
@@ -2979,41 +2980,41 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowLegend(true)}
-                  className="absolute bottom-4 right-4 z-40 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md px-3 py-2 rounded-2xl border border-slate-200 dark:border-zinc-700/80 shadow-xl flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-zinc-100 hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer animate-fade-in"
+                  className="absolute bottom-3 right-3 z-40 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700/80 flex items-center gap-1.5 text-xs font-medium text-slate-800 dark:text-zinc-100 hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                   title="Mostrar Legenda de Cores"
                 >
-                  <Leaf className="w-4 h-4 text-emerald-500" />
-                  <span>Mostrar Legenda</span>
-                  <Eye className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
+                  <Leaf className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Legenda</span>
+                  <Eye className="w-3.5 h-3.5 text-slate-400" />
                 </button>
               )
             )}
 
             {/* Drawing mode help tooltip absolute overlay */}
             {isDrawing && (
-              <div className="absolute top-4 left-14 sm:left-16 z-40 bg-amber-500 text-white text-xs font-bold px-4 py-2 rounded-xl border border-amber-400 shadow-md flex items-center gap-2 animate-bounce">
-                <Sparkles className="w-4 h-4 animate-pulse" />
-                Modo Desenho Ativo: Use o mouse ou a barra Leaflet.Draw para delimitar
+              <div className="absolute top-3 left-14 sm:left-16 z-40 bg-amber-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg border border-amber-500 flex items-center gap-2">
+                <Pencil className="w-3.5 h-3.5" />
+                Modo Desenho Ativo: clique no mapa ou use Leaflet.Draw para delimitar
               </div>
             )}
           </div>
 
           {/* Point Sample Inspector Banner (When clicking in NDVI mode) */}
           {pointSample && (
-            <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in shadow-xs">
+            <div className="bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/60 rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div
-                  className="w-10 h-10 rounded-2xl flex items-center justify-center font-black text-white text-sm shadow-md"
+                  className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white text-xs font-mono tabular-nums shrink-0"
                   style={{ backgroundColor: pointSample.color }}
                 >
                   {pointSample.val}
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-black text-xs text-emerald-950 dark:text-emerald-200">
-                      PONTO AMOSTRADO: {pointSample.classification} ({pointSample.indexName})
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-xs text-emerald-950 dark:text-emerald-200">
+                      Ponto Amostrado: {pointSample.classification} ({pointSample.indexName})
                     </span>
-                    <span className="text-[10px] font-mono text-slate-500">
+                    <span className="text-[10px] font-mono text-slate-500 tabular-nums">
                       ({pointSample.lat.toFixed(5)}, {pointSample.lng.toFixed(5)})
                     </span>
                   </div>
@@ -3025,18 +3026,19 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
               <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
                 <div className="text-right text-[10px]">
-                  <span className="text-slate-400 block">Biomassa Est.</span>
-                  <strong className="text-slate-800 dark:text-zinc-200">{pointSample.biomass}</strong>
+                  <span className="text-slate-500 dark:text-zinc-400 block">Biomassa Est.</span>
+                  <strong className="text-slate-800 dark:text-zinc-200 tabular-nums">{pointSample.biomass}</strong>
                 </div>
                 <div className="text-right text-[10px]">
-                  <span className="text-slate-400 block">Clorofila</span>
-                  <strong className="text-slate-800 dark:text-zinc-200">{pointSample.chlorophyll}</strong>
+                  <span className="text-slate-500 dark:text-zinc-400 block">Clorofila</span>
+                  <strong className="text-slate-800 dark:text-zinc-200 tabular-nums">{pointSample.chlorophyll}</strong>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setPointSample(null)}
-                  className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
                 >
-                  ✕
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
@@ -3044,48 +3046,53 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
         </div>
 
         {/* Sidebar GIS Controller & Inspector */}
-        <div className="lg:col-span-4 flex flex-col space-y-4">
+        <div className="lg:col-span-4 flex flex-col space-y-3">
           {/* Section Tab bar selector */}
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 p-1.5 rounded-2xl flex items-center gap-1 shadow-2xs">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 p-1 rounded-xl flex items-center gap-0.5">
             <button
+              type="button"
               onClick={() => { setActiveTab('list'); setIsDrawing(false); }}
-              className={`flex-1 text-center py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
-                activeTab === 'list' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 dark:text-zinc-400 dark:hover:bg-zinc-800/50'
+              className={`flex-1 text-center h-8 text-[11px] font-medium rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'list' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
               }`}
             >
               Talhões
             </button>
             <button
+              type="button"
               onClick={() => { setActiveTab('draw'); setIsDrawing(false); }}
-              className={`flex-1 text-center py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
-                activeTab === 'draw' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 dark:text-zinc-400 dark:hover:bg-zinc-800/50'
+              className={`flex-1 text-center h-8 text-[11px] font-medium rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'draw' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
               }`}
             >
               Delimitar
             </button>
             <button
+              type="button"
               onClick={() => { setActiveTab('layers'); setIsDrawing(false); }}
-              className={`flex-1 text-center py-2 text-xs font-bold rounded-xl transition cursor-pointer flex items-center justify-center gap-1 ${
-                activeTab === 'layers' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 dark:text-zinc-400 dark:hover:bg-zinc-800/50'
+              className={`flex-1 text-center h-8 text-[11px] font-medium rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1 ${
+                activeTab === 'layers' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
               }`}
-              title="Gerenciador Multicamadas (Drag & Drop)"
+              title="Gerenciador Multicamadas"
             >
-              <Layers className="w-3.5 h-3.5" />
+              <Layers className="w-3 h-3" />
               <span>Camadas</span>
             </button>
             <button
+              type="button"
               onClick={() => { setActiveTab('ndvi'); setIsDrawing(false); }}
-              className={`flex-1 text-center py-2 text-xs font-bold rounded-xl transition cursor-pointer flex items-center justify-center gap-1 ${
-                activeTab === 'ndvi' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 dark:text-zinc-400 dark:hover:bg-zinc-800/50'
+              className={`flex-1 text-center h-8 text-[11px] font-medium rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1 ${
+                activeTab === 'ndvi' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
               }`}
             >
-              <Leaf className="w-3.5 h-3.5" />
-              <span>NDVI & Raster</span>
+              <Leaf className="w-3 h-3" />
+              <span>NDVI</span>
             </button>
             <button
+              type="button"
               onClick={() => { setActiveTab('pois'); setIsDrawing(false); }}
-              className={`flex-1 text-center py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
-                activeTab === 'pois' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 dark:text-zinc-400 dark:hover:bg-zinc-800/50'
+              className={`flex-1 text-center h-8 text-[11px] font-medium rounded-lg transition-colors cursor-pointer ${
+                activeTab === 'pois' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
               }`}
             >
               POIs
@@ -3094,97 +3101,145 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
           {/* TAB 1: PLOT LIST & DETAILED INSPECTOR */}
           {activeTab === 'list' && (
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm space-y-4 flex-1">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
-                <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <Boxes className="w-4 h-4 text-emerald-600" />
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-4 space-y-3.5 flex-1">
+              <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-zinc-800">
+                <h4 className="font-semibold text-xs text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <Boxes className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   Talhões da Propriedade
                 </h4>
-                <span className="text-xs bg-slate-100 dark:bg-zinc-800 px-2 py-0.5 rounded font-bold">
-                  {plots.length} Unidades
+                <span className="text-[10px] bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 px-1.5 py-0.5 rounded-md font-semibold tabular-nums">
+                  {plots.length} unid.
                 </span>
               </div>
 
               {/* Scrollable Plots list */}
-              <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                {plots.map(plot => {
-                  const isSelected = selectedPlot.id === plot.id;
-                  const hasQuarantine = lots.some(l => (l.plotId === plot.id || l.plotCode === plot.code) && l.isUnderActiveQuarantine);
+              <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+                {plots.length === 0 ? (
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 py-6 text-center">
+                    Nenhum talhão delimitado. Use a aba &ldquo;Delimitar&rdquo; para desenhar o primeiro polígono no mapa.
+                  </p>
+                ) : (
+                  plots.map(plot => {
+                    const isSelected = selectedPlot?.id === plot.id;
+                    const hasQuarantine = lots.some(l => (l.plotId === plot.id || l.plotCode === plot.code) && l.isUnderActiveQuarantine);
 
-                  return (
-                    <div
-                      key={plot.id}
-                      onClick={() => setSelectedPlot(plot)}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer text-xs flex items-center justify-between ${
-                        isSelected
-                          ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-900 dark:text-emerald-200'
-                          : 'bg-slate-50 dark:bg-zinc-800/40 border-slate-200 dark:border-zinc-800 hover:border-slate-300'
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono font-bold">{plot.code}</span>
-                          <span className="text-[10px] text-slate-400 font-medium capitalize">{(plot.structureType || 'campo_aberto').replace('_', ' ')}</span>
+                    return (
+                      <div
+                        key={plot.id}
+                        onClick={() => setSelectedPlot(plot)}
+                        className={`p-2.5 rounded-lg border transition-colors cursor-pointer text-xs flex items-center justify-between gap-2 ${
+                          isSelected
+                            ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-500 text-emerald-950 dark:text-emerald-200'
+                            : 'bg-slate-50/70 dark:bg-zinc-950/60 border-slate-200/70 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700'
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono font-semibold text-slate-900 dark:text-zinc-100">{plot.code}</span>
+                            <span className="text-[10px] text-slate-400 capitalize truncate">{(plot.structureType || 'campo_aberto').replace('_', ' ')}</span>
+                          </div>
+                          <p className="font-medium text-slate-800 dark:text-zinc-200 mt-0.5 truncate">{plot.name}</p>
+                          <p className="text-[10px] text-slate-500 dark:text-zinc-400 mt-0.5 truncate">{plot.currentCrop ? `${plot.currentCrop} (${plot.currentCultivar})` : 'Sem plantio'}</p>
                         </div>
-                        <p className="font-bold text-slate-800 dark:text-zinc-200 mt-0.5">{plot.name}</p>
-                        <p className="text-[10px] text-slate-500 mt-0.5">{plot.currentCrop ? `${plot.currentCrop} (${plot.currentCultivar})` : 'Sem plantio'}</p>
-                      </div>
 
-                      <div className="text-right flex flex-col items-end gap-1.5 shrink-0">
-                        <div className="flex items-center gap-1">
-                          <span className="font-bold bg-white dark:bg-zinc-900 px-1.5 py-0.5 rounded border border-slate-200 dark:border-zinc-800">
-                            {plot.areaHa} ha
-                          </span>
-                          <button
-                            type="button"
-                            onClick={(e) => handleOpenEditPlot(plot, e)}
-                            className="p-1 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-zinc-800 rounded transition cursor-pointer"
-                            title="Editar Talhão"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => handleDeletePlot(plot, e)}
-                            className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-zinc-800 rounded transition cursor-pointer"
-                            title="Excluir Talhão"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                        <div className="text-right flex flex-col items-end gap-1 shrink-0">
+                          <div className="flex items-center gap-1">
+                            <span className="font-semibold text-[11px] bg-white dark:bg-zinc-900 px-1.5 py-0.5 rounded-md border border-slate-200/80 dark:border-zinc-800 tabular-nums">
+                              {plot.areaHa} ha
+                            </span>
+                            {confirmingDeletePlotId === plot.id ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleDeletePlot(plot, e)}
+                                  className="px-1.5 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-semibold cursor-pointer"
+                                >
+                                  Excluir
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setConfirmingDeletePlotId(null); }}
+                                  className="px-1.5 py-0.5 rounded-md border border-slate-200 dark:border-zinc-700 text-[10px] text-slate-600 dark:text-zinc-300 cursor-pointer"
+                                >
+                                  Não
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleOpenEditPlot(plot, e)}
+                                  className="p-1 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-zinc-800 rounded-md transition-colors cursor-pointer"
+                                  title="Editar Talhão"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setConfirmingDeletePlotId(plot.id); }}
+                                  className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-zinc-800 rounded-md transition-colors cursor-pointer"
+                                  title="Excluir Talhão"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                          {hasQuarantine && (
+                            <span className="text-[9px] font-semibold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/50 border border-rose-200/80 dark:border-rose-800/60 px-1.5 py-0.5 rounded-md uppercase">Carência</span>
+                          )}
                         </div>
-                        {hasQuarantine && (
-                          <span className="text-[9px] font-bold text-rose-600 bg-rose-100 px-1 rounded uppercase">Carência</span>
-                        )}
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
 
               {/* Inspector for selected plot */}
               {selectedPlot && (
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-200 dark:border-zinc-800 space-y-3 mt-2 animate-fade-in">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-200/50 dark:border-zinc-800 flex-wrap gap-2">
-                    <span className="font-black text-xs text-emerald-800 dark:text-emerald-300">INSPECIONAR: {selectedPlot.code}</span>
+                <div className="p-3.5 rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200/60 dark:border-zinc-800 flex-wrap gap-1.5">
+                    <span className="font-semibold text-xs text-emerald-700 dark:text-emerald-300 font-mono">
+                      {selectedPlot.code}
+                    </span>
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={(e) => handleOpenEditPlot(selectedPlot, e)}
-                        className="text-[10px] text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 font-bold flex items-center gap-1 cursor-pointer bg-emerald-100/70 dark:bg-emerald-950/60 px-2 py-1 rounded-lg border border-emerald-200/80 dark:border-emerald-800/80 transition"
+                        className="text-[10px] text-emerald-700 dark:text-emerald-300 font-medium flex items-center gap-1 cursor-pointer bg-emerald-50 dark:bg-emerald-950/50 px-2 py-1 rounded-md border border-emerald-200/80 dark:border-emerald-800/60 transition-colors"
                         title="Editar Dados do Talhão"
                       >
-                        <Pencil className="w-3 h-3 text-emerald-600" />
+                        <Pencil className="w-3 h-3" />
                         <span>Editar</span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={(e) => handleDeletePlot(selectedPlot, e)}
-                        className="text-[10px] text-rose-700 dark:text-rose-300 hover:text-rose-900 font-bold flex items-center gap-1 cursor-pointer bg-rose-100/70 dark:bg-rose-950/60 px-2 py-1 rounded-lg border border-rose-200/80 dark:border-rose-800/80 transition"
-                        title="Excluir Talhão"
-                      >
-                        <Trash2 className="w-3 h-3 text-rose-600" />
-                        <span>Excluir</span>
-                      </button>
+                      {confirmingDeletePlotId === selectedPlot.id ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeletePlot(selectedPlot, e)}
+                            className="text-[10px] text-white font-medium px-2 py-1 rounded-md bg-rose-600 hover:bg-rose-700 cursor-pointer"
+                          >
+                            Confirmar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmingDeletePlotId(null)}
+                            className="text-[10px] text-slate-600 dark:text-zinc-300 px-2 py-1 rounded-md border border-slate-200 dark:border-zinc-700 cursor-pointer"
+                          >
+                            Cancelar
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmingDeletePlotId(selectedPlot.id)}
+                          className="text-[10px] text-rose-700 dark:text-rose-300 font-medium flex items-center gap-1 cursor-pointer bg-rose-50 dark:bg-rose-950/50 px-2 py-1 rounded-md border border-rose-200/80 dark:border-rose-800/60 transition-colors"
+                          title="Excluir Talhão"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Excluir</span>
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => {
@@ -3265,23 +3320,23 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
           {/* TAB 2: DELIMITATION & LEAFLET.DRAW WORKBENCH */}
           {activeTab === 'draw' && (
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm space-y-4 flex-1">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
-                <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <Tag className="w-4 h-4 text-amber-500" />
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-4 space-y-3.5 flex-1">
+              <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-zinc-800">
+                <h4 className="font-semibold text-xs text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <Tag className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   Delimitação SIG & Leaflet.Draw
                 </h4>
-                <span className="text-xs text-amber-600 font-bold bg-amber-50 dark:bg-amber-950 px-2 py-0.5 rounded">
-                  {drawVertices.length} Vértices
+                <span className="text-[10px] text-amber-700 dark:text-amber-300 font-semibold bg-amber-50 dark:bg-amber-950/50 border border-amber-200/80 dark:border-amber-800/60 px-1.5 py-0.5 rounded-md tabular-nums">
+                  {drawVertices.length} vértices
                 </span>
               </div>
 
               {/* Target Plot Selection */}
               <div className="space-y-1.5 text-xs">
                 <div className="flex items-center justify-between">
-                  <label className="font-semibold text-slate-700 dark:text-zinc-300">Selecionar Talhão Alvo:</label>
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
-                    {plots.length} talhão(ões) disponível(is)
+                  <label className="text-[11px] font-medium text-slate-600 dark:text-zinc-400">Talhão Alvo</label>
+                  <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium tabular-nums">
+                    {plots.length} disponível(is)
                   </span>
                 </div>
                 <select
@@ -3289,9 +3344,7 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                   onChange={e => {
                     const id = e.target.value;
                     setSelectedPlotToDelimit(id);
-                    if (id === '__new_plot__') {
-                      return;
-                    }
+                    if (id === '__new_plot__') return;
                     const plot = plots.find(p => p.id === id);
                     if (plot && plot.croquiData) {
                       try { setDrawVertices(JSON.parse(plot.croquiData)); } catch { setDrawVertices([]); }
@@ -3299,7 +3352,7 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                       setDrawVertices([]);
                     }
                   }}
-                  className="w-full p-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl font-medium text-slate-800 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500"
+                  className="w-full h-9 px-3 bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-700 rounded-lg text-xs font-medium text-slate-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
                 >
                   {plots.length === 0 ? (
                     <option value="__new_plot__">+ Criar Novo Talhão com este Polígono</option>
@@ -3316,13 +3369,13 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                 </select>
 
                 {selectedPlotToDelimit === '__new_plot__' && (
-                  <div className="pt-1 animate-fadeIn">
+                  <div className="pt-1">
                     <input
                       type="text"
                       placeholder={`Nome do novo talhão (ex: Talhão 0${plots.length + 1})`}
                       value={newPlotCustomName}
                       onChange={e => setNewPlotCustomName(e.target.value)}
-                      className="w-full p-2.5 bg-white dark:bg-zinc-900 border border-emerald-400 dark:border-emerald-700 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 text-slate-800 dark:text-zinc-100 placeholder:text-slate-400"
+                      className="w-full h-9 px-3 bg-white dark:bg-zinc-950 border border-emerald-400 dark:border-emerald-700 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 text-slate-800 dark:text-zinc-100 placeholder:text-slate-400"
                     />
                   </div>
                 )}
@@ -3330,80 +3383,77 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
               {/* Interactive Delimitation controls */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   {!isDrawing ? (
                     <button
                       type="button"
                       onClick={() => setIsDrawing(true)}
-                      className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                      className="flex-1 h-9 bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <Plus className="w-4 h-4" /> Iniciar Desenho Livre
+                      <Plus className="w-3.5 h-3.5" /> Iniciar Desenho Livre
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={() => setIsDrawing(false)}
-                      className="flex-1 py-2.5 bg-slate-600 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
+                      className="flex-1 h-9 bg-zinc-700 hover:bg-zinc-800 text-white font-medium text-xs rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <Eye className="w-4 h-4" /> Pausar Desenho
+                      <Eye className="w-3.5 h-3.5" /> Pausar Desenho
                     </button>
                   )}
 
                   <button
                     type="button"
                     onClick={() => { setDrawVertices([]); }}
-                    className="p-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-600 dark:text-zinc-400 rounded-xl transition cursor-pointer"
+                    className="h-9 w-9 border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 rounded-lg transition-colors flex items-center justify-center cursor-pointer"
                     title="Limpar Vértices"
                   >
-                    <Trash2 className="w-4.5 h-4.5 text-rose-500" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
-                <div className="text-[10px] text-slate-500 dark:text-zinc-400 bg-slate-50 dark:bg-zinc-800/40 p-2.5 rounded-xl border border-slate-200/60 dark:border-zinc-800 leading-relaxed">
-                  💡 <strong>Dica:</strong> Você também pode usar a barra <strong>Leaflet.Draw</strong> no topo esquerdo do mapa para desenhar polígonos ou retângulos e editar vértices livremente!
+                <div className="text-[11px] text-slate-500 dark:text-zinc-400 bg-slate-50/70 dark:bg-zinc-950/60 p-2.5 rounded-lg border border-slate-200/70 dark:border-zinc-800 leading-relaxed">
+                  <strong>Dica:</strong> Utilize também a barra <strong>Leaflet.Draw</strong> no canto superior esquerdo do mapa para desenhar polígonos ou editar vértices.
                 </div>
 
                 {drawVertices.length > 0 && (
-                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl text-xs space-y-1.5">
+                  <div className="p-2.5 bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 rounded-lg text-xs space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-700 dark:text-zinc-300">Área Calculada:</span>
-                      <strong className="text-sm text-amber-700 dark:text-amber-300">{drawArea} hectares (ha)</strong>
+                      <span className="font-medium text-slate-700 dark:text-zinc-300">Área Calculada</span>
+                      <strong className="text-sm text-amber-700 dark:text-amber-300 tabular-nums">{drawArea} ha</strong>
                     </div>
-                    <p className="text-[10px] text-slate-500 leading-none">Vértices demarcados: <strong>{drawVertices.length} pontos</strong></p>
+                    <p className="text-[10px] text-slate-500 tabular-nums">Vértices demarcados: <strong>{drawVertices.length} pontos</strong></p>
                   </div>
                 )}
               </div>
 
-              {/* Import/Paste and vertex manager list */}
-              <div className="space-y-3 pt-3 border-t border-slate-200/50 dark:border-zinc-800 text-xs">
-                {/* Save vertices back to selected plot */}
+              {/* Save & Import/Export */}
+              <div className="space-y-3 pt-2.5 border-t border-slate-100 dark:border-zinc-800 text-xs">
                 <button
                   type="button"
                   onClick={handleSaveDelimitation}
                   disabled={drawVertices.length < 3}
-                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                  className="w-full h-9 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Save className="w-4 h-4" />
+                  <Save className="w-3.5 h-3.5" />
                   {selectedPlotToDelimit === '__new_plot__' || plots.length === 0
                     ? (drawArea > 0 ? `Criar Novo Talhão (${drawArea} ha)` : 'Criar Novo Talhão')
-                    : (drawArea > 0 ? `Salvar Polígono no Talhão (${drawArea} ha)` : 'Salvar Polígono no Talhão')}
+                    : (drawArea > 0 ? `Salvar Polígono (${drawArea} ha)` : 'Salvar Polígono')}
                 </button>
 
-                {/* Import paste coordination segment */}
                 <div className="space-y-2">
-                  <label className="font-bold text-slate-700 dark:text-zinc-400 block uppercase text-[10px]">Importar Coordenadas ou Arquivo GeoJSON:</label>
+                  <label className="font-semibold text-slate-600 dark:text-zinc-400 block uppercase text-[10px]">Importar Coordenadas ou GeoJSON</label>
                   
-                  {/* File Upload for GeoJSON */}
-                  <div className="border border-dashed border-slate-300 dark:border-zinc-700 p-2 rounded-xl bg-slate-50 dark:bg-zinc-800/20 text-center relative hover:bg-slate-100 dark:hover:bg-zinc-800 transition">
+                  <div className="border border-dashed border-slate-300 dark:border-zinc-700 p-2.5 rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 text-center relative hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors">
                     <input
                       type="file"
                       accept=".json,.geojson"
                       onChange={handleImportGeoJSONFile}
                       className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                     />
-                    <div className="flex flex-col items-center justify-center gap-0.5">
-                      <Upload className="w-4 h-4 text-emerald-500 animate-bounce" />
-                      <span className="text-[10px] text-slate-500 dark:text-zinc-400 font-bold">Importar arquivo .GeoJSON / .JSON</span>
+                    <div className="flex items-center justify-center gap-1.5">
+                      <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="text-[11px] text-slate-600 dark:text-zinc-300 font-medium">Importar .GeoJSON / .JSON</span>
                     </div>
                   </div>
 
@@ -3411,36 +3461,36 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                     rows={2}
                     value={coordPasteText}
                     onChange={e => setCoordPasteText(e.target.value)}
-                    placeholder="Ou cole os pontos aqui:&#10;-22.3712, -46.9419&#10;-22.3718, -46.9424"
-                    className="w-full p-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-[10px] font-mono outline-none focus:ring-1 focus:ring-amber-500"
+                    placeholder="Ou cole coordenadas (lat, lng por linha):&#10;-22.3712, -46.9419"
+                    className="w-full p-2 bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-700 rounded-lg text-[10px] font-mono outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
                   />
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={handleImportCoordinates}
-                      className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                      className="flex-1 h-8 border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 rounded-lg text-[10px] font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer"
                     >
-                      <Upload className="w-3.5 h-3.5 text-blue-500" /> Carregar Texto
+                      <Upload className="w-3 h-3 text-sky-600" /> Carregar
                     </button>
                     <button
                       type="button"
                       onClick={handleExportGeoJSON}
                       disabled={drawVertices.length === 0}
-                      className="flex-1 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 disabled:opacity-40 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                      className="flex-1 h-8 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 disabled:opacity-40 rounded-lg text-[10px] font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer"
                     >
-                      <Download className="w-3.5 h-3.5 text-emerald-600" /> GeoJSON
+                      <Download className="w-3 h-3" /> GeoJSON
                     </button>
                     <button
                       type="button"
                       onClick={handleExportDrawnKML}
                       disabled={drawVertices.length === 0}
-                      className="flex-1 py-1.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 disabled:opacity-40 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                      className="flex-1 h-8 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 text-amber-800 dark:text-amber-300 disabled:opacity-40 rounded-lg text-[10px] font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer"
                     >
-                      <Download className="w-3.5 h-3.5 text-amber-600" /> KML Drones
+                      <Download className="w-3 h-3" /> KML
                     </button>
                   </div>
-                  {importStatus === 'success' && <p className="text-[10px] text-emerald-600 font-bold">✓ Coordenadas carregadas com sucesso!</p>}
-                  {importStatus === 'error' && <p className="text-[10px] text-rose-500 font-bold">✗ Erro ao extrair coordenadas válidas. Verifique o formato.</p>}
+                  {importStatus === 'success' && <p className="text-[10px] text-emerald-600 font-medium">Coordenadas carregadas com sucesso.</p>}
+                  {importStatus === 'error' && <p className="text-[10px] text-rose-600 font-medium">Erro ao extrair coordenadas válidas. Verifique o formato.</p>}
                 </div>
               </div>
             </div>
@@ -3448,70 +3498,73 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
           {/* TAB 3: NDVI & VEGETATION INDEX CONTROLLER */}
           {activeTab === 'ndvi' && (
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm space-y-4 flex-1">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
-                <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <Leaf className="w-4 h-4 text-emerald-500" />
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-4 space-y-3.5 flex-1">
+              <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-zinc-800">
+                <h4 className="font-semibold text-xs text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <Leaf className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   Painel de Sensoriamento NDVI
                 </h4>
                 <button
+                  type="button"
                   onClick={() => setShowNdvi(!showNdvi)}
-                  className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition cursor-pointer ${
-                    showNdvi ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-zinc-800 text-slate-600'
+                  className={`px-2 py-0.5 text-[10px] font-semibold rounded-md transition-colors cursor-pointer ${
+                    showNdvi
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400'
                   }`}
                 >
-                  {showNdvi ? 'Camada Ativa' : 'Desativada'}
+                  {showNdvi ? 'Ativa' : 'Inativa'}
                 </button>
               </div>
 
               {/* Recalculate Index Action Banner */}
-              <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 p-3 rounded-2xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
-                    <Calculator className="w-4 h-4 text-emerald-600" />
-                    Cálculo de Índices Espectrais
+              <div className="bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/60 p-3 rounded-lg space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                    <Calculator className="w-3.5 h-3.5 text-emerald-600" />
+                    Índices Espectrais
                   </span>
                   <button
+                    type="button"
                     onClick={handleCalculateIndex}
                     disabled={isCalculatingIndex}
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-[10px] rounded-xl transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                    className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-medium text-[11px] rounded-md transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap"
                   >
-                    <Zap className={`w-3.5 h-3.5 ${isCalculatingIndex ? 'animate-spin' : ''}`} />
-                    <span>{isCalculatingIndex ? 'Processando...' : 'Calcular / Atualizar'}</span>
+                    <Zap className={`w-3 h-3 ${isCalculatingIndex ? 'animate-spin' : ''}`} />
+                    <span>{isCalculatingIndex ? 'Processando...' : 'Recalcular'}</span>
                   </button>
                 </div>
                 {calculationFeedback && (
-                  <p className="text-[10px] text-emerald-700 dark:text-emerald-300 font-bold animate-fade-in">
-                    ✓ {calculationFeedback}
+                  <p className="text-[10px] text-emerald-700 dark:text-emerald-300 font-medium">
+                    {calculationFeedback}
                   </p>
                 )}
               </div>
 
-              {/* Vegetation Index Selection Dropdown Menu */}
+              {/* Vegetation Index Selection */}
               <div className="space-y-2 text-xs">
                 <div className="flex items-center justify-between">
-                  <label className="font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-                    <BarChart3 className="w-4 h-4 text-emerald-600" />
-                    Seletor de Índice de Vegetação:
+                  <label className="text-[11px] font-medium text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
+                    <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
+                    Índice de Vegetação
                   </label>
                   <button
                     type="button"
                     onClick={() => setShowIndexGuideModal(true)}
-                    className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100/80 dark:bg-emerald-950/80 hover:bg-emerald-200 dark:hover:bg-emerald-900 border border-emerald-300/60 dark:border-emerald-800 px-2 py-0.5 rounded-lg transition flex items-center gap-1 cursor-pointer"
+                    className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200/80 dark:border-emerald-800/60 px-2 py-0.5 rounded-md transition-colors flex items-center gap-1 cursor-pointer"
                   >
-                    <BookOpen className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                    <span>Guia de Índices (15)</span>
+                    <BookOpen className="w-3 h-3" />
+                    <span>Guia (15)</span>
                   </button>
                 </div>
 
-                {/* Categorized Dropdown Select Input */}
                 <div className="relative">
                   <select
                     value={ndviIndexType}
                     onChange={e => setNdviIndexType(e.target.value as any)}
-                    className="w-full p-3 bg-slate-50 dark:bg-zinc-800/80 border-2 border-slate-200 dark:border-zinc-700/80 focus:border-emerald-500 dark:focus:border-emerald-500 rounded-2xl text-xs font-bold text-slate-800 dark:text-zinc-100 outline-none transition cursor-pointer appearance-none pr-10 shadow-xs"
+                    className="w-full h-9 pl-3 pr-9 bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-700 focus:border-emerald-500 rounded-lg text-xs font-medium text-slate-800 dark:text-zinc-100 outline-none transition-colors cursor-pointer appearance-none"
                   >
-                    <optgroup label="🌱 Multiespectrais (Infravermelho NIR / RedEdge)">
+                    <optgroup label="Multiespectrais (NIR / RedEdge)">
                       <option value="ndvi">NDVI — Vigor Vegetativo Geral — (NIR-RED)/(NIR+RED)</option>
                       <option value="savi">SAVI — Ajuste de Solo (L=0.5) — Fase Inicial</option>
                       <option value="evi">EVI — Canópias Densas — Sem Saturação</option>
@@ -3521,80 +3574,69 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                       <option value="wdrvi">WDRVI — Ampla Faixa Dinâmica — (a*NIR-RED)</option>
                       <option value="cigreen">Clorofila Green — CI Green — Clorofila & N</option>
                     </optgroup>
-                    <optgroup label="💧 Umidade Edáfica & Estresse Hídrico">
+                    <optgroup label="Umidade Edáfica & Estresse Hídrico">
                       <option value="ndwi">NDWI — Teor de Água & Estresse Hídrico</option>
                       <option value="ndsi">NDSI — Umidade Edáfica / Geada</option>
-                      <option value="msavi2">MSAVI2 — Mod. Soil Adjusted Index — Plantio & Solo Exposto</option>
+                      <option value="msavi2">MSAVI2 — Mod. Soil Adjusted Index — Plantio & Solo</option>
                     </optgroup>
-                    <optgroup label="📸 Sensores Visíveis & Drones (RGB)">
+                    <optgroup label="Sensores Visíveis & Drones (RGB)">
                       <option value="rgb">Visível (RGB) — Cor Real Espectro Visível</option>
                       <option value="vari">VARI — Sensor Visível Corrigido</option>
                       <option value="gli">GLI — Índice de Folha Verde (RGB)</option>
                       <option value="tgi">TGI — Clorofila Triangular (RGB)</option>
                     </optgroup>
                   </select>
-                  <ChevronDown className="w-4 h-4 text-slate-500 dark:text-zinc-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
 
-                {/* Active Selected Index Quick Specs Card */}
+                {/* Active Selected Index Specs */}
                 {(() => {
                   const current = VEGETATION_INDEX_DETAILS[ndviIndexType] || VEGETATION_INDEX_DETAILS['ndvi'];
 
                   return (
-                    <div className="p-3.5 bg-gradient-to-br from-emerald-50/90 to-teal-50/60 dark:from-emerald-950/50 dark:to-teal-950/30 border border-emerald-200 dark:border-emerald-800/80 rounded-2xl space-y-2 animate-fade-in shadow-2xs">
-                      <div className="flex items-center justify-between gap-2 border-b border-emerald-200/60 dark:border-emerald-800/60 pb-2">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="text-xs">{current.categoryIcon}</span>
-                          <span className="font-black text-emerald-950 dark:text-emerald-100 text-xs truncate">
-                            {current.label}
-                          </span>
-                        </div>
-                        <span className="font-mono text-[9px] bg-emerald-200/90 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-100 px-2 py-0.5 rounded-md font-black shrink-0 border border-emerald-300/50 dark:border-emerald-700">
+                    <div className="p-3 bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800 rounded-lg space-y-2">
+                      <div className="flex items-center justify-between gap-2 border-b border-slate-200/60 dark:border-zinc-800 pb-1.5">
+                        <span className="font-semibold text-slate-900 dark:text-zinc-100 text-xs truncate">
+                          {current.label}
+                        </span>
+                        <span className="font-mono text-[9px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-md font-semibold shrink-0 border border-emerald-200/80 dark:border-emerald-800/60">
                           {current.formula}
                         </span>
                       </div>
 
-                      {/* Breve Explicação */}
-                      <div>
-                        <span className="text-[9px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block mb-0.5">
-                          Breve Explicação:
-                        </span>
-                        <p className="text-[11px] text-slate-700 dark:text-zinc-200 font-medium leading-snug">
-                          {current.desc}
-                        </p>
-                      </div>
+                      <p className="text-[11px] text-slate-600 dark:text-zinc-300 leading-snug">
+                        {current.desc}
+                      </p>
 
-                      {/* O Que Mede & Aplicação */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5 text-[10px]">
-                        <div className="bg-white/80 dark:bg-zinc-900/80 p-2 rounded-xl border border-emerald-100 dark:border-zinc-800">
-                          <span className="font-black text-emerald-800 dark:text-emerald-300 block uppercase text-[8px]">
-                            🔍 O Que Mede na Planta:
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
+                        <div className="bg-white dark:bg-zinc-900 p-2 rounded-lg border border-slate-200/70 dark:border-zinc-800">
+                          <span className="font-semibold text-emerald-700 dark:text-emerald-400 block uppercase text-[9px]">
+                            O Que Mede
                           </span>
-                          <span className="text-slate-600 dark:text-zinc-300 leading-tight block mt-0.5 font-medium">
+                          <span className="text-slate-600 dark:text-zinc-300 leading-tight block mt-0.5">
                             {current.whatItMeasures}
                           </span>
                         </div>
-                        <div className="bg-white/80 dark:bg-zinc-900/80 p-2 rounded-xl border border-emerald-100 dark:border-zinc-800">
-                          <span className="font-black text-emerald-800 dark:text-emerald-300 block uppercase text-[8px]">
-                            🎯 Aplicação Ideal em Campo:
+                        <div className="bg-white dark:bg-zinc-900 p-2 rounded-lg border border-slate-200/70 dark:border-zinc-800">
+                          <span className="font-semibold text-emerald-700 dark:text-emerald-400 block uppercase text-[9px]">
+                            Aplicação em Campo
                           </span>
-                          <span className="text-slate-600 dark:text-zinc-300 leading-tight block mt-0.5 font-medium">
+                          <span className="text-slate-600 dark:text-zinc-300 leading-tight block mt-0.5">
                             {current.bestUse}
                           </span>
                         </div>
                       </div>
 
-                      {/* Faixa Típica */}
-                      <div className="flex items-center justify-between text-[10px] bg-emerald-100/50 dark:bg-emerald-900/40 p-2 rounded-xl border border-emerald-200/50 dark:border-emerald-800/50">
-                        <span className="text-slate-600 dark:text-zinc-300 font-medium">
-                          <strong>Faixa de Valores:</strong> {current.typicalRange}
+                      <div className="flex items-center justify-between text-[10px] pt-1 border-t border-slate-200/60 dark:border-zinc-800">
+                        <span className="text-slate-600 dark:text-zinc-300 tabular-nums">
+                          <strong>Faixa:</strong> {current.typicalRange}
                         </span>
                         <button
                           type="button"
                           onClick={() => setShowIndexGuideModal(true)}
-                          className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 underline hover:text-emerald-900 shrink-0 cursor-pointer ml-2"
+                          className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 hover:underline shrink-0 cursor-pointer ml-2"
                         >
-                          Guia Completo (15) →
+                          Guia (15) &rarr;
                         </button>
                       </div>
                     </div>
@@ -3602,19 +3644,18 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                 })()}
               </div>
 
-              {/* Opacity Control Interface with Quick Preset Buttons */}
-              <div className="space-y-2 text-xs pt-1 p-3 bg-slate-50 dark:bg-zinc-800/40 rounded-2xl border border-slate-200 dark:border-zinc-800">
+              {/* Opacity Control */}
+              <div className="space-y-2 text-xs p-3 bg-slate-50/70 dark:bg-zinc-950/60 rounded-lg border border-slate-200/70 dark:border-zinc-800">
                 <div className="flex items-center justify-between text-slate-700 dark:text-zinc-300">
-                  <span className="flex items-center gap-1 font-bold">
-                    <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-500" />
-                    Controle de Opacidade da Camada Raster:
+                  <span className="flex items-center gap-1.5 font-medium text-[11px]">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-600" />
+                    Opacidade da Camada Raster
                   </span>
-                  <span className="font-mono font-bold bg-white dark:bg-zinc-900 px-2 py-0.5 rounded border border-slate-200 dark:border-zinc-700 text-emerald-600">
+                  <span className="font-mono font-semibold text-[11px] text-emerald-700 dark:text-emerald-400 tabular-nums">
                     {Math.round(ndviOpacity * 100)}%
                   </span>
                 </div>
                 
-                {/* Continuous Slider */}
                 <input
                   type="range"
                   min="0.1"
@@ -3622,19 +3663,19 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                   step="0.05"
                   value={ndviOpacity}
                   onChange={e => setNdviOpacity(parseFloat(e.target.value))}
-                  className="w-full accent-emerald-600 cursor-pointer h-2"
+                  className="w-full accent-emerald-600 cursor-pointer h-1.5"
                 />
 
-                {/* Preset Quick Buttons */}
-                <div className="flex items-center gap-1 pt-1">
+                <div className="flex items-center gap-1">
                   {[0.25, 0.5, 0.75, 1.0].map(val => (
                     <button
                       key={val}
+                      type="button"
                       onClick={() => setNdviOpacity(val)}
-                      className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer border ${
+                      className={`flex-1 py-1 rounded-md text-[10px] font-medium transition-colors cursor-pointer border tabular-nums ${
                         ndviOpacity === val
-                          ? 'bg-emerald-600 text-white border-emerald-500'
-                          : 'bg-white dark:bg-zinc-900 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700 hover:bg-slate-100'
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-white dark:bg-zinc-900 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800'
                       }`}
                     >
                       {Math.round(val * 100)}%
@@ -3643,47 +3684,47 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                 </div>
               </div>
 
-              {/* Import Custom Raster / Drone / GeoTIFF Image */}
-              <div className="space-y-2 text-xs p-3.5 bg-blue-50/50 dark:bg-blue-950/20 rounded-2xl border border-blue-200/80 dark:border-blue-900/50">
+              {/* Import Custom Raster */}
+              <div className="space-y-2 text-xs p-3 bg-sky-50/50 dark:bg-sky-950/20 rounded-lg border border-sky-200/70 dark:border-sky-900/50">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
-                    <FileImage className="w-4 h-4 text-blue-500" />
-                    Importar Imagem NDVI / Ortomosaico Drone
+                  <span className="font-semibold text-[11px] text-sky-900 dark:text-sky-200 flex items-center gap-1.5">
+                    <FileImage className="w-3.5 h-3.5 text-sky-600" />
+                    Importar NDVI / Ortomosaico Drone
                   </span>
-                  <span className="text-[10px] text-blue-600 font-mono font-bold">{selectedPlot?.code}</span>
+                  <span className="text-[10px] text-sky-700 dark:text-sky-400 font-mono font-semibold">{selectedPlot?.code}</span>
                 </div>
                 
                 <p className="text-[10px] text-slate-500 dark:text-zinc-400">
-                  Faça o upload do mapa NDVI gerado pelo seu drone (DJI, Pix4D, DroneDeploy) ou arquivo GeoTIFF/PNG para sobrepor ao polígono:
+                  Carregue mapa NDVI de drone (DJI, Pix4D, DroneDeploy) ou GeoTIFF/PNG para sobrepor ao talhão:
                 </p>
 
-                <div className="border border-dashed border-blue-300 dark:border-blue-800 p-2.5 rounded-xl bg-white dark:bg-zinc-900 text-center relative hover:bg-blue-50 dark:hover:bg-zinc-800 transition">
+                <div className="border border-dashed border-sky-300 dark:border-sky-800 p-2 rounded-lg bg-white dark:bg-zinc-900 text-center relative hover:bg-sky-50 dark:hover:bg-zinc-800 transition-colors">
                   <input
                     type="file"
                     accept=".tif,.tiff,.png,.jpg,.jpeg"
                     onChange={handleImportCustomRaster}
                     className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                   />
-                  <div className="flex flex-col items-center justify-center gap-0.5">
-                    <Upload className="w-4 h-4 text-blue-500 animate-bounce" />
-                    <span className="text-[10px] text-slate-700 dark:text-zinc-300 font-bold">Selecionar Imagem NDVI (.TIF / .PNG / .JPG)</span>
+                  <div className="flex items-center justify-center gap-1.5">
+                    <Upload className="w-3.5 h-3.5 text-sky-600" />
+                    <span className="text-[11px] text-slate-700 dark:text-zinc-300 font-medium">Selecionar Imagem (.TIF / .PNG / .JPG)</span>
                   </div>
                 </div>
 
-                {/* Show Custom Raster if attached */}
-                {customRasters[selectedPlot?.id] && (
-                  <div className="p-2 bg-white dark:bg-zinc-900 rounded-xl border border-blue-200 dark:border-blue-900 flex items-center justify-between text-[10px]">
-                    <div>
-                      <strong className="text-blue-700 dark:text-blue-300 block truncate max-w-[180px]">
+                {selectedPlot && customRasters[selectedPlot.id] && (
+                  <div className="p-2 bg-white dark:bg-zinc-900 rounded-lg border border-sky-200/80 dark:border-sky-900 flex items-center justify-between text-[10px]">
+                    <div className="min-w-0">
+                      <strong className="text-sky-700 dark:text-sky-300 block truncate max-w-[180px]">
                         {customRasters[selectedPlot.id].fileName}
                       </strong>
-                      <span className="text-slate-400">
+                      <span className="text-slate-400 tabular-nums">
                         {customRasters[selectedPlot.id].fileSize} • {customRasters[selectedPlot.id].uploadedAt}
                       </span>
                     </div>
                     <button
+                      type="button"
                       onClick={() => handleRemoveCustomRaster(selectedPlot.id)}
-                      className="p-1 text-rose-500 hover:bg-rose-50 rounded transition cursor-pointer"
+                      className="p-1 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-md transition-colors cursor-pointer"
                       title="Remover Imagem e Voltar ao Satélite"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -3694,76 +3735,75 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
               {/* Satellite Orbital Pass Picker */}
               <div className="space-y-1.5 text-xs">
-                <label className="font-semibold text-slate-700 dark:text-zinc-400 flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-emerald-500" />
-                  Passagem Orbital do Satélite Sentinel-2:
+                <label className="text-[11px] font-medium text-slate-600 dark:text-zinc-400 flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                  Passagem Orbital Sentinel-2
                 </label>
                 <select
                   value={selectedPassId}
                   onChange={e => setSelectedPassId(e.target.value)}
-                  className="w-full p-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-medium"
+                  className="w-full h-9 px-3 bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-700 rounded-lg text-xs font-medium"
                 >
                   {SATELLITE_PASSES.map(p => (
                     <option key={p.id} value={p.id}>{p.label}</option>
                   ))}
                 </select>
-                <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
-                  <span>Cobertura de Nuvens: <strong>{activePass.cloudCover}</strong></span>
+                <div className="flex items-center justify-between text-[10px] text-slate-400 tabular-nums">
+                  <span>Nuvens: <strong>{activePass.cloudCover}</strong></span>
                   <span>Sensor: <strong>{activePass.satellite}</strong></span>
                 </div>
               </div>
 
               {/* Selected Plot NDVI Metrics */}
-              {selectedPlotNdviStats && (
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-800/50 border border-slate-200 dark:border-zinc-800 space-y-3">
-                  <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/60 dark:border-zinc-700">
-                    <span className="font-bold text-xs text-slate-800 dark:text-zinc-200">
-                      Métricas do Talhão: {selectedPlot.code}
+              {selectedPlot && selectedPlotNdviStats && (
+                <div className="p-3 rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800 space-y-2.5">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/60 dark:border-zinc-800">
+                    <span className="font-semibold text-xs text-slate-800 dark:text-zinc-200">
+                      Métricas: {selectedPlot.code}
                     </span>
-                    <span className="text-[10px] font-mono bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded font-bold">
-                      {ndviIndexType.toUpperCase()} Médio: {selectedPlotNdviStats.meanVal}
+                    <span className="text-[10px] font-mono bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 px-1.5 py-0.5 rounded-md font-semibold tabular-nums">
+                      Média {selectedPlotNdviStats.meanVal}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
-                    <div className="p-1.5 bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800">
+                  <div className="grid grid-cols-3 divide-x divide-slate-200/70 dark:divide-zinc-800 bg-white dark:bg-zinc-900 rounded-lg border border-slate-200/70 dark:border-zinc-800 text-center text-[10px]">
+                    <div className="py-1.5 px-1">
                       <span className="text-slate-400 block">Mínimo</span>
-                      <strong className="text-rose-600 text-xs font-mono">{selectedPlotNdviStats.minVal}</strong>
+                      <strong className="text-rose-600 text-xs font-mono tabular-nums">{selectedPlotNdviStats.minVal}</strong>
                     </div>
-                    <div className="p-1.5 bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800">
+                    <div className="py-1.5 px-1">
                       <span className="text-slate-400 block">Médio</span>
-                      <strong className="text-emerald-600 text-xs font-mono">{selectedPlotNdviStats.meanVal}</strong>
+                      <strong className="text-emerald-600 text-xs font-mono tabular-nums">{selectedPlotNdviStats.meanVal}</strong>
                     </div>
-                    <div className="p-1.5 bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800">
+                    <div className="py-1.5 px-1">
                       <span className="text-slate-400 block">Máximo</span>
-                      <strong className="text-emerald-700 text-xs font-mono">{selectedPlotNdviStats.maxVal}</strong>
+                      <strong className="text-emerald-700 text-xs font-mono tabular-nums">{selectedPlotNdviStats.maxVal}</strong>
                     </div>
                   </div>
 
                   {/* Vigor Zones Distribution Bar */}
                   <div className="space-y-1">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase block">Distribuição Zonal de Manejo:</span>
-                    <div className="h-2 w-full flex rounded-full overflow-hidden">
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase block">Distribuição Zonal</span>
+                    <div className="h-2 w-full flex rounded-sm overflow-hidden">
                       <div style={{ width: `${selectedPlotNdviStats.highVigorPct}%` }} className="bg-emerald-600" title={`Alto Vigor: ${selectedPlotNdviStats.highVigorPct}%`} />
                       <div style={{ width: `${selectedPlotNdviStats.moderateVigorPct}%` }} className="bg-amber-500" title={`Vigor Médio: ${selectedPlotNdviStats.moderateVigorPct}%`} />
                       <div style={{ width: `${selectedPlotNdviStats.stressSoilPct}%` }} className="bg-rose-500" title={`Estresse/Solo: ${selectedPlotNdviStats.stressSoilPct}%`} />
                     </div>
-                    <div className="flex justify-between text-[9px] text-slate-500">
-                      <span className="text-emerald-600 font-bold">● Alto: {selectedPlotNdviStats.highVigorPct}%</span>
-                      <span className="text-amber-500 font-bold">● Médio: {selectedPlotNdviStats.moderateVigorPct}%</span>
-                      <span className="text-rose-500 font-bold">● Baixo: {selectedPlotNdviStats.stressSoilPct}%</span>
+                    <div className="flex justify-between text-[10px] tabular-nums">
+                      <span className="text-emerald-700 dark:text-emerald-400 font-medium">Alto: {selectedPlotNdviStats.highVigorPct}%</span>
+                      <span className="text-amber-600 dark:text-amber-400 font-medium">Médio: {selectedPlotNdviStats.moderateVigorPct}%</span>
+                      <span className="text-rose-600 dark:text-rose-400 font-medium">Baixo: {selectedPlotNdviStats.stressSoilPct}%</span>
                     </div>
                   </div>
 
-                  {/* Nema IA Decision Button */}
-                  <div className="pt-2 border-t border-slate-200/60 dark:border-zinc-700">
+                  <div className="pt-2 border-t border-slate-200/60 dark:border-zinc-800">
                     <button
                       type="button"
                       onClick={() => handleRunNdviAiAnalysis()}
-                      className="w-full py-2.5 px-3 bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-700 hover:to-indigo-700 text-white font-bold rounded-xl transition shadow-md flex items-center justify-center gap-2 cursor-pointer text-xs group"
+                      className="w-full h-9 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer text-xs"
                     >
-                      <Sparkles className="w-4 h-4 text-amber-300 animate-pulse group-hover:scale-110 transition-transform" />
-                      <span>Analisar Tomada de Decisão com a Nema</span>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Analisar Decisão com a Nema</span>
                     </button>
                   </div>
                 </div>
@@ -3773,56 +3813,56 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
           {/* TAB 4: POIS MARKERS SYSTEM */}
           {activeTab === 'pois' && (
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-5 shadow-sm space-y-4 flex-1">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
-                <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <PinIcon className="w-4 h-4 text-emerald-500" />
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-4 space-y-3.5 flex-1">
+              <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-zinc-800">
+                <h4 className="font-semibold text-xs text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <PinIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   Marcadores de Interesse (POI)
                 </h4>
-                <span className="text-xs bg-slate-100 dark:bg-zinc-800 px-2 py-0.5 rounded font-bold">
-                  {pois.length} Ativos
+                <span className="text-[10px] bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 px-1.5 py-0.5 rounded-md font-semibold tabular-nums">
+                  {pois.length} ativos
                 </span>
               </div>
 
               {/* Add New POI form */}
-              <div className="p-3 bg-slate-50 dark:bg-zinc-800/40 border border-slate-200 dark:border-zinc-800 rounded-2xl text-xs space-y-2">
-                <span className="font-bold text-[10px] uppercase text-emerald-700 block">Adicionar Marcador Técnico:</span>
+              <div className="p-3 bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800 rounded-lg text-xs space-y-2.5">
+                <span className="font-semibold text-[10px] uppercase text-emerald-700 dark:text-emerald-400 block">Adicionar Marcador Técnico</span>
                 
-                <div className="space-y-1">
-                  <label className="text-slate-500">Nome do Marcador:</label>
+                <div>
+                  <label className="block text-[11px] text-slate-600 dark:text-zinc-400 mb-1">Nome do Marcador</label>
                   <input
                     type="text"
                     value={newPoiName}
                     onChange={e => setNewPoiName(e.target.value)}
                     placeholder="Ex: Poço, Amostra Solo T1"
-                    className="w-full p-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl"
+                    className="w-full h-9 px-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg text-xs"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-slate-500">Tipo de Estrutura:</label>
+                  <div>
+                    <label className="block text-[11px] text-slate-600 dark:text-zinc-400 mb-1">Tipo</label>
                     <select
                       value={newPoiType}
                       onChange={e => setNewPoiType(e.target.value as any)}
-                      className="w-full p-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-[11px]"
+                      className="w-full h-9 px-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg text-[11px]"
                     >
-                      <option value="soil">🧪 Amostra de Solo</option>
-                      <option value="nematode">🪱 Reboleira de Nematoides</option>
-                      <option value="pest">🐛 Foco de Praga</option>
-                      <option value="disease">🍂 Foco de Doença</option>
-                      <option value="well">💧 Poço Artesiano</option>
-                      <option value="water">🌊 Caixa d'Água</option>
-                      <option value="trap">🪰 Armadilha MIP</option>
-                      <option value="station">🌤️ Estação Clima</option>
-                      <option value="gate">🚪 Porteira</option>
-                      <option value="house">🏠 Packing House</option>
+                      <option value="soil">Amostra de Solo</option>
+                      <option value="nematode">Reboleira de Nematoides</option>
+                      <option value="pest">Foco de Praga</option>
+                      <option value="disease">Foco de Doença</option>
+                      <option value="well">Poço Artesiano</option>
+                      <option value="water">Caixa d&apos;Água</option>
+                      <option value="trap">Armadilha MIP</option>
+                      <option value="station">Estação Clima</option>
+                      <option value="gate">Porteira</option>
+                      <option value="house">Packing House</option>
                     </select>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-slate-500">Coordenadas:</label>
-                    <div className="p-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-[10px] font-mono select-all truncate text-slate-700 dark:text-zinc-300">
-                      {newPoiCoords ? `${newPoiCoords.lat.toFixed(4)}, ${newPoiCoords.lng.toFixed(4)}` : "Clique no Mapa"}
+                  <div>
+                    <label className="block text-[11px] text-slate-600 dark:text-zinc-400 mb-1">Coordenadas</label>
+                    <div className="h-9 px-2.5 flex items-center bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg text-[10px] font-mono select-all truncate text-slate-700 dark:text-zinc-300 tabular-nums">
+                      {newPoiCoords ? `${newPoiCoords.lat.toFixed(4)}, ${newPoiCoords.lng.toFixed(4)}` : 'Clique no mapa'}
                     </div>
                   </div>
                 </div>
@@ -3831,7 +3871,7 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                   type="button"
                   onClick={handleAddPOI}
                   disabled={!newPoiName.trim() || !newPoiCoords}
-                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600 text-white font-bold rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
+                  className="w-full h-8 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer"
                 >
                   <Check className="w-3.5 h-3.5" /> Adicionar Marcador
                 </button>
@@ -3839,36 +3879,43 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
               {/* POI List Scrollable */}
               <div className="space-y-1.5 max-h-[170px] overflow-y-auto pr-1">
-                {pois.map(poi => {
-                  const labelMap: Record<CustomPOI['type'], string> = {
-                    soil: 'Amostra de Solo',
-                    nematode: 'Reboleira de Nematoides',
-                    pest: 'Foco de Praga',
-                    disease: 'Foco de Doença',
-                    well: 'Poço Artesiano',
-                    water: 'Reservatório Hídrico',
-                    trap: 'Armadilha MIP',
-                    station: 'Estação Clima',
-                    gate: 'Acesso Principal',
-                    house: 'Sede / Packing',
-                  };
-                  return (
-                    <div key={poi.id} className="p-2.5 bg-slate-50 dark:bg-zinc-800/40 border border-slate-100 dark:border-zinc-800 rounded-xl flex items-center justify-between text-xs">
-                      <div>
-                        <strong className="text-slate-800 dark:text-zinc-200 block">{poi.name}</strong>
-                        <span className="text-[10px] text-slate-400 font-medium block">{labelMap[poi.type]}</span>
-                        <span className="text-[9px] font-mono text-slate-400 block">{poi.lat.toFixed(5)}, {poi.lng.toFixed(5)}</span>
+                {pois.length === 0 ? (
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 py-4 text-center">
+                    Nenhum marcador adicionado.
+                  </p>
+                ) : (
+                  pois.map(poi => {
+                    const labelMap: Record<CustomPOI['type'], string> = {
+                      soil: 'Amostra de Solo',
+                      nematode: 'Reboleira de Nematoides',
+                      pest: 'Foco de Praga',
+                      disease: 'Foco de Doença',
+                      well: 'Poço Artesiano',
+                      water: 'Reservatório Hídrico',
+                      trap: 'Armadilha MIP',
+                      station: 'Estação Clima',
+                      gate: 'Acesso Principal',
+                      house: 'Sede / Packing',
+                    };
+                    return (
+                      <div key={poi.id} className="p-2.5 bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800 rounded-lg flex items-center justify-between gap-2 text-xs">
+                        <div className="min-w-0">
+                          <strong className="font-medium text-slate-800 dark:text-zinc-200 block truncate">{poi.name}</strong>
+                          <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">{labelMap[poi.type]}</span>
+                          <span className="text-[9px] font-mono text-slate-400 block tabular-nums">{poi.lat.toFixed(5)}, {poi.lng.toFixed(5)}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePOI(poi.id)}
+                          className="p-1 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 rounded-md transition-colors shrink-0 cursor-pointer"
+                          title="Excluir marcador"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDeletePOI(poi.id)}
-                        className="p-1 hover:bg-rose-100 dark:hover:bg-rose-950/40 text-rose-600 rounded transition shrink-0 cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </div>
           )}
@@ -3888,26 +3935,33 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
       {/* EDIT PLOT MODAL DIALOG */}
       {editingPlot && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-2xl max-w-md w-full space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
-              <div className="flex items-center gap-2 font-bold text-base text-slate-900 dark:text-white">
-                <Pencil className="w-5 h-5 text-emerald-600" />
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setEditingPlot(null)}
+        >
+          <div
+            className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-5 max-w-md w-full space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200/80 dark:border-zinc-800">
+              <div className="flex items-center gap-2 font-semibold text-sm text-slate-900 dark:text-zinc-100">
+                <Pencil className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <span>Editar Talhão {editingPlot.code}</span>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingPlot(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                aria-label="Fechar modal"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditPlot} className="space-y-3.5 text-xs">
+            <form onSubmit={handleSaveEditPlot} className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">
                     Código do Talhão *
                   </label>
                   <input
@@ -3916,11 +3970,11 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                     value={plotFormData.code}
                     onChange={e => setPlotFormData(p => ({ ...p, code: e.target.value }))}
                     placeholder="Ex: EST-01, TAL-04"
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                    className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 font-medium text-slate-900 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">
                     Área (Hectares) *
                   </label>
                   <input
@@ -3930,13 +3984,13 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                     required
                     value={plotFormData.areaHa}
                     onChange={e => setPlotFormData(p => ({ ...p, areaHa: parseFloat(e.target.value) || 0 }))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                    className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 font-medium tabular-nums text-slate-900 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">
                   Nome / Identificador *
                 </label>
                 <input
@@ -3945,13 +3999,13 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                   value={plotFormData.name}
                   onChange={e => setPlotFormData(p => ({ ...p, name: e.target.value }))}
                   placeholder="Ex: Estufa 01 - Tomate Especial"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                  className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 font-medium text-slate-900 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">
                     Cultura Atual
                   </label>
                   <input
@@ -3959,11 +4013,11 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                     value={plotFormData.currentCrop}
                     onChange={e => setPlotFormData(p => ({ ...p, currentCrop: e.target.value }))}
                     placeholder="Ex: Tomate, Milho, Alface"
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                    className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 text-slate-900 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">
                     Cultivar / Variedade
                   </label>
                   <input
@@ -3971,20 +4025,20 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                     value={plotFormData.currentCultivar}
                     onChange={e => setPlotFormData(p => ({ ...p, currentCultivar: e.target.value }))}
                     placeholder="Ex: Sweet Grape, BRS 1030"
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                    className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 text-slate-900 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">
                     Sistema de Irrigação
                   </label>
                   <select
                     value={plotFormData.irrigationSystem}
                     onChange={e => setPlotFormData(p => ({ ...p, irrigationSystem: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                    className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 text-slate-900 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
                   >
                     <option value="gotejamento">Gotejamento</option>
                     <option value="pivo">Pivô Central</option>
@@ -3993,13 +4047,13 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">
                     Estrutura de Cultivo
                   </label>
                   <select
                     value={plotFormData.structureType}
                     onChange={e => setPlotFormData(p => ({ ...p, structureType: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                    className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 text-slate-900 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
                   >
                     <option value="campo_aberto">Campo Aberto</option>
                     <option value="estufa_plastica">Estufa Plástica</option>
@@ -4010,7 +4064,7 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">
                   Tipo de Solo
                 </label>
                 <input
@@ -4018,23 +4072,23 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                   value={plotFormData.soilType}
                   onChange={e => setPlotFormData(p => ({ ...p, soilType: e.target.value }))}
                   placeholder="Ex: Franco-Argiloso, Latossolo Vermelho"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                  className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 text-slate-900 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
                 />
               </div>
 
-              <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-slate-200/80 dark:border-zinc-800 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setEditingPlot(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 font-bold hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                  className="h-9 px-3.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 font-medium hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  className="h-9 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
-                  <Save className="w-4 h-4" />
+                  <Save className="w-3.5 h-3.5" />
                   <span>Salvar Alterações</span>
                 </button>
               </div>
@@ -4045,29 +4099,33 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
       {/* GEMINI AI NDVI DECISION ASSISTANT MODAL */}
       {showNdviAiModal && selectedPlot && (
-        <div className="fixed inset-0 z-[1200] bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden my-auto">
+        <div
+          className="fixed inset-0 z-[1200] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+          onClick={() => setShowNdviAiModal(false)}
+        >
+          <div
+            className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden my-auto"
+            onClick={e => e.stopPropagation()}
+          >
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 bg-gradient-to-r from-emerald-900 via-teal-900 to-indigo-950 text-white flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-amber-400 p-0.5 shadow-lg flex items-center justify-center">
-                  <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-                    <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
-                  </div>
+            <div className="p-4 border-b border-slate-200/80 dark:border-zinc-800 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/60 flex items-center justify-center shrink-0">
+                  <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-extrabold text-base sm:text-lg tracking-tight">
+                    <h3 className="font-semibold text-sm text-slate-900 dark:text-zinc-100">
                       Nema IA
                     </h3>
-                    <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 rounded-full font-mono text-[10px] font-bold uppercase tracking-wider">
+                    <span className="px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 rounded-md font-mono text-[10px] font-semibold uppercase">
                       Sensoriamento Remoto
                     </span>
                   </div>
-                  <p className="text-xs text-slate-300 flex items-center gap-2 mt-0.5">
-                    <span>Talhão: <strong>{selectedPlot.code} - {selectedPlot.name}</strong> ({selectedPlot.areaHa} ha)</span>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 flex flex-wrap items-center gap-1.5 mt-0.5 tabular-nums">
+                    <span>Talhão: <strong className="text-slate-700 dark:text-zinc-200">{selectedPlot.code} - {selectedPlot.name}</strong> ({selectedPlot.areaHa} ha)</span>
                     <span>•</span>
-                    <span>Índice: <strong>{ndviIndexType.toUpperCase()}</strong></span>
+                    <span>Índice: <strong className="text-slate-700 dark:text-zinc-200">{ndviIndexType.toUpperCase()}</strong></span>
                   </p>
                 </div>
               </div>
@@ -4075,27 +4133,27 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
               <button
                 type="button"
                 onClick={() => setShowNdviAiModal(false)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1">
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
               {/* Loading State */}
               {isAnalyzingNdviAi && (
-                <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
+                <div className="py-10 flex flex-col items-center justify-center text-center space-y-3">
                   <div className="relative">
-                    <div className="w-16 h-16 rounded-full border-4 border-emerald-500/20 border-t-emerald-600 animate-spin" />
-                    <Brain className="w-8 h-8 text-emerald-600 absolute inset-0 m-auto animate-pulse" />
+                    <div className="w-12 h-12 rounded-full border-2 border-emerald-500/20 border-t-emerald-600 animate-spin" />
+                    <Brain className="w-5 h-5 text-emerald-600 absolute inset-0 m-auto" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-base text-slate-800 dark:text-zinc-100">
-                      Analisando Matriz Vegetacional com Nema IA...
+                    <h4 className="font-semibold text-sm text-slate-900 dark:text-zinc-100">
+                      Analisando matriz vegetacional...
                     </h4>
                     <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mt-1">
-                      Avaliando padrões de reflectância espectral, distribuição zonal de vigor e cruzando com o perfil edafoclimático do talhão.
+                      Avaliando padrões de reflectância espectral, distribuição zonal de vigor e perfil edafoclimático do talhão.
                     </p>
                   </div>
                 </div>
@@ -4103,16 +4161,16 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
               {/* Error State */}
               {ndviAiError && (
-                <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 rounded-2xl text-rose-800 dark:text-rose-200 text-xs space-y-2">
-                  <div className="flex items-center gap-2 font-bold text-sm">
-                    <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+                <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200/80 dark:border-rose-800/60 rounded-xl text-rose-800 dark:text-rose-200 text-xs space-y-2">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
                     <span>Erro no Processamento Inteligente</span>
                   </div>
                   <p>{ndviAiError}</p>
                   <button
                     type="button"
                     onClick={() => handleRunNdviAiAnalysis()}
-                    className="px-3 py-1.5 bg-rose-600 text-white font-bold rounded-xl text-xs hover:bg-rose-700 transition cursor-pointer"
+                    className="h-8 px-3 bg-rose-600 text-white font-medium rounded-lg text-xs hover:bg-rose-700 transition-colors cursor-pointer"
                   >
                     Tentar Novamente
                   </button>
@@ -4121,49 +4179,49 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
               {/* Success Data Presentation */}
               {!isAnalyzingNdviAi && ndviAiData && (
-                <div className="space-y-5 animate-fade-in text-xs">
+                <div className="space-y-4 text-xs">
                   {/* Executive Overview Header Box */}
-                  <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 text-white border border-slate-800 shadow-lg space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
-                      <div className="flex items-center gap-3">
-                        {/* Overall Score Badge */}
-                        <div className="flex flex-col items-center justify-center w-14 h-14 rounded-2xl bg-slate-800 border border-slate-700">
-                          <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Escore</span>
-                          <span className="text-xl font-black font-mono text-emerald-400">{ndviAiData.overallHealthScore}</span>
+                  <div className="p-4 rounded-xl bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/80 dark:border-zinc-800 space-y-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-200/70 dark:border-zinc-800">
+                      <div className="flex items-start gap-3">
+                        <div className="flex flex-col items-center justify-center w-14 h-14 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 shrink-0">
+                          <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Escore</span>
+                          <span className="text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">{ndviAiData.overallHealthScore}</span>
                         </div>
 
                         <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-sm text-zinc-100">Diagnóstico Geral do Vigor Vegetativo</span>
-                            <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase border ${
-                              ndviAiData.riskLevel === 'Baixo' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' :
-                              ndviAiData.riskLevel === 'Moderado' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' :
-                              'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-semibold text-sm text-slate-900 dark:text-zinc-100">Diagnóstico Geral do Vigor Vegetativo</span>
+                            <span className={`px-1.5 py-0.5 rounded-md font-semibold text-[10px] uppercase border ${
+                              ndviAiData.riskLevel === 'Baixo'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60'
+                                : ndviAiData.riskLevel === 'Moderado'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200/80 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60'
+                                  : 'bg-rose-50 text-rose-700 border-rose-200/80 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800/60'
                             }`}>
                               Risco {ndviAiData.riskLevel}
                             </span>
                           </div>
-                          <p className="text-slate-300 text-xs mt-1 leading-relaxed">
+                          <p className="text-slate-600 dark:text-zinc-300 text-xs mt-1 leading-relaxed">
                             {ndviAiData.executiveSummary}
                           </p>
                         </div>
                       </div>
                     </div>
 
-                    {/* Fast Stats Bar */}
                     {selectedPlotNdviStats && (
-                      <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
-                        <div className="p-2 bg-slate-800/80 rounded-xl border border-slate-700">
-                          <span className="text-slate-400 block font-medium">Mínimo ({ndviIndexType.toUpperCase()})</span>
-                          <strong className="text-rose-400 font-mono text-xs">{selectedPlotNdviStats.minVal}</strong>
+                      <div className="grid grid-cols-3 divide-x divide-slate-200/80 dark:divide-zinc-800 bg-white dark:bg-zinc-900 rounded-lg border border-slate-200/70 dark:border-zinc-800 text-center text-[10px]">
+                        <div className="p-2">
+                          <span className="text-slate-500 dark:text-zinc-400 block">Mínimo ({ndviIndexType.toUpperCase()})</span>
+                          <strong className="text-rose-600 dark:text-rose-400 font-mono text-xs tabular-nums">{selectedPlotNdviStats.minVal}</strong>
                         </div>
-                        <div className="p-2 bg-slate-800/80 rounded-xl border border-slate-700">
-                          <span className="text-slate-400 block font-medium">Média Vegetativa</span>
-                          <strong className="text-emerald-400 font-mono text-xs">{selectedPlotNdviStats.meanVal}</strong>
+                        <div className="p-2">
+                          <span className="text-slate-500 dark:text-zinc-400 block">Média Vegetativa</span>
+                          <strong className="text-emerald-600 dark:text-emerald-400 font-mono text-xs tabular-nums">{selectedPlotNdviStats.meanVal}</strong>
                         </div>
-                        <div className="p-2 bg-slate-800/80 rounded-xl border border-slate-700">
-                          <span className="text-slate-400 block font-medium">Máximo Pico</span>
-                          <strong className="text-teal-300 font-mono text-xs">{selectedPlotNdviStats.maxVal}</strong>
+                        <div className="p-2">
+                          <span className="text-slate-500 dark:text-zinc-400 block">Máximo Pico</span>
+                          <strong className="text-teal-600 dark:text-teal-400 font-mono text-xs tabular-nums">{selectedPlotNdviStats.maxVal}</strong>
                         </div>
                       </div>
                     )}
@@ -4171,16 +4229,15 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
                   {/* Zonal Analysis Breakdown Cards */}
                   <div className="space-y-2">
-                    <h4 className="font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-                      <Activity className="w-4 h-4 text-emerald-500" />
+                    <h4 className="font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-emerald-600" />
                       <span>Análise Fisiológica Zonal ({ndviIndexType.toUpperCase()})</span>
                     </h4>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      {/* High Vigor Card */}
-                      <div className="p-3.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 space-y-1.5">
-                        <span className="font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5 text-xs">
-                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
+                      <div className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/50 space-y-1">
+                        <span className="font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5 text-xs">
+                          <span className="w-2 h-2 rounded-sm bg-emerald-600" />
                           Alto Vigor (&gt;0.60)
                         </span>
                         <p className="text-slate-700 dark:text-zinc-300 text-[11px] leading-relaxed">
@@ -4188,10 +4245,9 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                         </p>
                       </div>
 
-                      {/* Moderate Vigor Card */}
-                      <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 space-y-1.5">
-                        <span className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5 text-xs">
-                          <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                      <div className="p-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/50 space-y-1">
+                        <span className="font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5 text-xs">
+                          <span className="w-2 h-2 rounded-sm bg-amber-500" />
                           Vigor Moderado (0.30-0.60)
                         </span>
                         <p className="text-slate-700 dark:text-zinc-300 text-[11px] leading-relaxed">
@@ -4199,10 +4255,9 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                         </p>
                       </div>
 
-                      {/* Stress / Soil Card */}
-                      <div className="p-3.5 rounded-2xl bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/50 space-y-1.5">
-                        <span className="font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1.5 text-xs">
-                          <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                      <div className="p-3 rounded-xl bg-rose-50/60 dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-800/50 space-y-1">
+                        <span className="font-semibold text-rose-800 dark:text-rose-300 flex items-center gap-1.5 text-xs">
+                          <span className="w-2 h-2 rounded-sm bg-rose-500" />
                           Estresse / Solo (&lt;0.30)
                         </span>
                         <p className="text-slate-700 dark:text-zinc-300 text-[11px] leading-relaxed">
@@ -4214,23 +4269,25 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
                   {/* Field Action Prescriptions */}
                   <div className="space-y-2">
-                    <h4 className="font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-amber-500" />
-                      <span>Prescrições Práticas e Ações de Campo (Manejo)</span>
+                    <h4 className="font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Prescrições Práticas e Ações de Campo</span>
                     </h4>
 
                     <div className="space-y-2">
                       {ndviAiData.fieldActionPrescriptions.map((action, idx) => (
-                        <div key={idx} className="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-800/50 border border-slate-200 dark:border-zinc-800 flex items-start gap-3">
-                          <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase shrink-0 mt-0.5 ${
-                            action.priority === 'Alta' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' :
-                            action.priority === 'Média' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' :
-                            'bg-slate-200 text-slate-700 dark:bg-zinc-700 dark:text-zinc-300'
+                        <div key={idx} className="p-3 rounded-xl bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/70 dark:border-zinc-800 flex items-start gap-2.5">
+                          <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold uppercase shrink-0 mt-0.5 border ${
+                            action.priority === 'Alta'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200/80 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800/60'
+                              : action.priority === 'Média'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200/80 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60'
+                                : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700'
                           }`}>
                             {action.priority}
                           </span>
                           <div>
-                            <strong className="block text-slate-900 dark:text-zinc-100 text-xs">{action.title}</strong>
+                            <strong className="block font-semibold text-slate-900 dark:text-zinc-100 text-xs">{action.title}</strong>
                             <p className="text-slate-600 dark:text-zinc-400 text-[11px] mt-0.5 leading-relaxed">{action.description}</p>
                           </div>
                         </div>
@@ -4238,30 +4295,30 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                     </div>
                   </div>
 
-                  {/* Suggested POIs / Scouting Points */}
+                  {/* Suggested POIs */}
                   {ndviAiData.suggestedSamplingPois && ndviAiData.suggestedSamplingPois.length > 0 && (
-                    <div className="p-4 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/50 space-y-3">
+                    <div className="p-3.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/25 border border-indigo-200/80 dark:border-indigo-800/50 space-y-2.5">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <PinIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                          <h4 className="font-bold text-indigo-950 dark:text-indigo-200 text-xs">
-                            Pontos de Amostragem Georreferenciada Recomendados (Scouting)
+                        <div className="flex items-center gap-1.5">
+                          <PinIcon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                          <h4 className="font-semibold text-indigo-950 dark:text-indigo-200 text-xs">
+                            Pontos de Amostragem Recomendados (Scouting)
                           </h4>
                         </div>
                         <button
                           type="button"
                           onClick={handleInjectSuggestedPois}
-                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          className="h-8 px-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                         >
                           <Plus className="w-3.5 h-3.5" />
-                          <span>Adicionar Marcadores no Mapa</span>
+                          <span>Adicionar no Mapa</span>
                         </button>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {ndviAiData.suggestedSamplingPois.map((poi, idx) => (
-                          <div key={idx} className="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-indigo-100 dark:border-indigo-900/40 text-[11px]">
-                            <strong className="text-indigo-900 dark:text-indigo-300 block">{poi.name}</strong>
+                          <div key={idx} className="p-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-indigo-200/70 dark:border-indigo-900/40 text-[11px]">
+                            <strong className="font-semibold text-indigo-900 dark:text-indigo-300 block">{poi.name}</strong>
                             <span className="text-slate-500 dark:text-zinc-400 block mt-0.5">{poi.reason}</span>
                           </div>
                         ))}
@@ -4269,10 +4326,10 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                     </div>
                   )}
 
-                  {/* Follow Up Interaction Suggestions */}
+                  {/* Follow Up Suggestions */}
                   {ndviAiData.followUpSuggestions && ndviAiData.followUpSuggestions.length > 0 && (
-                    <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-zinc-800">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Procurando mais detalhes? Pergunte à IA:</span>
+                    <div className="space-y-1.5 pt-2 border-t border-slate-200/80 dark:border-zinc-800">
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase block">Perguntas sugeridas</span>
                       <div className="flex flex-wrap gap-1.5">
                         {ndviAiData.followUpSuggestions.map((sug, idx) => (
                           <button
@@ -4282,35 +4339,35 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                               setNdviAiFollowUpInput(sug);
                               handleRunNdviAiAnalysis(sug);
                             }}
-                            className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-zinc-300 hover:text-emerald-700 text-[11px] font-medium transition cursor-pointer text-left border border-slate-200/60 dark:border-zinc-700"
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-zinc-300 hover:text-emerald-700 text-[11px] font-medium transition-colors cursor-pointer text-left border border-slate-200/70 dark:border-zinc-700"
                           >
-                            💡 {sug}
+                            {sug}
                           </button>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Custom Prompt Box to Ask Gemini */}
+                  {/* Custom Prompt Box */}
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
                       if (!ndviAiFollowUpInput.trim()) return;
                       handleRunNdviAiAnalysis(ndviAiFollowUpInput);
                     }}
-                    className="flex items-center gap-2 pt-2"
+                    className="flex items-center gap-2 pt-1"
                   >
                     <input
                       type="text"
                       value={ndviAiFollowUpInput}
                       onChange={e => setNdviAiFollowUpInput(e.target.value)}
                       placeholder="Faça uma pergunta específica para a Nema IA sobre este talhão..."
-                      className="flex-1 px-3 py-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="flex-1 h-9 px-3 bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
                     />
                     <button
                       type="submit"
                       disabled={isAnalyzingNdviAi || !ndviAiFollowUpInput.trim()}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer"
+                      className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-medium rounded-lg text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                     >
                       <Send className="w-3.5 h-3.5" />
                       <span>Enviar</span>
@@ -4325,71 +4382,74 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
       {/* GUIA TÉCNICO COMPLETO DE ÍNDICES DE VEGETAÇÃO MODAL */}
       {showIndexGuideModal && (
-        <div className="fixed inset-0 z-[9999] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fade-in">
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden my-auto">
+        <div
+          className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+          onClick={() => setShowIndexGuideModal(false)}
+        >
+          <div
+            className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden my-auto"
+            onClick={e => e.stopPropagation()}
+          >
             {/* Modal Header */}
-            <div className="p-5 sm:p-6 bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white flex items-start justify-between gap-4 border-b border-emerald-800/50">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                    <BookOpen className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg sm:text-xl font-black tracking-tight text-white flex items-center gap-2">
-                      Guia Técnico de Índices de Vegetação & Sensoriamento Remoto
-                    </h3>
-                    <p className="text-xs text-emerald-200/90 font-medium">
-                      Explicação agronômica detalhada, fórmulas espectrais, interpretação de valores e aplicações recomendadas no campo.
-                    </p>
-                  </div>
+            <div className="p-4 border-b border-slate-200/80 dark:border-zinc-800 flex items-start justify-between gap-4">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60 flex items-center justify-center shrink-0">
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 truncate">
+                    Guia Técnico de Índices de Vegetação & Sensoriamento Remoto
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400">
+                    Fórmulas espectrais, interpretação de valores e aplicações recomendadas em campo.
+                  </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowIndexGuideModal(false)}
-                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition cursor-pointer shrink-0"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Filter Controls Bar */}
-            <div className="p-4 bg-slate-50 dark:bg-zinc-800/60 border-b border-slate-200 dark:border-zinc-800 flex flex-col sm:flex-row items-center gap-3">
-              {/* Search Bar */}
+            <div className="p-3.5 bg-slate-50/70 dark:bg-zinc-950/60 border-b border-slate-200/80 dark:border-zinc-800 flex flex-col sm:flex-row items-center gap-2.5">
               <div className="relative flex-1 w-full">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   value={indexSearchQuery}
                   onChange={e => setIndexSearchQuery(e.target.value)}
-                  placeholder="Pesquisar índice, palavra-chave (ex: Nitrogênio, Solo, Drone, Estresse, Milho)..."
-                  className="w-full pl-9 pr-3 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs text-slate-800 dark:text-zinc-100 outline-none focus:ring-2 focus:ring-emerald-500"
+                  placeholder="Pesquisar índice ou palavra-chave (Nitrogênio, Solo, Drone, Estresse)..."
+                  className="w-full h-9 pl-8 pr-8 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg text-xs text-slate-800 dark:text-zinc-100 outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
                 />
                 {indexSearchQuery && (
                   <button
                     type="button"
                     onClick={() => setIndexSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 text-xs font-bold"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
                   >
-                    ×
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
 
-              {/* Category Filter Tabs */}
-              <div className="flex items-center gap-1 overflow-x-auto w-full sm:w-auto shrink-0 pb-1 sm:pb-0">
+              <div className="flex items-center gap-1 overflow-x-auto w-full sm:w-auto shrink-0">
                 {[
                   { id: 'all', label: 'Todos (15)' },
-                  { id: 'multispectral', label: '🌱 Multiespectrais (8)' },
-                  { id: 'water_soil', label: '💧 Umidade & Água (3)' },
-                  { id: 'visible_rgb', label: '📸 Drones & RGB (4)' },
+                  { id: 'multispectral', label: 'Multiespectrais (8)' },
+                  { id: 'water_soil', label: 'Umidade & Solo (3)' },
+                  { id: 'visible_rgb', label: 'Drones & RGB (4)' },
                 ].map(tab => (
                   <button
                     key={tab.id}
+                    type="button"
                     onClick={() => setIndexCategoryFilter(tab.id as any)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer ${
+                    className={`h-8 px-2.5 rounded-lg text-xs font-medium transition-colors shrink-0 cursor-pointer whitespace-nowrap ${
                       indexCategoryFilter === tab.id
-                        ? 'bg-emerald-600 text-white shadow-xs'
+                        ? 'bg-emerald-600 text-white'
                         : 'bg-white dark:bg-zinc-900 text-slate-600 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800'
                     }`}
                   >
@@ -4400,7 +4460,7 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
             </div>
 
             {/* Index Cards List Container */}
-            <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+            <div className="p-4 sm:p-5 overflow-y-auto flex-1">
               {(() => {
                 const filtered = Object.values(VEGETATION_INDEX_DETAILS).filter(item => {
                   const matchesCategory =
@@ -4421,79 +4481,75 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
 
                 if (filtered.length === 0) {
                   return (
-                    <div className="text-center py-12 space-y-2">
-                      <p className="text-slate-400 font-bold text-sm">Nenhum índice encontrado para "{indexSearchQuery}".</p>
+                    <div className="text-center py-10 space-y-2">
+                      <p className="text-slate-500 dark:text-zinc-400 font-medium text-xs">
+                        Nenhum índice encontrado para &ldquo;{indexSearchQuery}&rdquo;.
+                      </p>
                       <button
+                        type="button"
                         onClick={() => { setIndexSearchQuery(''); setIndexCategoryFilter('all'); }}
-                        className="text-xs text-emerald-600 font-bold underline cursor-pointer"
+                        className="text-xs text-emerald-600 dark:text-emerald-400 font-medium hover:underline cursor-pointer"
                       >
-                        Limpar filtros de pesquisa
+                        Limpar filtros
                       </button>
                     </div>
                   );
                 }
 
                 return (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {filtered.map(index => {
                       const isSelected = ndviIndexType === index.id;
 
                       return (
                         <div
                           key={index.id}
-                          className={`p-4 rounded-2xl border transition-all space-y-2.5 flex flex-col justify-between ${
+                          className={`p-3.5 rounded-xl border transition-colors space-y-2.5 flex flex-col justify-between ${
                             isSelected
-                              ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-2 border-emerald-500 dark:border-emerald-500 shadow-md ring-2 ring-emerald-500/20'
-                              : 'bg-white dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700/80 hover:border-emerald-300 dark:hover:border-emerald-700'
+                              ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-500'
+                              : 'bg-white dark:bg-zinc-900 border-slate-200/80 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700'
                           }`}
                         >
                           <div className="space-y-2">
-                            {/* Card Header */}
                             <div className="flex items-start justify-between gap-2">
                               <div className="space-y-0.5 min-w-0">
-                                <span className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 block truncate">
-                                  {index.categoryLabel}
+                                <span className="text-[10px] font-semibold uppercase text-emerald-700 dark:text-emerald-400 block truncate">
+                                  {index.categoryLabel.replace(/^[^\w\s]+\s*/, '')}
                                 </span>
-                                <h4 className="font-black text-slate-900 dark:text-white text-sm leading-tight">
+                                <h4 className="font-semibold text-slate-900 dark:text-zinc-100 text-xs leading-tight">
                                   {index.label}
                                 </h4>
                               </div>
-                              <span className="font-mono text-[10px] bg-slate-100 dark:bg-zinc-900 text-emerald-700 dark:text-emerald-300 border border-slate-200 dark:border-zinc-700 px-2 py-0.5 rounded-lg font-black shrink-0">
+                              <span className="font-mono text-[10px] bg-slate-100 dark:bg-zinc-950 text-emerald-700 dark:text-emerald-300 border border-slate-200 dark:border-zinc-800 px-1.5 py-0.5 rounded-md font-semibold shrink-0">
                                 {index.formula}
                               </span>
                             </div>
 
-                            {/* Breve Explicação */}
-                            <div className="bg-slate-50 dark:bg-zinc-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-zinc-800">
-                              <span className="text-[9px] font-black uppercase text-slate-500 dark:text-zinc-400 block mb-0.5">
-                                💡 Breve Explicação (O Que É):
-                              </span>
-                              <p className="text-xs text-slate-800 dark:text-zinc-200 font-bold leading-relaxed">
+                            <div className="bg-slate-50/70 dark:bg-zinc-950/60 p-2.5 rounded-lg border border-slate-200/70 dark:border-zinc-800">
+                              <p className="text-xs text-slate-700 dark:text-zinc-200 leading-relaxed">
                                 {index.desc}
                               </p>
                             </div>
 
-                            {/* Details Grid */}
-                            <div className="grid grid-cols-1 gap-1.5 text-[11px]">
+                            <div className="grid grid-cols-1 gap-1 text-[11px]">
                               <div>
-                                <span className="font-bold text-slate-700 dark:text-zinc-300">🔍 O Que Mede: </span>
-                                <span className="text-slate-600 dark:text-zinc-300">{index.whatItMeasures}</span>
+                                <span className="font-semibold text-slate-700 dark:text-zinc-300">O que mede: </span>
+                                <span className="text-slate-600 dark:text-zinc-400">{index.whatItMeasures}</span>
                               </div>
                               <div>
-                                <span className="font-bold text-slate-700 dark:text-zinc-300">🎯 Aplicação no Campo: </span>
-                                <span className="text-slate-600 dark:text-zinc-300">{index.bestUse}</span>
+                                <span className="font-semibold text-slate-700 dark:text-zinc-300">Aplicação: </span>
+                                <span className="text-slate-600 dark:text-zinc-400">{index.bestUse}</span>
                               </div>
                               <div>
-                                <span className="font-bold text-slate-700 dark:text-zinc-300">📊 Faixa Típica: </span>
-                                <span className="text-slate-600 dark:text-zinc-300 font-mono text-[10px]">{index.typicalRange}</span>
+                                <span className="font-semibold text-slate-700 dark:text-zinc-300">Faixa típica: </span>
+                                <span className="text-slate-600 dark:text-zinc-400 font-mono text-[10px] tabular-nums">{index.typicalRange}</span>
                               </div>
                             </div>
                           </div>
 
-                          {/* Action Button */}
                           <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between">
-                            <span className="text-[10px] text-slate-400 font-medium">
-                              {isSelected ? '✓ Índice Ativo no Mapa' : 'Disponível no Mapa'}
+                            <span className="text-[10px] text-slate-500 dark:text-zinc-400">
+                              {isSelected ? 'Índice ativo no mapa' : 'Disponível no mapa'}
                             </span>
                             <button
                               type="button"
@@ -4501,14 +4557,14 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
                                 setNdviIndexType(index.id as any);
                                 setShowIndexGuideModal(false);
                               }}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                              className={`h-8 px-3 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
                                 isSelected
-                                  ? 'bg-emerald-600 text-white shadow-xs'
-                                  : 'bg-slate-100 dark:bg-zinc-700 hover:bg-emerald-600 hover:text-white text-slate-700 dark:text-zinc-200'
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 text-slate-700 dark:text-zinc-200'
                               }`}
                             >
                               {isSelected ? <CheckCircle2 className="w-3.5 h-3.5" /> : <BarChart3 className="w-3.5 h-3.5" />}
-                              <span>{isSelected ? 'Ativo no Mapa' : 'Selecionar este Índice'}</span>
+                              <span>{isSelected ? 'Ativo' : 'Selecionar'}</span>
                             </button>
                           </div>
                         </div>
@@ -4520,14 +4576,14 @@ export const TraceabilityLeafletMap: React.FC<LeafletMapProps> = ({
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 bg-slate-50 dark:bg-zinc-800/80 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-between">
-              <span className="text-xs text-slate-500 dark:text-zinc-400 font-medium">
-                15 Índices de Sensoriamento Remoto Integrados • GeaAgro GIS Suite
+            <div className="p-3.5 bg-slate-50/70 dark:bg-zinc-950/60 border-t border-slate-200/80 dark:border-zinc-800 flex items-center justify-between">
+              <span className="text-xs text-slate-500 dark:text-zinc-400">
+                15 índices de sensoriamento remoto integrados
               </span>
               <button
                 type="button"
                 onClick={() => setShowIndexGuideModal(false)}
-                className="px-4 py-2 bg-slate-900 dark:bg-zinc-100 text-white dark:text-slate-900 font-bold rounded-xl text-xs hover:bg-slate-800 transition cursor-pointer"
+                className="h-8 px-3.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium rounded-lg text-xs hover:opacity-90 transition-opacity cursor-pointer"
               >
                 Fechar Guia
               </button>

@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { X, Scale, Building2, MapPin, Calendar, FileText, User, Plus, UserCheck } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { X, Scale, Plus, UserCheck } from 'lucide-react';
 import { Pericia, TipoPericia } from '../../types/pericia';
 import { TIPO_PERICIA_LABELS } from './PericiaDashboard';
 import { Agronomist } from '../../types/agronomy';
@@ -10,12 +10,15 @@ interface NewPericiaModalProps {
   onCreatePericia: (newPericia: Pericia) => void;
 }
 
+const INPUT_CLASS =
+  'w-full h-9 px-3 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950/60 text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500';
+const LABEL_CLASS = 'block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1';
+
 export const NewPericiaModal: React.FC<NewPericiaModalProps> = ({
   isOpen,
   onClose,
   onCreatePericia,
 }) => {
-  // Fetch registered agronomists from local storage
   const registeredAgronomists = useMemo(() => {
     let list: Agronomist[] = [];
     try {
@@ -49,6 +52,15 @@ export const NewPericiaModal: React.FC<NewPericiaModalProps> = ({
     autor: '',
     reu: '',
   });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -107,9 +119,9 @@ export const NewPericiaModal: React.FC<NewPericiaModalProps> = ({
       quesitos: [],
       documentosIniciais: [],
       checklistPreliminar: [
-        { id: `ck-1`, item: 'Solicitar ART de Perícia e Anotação CREA', checado: false },
-        { id: `ck-2`, item: 'Definir roteiro de campo e pontos GPS de amostragem', checado: false },
-        { id: `ck-3`, item: 'Agendar vistoria presencial com acompanhamento das partes', checado: false },
+        { id: 'ck-1', item: 'Solicitar ART de Perícia e Anotação CREA', checado: false },
+        { id: 'ck-2', item: 'Definir roteiro de campo e pontos GPS de amostragem', checado: false },
+        { id: 'ck-3', item: 'Agendar vistoria presencial com acompanhamento das partes', checado: false },
       ],
 
       vistorias: [],
@@ -274,288 +286,276 @@ export const NewPericiaModal: React.FC<NewPericiaModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[200] bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto">
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh] my-auto animate-in fade-in zoom-in-95 duration-200">
-        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between shrink-0 bg-white dark:bg-zinc-900">
-          <div className="flex items-center gap-2.5">
-            <span className="p-2 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 rounded-xl">
-              <Scale className="w-5 h-5" />
-            </span>
+    <div
+      className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
+      onClick={e => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl w-full max-w-3xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+        {/* HEADER */}
+        <div className="px-5 py-3.5 border-b border-slate-200/80 dark:border-zinc-800 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2">
+            <Scale className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">Abertura de Nova Perícia Rural</h3>
-              <p className="text-xs text-slate-500">Cadastre um novo processo pericial para vistoria e laudo</p>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Abertura de Nova Perícia Rural</h3>
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400">Cadastre os dados iniciais para vistoria, análise e laudo</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-lg cursor-pointer transition-colors"
+            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 rounded-md cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
+        {/* FORM */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
-          <div className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1 min-h-0 overscroll-contain">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-slate-500 font-semibold mb-1">Título / Nome da Perícia *</label>
-              <input
-                type="text"
-                required
-                placeholder="Ex: Perícia de Deriva de Defensivo em Lavoura de Tomate"
-                value={formData.nome}
-                onChange={e => setFormData({ ...formData, nome: e.target.value })}
-                className="w-full p-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl font-bold"
-              />
-            </div>
-
-            <div>
-              <label className="block text-slate-500 font-semibold mb-1">Tipo de Perícia *</label>
-              <select
-                value={formData.tipo}
-                onChange={e => setFormData({ ...formData, tipo: e.target.value as TipoPericia })}
-                className="w-full p-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl"
-              >
-                {Object.entries(TIPO_PERICIA_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-slate-500 font-semibold mb-1">Contratante / Solicitante *</label>
-              <input
-                type="text"
-                required
-                placeholder="Ex: Fazenda Santa Helena / Banco Agro"
-                value={formData.contratanteNome}
-                onChange={e => setFormData({ ...formData, contratanteNome: e.target.value })}
-                className="w-full p-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl"
-              />
-            </div>
-
-            <div>
-              <label className="block text-slate-500 font-semibold mb-1">Nome do Imóvel Rural *</label>
-              <input
-                type="text"
-                required
-                placeholder="Ex: Fazenda Progresso - Gleba A"
-                value={formData.imovelNome}
-                onChange={e => setFormData({ ...formData, imovelNome: e.target.value })}
-                className="w-full p-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl"
-              />
-            </div>
-
-            <div>
-              <label className="block text-slate-500 font-semibold mb-1">Município / UF *</label>
-              <div className="flex gap-2">
+          <div className="p-5 space-y-5 overflow-y-auto flex-1 min-h-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              <div className="md:col-span-2">
+                <label className={LABEL_CLASS}>Título / Nome da Perícia *</label>
                 <input
                   type="text"
                   required
-                  placeholder="Município"
-                  value={formData.municipio}
-                  onChange={e => setFormData({ ...formData, municipio: e.target.value })}
-                  className="w-full p-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl"
+                  placeholder="Ex: Perícia de Deriva de Defensivo em Lavoura de Tomate"
+                  value={formData.nome}
+                  onChange={e => setFormData({ ...formData, nome: e.target.value })}
+                  className={INPUT_CLASS}
                 />
+              </div>
+
+              <div>
+                <label className={LABEL_CLASS}>Tipo de Perícia *</label>
+                <select
+                  value={formData.tipo}
+                  onChange={e => setFormData({ ...formData, tipo: e.target.value as TipoPericia })}
+                  className={INPUT_CLASS}
+                >
+                  {Object.entries(TIPO_PERICIA_LABELS).map(([key, label]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className={LABEL_CLASS}>Contratante / Solicitante *</label>
                 <input
                   type="text"
                   required
-                  maxLength={2}
-                  value={formData.uf}
-                  onChange={e => setFormData({ ...formData, uf: e.target.value.toUpperCase() })}
-                  className="w-16 p-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl font-bold uppercase text-center"
+                  placeholder="Ex: Fazenda Santa Helena / Banco Agro"
+                  value={formData.contratanteNome}
+                  onChange={e => setFormData({ ...formData, contratanteNome: e.target.value })}
+                  className={INPUT_CLASS}
+                />
+              </div>
+
+              <div>
+                <label className={LABEL_CLASS}>Nome do Imóvel Rural *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Fazenda Progresso - Gleba A"
+                  value={formData.imovelNome}
+                  onChange={e => setFormData({ ...formData, imovelNome: e.target.value })}
+                  className={INPUT_CLASS}
+                />
+              </div>
+
+              <div>
+                <label className={LABEL_CLASS}>Município / UF *</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Município"
+                    value={formData.municipio}
+                    onChange={e => setFormData({ ...formData, municipio: e.target.value })}
+                    className={INPUT_CLASS}
+                  />
+                  <input
+                    type="text"
+                    required
+                    maxLength={2}
+                    value={formData.uf}
+                    onChange={e => setFormData({ ...formData, uf: e.target.value.toUpperCase() })}
+                    className={`${INPUT_CLASS} w-16 text-center uppercase`}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className={LABEL_CLASS}>Cultura Principal</label>
+                <input
+                  type="text"
+                  value={formData.cultura}
+                  onChange={e => setFormData({ ...formData, cultura: e.target.value })}
+                  className={INPUT_CLASS}
+                />
+              </div>
+
+              <div>
+                <label className={LABEL_CLASS}>Área Estimada Afetada (ha)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={formData.areaAfetadaHa}
+                  onChange={e => setFormData({ ...formData, areaAfetadaHa: Number(e.target.value) })}
+                  className={`${INPUT_CLASS} tabular-nums`}
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className={LABEL_CLASS}>Objetivo da Perícia</label>
+                <textarea
+                  rows={2}
+                  placeholder="Descreva resumidamente o objetivo técnico..."
+                  value={formData.objetivo}
+                  onChange={e => setFormData({ ...formData, objetivo: e.target.value })}
+                  className="w-full p-2.5 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950/60 text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-slate-500 font-semibold mb-1">Cultura Principal</label>
-              <input
-                type="text"
-                value={formData.cultura}
-                onChange={e => setFormData({ ...formData, cultura: e.target.value })}
-                className="w-full p-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl font-bold"
-              />
-            </div>
-
-            <div>
-              <label className="block text-slate-500 font-semibold mb-1">Área Estimada Afetada (ha)</label>
-              <input
-                type="number"
-                value={formData.areaAfetadaHa}
-                onChange={e => setFormData({ ...formData, areaAfetadaHa: Number(e.target.value) })}
-                className="w-full p-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl font-mono font-bold"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-slate-500 font-semibold mb-1">Objetivo da Perícia</label>
-              <textarea
-                rows={2}
-                placeholder="Descreva resumidamente o objetivo técnico..."
-                value={formData.objetivo}
-                onChange={e => setFormData({ ...formData, objetivo: e.target.value })}
-                className="w-full p-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl"
-              />
-            </div>
-
-            {/* Judicial / Processual Fields for Capa */}
-            <div className="md:col-span-2 border-t border-slate-100 dark:border-zinc-800 pt-4 mt-2">
-              <h4 className="font-bold text-slate-800 dark:text-zinc-200 mb-2 flex items-center gap-1.5 text-xs uppercase tracking-wider">
-                <Scale className="w-4 h-4 text-emerald-600" />
-                Dados Judiciais / Processuais (Para Capa do Laudo)
+            {/* JUDICIAL */}
+            <div className="pt-4 border-t border-slate-200/80 dark:border-zinc-800 space-y-3">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
+                <Scale className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>Dados Processuais (Capa do Laudo)</span>
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50/50 dark:bg-zinc-800/40 p-4 rounded-2xl border border-slate-100 dark:border-zinc-800/60">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
                 <div>
-                  <label className="block text-slate-500 font-semibold mb-1">Número do Processo</label>
+                  <label className={LABEL_CLASS}>Número do Processo</label>
                   <input
                     type="text"
                     placeholder="Ex: 5012938-42.2026.8.09.0051"
                     value={formData.numeroProcesso}
                     onChange={e => setFormData({ ...formData, numeroProcesso: e.target.value })}
-                    className="w-full p-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl font-mono font-bold"
+                    className={`${INPUT_CLASS} font-mono`}
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-500 font-semibold mb-1">Autor (Requerente)</label>
+                  <label className={LABEL_CLASS}>Autor (Requerente)</label>
                   <input
                     type="text"
                     placeholder="Ex: João da Silva"
                     value={formData.autor}
                     onChange={e => setFormData({ ...formData, autor: e.target.value })}
-                    className="w-full p-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl font-bold"
+                    className={INPUT_CLASS}
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-500 font-semibold mb-1">Réu (Requerido)</label>
+                  <label className={LABEL_CLASS}>Réu (Requerido)</label>
                   <input
                     type="text"
                     placeholder="Ex: Seguradora Agro SA"
                     value={formData.reu}
                     onChange={e => setFormData({ ...formData, reu: e.target.value })}
-                    className="w-full p-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl font-bold"
+                    className={INPUT_CLASS}
                   />
                 </div>
               </div>
             </div>
 
-            {/* Technical Responsability Registry Integration Block */}
-            <div className="md:col-span-2 border-t border-slate-100 dark:border-zinc-800 pt-4 mt-2">
-              <h4 className="font-bold text-slate-800 dark:text-zinc-200 mb-2 flex items-center gap-1.5 text-xs uppercase tracking-wider">
-                <UserCheck className="w-4 h-4 text-emerald-600" />
-                Responsabilidade Técnica (Integrada ao Cadastro Técnico)
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 dark:bg-zinc-800/40 p-4 rounded-2xl border border-slate-100 dark:border-zinc-800/60">
+            {/* RT */}
+            <div className="pt-4 border-t border-slate-200/80 dark:border-zinc-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
+                  <UserCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Responsabilidade Técnica (RT)</span>
+                </h4>
+                {(formData.responsavelTecnico || formData.crea || formData.artNumero) && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, responsavelTecnico: '', crea: '', artNumero: '' })}
+                    className="text-[11px] font-medium text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
+                  >
+                    Limpar RT
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-slate-500 font-semibold">Selecionar RT do Cadastro Técnico</label>
-                    {(formData.responsavelTecnico || formData.crea || formData.artNumero) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFormData({
-                            ...formData,
-                            responsavelTecnico: '',
-                            crea: '',
-                            artNumero: '',
-                          });
-                        }}
-                        className="text-[11px] text-rose-600 hover:text-rose-700 dark:text-rose-400 font-bold hover:underline cursor-pointer"
-                      >
-                        Limpar dados do RT
-                      </button>
-                    )}
-                  </div>
+                  <label className={LABEL_CLASS}>Selecionar do Cadastro Técnico</label>
                   <select
                     value={formData.responsavelTecnico}
                     onChange={e => {
                       const selectedName = e.target.value;
                       const selected = registeredAgronomists.find(a => a.name === selectedName);
                       if (selected) {
-                        setFormData({
-                          ...formData,
-                          responsavelTecnico: selected.name,
-                          crea: selected.crea,
-                        });
+                        setFormData({ ...formData, responsavelTecnico: selected.name, crea: selected.crea });
                       } else {
-                        setFormData({
-                          ...formData,
-                          responsavelTecnico: selectedName,
-                        });
+                        setFormData({ ...formData, responsavelTecnico: selectedName });
                       }
                     }}
-                    className="w-full p-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl font-bold"
+                    className={INPUT_CLASS}
                   >
-                    <option value="">-- Selecionar RT ou Inserir Manualmente --</option>
+                    <option value="">Selecionar RT ou digitar abaixo...</option>
                     {registeredAgronomists.map(a => (
                       <option key={a.id} value={a.name}>
                         {a.name} ({a.crea || 'Sem CREA'})
                       </option>
                     ))}
-                    {registeredAgronomists.length === 0 && (
-                      <option value="" disabled>
-                        Nenhum profissional cadastrado no Cadastro Técnico
-                      </option>
-                    )}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-slate-500 font-semibold mb-1">Confirmar Nome do Perito</label>
+                  <label className={LABEL_CLASS}>Nome do Perito *</label>
                   <input
                     type="text"
                     required
                     placeholder="Nome do Responsável Técnico"
                     value={formData.responsavelTecnico}
                     onChange={e => setFormData({ ...formData, responsavelTecnico: e.target.value })}
-                    className="w-full p-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl font-bold text-emerald-700 dark:text-emerald-400"
+                    className={INPUT_CLASS}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-500 font-semibold mb-1">Número de Registro / CREA</label>
+                  <label className={LABEL_CLASS}>Registro CREA *</label>
                   <input
                     type="text"
                     required
                     placeholder="Ex: CREA-GO 109823/D"
                     value={formData.crea}
                     onChange={e => setFormData({ ...formData, crea: e.target.value })}
-                    className="w-full p-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl font-mono font-bold"
+                    className={`${INPUT_CLASS} font-mono`}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-500 font-semibold mb-1">Número da ART Vinculada</label>
+                  <label className={LABEL_CLASS}>Número da ART *</label>
                   <input
                     type="text"
                     required
                     placeholder="Ex: ART-2026-999123"
                     value={formData.artNumero}
                     onChange={e => setFormData({ ...formData, artNumero: e.target.value })}
-                    className="w-full p-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl font-mono font-bold"
+                    className={`${INPUT_CLASS} font-mono`}
                   />
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Fixed Sticky Footer with Actions */}
-          <div className="p-4 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-end gap-2.5 shrink-0 bg-slate-50/90 dark:bg-zinc-900/90 backdrop-blur-xs">
+          {/* FOOTER */}
+          <div className="px-5 py-3.5 border-t border-slate-200/80 dark:border-zinc-800 flex items-center justify-end gap-2 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 rounded-xl font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
+              className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all"
+              className="h-8 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
-              Criar Processo de Perícia
+              <Plus className="w-3.5 h-3.5" />
+              <span>Criar Perícia</span>
             </button>
           </div>
         </form>

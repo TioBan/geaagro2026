@@ -1,5 +1,4 @@
 import React, { Suspense, lazy } from 'react';
-import { Sparkles } from 'lucide-react';
 import { Farm, SoilSample, LeafSample, CropNutritionalTarget } from '../../types/agronomy';
 import { AIFarmScoreWidget } from '../AIFarmScoreWidget';
 import { SmartWidgets } from '../SmartWidgets';
@@ -14,7 +13,7 @@ const FinancialEfficiencyChart = lazy(() =>
 );
 
 const ChartSkeleton = () => (
-  <div className="h-72 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 animate-pulse" />
+  <div className="h-72 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 animate-pulse" />
 );
 
 interface DashboardDiagnosticsSectionProps {
@@ -33,32 +32,35 @@ export const DashboardDiagnosticsSection: React.FC<DashboardDiagnosticsSectionPr
   setActiveTab,
 }) => {
   return (
-    <div className="bg-slate-50/50 dark:bg-zinc-900/20 p-1.5 rounded-2xl border dark:border-zinc-900">
-      <div className="p-3">
-        <h3 className="text-xs font-extrabold text-slate-400 dark:text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
-          <Sparkles className="w-4 h-4 text-emerald-500" />
-          Ferramentas Diagnósticas & Climatologia
-        </h3>
+    <section className="space-y-4">
+      <div className="flex items-baseline justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+            Diagnósticos e climatologia
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Indicadores integrados de solo, nutrição foliar, alertas e eficiência da propriedade {farm.name}
+          </p>
+        </div>
       </div>
-      <div className="space-y-6">
+
+      <div className="space-y-4">
         <AIFarmScoreWidget farm={farm} soilSamples={soilSamples} leafSamples={leafSamples} />
         <SmartWidgets farm={farm} />
-
         <WeatherSummaryWidget farm={farm} onClickDetails={() => setActiveTab('meteorologia')} />
         <ClimateAlertWidget farm={farm} onNavigatePhenology={() => setActiveTab('fenologia')} />
 
         <Suspense fallback={<ChartSkeleton />}>
-          <div className="space-y-6">
+          <div className="space-y-4">
             <BaseSaturationChart
               farm={farm}
               soilSamples={soilSamples}
               targetVPercent={activeCrop?.targetVPercent || 70}
             />
-
             <FinancialEfficiencyChart farm={farm} soilSamples={soilSamples} />
           </div>
         </Suspense>
       </div>
-    </div>
+    </section>
   );
 };

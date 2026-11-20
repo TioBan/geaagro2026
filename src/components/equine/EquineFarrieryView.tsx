@@ -1,23 +1,6 @@
-// @ts-nocheck
-import React, { useState } from 'react';
-import {
-  Hammer,
-  Clock,
-  Plus,
-  Calendar,
-  AlertTriangle,
-  CheckCircle2,
-  Scale,
-  User,
-  X,
-  Compass,
-  DollarSign,
-} from 'lucide-react';
-import {
-  EquineAnimal,
-  EquineFarrieryRecord,
-  HorseshoeType,
-} from '../../types/equine';
+import React, { useState, useMemo } from 'react';
+import { Hammer, Plus, X } from 'lucide-react';
+import { EquineAnimal, EquineFarrieryRecord, HorseshoeType } from '../../types/equine';
 
 interface Props {
   animals: EquineAnimal[];
@@ -25,341 +8,410 @@ interface Props {
   onAddFarriery: (record: EquineFarrieryRecord) => void;
 }
 
+const HORSESHOE_OPTIONS: HorseshoeType[] = [
+  'Ferradura de Aço Convencional',
+  'Ferradura de Alumínio (Esporte/Corrida)',
+  'Ferradura Polo / Fina',
+  'Ferradura Corretiva Heart-bar (Barra Coração)',
+  'Ferradura Banana / Rocked Toe',
+  'Ferradura Rolada (Roller Shoe)',
+  'Ferradura com Tala e Rampa',
+  'Casqueamento Descalço (Barefoot)',
+  'Ferradura de Poliuretano / Borracha',
+  'Palmilha de Absorção de Impacto',
+];
+
+const inputCls =
+  'w-full h-9 px-3 rounded-lg bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500';
+const labelCls = 'block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1';
+
 export const EquineFarrieryView: React.FC<Props> = ({
   animals,
   farrieryRecords,
   onAddFarriery,
 }) => {
-  const [selectedAnimalId, setSelectedAnimalFilter] = useState<string>('all');
+  const safeAnimals = useMemo(() => (animals || []).filter(a => a && a.id), [animals]);
+  const safeRecords = useMemo(() => (farrieryRecords || []).filter(f => f && f.id), [farrieryRecords]);
+
+  const [selectedAnimalFilter, setSelectedAnimalFilter] = useState<string>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Form State
   const [formData, setFormData] = useState<Partial<EquineFarrieryRecord>>({
-    animalId: animals[0]?.id || '',
+    animalId: safeAnimals[0]?.id || '',
     date: new Date().toISOString().split('T')[0],
-    horseshoeType: 'Ferradura de Alumínio com Rolling Toe',
+    farrierName: '',
+    horseshoeType: 'Ferradura de Aço Convencional',
+    material: 'Aço',
     frontHoofAngleDegrees: 51,
     hindHoofAngleDegrees: 54,
-    farrierName: 'Mestre Ferrador Tiago Santos',
-    intervalDays: 35,
-    costBrl: 320,
-    hoofCondition: 'Casco íntegro com boa espessura de muralha e ranilha flexível',
+    hoofCondition: 'Excelente',
+    intervalDays: 40,
     correctiveShoeing: false,
+    correctionsMade: '',
+    costBrl: 380,
     notes: '',
   });
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.animalId) return;
+    const targetId = formData.animalId || safeAnimals[0]?.id;
+    if (!targetId) return;
 
     const baseDate = new Date(formData.date || new Date());
+    const interval = Number(formData.intervalDays) || 40;
     const nextDate = new Date(baseDate);
-    nextDate.setDate(nextDate.getDate() + (formData.intervalDays || 35));
+    nextDate.setDate(nextDate.getDate() + interval);
 
     const newRecord: EquineFarrieryRecord = {
-      ...(formData as EquineFarrieryRecord),
       id: `far-${Date.now()}`,
+      animalId: targetId,
+      date: formData.date || new Date().toISOString().split('T')[0],
+      farrierName: formData.farrierName?.trim() || 'Ferrador Responsável',
+      horseshoeType: formData.horseshoeType || 'Ferradura de Aço Convencional',
+      material: formData.material || 'Aço',
+      frontHoofAngleDegrees: formData.frontHoofAngleDegrees ? Number(formData.frontHoofAngleDegrees) : undefined,
+      hindHoofAngleDegrees: formData.hindHoofAngleDegrees ? Number(formData.hindHoofAngleDegrees) : undefined,
+      intervalDays: interval,
+      correctiveShoeing: Boolean(formData.correctiveShoeing),
+      correctionsMade: formData.correctionsMade || '',
       nextShoeingDate: nextDate.toISOString().split('T')[0],
+      costBrl: Number(formData.costBrl) || 0,
+      hoofCondition: formData.hoofCondition || 'Excelente',
+      notes: formData.notes || '',
     };
 
     onAddFarriery(newRecord);
     setIsModalOpen(false);
   };
 
-  const filteredRecords = farrieryRecords.filter(f =>
-    selectedAnimalId === 'all' || f.animalId === selectedAnimalId
+  const filteredRecords = safeRecords.filter(
+    f => selectedAnimalFilter === 'all' || f.animalId === selectedAnimalFilter
   );
 
+  const avgFrontAngle = useMemo(() => {
+    const withAngle = safeRecords.filter(r => typeof r.frontHoofAngleDegrees === 'number');
+    if (withAngle.length === 0) return null;
+    return withAngle.reduce((s, r) => s + (r.frontHoofAngleDegrees || 0), 0) / withAngle.length;
+  }, [safeRecords]);
+
+  const avgCycleDays = useMemo(() => {
+    const withInterval = safeRecords.filter(r => typeof r.intervalDays === 'number' && r.intervalDays > 0);
+    if (withInterval.length === 0) return 40;
+    return Math.round(withInterval.reduce((s, r) => s + (r.intervalDays || 40), 0) / withInterval.length);
+  }, [safeRecords]);
+
+  const correctiveCount = safeRecords.filter(
+    f => f.correctiveShoeing || f.horseshoeType.includes('Corretiva') || f.horseshoeType.includes('Heart-bar')
+  ).length;
+
   return (
-    <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 shadow-xs">
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <div className="text-[10px] font-black uppercase text-amber-900 tracking-wider flex items-center gap-1">
-            <Hammer className="w-3.5 h-3.5 text-amber-700" /> Podologia, Casqueamento & Ferrageamento
-          </div>
-          <h2 className="text-xl font-black text-stone-900">
-            Saúde dos Cascos & Balanceamento Podal
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+            <Hammer className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span>Podologia, Casqueamento & Ferrageamento</span>
           </h2>
-          <p className="text-xs text-stone-500 mt-0.5">
-            Controle de angulação podal, ferraduras terapêuticas e ciclos de troca (35-45 dias)
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Ciclos de troca de ferraduras, angulação podal, ferrageamento corretivo e histórico por animal
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <select
-            value={selectedAnimalId}
+            value={selectedAnimalFilter}
             onChange={e => setSelectedAnimalFilter(e.target.value)}
-            className="px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
+            className="h-8 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs text-slate-700 dark:text-zinc-200 focus:outline-none focus:border-emerald-500"
           >
-            <option value="all">Todos os Animais</option>
-            {animals.map(a => (
+            <option value="all">Todos os cavalos</option>
+            {safeAnimals.map(a => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </select>
 
           <button
+            type="button"
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-xl shadow-xs transition-colors cursor-pointer"
+            className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
-            <span>Registrar Ferrageamento</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>Novo Ferrageamento</span>
           </button>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
-          <span className="text-[10px] text-stone-500 font-bold uppercase block">Animais Ferrados</span>
-          <span className="text-2xl font-black text-stone-900">{animals.length}</span>
-          <span className="text-[11px] text-stone-500 block mt-0.5">100% Plantel monitorado</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
-          <span className="text-[10px] text-amber-800 font-bold uppercase block">Ciclo Médio de Troca</span>
-          <span className="text-2xl font-black text-amber-900 font-mono">38 dias</span>
-          <span className="text-[11px] text-emerald-700 block mt-0.5 font-semibold">Dentro do ideal (35-42d)</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
-          <span className="text-[10px] text-stone-500 font-bold uppercase block">Ângulo Médio Anterior</span>
-          <span className="text-2xl font-black text-stone-900 font-mono">51.5°</span>
-          <span className="text-[11px] text-emerald-700 block mt-0.5">Eixo Póstero-Falângico Ideal</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
-          <span className="text-[10px] text-stone-500 font-bold uppercase block">Ferrageamento Terapêutico</span>
-          <span className="text-2xl font-black text-blue-900 font-mono">
-            {farrieryRecords.filter(f => f.correctiveShoeing).length}
-          </span>
-          <span className="text-[11px] text-stone-500 block mt-0.5">Correção de aprumos</span>
+      {/* Hairline KPI Strip */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-zinc-800">
+          <div className="p-3.5">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Ciclo Médio</span>
+            <span className="mt-1 text-lg font-semibold text-slate-900 dark:text-zinc-100 tabular-nums block">
+              {avgCycleDays} dias
+            </span>
+          </div>
+          <div className="p-3.5">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Ferrageamentos</span>
+            <span className="mt-1 text-lg font-semibold text-slate-900 dark:text-zinc-100 tabular-nums block">
+              {safeRecords.length}
+            </span>
+          </div>
+          <div className="p-3.5">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Corretivos / Ortopédicos</span>
+            <span className="mt-1 text-lg font-semibold text-amber-700 dark:text-amber-400 tabular-nums block">
+              {correctiveCount}
+            </span>
+          </div>
+          <div className="p-3.5">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Ângulo Médio Ant.</span>
+            <span className="mt-1 text-lg font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums block">
+              {avgFrontAngle !== null ? `${avgFrontAngle.toFixed(1)}°` : '—'}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Farriery Records List */}
-      <div className="space-y-4">
-        {filteredRecords.map(record => {
-          const animal = animals.find(a => a.id === record.animalId);
-          const daysRemaining = record.nextShoeingDate
-            ? Math.round((new Date(record.nextShoeingDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24))
-            : null;
+      {/* Records List */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+        {filteredRecords.length === 0 ? (
+          <div className="p-8 text-center text-xs text-slate-500 dark:text-zinc-400">
+            Nenhum registro de ferrageamento ou casqueamento cadastrado.
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-200 dark:divide-zinc-800">
+            {filteredRecords.map(record => {
+              const animal = safeAnimals.find(a => a.id === record.animalId);
+              const nextDateStr = record.nextShoeingDate || record.nextDueDate;
 
-          return (
-            <div
-              key={record.id}
-              className="bg-white rounded-2xl border border-stone-200 p-5 shadow-xs hover:border-amber-400 transition-all space-y-3"
-            >
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-stone-100 pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center text-xl font-bold">
-                    🔨
-                  </div>
-                  <div>
-                    <h3 className="font-black text-stone-900 text-sm">{record.horseshoeType}</h3>
-                    <div className="text-xs text-stone-500 font-medium">
-                      Cavalo: <strong className="text-stone-800">{animal?.name || 'Cavalo'}</strong> • Data: {new Date(record.date).toLocaleDateString('pt-BR')} • Ferrador: {record.farrierName}
+              return (
+                <div key={record.id} className="p-4 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <Hammer className="w-4 h-4 mt-0.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                          {animal?.name || 'Animal'} — {record.horseshoeType}
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+                          {new Date(record.date).toLocaleDateString('pt-BR')} · Ferrador: {record.farrierName}
+                          {record.costBrl > 0 ? ` · R$ ${record.costBrl.toFixed(2)}` : ''}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0 text-xs">
+                      {record.correctiveShoeing && (
+                        <span className="text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                          Ortopédico / Corretivo
+                        </span>
+                      )}
+                      <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                        Casco: {record.hoofCondition}
+                      </span>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  {daysRemaining !== null && (
-                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${
-                      daysRemaining < 0 ? 'bg-red-100 text-red-900' :
-                      daysRemaining < 7 ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-900'
-                    }`}>
-                      {daysRemaining < 0 ? `Vencido há ${Math.abs(daysRemaining)} dias` : `Próxima troca em ${daysRemaining} dias`}
-                    </span>
+                  <div className="pl-6.5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs tabular-nums">
+                    <div>
+                      <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Ângulo Anterior</span>
+                      <span className="font-medium text-slate-900 dark:text-zinc-100">
+                        {record.frontHoofAngleDegrees ? `${record.frontHoofAngleDegrees}°` : '—'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Ângulo Posterior</span>
+                      <span className="font-medium text-slate-900 dark:text-zinc-100">
+                        {record.hindHoofAngleDegrees ? `${record.hindHoofAngleDegrees}°` : '—'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Próxima Troca</span>
+                      <span className="font-medium text-slate-900 dark:text-zinc-100">
+                        {nextDateStr ? new Date(nextDateStr).toLocaleDateString('pt-BR') : '—'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Intervalo</span>
+                      <span className="font-medium text-slate-900 dark:text-zinc-100">
+                        {record.intervalDays ? `${record.intervalDays} dias` : 'Padrão'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {(record.correctionsMade || record.notes) && (
+                    <div className="pl-6.5 text-xs text-slate-600 dark:text-zinc-400">
+                      {record.correctionsMade && <div>Correções: {record.correctionsMade}</div>}
+                      {record.notes && <div>{record.notes}</div>}
+                    </div>
                   )}
-                  <span className="text-xs font-mono font-bold bg-stone-100 px-2.5 py-1 rounded-lg">
-                    R$ {record.costBrl?.toFixed(2)}
-                  </span>
                 </div>
-              </div>
-
-              {/* Angles & Details */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div className="p-3 bg-stone-50 rounded-xl border border-stone-200">
-                  <span className="text-[10px] text-stone-500 font-bold uppercase block flex items-center gap-1">
-                    <Compass className="w-3 h-3 text-amber-700" /> Casco Anterior (Mão)
-                  </span>
-                  <strong className="text-base font-black text-stone-900 font-mono mt-0.5 block">
-                    {record.frontHoofAngleDegrees}°
-                  </strong>
-                  <span className="text-[10px] text-emerald-700 font-semibold">Ideal: 50° - 54°</span>
-                </div>
-
-                <div className="p-3 bg-stone-50 rounded-xl border border-stone-200">
-                  <span className="text-[10px] text-stone-500 font-bold uppercase block flex items-center gap-1">
-                    <Compass className="w-3 h-3 text-amber-700" /> Casco Posterior (Pé)
-                  </span>
-                  <strong className="text-base font-black text-stone-900 font-mono mt-0.5 block">
-                    {record.hindHoofAngleDegrees}°
-                  </strong>
-                  <span className="text-[10px] text-emerald-700 font-semibold">Ideal: 53° - 57°</span>
-                </div>
-
-                <div className="p-3 bg-stone-50 rounded-xl border border-stone-200">
-                  <span className="text-[10px] text-stone-500 font-bold uppercase block">Próxima Troca Prevista</span>
-                  <strong className="text-xs font-black text-amber-900 font-mono mt-0.5 block">
-                    {record.nextDueDate ? new Date(record.nextDueDate).toLocaleDateString('pt-BR') : 'N/A'}
-                  </strong>
-                  <span className="text-[10px] text-stone-500">Ciclo de {record.intervalDays} dias</span>
-                </div>
-
-                <div className="p-3 bg-stone-50 rounded-xl border border-stone-200">
-                  <span className="text-[10px] text-stone-500 font-bold uppercase block">Finalidade</span>
-                  <strong className="text-xs font-black text-stone-900 mt-0.5 block">
-                    {record.correctiveShoeing ? 'Terapêutico / Corretivo' : 'Rotina Esportiva'}
-                  </strong>
-                  <span className="text-[10px] text-stone-500">Muralha e ranilha avaliadas</span>
-                </div>
-              </div>
-
-              {record.hoofCondition && (
-                <div className="text-xs text-stone-700 bg-stone-50 p-2.5 rounded-lg border border-stone-100">
-                  <strong>Avaliação Podal:</strong> {record.hoofCondition}
-                </div>
-              )}
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Add Farriery Modal */}
+      {/* Modal: New Farriery Record */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl border border-stone-200 max-w-lg w-full">
-            <div className="bg-amber-900 text-white px-6 py-4 flex items-center justify-between rounded-t-2xl">
-              <div className="flex items-center gap-2">
-                <Hammer className="w-5 h-5 text-amber-400" />
-                <h3 className="font-black text-sm">Registrar Ferrageamento / Casqueamento</h3>
-              </div>
-              <button onClick={() => setIsModalOpen(false)} className="text-stone-300 hover:text-white cursor-pointer">
-                <X className="w-5 h-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl max-w-lg w-full">
+            <div className="px-5 py-3.5 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Registrar Ferrageamento / Casqueamento
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="h-7 w-7 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-500 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="p-6 space-y-4 text-xs text-stone-800">
+            <form onSubmit={handleSave} className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="font-bold text-stone-700 block mb-1">Cavalo *</label>
+                  <label className={labelCls}>Animal *</label>
                   <select
-                    value={formData.animalId}
+                    value={formData.animalId || safeAnimals[0]?.id || ''}
                     onChange={e => setFormData({ ...formData, animalId: e.target.value })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-bold"
+                    className={inputCls}
                   >
-                    {animals.map(a => (
-                      <option key={a.id} value={a.id}>{a.name} ({a.registrationNumber})</option>
+                    {safeAnimals.map(a => (
+                      <option key={a.id} value={a.id}>{a.name} ({a.breed})</option>
                     ))}
                   </select>
                 </div>
 
-                <div className="col-span-2">
-                  <label className="font-bold text-stone-700 block mb-1">Tipo de Ferradura / Casqueamento</label>
-                  <select
-                    value={formData.horseshoeType}
-                    onChange={e => setFormData({ ...formData, horseshoeType: e.target.value as HorseshoeType })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-bold"
-                  >
-                    <option value="Ferradura de Alumínio com Rolling Toe">Alumínio com Rolling Toe (Performance)</option>
-                    <option value="Ferradura de Ferro com Talonete">Ferro com Talonete Elevado</option>
-                    <option value="Ferradura de Ferro Padrão">Ferro Padrão</option>
-                    <option value="Ferradura Terapêutica em Coração (Heart-Bar)">Terapêutica em Coração (Heart-Bar)</option>
-                    <option value="Ferradura Egg-Bar (Oval)">Egg-Bar (Oval para Navicular)</option>
-                    <option value="Casqueamento Simples (Descalço / Barefoot)">Descalço / Barefoot (Sem ferradura)</option>
-                  </select>
-                </div>
-
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Ângulo Anterior (°)</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={formData.frontHoofAngleDegrees}
-                    onChange={e => setFormData({ ...formData, frontHoofAngleDegrees: parseFloat(e.target.value) || 51 })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-mono font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-stone-700 block mb-1">Ângulo Posterior (°)</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={formData.hindHoofAngleDegrees}
-                    onChange={e => setFormData({ ...formData, hindHoofAngleDegrees: parseFloat(e.target.value) || 54 })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-mono font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-stone-700 block mb-1">Data da Aplicação</label>
+                  <label className={labelCls}>Data do Serviço</label>
                   <input
                     type="date"
                     value={formData.date}
                     onChange={e => setFormData({ ...formData, date: e.target.value })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl"
+                    className={inputCls}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Intervalo de Troca (dias)</label>
-                  <input
-                    type="number"
-                    value={formData.intervalDays}
-                    onChange={e => setFormData({ ...formData, intervalDays: parseInt(e.target.value) || 35 })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-stone-700 block mb-1">Ferrador Responsável</label>
+                  <label className={labelCls}>Ferrador / Podólogo</label>
                   <input
                     type="text"
                     value={formData.farrierName || ''}
                     onChange={e => setFormData({ ...formData, farrierName: e.target.value })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl"
+                    placeholder="Nome do profissional"
+                    className={inputCls}
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className={labelCls}>Tipo de Ferradura / Serviço</label>
+                  <select
+                    value={formData.horseshoeType}
+                    onChange={e => setFormData({ ...formData, horseshoeType: e.target.value as HorseshoeType })}
+                    className={inputCls}
+                  >
+                    {HORSESHOE_OPTIONS.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className={labelCls}>Ângulo Anterior (°)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={formData.frontHoofAngleDegrees ?? ''}
+                    onChange={e => setFormData({ ...formData, frontHoofAngleDegrees: Number(e.target.value) || undefined })}
+                    className={`${inputCls} tabular-nums`}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Custo Total (R$)</label>
+                  <label className={labelCls}>Ângulo Posterior (°)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={formData.hindHoofAngleDegrees ?? ''}
+                    onChange={e => setFormData({ ...formData, hindHoofAngleDegrees: Number(e.target.value) || undefined })}
+                    className={`${inputCls} tabular-nums`}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelCls}>Condição do Casco</label>
+                  <select
+                    value={formData.hoofCondition}
+                    onChange={e => setFormData({ ...formData, hoofCondition: e.target.value as EquineFarrieryRecord['hoofCondition'] })}
+                    className={inputCls}
+                  >
+                    <option value="Excelente">Excelente</option>
+                    <option value="Bom">Bom</option>
+                    <option value="Quebradiço">Quebradiço</option>
+                    <option value="Broca / Pododermatite">Broca / Pododermatite</option>
+                    <option value="Sensível / Laminite Prévia">Sensível / Laminite Prévia</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className={labelCls}>Próximo Ciclo (dias)</label>
+                  <input
+                    type="number"
+                    value={formData.intervalDays ?? 40}
+                    onChange={e => setFormData({ ...formData, intervalDays: Number(e.target.value) || 40 })}
+                    className={`${inputCls} tabular-nums`}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelCls}>Custo (R$)</label>
                   <input
                     type="number"
                     step="0.01"
-                    value={formData.costBrl}
-                    onChange={e => setFormData({ ...formData, costBrl: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-mono"
+                    value={formData.costBrl ?? 0}
+                    onChange={e => setFormData({ ...formData, costBrl: Number(e.target.value) || 0 })}
+                    className={`${inputCls} tabular-nums`}
                   />
+                </div>
+
+                <div className="flex items-end pb-1.5">
+                  <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-zinc-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formData.correctiveShoeing)}
+                      onChange={e => setFormData({ ...formData, correctiveShoeing: e.target.checked })}
+                      className="rounded accent-emerald-600"
+                    />
+                    <span>Ferrageamento ortopédico</span>
+                  </label>
                 </div>
               </div>
 
               <div>
-                <label className="font-bold text-stone-700 block mb-1">Condição dos Cascos & Observações</label>
+                <label className={labelCls}>Correções & Observações</label>
                 <textarea
                   rows={2}
-                  value={formData.hoofCondition || ''}
-                  onChange={e => setFormData({ ...formData, hoofCondition: e.target.value })}
-                  placeholder="Ranilha, linha branca, espessura da sola..."
-                  className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl"
+                  value={formData.notes || ''}
+                  onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Aprumos, talões, uso de palmilha, sensibilidade..."
+                  className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
-              <div className="pt-3 border-t flex justify-end gap-3">
+              <div className="pt-3 border-t border-slate-200 dark:border-zinc-800 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-stone-100 text-stone-700 font-bold rounded-xl cursor-pointer"
+                  className="h-8 px-3.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-600 dark:text-zinc-300 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl shadow-md cursor-pointer"
+                  className="h-8 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium cursor-pointer"
                 >
-                  Salvar Ferrageamento
+                  Salvar Registro
                 </button>
               </div>
             </form>

@@ -27,6 +27,7 @@ export const AvaliacaoVeiculosTab: React.FC<AvaliacaoVeiculosTabProps> = ({
   const items: PericiaAvaliacaoVeiculo[] = avaliacao.veiculos || [];
 
   const [showForm, setShowForm] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<PericiaAvaliacaoVeiculo>>({
     tipo: 'Camionete 4x4',
     marca: 'Toyota',
@@ -67,7 +68,7 @@ export const AvaliacaoVeiculosTab: React.FC<AvaliacaoVeiculosTabProps> = ({
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.modelo?.trim() || !formData.marca?.trim()) {
-      alert('Informe a marca e o modelo do veículo.');
+      onShowNotification('Informe a marca e o modelo do veículo.');
       return;
     }
 
@@ -105,14 +106,19 @@ export const AvaliacaoVeiculosTab: React.FC<AvaliacaoVeiculosTabProps> = ({
   };
 
   const handleDeleteItem = (id: string) => {
-    if (confirm('Deseja excluir este veículo da avaliação?')) {
-      const updated = items.filter(item => item.id !== id);
-      onUpdateAvaliacao({
-        ...avaliacao,
-        veiculos: updated,
-      });
-      onShowNotification('Veículo removido.');
+    if (pendingDeleteId !== id) {
+      setPendingDeleteId(id);
+      onShowNotification('Clique novamente em excluir para confirmar a remoção do veículo.');
+      setTimeout(() => setPendingDeleteId((prev) => (prev === id ? null : prev)), 4000);
+      return;
     }
+    const updated = items.filter(item => item.id !== id);
+    onUpdateAvaliacao({
+      ...avaliacao,
+      veiculos: updated,
+    });
+    setPendingDeleteId(null);
+    onShowNotification('Veículo removido.');
   };
 
   const handleExportCSV = () => {

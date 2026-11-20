@@ -1,28 +1,23 @@
 import React, { useMemo } from 'react';
 import {
-  DollarSign,
-  TrendingUp,
-  BarChart3,
-  MapPin,
-  Wheat,
-  Package,
-  Calendar,
-  Droplets,
-  CloudSun,
-  Tractor,
-  Sparkles,
-} from 'lucide-react';
-import {
   ResponsiveContainer,
+  AreaChart,
+  Area,
   BarChart,
   Bar,
   XAxis,
   YAxis,
+  CartesianGrid,
   Tooltip,
   Legend,
-  AreaChart,
-  Area,
 } from 'recharts';
+import {
+  AlertTriangle,
+  Wrench,
+  CalendarClock,
+  ArrowRight,
+  Tractor,
+} from 'lucide-react';
 import {
   PropriedadeRural,
   TalhaoRural,
@@ -36,7 +31,7 @@ import {
 } from '../../types/gestaoRural';
 
 interface GestaoExecutiveDashboardProps {
-  propriedade?: PropriedadeRural;
+  propriedade: PropriedadeRural;
   talhoes: TalhaoRural[];
   safras: SafraAgragricola[];
   financeiro: ContaFinanceiraRecord[];
@@ -46,8 +41,18 @@ interface GestaoExecutiveDashboardProps {
   operacoes: OperacaoCampoRecord[];
   configCultura?: ConfigCulturaIntegrada;
   onOpenConfigCultura?: () => void;
-  onNavigateTab: (tabId: string) => void;
+  onNavigateTab: (tab: string) => void;
 }
+
+const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+const formatCompactBRL = (val: number) => {
+  const abs = Math.abs(val);
+  const sign = val < 0 ? '-' : '';
+  if (abs >= 1_000_000) return `${sign}R$ ${(abs / 1_000_000).toFixed(2)}M`;
+  if (abs >= 1_000) return `${sign}R$ ${(abs / 1_000).toFixed(1)}k`;
+  return `${sign}R$ ${abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
 
 export const GestaoExecutiveDashboard: React.FC<GestaoExecutiveDashboardProps> = ({
   talhoes,
@@ -60,459 +65,415 @@ export const GestaoExecutiveDashboard: React.FC<GestaoExecutiveDashboardProps> =
   configCultura,
   onNavigateTab,
 }) => {
-  const kpis = useMemo(() => {
-    const receitaTotal = financeiro
+  const unidadePrincipal = configCultura?.unidadeComercializacaoPrincipal || 'sc';
+
+  const metrics = useMemo(() => {
+    const areaPlantada = safras.reduce((acc, s) => acc + (s.areaHa || 0), 0);
+    const totalReceita = financeiro
       .filter(f => f.tipo === 'receita')
       .reduce((acc, f) => acc + f.valorR$, 0);
-
-    const despesaTotal = financeiro
+    const totalDespesa = financeiro
       .filter(f => f.tipo === 'despesa')
       .reduce((acc, f) => acc + f.valorR$, 0);
+    const lucroLiquido = totalReceita - totalDespesa;
+    const custoPorHa = areaPlantada > 0 ? totalDespesa / areaPlantada : 0;
+    const roi = totalDespesa > 0 ? (lucroLiquido / totalDespesa) * 100 : 0;
+    const margemLucro = totalReceita > 0 ? (lucroLiquido / totalReceita) * 100 : 0;
 
-    const lucroLiquido = receitaTotal - despesaTotal;
+    const estoqueAlerta = estoque.filter(e => e.statusAlerta !== 'normal');
+    const maquinasManutencao = maquinas.filter(m => m.status === 'em_manutencao');
+    const contasAtrasadas = financeiro.filter(f => f.status === 'atrasado');
+    const contasPendentesPagar = financeiro.filter(
+      f => f.tipo === 'despesa' && (f.status === 'pendente' || f.status === 'atrasado')
+    );
 
-    const contasPagar = financeiro
-      .filter(f => f.tipo === 'despesa' && f.status === 'pendente')
-      .reduce((acc, f) => acc + f.valorR$, 0);
-
-    const contasReceber = financeiro
-      .filter(f => f.tipo === 'receita' && f.status === 'pendente')
-      .reduce((acc, f) => acc + f.valorR$, 0);
-
-    const areaTotalPlantada = safras.reduce((acc, s) => acc + s.areaHa, 0);
-    const safrasColhidas = safras.filter(s => s.status === 'colhida');
-    const areaTotalColhida = safrasColhidas.reduce((acc, s) => acc + s.areaHa, 0);
-    const produtividadeMediaSacas =
+    const safrasColhidas = safras.filter(s => s.status === 'colhida' && (s.produtividadeRealizadaSacasHa || 0) > 0);
+    const mediaProdutividade =
       safrasColhidas.length > 0
-        ? safrasColhidas.reduce((acc, s) => acc + (s.produtividadeRealizadaSacasHa || 0), 0) /
-          safrasColhidas.length
+        ? safrasColhidas.reduce((acc, s) => acc + (s.produtividadeRealizadaSacasHa || 0), 0) / safrasColhidas.length
         : 0;
 
-    const maquinasAtivas = maquinas.filter(m => m.status === 'ativo').length;
-    const funcionariosAtivos = funcionarios.filter(f => f.status === 'ativo').length;
-    const alertasEstoqueCount = estoque.filter(
-      e => e.statusAlerta === 'minimo' || e.statusAlerta === 'vencendo' || e.statusAlerta === 'vencido'
-    ).length;
-
     return {
-      receitaTotal,
-      despesaTotal,
+      areaPlantada,
+      totalReceita,
+      totalDespesa,
       lucroLiquido,
-      contasPagar,
-      contasReceber,
-      areaTotalPlantada,
-      safrasColhidasCount: safrasColhidas.length,
-      areaTotalColhida,
-      produtividadeMediaSacas,
-      maquinasAtivas,
-      funcionariosAtivos,
-      alertasEstoqueCount,
+      custoPorHa,
+      roi,
+      margemLucro,
+      estoqueAlerta,
+      maquinasManutencao,
+      contasAtrasadas,
+      contasPendentesPagar,
+      mediaProdutividade,
     };
-  }, [financeiro, safras, maquinas, funcionarios, estoque]);
+  }, [safras, financeiro, estoque, maquinas]);
 
-  const fluxoCaixaChartData = useMemo(() => {
-    if (financeiro.length === 0) return [];
-    const monthlyMap: Record<string, { receita: number; despesa: number }> = {};
-    financeiro.forEach(f => {
-      const date = f.dataPagamentoRecebimento || f.dataVencimento;
-      if (!date) return;
-      const d = new Date(date);
-      const key = `${d.toLocaleString('pt-BR', { month: 'short' })}/${String(d.getFullYear()).slice(-2)}`;
-      if (!monthlyMap[key]) monthlyMap[key] = { receita: 0, despesa: 0 };
-      if (f.tipo === 'receita') monthlyMap[key].receita += f.valorR$;
-      else if (f.tipo === 'despesa') monthlyMap[key].despesa += f.valorR$;
+  const fluxoCaixaMensal = useMemo(() => {
+    const map = new Map<number, { mes: string; receita: number; despesa: number; saldo: number }>();
+    financeiro.forEach(item => {
+      const dateStr = item.dataPagamentoRecebimento || item.dataVencimento;
+      if (!dateStr) return;
+      const d = new Date(`${dateStr}T00:00:00`);
+      if (Number.isNaN(d.getTime())) return;
+      const mIdx = d.getMonth();
+      const entry = map.get(mIdx) || { mes: MONTH_LABELS[mIdx], receita: 0, despesa: 0, saldo: 0 };
+      if (item.tipo === 'receita') entry.receita += item.valorR$;
+      else entry.despesa += item.valorR$;
+      entry.saldo = entry.receita - entry.despesa;
+      map.set(mIdx, entry);
     });
-    return Object.entries(monthlyMap).map(([mes, vals]) => ({
-      mes,
-      receita: vals.receita,
-      despesa: vals.despesa,
-      saldo: vals.receita - vals.despesa,
-    }));
+    return Array.from(map.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([, val]) => val);
   }, [financeiro]);
 
-  const custosPorCulturaChartData = useMemo(() => {
-    if (safras.length === 0) return [];
-    return safras.map(s => {
-      const safrasDespesas = financeiro.filter(f => f.tipo === 'despesa' && f.safraId === s.id);
-      const adubacao = safrasDespesas
-        .filter(f => f.categoria?.toLowerCase().includes('fertilizante') || f.categoria?.toLowerCase().includes('adubo'))
-        .reduce((a, b) => a + b.valorR$, 0);
-      const defensivos = safrasDespesas
-        .filter(f => f.categoria?.toLowerCase().includes('defensivo'))
-        .reduce((a, b) => a + b.valorR$, 0);
-      const sementes = safrasDespesas
-        .filter(f => f.categoria?.toLowerCase().includes('semente'))
-        .reduce((a, b) => a + b.valorR$, 0);
-      const outras = safrasDespesas
-        .filter(f => !['fertilizante', 'adubo', 'defensivo', 'semente'].some(k => f.categoria?.toLowerCase().includes(k)))
-        .reduce((a, b) => a + b.valorR$, 0);
-      const area = s.areaHa > 0 ? s.areaHa : 1;
-      return {
-        cultura: `${s.cultura} (${s.nomeSafra})`,
-        adubacao: Math.round(adubacao / area),
-        defensivos: Math.round(defensivos / area),
-        sementes: Math.round(sementes / area),
-        operacoes: Math.round(outras / area),
-      };
-    });
-  }, [safras, financeiro]);
+  const custosPorCategoria = useMemo(() => {
+    const grouped: Record<string, number> = {};
+    financeiro
+      .filter(f => f.tipo === 'despesa')
+      .forEach(f => {
+        grouped[f.categoria] = (grouped[f.categoria] || 0) + f.valorR$;
+      });
+    return Object.entries(grouped)
+      .map(([categoria, valor]) => ({ categoria, valor }))
+      .sort((a, b) => b.valor - a.valor)
+      .slice(0, 6);
+  }, [financeiro]);
 
-  const receitaPorTalhaoChartData = useMemo(() => {
-    if (talhoes.length === 0) return [];
-    return talhoes.map(t => {
-      const talhaoReceita = financeiro
-        .filter(f => f.tipo === 'receita' && f.talhaoId === t.id)
-        .reduce((a, b) => a + b.valorR$, 0);
-      const talhaoCusto = financeiro
-        .filter(f => f.tipo === 'despesa' && f.talhaoId === t.id)
-        .reduce((a, b) => a + b.valorR$, 0);
-      const area = t.areaHa > 0 ? t.areaHa : 1;
-      return {
-        name: t.nome || t.codigo,
-        receitaHa: Math.round(talhaoReceita / area),
-        custoHa: Math.round(talhaoCusto / area),
-      };
-    });
-  }, [talhoes, financeiro]);
-
-  const unitLabel = configCultura?.unidadeComercializacaoPrincipal || 'cx';
+  const produtividadePorTalhao = useMemo(() => {
+    return safras.slice(0, 6).map(s => ({
+      nome: s.talhaoNome.length > 14 ? `${s.talhaoNome.slice(0, 14)}…` : s.talhaoNome,
+      meta: s.metaProdutividadeSacasHa || 0,
+      realizada: s.produtividadeRealizadaSacasHa || 0,
+    }));
+  }, [safras]);
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* TOP METRIC CARDS GRID */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Receita Bruta
-            </span>
-            <DollarSign className="w-4 h-4 text-emerald-500" />
+    <div className="space-y-5 animate-fade-in">
+      {/* PRIMARY KPI STRIP (SINGLE ELEVATION HAIRLINE GRID) */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80 dark:divide-zinc-800">
+        <div className="p-4 space-y-1">
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">Área Plantada</span>
+          <div className="text-lg font-semibold text-slate-900 dark:text-zinc-50 tabular-nums">
+            {metrics.areaPlantada.toLocaleString('pt-BR')} ha
           </div>
-          <span className="block text-lg font-black text-slate-900 dark:text-white">
-            R$ {(kpis.receitaTotal / 1000).toFixed(1)}k
-          </span>
-          <span className="text-[10px] text-slate-500">
-            {kpis.receitaTotal > 0 ? 'Entradas acumuladas' : 'Sem receitas'}
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums block">
+            {talhoes.length} talhão(ões) · {safras.length} safra(s)
           </span>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Lucro Líquido
-            </span>
-            <TrendingUp className="w-4 h-4 text-blue-500" />
+        <div className="p-4 space-y-1">
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">Receita Total</span>
+          <div className="text-lg font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">
+            {formatCompactBRL(metrics.totalReceita)}
           </div>
-          <span className="block text-lg font-black text-slate-900 dark:text-white">
-            R$ {(kpis.lucroLiquido / 1000).toFixed(1)}k
-          </span>
-          <span className="text-[10px] text-slate-500">
-            Margem: {kpis.receitaTotal > 0 ? ((kpis.lucroLiquido / kpis.receitaTotal) * 100).toFixed(1) : 0}%
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums block">
+            Margem {metrics.margemLucro.toFixed(1)}%
           </span>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Custo Total
-            </span>
-            <BarChart3 className="w-4 h-4 text-amber-500" />
+        <div className="p-4 space-y-1">
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">Despesas</span>
+          <div className="text-lg font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
+            {formatCompactBRL(metrics.totalDespesa)}
           </div>
-          <span className="block text-lg font-black text-slate-900 dark:text-white">
-            R$ {(kpis.despesaTotal / 1000).toFixed(1)}k
-          </span>
-          <span className="text-[10px] text-slate-500">
-            {kpis.areaTotalPlantada > 0 ? `R$ ${(kpis.despesaTotal / kpis.areaTotalPlantada).toFixed(0)} / ha` : 'Sem área colhida'}
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums block">
+            {metrics.custoPorHa > 0 ? `R$ ${metrics.custoPorHa.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}/ha` : 'Sem área base'}
           </span>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Área Plantada
-            </span>
-            <Wheat className="w-4 h-4 text-emerald-600" />
+        <div className="p-4 space-y-1">
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">Lucro Líquido</span>
+          <div
+            className={`text-lg font-semibold tabular-nums ${
+              metrics.lucroLiquido >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+            }`}
+          >
+            {formatCompactBRL(metrics.lucroLiquido)}
           </div>
-          <span className="block text-lg font-black text-slate-900 dark:text-white">
-            {kpis.areaTotalPlantada} ha
-          </span>
-          <span className="text-[10px] text-slate-500">Colhida: {kpis.areaTotalColhida} ha</span>
-        </div>
-
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Produtividade ({configCultura?.cultura || 'Cultura'})
-            </span>
-            <Sparkles className="w-4 h-4 text-purple-500" />
-          </div>
-          <span className="block text-lg font-black text-slate-900 dark:text-white">
-            {kpis.produtividadeMediaSacas > 0
-              ? `${kpis.produtividadeMediaSacas.toFixed(1)} ${unitLabel}/ha`
-              : `${configCultura?.metaProdutividadePadraoHa || 1500} ${unitLabel}/ha`}
-          </span>
-          <span className="text-[10px] text-slate-500">
-            {kpis.safrasColhidasCount > 0 ? `${kpis.safrasColhidasCount} safra(s) colhida(s)` : `Meta estimada em ${unitLabel}`}
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums block">
+            ROI {metrics.roi.toFixed(1)}%
           </span>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Contas P/R
-            </span>
-            <Calendar className="w-4 h-4 text-orange-500" />
+        <div className="p-4 space-y-1">
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">Produtividade</span>
+          <div className="text-lg font-semibold text-slate-900 dark:text-zinc-50 tabular-nums">
+            {metrics.mediaProdutividade > 0 ? `${metrics.mediaProdutividade.toFixed(1)} ${unidadePrincipal}/ha` : '—'}
           </div>
-          <span className="block text-xs font-bold text-red-600 dark:text-red-400">
-            Pagar: R$ {(kpis.contasPagar / 1000).toFixed(0)}k
-          </span>
-          <span className="block text-xs font-bold text-emerald-600 dark:text-emerald-400">
-            Receber: R$ {(kpis.contasReceber / 1000).toFixed(0)}k
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">
+            Média safras colhidas
           </span>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Frota & RH
-            </span>
-            <Tractor className="w-4 h-4 text-blue-500" />
+        <div className="p-4 space-y-1">
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">Operação &amp; Equipe</span>
+          <div className="text-lg font-semibold text-slate-900 dark:text-zinc-50 tabular-nums">
+            {maquinas.length} máq. · {funcionarios.length} colab.
           </div>
-          <span className="block text-xs font-bold text-slate-800 dark:text-zinc-200">
-            {kpis.maquinasAtivas} Máquinas Ativas
-          </span>
-          <span className="block text-xs font-bold text-slate-800 dark:text-zinc-200">
-            {kpis.funcionariosAtivos} Funcionários
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums block">
+            {operacoes.length} apontamento(s)
           </span>
         </div>
       </div>
 
-      {/* ALERT BANNERS SECTION */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-2xl p-4 flex items-start gap-3">
-          <CloudSun className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-          <div className="space-y-0.5 text-xs">
-            <h4 className="font-bold text-amber-900 dark:text-amber-200">
-              Condições Climáticas & Janela Operacional
-            </h4>
-            <p className="text-amber-700 dark:text-amber-300/80">
-              Consulte a aba Clima & ZARC para monitorar previsões de precipitação e janelas de plantio.
-            </p>
+      {/* OPERATIONAL ALERTS STRIP */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <button
+          type="button"
+          onClick={() => onNavigateTab('estoque')}
+          className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 hover:border-amber-400/70 dark:hover:border-amber-600/60 rounded-xl p-4 text-left flex items-center justify-between gap-3 transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-slate-900 dark:text-zinc-100">Alertas de Estoque</div>
+              <div className="text-[11px] text-slate-500 dark:text-zinc-400 truncate tabular-nums">
+                {metrics.estoqueAlerta.length > 0
+                  ? `${metrics.estoqueAlerta.length} item(ns) no mínimo ou vencendo`
+                  : `${estoque.length} insumo(s) em nível regular`}
+              </div>
+            </div>
           </div>
-        </div>
+          <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+        </button>
 
-        <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60 rounded-2xl p-4 flex items-start gap-3">
-          <Droplets className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-          <div className="space-y-0.5 text-xs">
-            <h4 className="font-bold text-blue-900 dark:text-blue-200">
-              Operações de Campo & Manejo
-            </h4>
-            <p className="text-blue-700 dark:text-blue-300/80">
-              {operacoes.length > 0
-                ? `${operacoes.length} operação(ões) registrada(s) no histórico da fazenda.`
-                : 'Nenhuma operação em andamento registrada no momento.'}
-            </p>
+        <button
+          type="button"
+          onClick={() => onNavigateTab('maquinas_rh')}
+          className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 hover:border-sky-400/70 dark:hover:border-sky-600/60 rounded-xl p-4 text-left flex items-center justify-between gap-3 transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <Wrench className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-slate-900 dark:text-zinc-100">Frota &amp; Manutenção</div>
+              <div className="text-[11px] text-slate-500 dark:text-zinc-400 truncate tabular-nums">
+                {metrics.maquinasManutencao.length > 0
+                  ? `${metrics.maquinasManutencao.length} máquina(s) em manutenção`
+                  : `${maquinas.length} ativo(s) disponível(is)`}
+              </div>
+            </div>
           </div>
-        </div>
+          <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+        </button>
 
-        <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/60 rounded-2xl p-4 flex items-start gap-3">
-          <Package className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-          <div className="space-y-0.5 text-xs">
-            <h4 className="font-bold text-red-900 dark:text-red-200">
-              {kpis.alertasEstoqueCount} Alerta(s) de Insumos & Validade
-            </h4>
-            <p className="text-red-700 dark:text-red-300/80">
-              {kpis.alertasEstoqueCount > 0
-                ? 'Existem insumos atingindo o estoque mínimo ou com validade próxima.'
-                : 'Nenhum insumo em nível crítico ou com validade expirada.'}
-            </p>
+        <button
+          type="button"
+          onClick={() => onNavigateTab('financeiro')}
+          className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 hover:border-rose-400/70 dark:hover:border-rose-600/60 rounded-xl p-4 text-left flex items-center justify-between gap-3 transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <CalendarClock className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-slate-900 dark:text-zinc-100">Contas a Pagar</div>
+              <div className="text-[11px] text-slate-500 dark:text-zinc-400 truncate tabular-nums">
+                {metrics.contasAtrasadas.length > 0
+                  ? `${metrics.contasAtrasadas.length} título(s) vencido(s)`
+                  : `${metrics.contasPendentesPagar.length} pagamento(s) pendente(s)`}
+              </div>
+            </div>
           </div>
-        </div>
+          <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+        </button>
       </div>
 
-      {/* CHARTS GRID 1: FLUXO DE CAIXA & CUSTOS POR CULTURA */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-7 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-2xs space-y-4">
+      {/* CHARTS GRID */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* FLUXO DE CAIXA */}
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2">
-                <DollarSign className="w-4 h-4 text-emerald-600" />
-                Fluxo de Caixa Agrícola (Entradas x Saídas)
-              </h3>
-              <p className="text-[11px] text-slate-500">Evolução mensal de receitas e despesas</p>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Fluxo de Caixa Mensal</h3>
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400">Receitas e despesas agrupadas por mês</p>
             </div>
             <button
+              type="button"
               onClick={() => onNavigateTab('financeiro')}
-              className="text-xs font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 cursor-pointer"
+              className="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
             >
-              Ver DRE Completo &rarr;
+              Abrir ERP
             </button>
           </div>
 
-          <div className="h-64 w-full">
-            {fluxoCaixaChartData.length > 0 ? (
+          {fluxoCaixaMensal.length > 0 ? (
+            <div className="h-56 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={fluxoCaixaChartData}>
-                  <XAxis dataKey="mes" stroke="#888888" fontSize={11} />
-                  <YAxis stroke="#888888" fontSize={11} />
+                <AreaChart data={fluxoCaixaMensal} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" strokeOpacity={0.2} />
+                  <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
                   <Tooltip
-                    formatter={(value: number | string | Array<number | string> | undefined) => [
-                      `R$ ${Number(value ?? 0).toLocaleString('pt-BR')}`,
-                      '',
-                    ]}
+                    formatter={(value: any) => [`R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, '']}
+                    contentStyle={{
+                      fontSize: '12px',
+                      borderRadius: '8px',
+                      border: '1px solid #e2e8f0',
+                    }}
                   />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Area
-                    type="monotone"
-                    dataKey="receita"
-                    name="Receita (Entradas)"
-                    stroke="#10b981"
-                    fill="#10b981"
-                    fillOpacity={0.2}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="despesa"
-                    name="Despesa (Saídas)"
-                    stroke="#ef4444"
-                    fill="#ef4444"
-                    fillOpacity={0.15}
-                  />
+                  <Legend wrapperStyle={{ fontSize: '11px' }} />
+                  <Area type="monotone" dataKey="receita" name="Receitas" stroke="#10b981" fill="#10b981" fillOpacity={0.14} strokeWidth={2} />
+                  <Area type="monotone" dataKey="despesa" name="Despesas" stroke="#f43f5e" fill="#f43f5e" fillOpacity={0.1} strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-4 border border-dashed border-slate-200 dark:border-zinc-800 rounded-2xl text-slate-400">
-                <DollarSign className="w-8 h-8 text-slate-300 dark:text-zinc-600 mb-1" />
-                <p className="font-semibold text-xs text-slate-600 dark:text-zinc-300">Nenhum lançamento financeiro</p>
-                <p className="text-[11px] text-slate-400">Cadastre receitas e despesas para acompanhar o fluxo de caixa.</p>
-              </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="h-56 flex flex-col items-center justify-center text-center border border-dashed border-slate-200 dark:border-zinc-800 rounded-lg p-4">
+              <p className="text-xs text-slate-500 dark:text-zinc-400">
+                Nenhum lançamento financeiro registrado para compor o fluxo mensal.
+              </p>
+              <button
+                type="button"
+                onClick={() => onNavigateTab('financeiro')}
+                className="mt-2.5 h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium cursor-pointer"
+              >
+                Lançar no Financeiro
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="lg:col-span-5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-2xs space-y-4">
+        {/* CUSTOS POR CATEGORIA */}
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-emerald-600" />
-                Composição de Custos por Hectare (R$/ha)
-              </h3>
-              <p className="text-[11px] text-slate-500">Detalhamento por insumo e operação</p>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Despesas por Categoria</h3>
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400">Principais centros de custo registrados</p>
             </div>
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+              {custosPorCategoria.length} categoria(s)
+            </span>
           </div>
 
-          <div className="h-64 w-full">
-            {custosPorCulturaChartData.length > 0 ? (
+          {custosPorCategoria.length > 0 ? (
+            <div className="h-56 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={custosPorCulturaChartData}>
-                  <XAxis dataKey="cultura" stroke="#888888" fontSize={11} />
-                  <YAxis stroke="#888888" fontSize={11} />
+                <BarChart data={custosPorCategoria} layout="vertical" margin={{ top: 4, right: 16, left: 10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" strokeOpacity={0.2} horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+                  <YAxis type="category" dataKey="categoria" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={96} />
                   <Tooltip
-                    formatter={(value: number | string | Array<number | string> | undefined) => [
-                      `R$ ${Number(value ?? 0).toLocaleString('pt-BR')}`,
-                      '',
-                    ]}
+                    formatter={(value: any) => [`R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Despesa']}
+                    contentStyle={{ fontSize: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
                   />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="adubacao" name="Adubação / Fertilizante" stackId="a" fill="#10b981" />
-                  <Bar dataKey="defensivos" name="Defensivos" stackId="a" fill="#3b82f6" />
-                  <Bar dataKey="sementes" name="Sementes" stackId="a" fill="#f59e0b" />
-                  <Bar dataKey="operacoes" name="Máquinas & Mão de Obra" stackId="a" fill="#8b5cf6" />
+                  <Bar dataKey="valor" name="Despesa" fill="#059669" radius={[0, 4, 4, 0]} barSize={16} />
                 </BarChart>
               </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-4 border border-dashed border-slate-200 dark:border-zinc-800 rounded-2xl text-slate-400">
-                <BarChart3 className="w-8 h-8 text-slate-300 dark:text-zinc-600 mb-1" />
-                <p className="font-semibold text-xs text-slate-600 dark:text-zinc-300">Sem custos de safra apurados</p>
-                <p className="text-[11px] text-slate-400">Cadastre safras e lance despesas para visualizar os custos por cultura.</p>
-              </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="h-56 flex items-center justify-center text-center border border-dashed border-slate-200 dark:border-zinc-800 rounded-lg p-4">
+              <p className="text-xs text-slate-500 dark:text-zinc-400">
+                Cadastre despesas no Financeiro Rural para visualizar a composição de custos.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* CHARTS GRID 2: RECEITA POR TALHÃO & MAPA DE OPERAÇÕES RECENTES */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-6 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-2xs space-y-4">
-          <h3 className="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-emerald-600" />
-            Rentabilidade por Talhão (R$/ha)
-          </h3>
-
-          <div className="h-56 w-full">
-            {receitaPorTalhaoChartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={receitaPorTalhaoChartData}>
-                  <XAxis dataKey="name" stroke="#888888" fontSize={11} />
-                  <YAxis stroke="#888888" fontSize={11} />
-                  <Tooltip
-                    formatter={(value: number | string | Array<number | string> | undefined) => [
-                      `R$ ${value ?? 0}/ha`,
-                      '',
-                    ]}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="receitaHa" name="Receita/ha" fill="#10b981" />
-                  <Bar dataKey="custoHa" name="Custo/ha" fill="#f59e0b" />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-4 border border-dashed border-slate-200 dark:border-zinc-800 rounded-2xl text-slate-400">
-                <MapPin className="w-8 h-8 text-slate-300 dark:text-zinc-600 mb-1" />
-                <p className="font-semibold text-xs text-slate-600 dark:text-zinc-300">Nenhum talhão cadastrado</p>
-                <p className="text-[11px] text-slate-400">Cadastre talhões na aba Administração para calcular a rentabilidade.</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="lg:col-span-6 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-2xs space-y-4">
+      {/* BOTTOM ROW: PRODUTIVIDADE & OPERAÇÕES RECENTES */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* PRODUTIVIDADE META VS REALIZADA */}
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2">
-              <Tractor className="w-4 h-4 text-emerald-600" />
-              Últimas Operações de Campo Lançadas
-            </h3>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Produtividade por Talhão</h3>
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400">Meta vs. realizado ({unidadePrincipal}/ha)</p>
+            </div>
             <button
-              onClick={() => onNavigateTab('operacoes')}
-              className="text-xs font-bold text-emerald-600 hover:underline cursor-pointer"
+              type="button"
+              onClick={() => onNavigateTab('planejamento')}
+              className="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
             >
-              Ver Todas
+              Ver Safras
             </button>
           </div>
 
-          <div className="space-y-2 text-xs">
-            {operacoes.length > 0 ? (
-              operacoes.slice(0, 3).map(op => (
-                <div
-                  key={op.id}
-                  className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800 flex items-center justify-between gap-2"
-                >
-                  <div className="space-y-0.5">
-                    <span className="font-bold text-slate-800 dark:text-zinc-100 block">
-                      {op.tipoOperacao} • {op.talhaoNome}
-                    </span>
-                    <span className="text-[11px] text-slate-500 block">
-                      {op.operadorNome || 'Operador não informado'} | {op.maquinaNome || 'Máquina não informada'}
-                    </span>
+          {produtividadePorTalhao.length > 0 ? (
+            <div className="h-52 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={produtividadePorTalhao} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" strokeOpacity={0.2} />
+                  <XAxis dataKey="nome" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ fontSize: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                  <Legend wrapperStyle={{ fontSize: '11px' }} />
+                  <Bar dataKey="meta" name={`Meta (${unidadePrincipal}/ha)`} fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={16} />
+                  <Bar dataKey="realizada" name={`Realizada (${unidadePrincipal}/ha)`} fill="#10b981" radius={[4, 4, 0, 0]} barSize={16} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-52 flex flex-col items-center justify-center text-center border border-dashed border-slate-200 dark:border-zinc-800 rounded-lg p-4">
+              <p className="text-xs text-slate-500 dark:text-zinc-400">
+                Nenhuma safra cadastrada para comparar produtividade.
+              </p>
+              <button
+                type="button"
+                onClick={() => onNavigateTab('planejamento')}
+                className="mt-2.5 h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-medium cursor-pointer"
+              >
+                Planejar Safra
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ÚLTIMAS OPERAÇÕES DE CAMPO */}
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-5 flex flex-col">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Operações Recentes</h3>
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400">Últimos apontamentos do caderno de campo</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('operacoes')}
+              className="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
+            >
+              Ver todas
+            </button>
+          </div>
+
+          {operacoes.length > 0 ? (
+            <div className="divide-y divide-slate-100 dark:divide-zinc-800/80 flex-1">
+              {operacoes.slice(0, 5).map(op => (
+                <div key={op.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Tractor className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="font-medium text-slate-900 dark:text-zinc-100 truncate">
+                        {op.tipoOperacao} · <span className="text-slate-500 dark:text-zinc-400 font-normal">{op.talhaoNome}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 dark:text-zinc-400 truncate tabular-nums">
+                        {op.areaAplicadaHa} ha{op.produtoUtilizado ? ` · ${op.produtoUtilizado}` : ''}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400 block">
-                      {op.areaAplicadaHa} ha
-                    </span>
-                    <span className="text-[10px] text-slate-400 block">
+                  <div className="text-right shrink-0 tabular-nums">
+                    <div className="font-semibold text-slate-900 dark:text-zinc-100">
+                      R$ {op.custoTotalOperacaoR$.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                    <div className="text-[10px] text-slate-400 dark:text-zinc-500">
                       {new Date(op.dataHoraInicio).toLocaleDateString('pt-BR')}
-                    </span>
+                    </div>
                   </div>
                 </div>
-              ))
-            ) : (
-              <div className="p-6 text-center border border-dashed border-slate-200 dark:border-zinc-800 rounded-2xl text-slate-400">
-                <Tractor className="w-8 h-8 text-slate-300 dark:text-zinc-600 mx-auto mb-1" />
-                <p className="font-semibold text-xs text-slate-600 dark:text-zinc-300">Nenhuma operação lançada</p>
-                <p className="text-[11px] text-slate-400">Acesse a aba Operações de Campo para realizar o primeiro lançamento.</p>
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex-1 min-h-40 flex flex-col items-center justify-center text-center border border-dashed border-slate-200 dark:border-zinc-800 rounded-lg p-4">
+              <p className="text-xs text-slate-500 dark:text-zinc-400">
+                Nenhuma operação de campo registrada ainda.
+              </p>
+              <button
+                type="button"
+                onClick={() => onNavigateTab('operacoes')}
+                className="mt-2.5 h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium cursor-pointer"
+              >
+                Lançar Operação
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

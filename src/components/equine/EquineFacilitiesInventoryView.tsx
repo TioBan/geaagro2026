@@ -1,23 +1,19 @@
-// @ts-nocheck
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Building2,
   Package,
-  Sparkles,
   Plus,
   AlertTriangle,
-  CheckCircle2,
-  Calendar,
   X,
-  Layers,
-  ShieldCheck,
-  Search,
+  CheckCircle2,
+  Minus,
 } from 'lucide-react';
 import {
   EquineFacility,
   EquineInventoryItem,
   EquineAnimal,
 } from '../../types/equine';
+import { EquinoIcon } from '../icons/EquinoIcon';
 
 interface Props {
   animals: EquineAnimal[];
@@ -29,6 +25,10 @@ interface Props {
   onUpdateInventoryItem: (item: EquineInventoryItem) => void;
 }
 
+const inputCls =
+  'w-full h-9 px-3 rounded-lg bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500';
+const labelCls = 'block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1';
+
 export const EquineFacilitiesInventoryView: React.FC<Props> = ({
   animals,
   facilities,
@@ -38,343 +38,476 @@ export const EquineFacilitiesInventoryView: React.FC<Props> = ({
   onAddInventoryItem,
   onUpdateInventoryItem,
 }) => {
+  const safeAnimals = useMemo(() => (animals || []).filter(a => a && a.id), [animals]);
+  const safeFacilities = useMemo(() => (facilities || []).filter(f => f && f.id), [facilities]);
+  const safeInventory = useMemo(() => (inventory || []).filter(i => i && i.id), [inventory]);
+
   const [activeTab, setActiveTab] = useState<'facilities' | 'inventory'>('facilities');
   const [isFacilityModalOpen, setIsFacilityModalOpen] = useState(false);
   const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
 
-  // Facility Form State
-  const [facilityForm, setFacilityForm] = useState<Partial<EquineFacility>>({
-    name: 'Baia 05 - Garanhões',
+  const [facilityForm, setFacilityForm] = useState({
+    name: '',
     type: 'Baia Individual',
-    dimensionsMeters: '4.0m x 4.0m (16m²)',
-    beddingType: 'Maravalha de Pinus Tratada',
-    currentOccupantAnimalId: '',
+    dimensionsMeters: '4.0m x 4.0m',
+    beddingType: 'Maravalha de Pinus',
+    occupantId: '',
     hygieneStatus: 'Limpo / Desinfetado',
-    lastCleanedDate: new Date().toISOString().split('T')[0],
-    notes: 'Bebedouro automático e cocho em inox.',
+    notes: '',
   });
 
-  // Inventory Form State
-  const [inventoryForm, setInventoryForm] = useState<Partial<EquineInventoryItem>>({
-    name: 'Feno Tifton 85 Especial (Fardos 12kg)',
-    category: 'Feno & Volumoso',
-    quantity: 120,
+  const [inventoryForm, setInventoryForm] = useState({
+    name: '',
+    category: 'Feno / Volumoso',
+    quantity: 50,
     unit: 'fardos',
-    minimumQuantity: 30,
-    costPerUnitBrl: 45,
-    location: 'Galpão de Feno 01',
-    expiryDate: '2026-12-31',
+    minThreshold: 15,
+    unitCostBrl: 45,
+    location: 'Galpão Principal',
+    expiryDate: '',
   });
 
   const handleSaveFacility = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!facilityForm.name) return;
+    if (!facilityForm.name.trim()) return;
 
     const newFacility: EquineFacility = {
-      ...(facilityForm as EquineFacility),
       id: `fac-${Date.now()}`,
+      name: facilityForm.name.trim(),
+      type: facilityForm.type,
+      dimensionsMeters: facilityForm.dimensionsMeters,
+      beddingType: facilityForm.beddingType,
+      currentAnimalIds: facilityForm.occupantId ? [facilityForm.occupantId] : [],
+      currentOccupantAnimalId: facilityForm.occupantId || undefined,
+      capacityAnimals: 1,
+      currentOccupancy: facilityForm.occupantId ? 1 : 0,
+      status: facilityForm.occupantId ? 'Ocupado' : 'Disponível / Livre',
+      hygieneStatus: facilityForm.hygieneStatus,
+      lastCleanedDate: new Date().toISOString().split('T')[0],
+      notes: facilityForm.notes,
     };
+
     onAddFacility(newFacility);
+    setFacilityForm({ ...facilityForm, name: '', notes: '' });
     setIsFacilityModalOpen(false);
   };
 
   const handleSaveInventory = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inventoryForm.name) return;
+    if (!inventoryForm.name.trim()) return;
 
     const newItem: EquineInventoryItem = {
-      ...(inventoryForm as EquineInventoryItem),
       id: `inv-${Date.now()}`,
+      name: inventoryForm.name.trim(),
+      category: inventoryForm.category,
+      quantity: Number(inventoryForm.quantity) || 0,
+      unit: inventoryForm.unit.trim() || 'unidade',
+      minThreshold: Number(inventoryForm.minThreshold) || 0,
+      unitCostBrl: Number(inventoryForm.unitCostBrl) || 0,
+      location: inventoryForm.location.trim() || 'Almoxarifado',
+      expiryDate: inventoryForm.expiryDate || undefined,
     };
+
     onAddInventoryItem(newItem);
+    setInventoryForm({ ...inventoryForm, name: '' });
     setIsInventoryModalOpen(false);
   };
 
-  const lowStockItems = inventory.filter(i => i.quantity <= i.minimumQuantity);
+  const handleMarkCleaned = (fac: EquineFacility) => {
+    onUpdateFacility({
+      ...fac,
+      hygieneStatus: 'Limpo / Desinfetado',
+      lastCleanedDate: new Date().toISOString().split('T')[0],
+    });
+  };
+
+  const handleAdjustStock = (item: EquineInventoryItem, delta: number) => {
+    onUpdateInventoryItem({
+      ...item,
+      quantity: Math.max(0, Number((item.quantity + delta).toFixed(2))),
+    });
+  };
+
+  const lowStockItems = safeInventory.filter(i => {
+    const min = i.minThreshold ?? i.minimumQuantity ?? 0;
+    return i.quantity <= min;
+  });
+
+  const totalInventoryValue = safeInventory.reduce((sum, i) => {
+    const unitCost = i.unitCostBrl ?? i.costPerUnitBrl ?? 0;
+    return sum + i.quantity * unitCost;
+  }, 0);
 
   return (
-    <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 shadow-xs">
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <div className="text-[10px] font-black uppercase text-amber-900 tracking-wider flex items-center gap-1">
-            <Building2 className="w-3.5 h-3.5 text-amber-700" /> Infraestrutura do Haras & Farmácia Veterinária
-          </div>
-          <h2 className="text-xl font-black text-stone-900">
-            Baias, Piquetes, Estoque de Insumos & Medicamentos
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+            <Building2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span>Instalações, Baias & Almoxarifado</span>
           </h2>
-          <p className="text-xs text-stone-500 mt-0.5">
-            Manejo de camas, desinfecção de instalações, saldo de ração, feno e farmácia equina
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Alocação de animais, higienização de baias, feno, ração e farmácia veterinária
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           {activeTab === 'facilities' ? (
             <button
+              type="button"
               onClick={() => setIsFacilityModalOpen(true)}
-              className="flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-xl shadow-xs transition-colors cursor-pointer"
+              className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
-              <span>Nova Instalação / Baia</span>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Nova Instalação</span>
             </button>
           ) : (
             <button
+              type="button"
               onClick={() => setIsInventoryModalOpen(true)}
-              className="flex items-center gap-1.5 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black rounded-xl shadow-xs transition-colors cursor-pointer"
+              className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5" />
               <span>Novo Item de Estoque</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Low stock warning banner */}
-      {(lowStockItems || []).length > 0 && (
-        <div className="p-4 bg-amber-50 rounded-2xl border-2 border-amber-300 flex items-center justify-between gap-3 text-xs text-amber-950">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
-            <span>
-              <strong>Atenção de Reposição:</strong> Existem <strong>{(lowStockItems || []).length} itens</strong> com estoque abaixo do nível mínimo de segurança (Ex: {lowStockItems[0]?.name}).
+      {/* Low Stock Alert */}
+      {lowStockItems.length > 0 && (
+        <div className="px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/70 flex items-center justify-between gap-3 text-xs text-amber-900 dark:text-amber-300">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span className="truncate">
+              <strong>Reposição necessária:</strong> {lowStockItems.length} item(ns) no limite mínimo (ex.: {lowStockItems[0]?.name}).
             </span>
           </div>
-          <button
-            onClick={() => setActiveTab('inventory')}
-            className="px-3 py-1 bg-amber-600 text-white font-bold rounded-lg shrink-0 cursor-pointer"
-          >
-            Ver Almoxarifado
-          </button>
+          {activeTab !== 'inventory' && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('inventory')}
+              className="h-7 px-2.5 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-medium shrink-0 cursor-pointer"
+            >
+              Ver Estoque
+            </button>
+          )}
         </div>
       )}
 
-      {/* Switcher Tabs */}
-      <div className="flex items-center gap-2 border-b border-stone-200 pb-2 text-xs font-bold">
+      {/* Switcher */}
+      <div className="flex items-center gap-1.5">
         <button
+          type="button"
           onClick={() => setActiveTab('facilities')}
-          className={`px-4 py-2 rounded-xl transition-colors cursor-pointer flex items-center gap-2 ${
-            activeTab === 'facilities' ? 'bg-amber-900 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+          className={`h-8 px-3 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+            activeTab === 'facilities'
+              ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-950'
+              : 'bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800'
           }`}
         >
-          <Building2 className="w-4 h-4" />
-          <span>Instalações, Baias & Piquetes ({facilities.length})</span>
+          <Building2 className="w-3.5 h-3.5" />
+          <span>Baias & Piquetes ({safeFacilities.length})</span>
         </button>
 
         <button
+          type="button"
           onClick={() => setActiveTab('inventory')}
-          className={`px-4 py-2 rounded-xl transition-colors cursor-pointer flex items-center gap-2 ${
-            activeTab === 'inventory' ? 'bg-amber-900 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+          className={`h-8 px-3 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+            activeTab === 'inventory'
+              ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-950'
+              : 'bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800'
           }`}
         >
-          <Package className="w-4 h-4" />
-          <span>Almoxarifado & Farmácia Veterinária ({inventory.length})</span>
+          <Package className="w-3.5 h-3.5" />
+          <span>Almoxarifado & Farmácia ({safeInventory.length})</span>
         </button>
       </div>
 
-      {/* View 1: Facilities Grid */}
+      {/* View 1: Facilities */}
       {activeTab === 'facilities' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {facilities.map(fac => {
-            const occupant = animals.find(a => a.id === fac.currentOccupantAnimalId);
+        <>
+          {safeFacilities.length === 0 ? (
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-8 text-center text-xs text-slate-500 dark:text-zinc-400">
+              Nenhuma baia, piquete ou instalação cadastrada ainda.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {safeFacilities.map(fac => {
+                const occupantId = fac.currentAnimalIds?.[0] || fac.currentOccupantAnimalId;
+                const occupant = safeAnimals.find(a => a.id === occupantId);
+                const hygiene = fac.hygieneStatus || fac.status || 'Limpo / Desinfetado';
 
-            return (
-              <div
-                key={fac.id}
-                className="bg-white rounded-2xl border border-stone-200 p-5 shadow-xs hover:border-amber-400 transition-all space-y-3"
-              >
-                <div className="flex items-start justify-between gap-2 border-b border-stone-100 pb-3">
-                  <div>
-                    <span className="text-[10px] font-black uppercase text-amber-800 tracking-wider block">
-                      {fac.type}
-                    </span>
-                    <h3 className="font-black text-stone-900 text-sm">{fac.name}</h3>
-                  </div>
-
-                  <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${
-                    fac.hygieneStatus === 'Limpo / Desinfetado' ? 'bg-emerald-100 text-emerald-900' :
-                    fac.hygieneStatus === 'Necessita Troca de Cama' ? 'bg-amber-100 text-amber-900' : 'bg-blue-100 text-blue-900'
-                  }`}>
-                    {fac.hygieneStatus}
-                  </span>
-                </div>
-
-                <div className="space-y-1.5 text-xs text-stone-700">
-                  <div className="flex justify-between">
-                    <span className="text-stone-500">Dimensões:</span>
-                    <strong className="font-mono">{fac.dimensionsMeters}</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-stone-500">Tipo de Cama:</span>
-                    <strong className="truncate max-w-[160px]">{fac.beddingType}</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-stone-500">Última Higienização:</span>
-                    <span className="font-mono">{new Date(fac.lastCleanedDate).toLocaleDateString('pt-BR')}</span>
-                  </div>
-                </div>
-
-                {/* Occupant card */}
-                <div className="p-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs">
-                  <span className="text-[10px] text-stone-400 font-bold uppercase block">Animal Alocado:</span>
-                  {occupant ? (
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-sm">🐎</span>
-                      <div>
-                        <strong className="text-stone-900 block">{occupant.name}</strong>
-                        <span className="text-[10px] text-stone-500">{occupant.breed} ({occupant.category})</span>
+                return (
+                  <div
+                    key={fac.id}
+                    className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-3 flex flex-col justify-between"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-zinc-800">
+                        <div className="min-w-0">
+                          <div className="text-[11px] text-slate-500 dark:text-zinc-400">
+                            {fac.type}
+                          </div>
+                          <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 truncate">
+                            {fac.name}
+                          </h3>
+                        </div>
+                        <span
+                          className={`text-[11px] font-medium shrink-0 ${
+                            hygiene.includes('Limpo') || hygiene.includes('Disponível')
+                              ? 'text-emerald-700 dark:text-emerald-400'
+                              : 'text-amber-600 dark:text-amber-400'
+                          }`}
+                        >
+                          {hygiene}
+                        </span>
                       </div>
-                    </div>
-                  ) : (
-                    <span className="text-stone-400 italic mt-0.5 block">Baia livre / Disponível</span>
-                  )}
-                </div>
 
-                {fac.notes && (
-                  <p className="text-[11px] text-stone-500 italic bg-amber-50/50 p-2 rounded-lg">
-                    {fac.notes}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between gap-2">
+                          <span className="text-slate-500 dark:text-zinc-400">Dimensões</span>
+                          <span className="font-medium text-slate-900 dark:text-zinc-100 tabular-nums">
+                            {fac.dimensionsMeters || '—'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <span className="text-slate-500 dark:text-zinc-400">Cama</span>
+                          <span className="font-medium text-slate-900 dark:text-zinc-100 truncate">
+                            {fac.beddingType || '—'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <span className="text-slate-500 dark:text-zinc-400">Última Limpeza</span>
+                          <span className="font-medium text-slate-900 dark:text-zinc-100 tabular-nums">
+                            {fac.lastCleanedDate
+                              ? new Date(fac.lastCleanedDate).toLocaleDateString('pt-BR')
+                              : '—'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2.5 border-t border-slate-100 dark:border-zinc-800 text-xs">
+                        <span className="text-[10px] text-slate-500 dark:text-zinc-400 block mb-1">
+                          Animal Alocado
+                        </span>
+                        {occupant ? (
+                          <div className="flex items-center gap-2">
+                            <EquinoIcon className="w-4 h-4 text-slate-500 dark:text-zinc-400 shrink-0" />
+                            <div className="min-w-0">
+                              <div className="font-medium text-slate-900 dark:text-zinc-100 truncate">
+                                {occupant.name}
+                              </div>
+                              <div className="text-[11px] text-slate-500 dark:text-zinc-400 truncate">
+                                {occupant.breed}
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 dark:text-zinc-500">Baia livre / disponível</span>
+                        )}
+                      </div>
+
+                      {fac.notes && (
+                        <p className="text-[11px] text-slate-500 dark:text-zinc-400">{fac.notes}</p>
+                      )}
+                    </div>
+
+                    <div className="pt-2.5 border-t border-slate-100 dark:border-zinc-800 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleMarkCleaned(fac)}
+                        className="h-7 px-2.5 rounded-md border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 text-[11px] font-medium text-slate-700 dark:text-zinc-200 inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                        <span>Registrar Higienização</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
 
-      {/* View 2: Inventory Listing */}
+      {/* View 2: Inventory Table */}
       {activeTab === 'inventory' && (
-        <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b pb-3">
-            <h3 className="text-sm font-black text-stone-900 uppercase tracking-wider">
-              Catálogo de Produtos, Insumos & Farmácia
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+              Insumos, Volumosos & Farmácia Veterinária
             </h3>
-            <span className="text-xs font-bold text-stone-500">
-              Valor Total em Estoque: R$ {inventory.reduce((sum, i) => sum + (i.quantity * i.costPerUnitBrl), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            <span className="text-xs font-medium text-slate-600 dark:text-zinc-300 tabular-nums">
+              Valor em Estoque:{' '}
+              <strong className="text-slate-900 dark:text-zinc-100">
+                R$ {totalInventoryValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </strong>
             </span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-stone-50 text-stone-600 font-bold border-b">
-                <tr>
-                  <th className="p-3">Item / Fármaco</th>
-                  <th className="p-3">Categoria</th>
-                  <th className="p-3">Localização</th>
-                  <th className="p-3">Saldo Atual</th>
-                  <th className="p-3">Mínimo</th>
-                  <th className="p-3">Validade</th>
-                  <th className="p-3 text-right">Custo Unitário</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {inventory.map(item => {
-                  const isLow = item.quantity <= item.minimumQuantity;
+          {safeInventory.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-500 dark:text-zinc-400">
+              Nenhum item de estoque cadastrado.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-zinc-950/60 text-slate-500 dark:text-zinc-400 border-b border-slate-200 dark:border-zinc-800">
+                  <tr>
+                    <th className="px-4 py-2.5 font-medium">Item / Fármaco</th>
+                    <th className="px-4 py-2.5 font-medium">Categoria</th>
+                    <th className="px-4 py-2.5 font-medium">Local</th>
+                    <th className="px-4 py-2.5 font-medium">Saldo</th>
+                    <th className="px-4 py-2.5 font-medium">Mínimo</th>
+                    <th className="px-4 py-2.5 font-medium">Validade</th>
+                    <th className="px-4 py-2.5 font-medium text-right">Custo Unit.</th>
+                    <th className="px-4 py-2.5 font-medium text-right">Ajuste</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-zinc-800 tabular-nums">
+                  {safeInventory.map(item => {
+                    const min = item.minThreshold ?? item.minimumQuantity ?? 0;
+                    const unitCost = item.unitCostBrl ?? item.costPerUnitBrl ?? 0;
+                    const isLow = item.quantity <= min;
 
-                  return (
-                    <tr key={item.id} className="hover:bg-stone-50">
-                      <td className="p-3 font-bold text-stone-900">
-                        {item.name}
-                      </td>
-                      <td className="p-3">
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-stone-100 text-stone-800 border">
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50/70 dark:hover:bg-zinc-800/40">
+                        <td className="px-4 py-2.5 font-medium text-slate-900 dark:text-zinc-100">
+                          {item.name}
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-600 dark:text-zinc-400">
                           {item.category}
-                        </span>
-                      </td>
-                      <td className="p-3 text-stone-600">{item.location}</td>
-                      <td className="p-3">
-                        <span className={`font-mono font-black ${isLow ? 'text-red-700 bg-red-50 px-2 py-0.5 rounded-md' : 'text-stone-900'}`}>
-                          {item.quantity} {item.unit}
-                        </span>
-                      </td>
-                      <td className="p-3 font-mono text-stone-500">{item.minimumQuantity} {item.unit}</td>
-                      <td className="p-3 font-mono text-stone-600">
-                        {item.expiryDate ? new Date(item.expiryDate).toLocaleDateString('pt-BR') : 'N/A'}
-                      </td>
-                      <td className="p-3 text-right font-black font-mono text-stone-900">
-                        R$ {item.costPerUnitBrl.toFixed(2)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-600 dark:text-zinc-400">
+                          {item.location}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span
+                            className={`font-semibold ${
+                              isLow ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-zinc-100'
+                            }`}
+                          >
+                            {item.quantity} {item.unit}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-500 dark:text-zinc-400">
+                          {min} {item.unit}
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-600 dark:text-zinc-400">
+                          {item.expiryDate ? new Date(item.expiryDate).toLocaleDateString('pt-BR') : '—'}
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-medium text-slate-900 dark:text-zinc-100">
+                          R$ {unitCost.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleAdjustStock(item, -1)}
+                              title="Baixar 1 unidade"
+                              className="h-6 w-6 rounded border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 flex items-center justify-center cursor-pointer"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleAdjustStock(item, 1)}
+                              title="Adicionar 1 unidade"
+                              className="h-6 w-6 rounded border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 flex items-center justify-center cursor-pointer"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
       {/* Modal: New Facility */}
       {isFacilityModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl border border-stone-200 max-w-lg w-full">
-            <div className="bg-stone-900 text-white px-6 py-4 flex items-center justify-between rounded-t-2xl">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-amber-400" />
-                <h3 className="font-black text-sm">Cadastrar Instalação / Baia</h3>
-              </div>
-              <button onClick={() => setIsFacilityModalOpen(false)} className="text-stone-300 hover:text-white cursor-pointer">
-                <X className="w-5 h-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl max-w-lg w-full">
+            <div className="px-5 py-3.5 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Cadastrar Instalação / Baia
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsFacilityModalOpen(false)}
+                className="h-7 w-7 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-500 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveFacility} className="p-6 space-y-4 text-xs text-stone-800">
+            <form onSubmit={handleSaveFacility} className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="font-bold text-stone-700 block mb-1">Identificação da Instalação *</label>
+                  <label className={labelCls}>Identificação *</label>
                   <input
                     type="text"
                     required
-                    value={facilityForm.name || ''}
+                    value={facilityForm.name}
                     onChange={e => setFacilityForm({ ...facilityForm, name: e.target.value })}
-                    placeholder="Ex: Baia 05 - Garanhões"
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-bold"
+                    placeholder="Ex: Baia 05 — Garanhões"
+                    className={inputCls}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Tipo de Instalação</label>
+                  <label className={labelCls}>Tipo</label>
                   <select
                     value={facilityForm.type}
-                    onChange={e => setFacilityForm({ ...facilityForm, type: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl"
+                    onChange={e => setFacilityForm({ ...facilityForm, type: e.target.value })}
+                    className={inputCls}
                   >
                     <option value="Baia Individual">Baia Individual</option>
                     <option value="Baia Maternidade">Baia Maternidade</option>
-                    <option value="Piquete de Lazer / Pasto">Piquete de Lazer / Pasto</option>
+                    <option value="Piquete com Pastagem">Piquete com Pastagem</option>
                     <option value="Redondel">Redondel</option>
-                    <option value="Pista de Prova">Pista de Prova</option>
-                    <option value="Ducha / Lavador">Ducha / Lavador</option>
+                    <option value="Pista de Treinamento">Pista de Treinamento</option>
+                    <option value="Duchador / Lavador">Duchador / Lavador</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Dimensões (m²)</label>
+                  <label className={labelCls}>Dimensões</label>
                   <input
                     type="text"
-                    value={facilityForm.dimensionsMeters || ''}
+                    value={facilityForm.dimensionsMeters}
                     onChange={e => setFacilityForm({ ...facilityForm, dimensionsMeters: e.target.value })}
                     placeholder="Ex: 4.0m x 4.0m"
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-mono"
+                    className={inputCls}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Tipo de Cama</label>
+                  <label className={labelCls}>Tipo de Cama</label>
                   <input
                     type="text"
-                    value={facilityForm.beddingType || ''}
+                    value={facilityForm.beddingType}
                     onChange={e => setFacilityForm({ ...facilityForm, beddingType: e.target.value })}
-                    placeholder="Ex: Maravalha de Pinus"
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl"
+                    className={inputCls}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Animal Alocado</label>
+                  <label className={labelCls}>Animal Alocado</label>
                   <select
-                    value={facilityForm.currentOccupantAnimalId || ''}
-                    onChange={e => setFacilityForm({ ...facilityForm, currentOccupantAnimalId: e.target.value })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl"
+                    value={facilityForm.occupantId}
+                    onChange={e => setFacilityForm({ ...facilityForm, occupantId: e.target.value })}
+                    className={inputCls}
                   >
-                    <option value="">Nenhum (Baia Livre)</option>
-                    {animals.map(a => (
+                    <option value="">Nenhum (Livre)</option>
+                    {safeAnimals.map(a => (
                       <option key={a.id} value={a.id}>{a.name}</option>
                     ))}
                   </select>
@@ -382,27 +515,27 @@ export const EquineFacilitiesInventoryView: React.FC<Props> = ({
               </div>
 
               <div>
-                <label className="font-bold text-stone-700 block mb-1">Observações & Estrutura</label>
+                <label className={labelCls}>Observações</label>
                 <input
                   type="text"
-                  value={facilityForm.notes || ''}
+                  value={facilityForm.notes}
                   onChange={e => setFacilityForm({ ...facilityForm, notes: e.target.value })}
-                  placeholder="Ex: Bebedouro tipo concha automático..."
-                  className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl"
+                  placeholder="Bebedouro automático, cocho, ventilação..."
+                  className={inputCls}
                 />
               </div>
 
-              <div className="pt-3 border-t flex justify-end gap-3">
+              <div className="pt-3 border-t border-slate-200 dark:border-zinc-800 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsFacilityModalOpen(false)}
-                  className="px-4 py-2 bg-stone-100 text-stone-700 font-bold rounded-xl cursor-pointer"
+                  className="h-8 px-3.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-600 dark:text-zinc-300 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl shadow-md cursor-pointer"
+                  className="h-8 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium cursor-pointer"
                 >
                   Salvar Instalação
                 </button>
@@ -414,112 +547,126 @@ export const EquineFacilitiesInventoryView: React.FC<Props> = ({
 
       {/* Modal: New Inventory Item */}
       {isInventoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl border border-stone-200 max-w-lg w-full">
-            <div className="bg-emerald-950 text-white px-6 py-4 flex items-center justify-between rounded-t-2xl">
-              <div className="flex items-center gap-2">
-                <Package className="w-5 h-5 text-emerald-400" />
-                <h3 className="font-black text-sm">Adicionar Item ao Estoque</h3>
-              </div>
-              <button onClick={() => setIsInventoryModalOpen(false)} className="text-stone-300 hover:text-white cursor-pointer">
-                <X className="w-5 h-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl max-w-lg w-full">
+            <div className="px-5 py-3.5 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Adicionar Item ao Estoque
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsInventoryModalOpen(false)}
+                className="h-7 w-7 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-500 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveInventory} className="p-6 space-y-4 text-xs text-stone-800">
+            <form onSubmit={handleSaveInventory} className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="font-bold text-stone-700 block mb-1">Nome do Item / Medicamento *</label>
+                  <label className={labelCls}>Nome do Item / Medicamento *</label>
                   <input
                     type="text"
                     required
-                    value={inventoryForm.name || ''}
+                    value={inventoryForm.name}
                     onChange={e => setInventoryForm({ ...inventoryForm, name: e.target.value })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-bold"
+                    placeholder="Ex: Feno Tifton 85 (Fardos 12 kg)"
+                    className={inputCls}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Categoria</label>
+                  <label className={labelCls}>Categoria</label>
                   <select
                     value={inventoryForm.category}
-                    onChange={e => setInventoryForm({ ...inventoryForm, category: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl"
+                    onChange={e => setInventoryForm({ ...inventoryForm, category: e.target.value })}
+                    className={inputCls}
                   >
-                    <option value="Ração Concentrada">Ração Concentrada</option>
-                    <option value="Feno & Volumoso">Feno & Volumoso</option>
-                    <option value="Medicamento & Sanidade">Medicamento & Sanidade</option>
-                    <option value="Vacina">Vacina</option>
-                    <option value="Ferradura & Podologia">Ferradura & Podologia</option>
-                    <option value="Suplemento & Mineral">Suplemento & Mineral</option>
+                    <option value="Ração / Concentrado">Ração / Concentrado</option>
+                    <option value="Feno / Volumoso">Feno / Volumoso</option>
+                    <option value="Medicamento">Medicamento</option>
+                    <option value="Vacina / Soro">Vacina / Soro</option>
+                    <option value="Suplemento / Mineral">Suplemento / Mineral</option>
+                    <option value="Ferradura / Cravo">Ferradura / Cravo</option>
+                    <option value="Arreio / Equipamento">Arreio / Equipamento</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Localização no Haras</label>
+                  <label className={labelCls}>Localização</label>
                   <input
                     type="text"
-                    value={inventoryForm.location || ''}
+                    value={inventoryForm.location}
                     onChange={e => setInventoryForm({ ...inventoryForm, location: e.target.value })}
-                    placeholder="Ex: Farmácia / Geladeira"
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl"
+                    className={inputCls}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Quantidade em Estoque</label>
+                  <label className={labelCls}>Quantidade Atual</label>
                   <input
                     type="number"
                     value={inventoryForm.quantity}
-                    onChange={e => setInventoryForm({ ...inventoryForm, quantity: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-mono font-bold"
+                    onChange={e => setInventoryForm({ ...inventoryForm, quantity: Number(e.target.value) || 0 })}
+                    className={`${inputCls} tabular-nums`}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Unidade de Medida</label>
+                  <label className={labelCls}>Unidade</label>
                   <input
                     type="text"
-                    value={inventoryForm.unit || ''}
+                    value={inventoryForm.unit}
                     onChange={e => setInventoryForm({ ...inventoryForm, unit: e.target.value })}
-                    placeholder="Ex: kg, frascos, fardos"
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl"
+                    placeholder="kg, fardos, frascos..."
+                    className={inputCls}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Estoque Mínimo de Segurança</label>
+                  <label className={labelCls}>Estoque Mínimo</label>
                   <input
                     type="number"
-                    value={inventoryForm.minimumQuantity}
-                    onChange={e => setInventoryForm({ ...inventoryForm, minimumQuantity: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-mono"
+                    value={inventoryForm.minThreshold}
+                    onChange={e => setInventoryForm({ ...inventoryForm, minThreshold: Number(e.target.value) || 0 })}
+                    className={`${inputCls} tabular-nums`}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Custo Unitário (R$)</label>
+                  <label className={labelCls}>Custo Unitário (R$)</label>
                   <input
                     type="number"
                     step="0.01"
-                    value={inventoryForm.costPerUnitBrl}
-                    onChange={e => setInventoryForm({ ...inventoryForm, costPerUnitBrl: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl font-mono font-bold"
+                    value={inventoryForm.unitCostBrl}
+                    onChange={e => setInventoryForm({ ...inventoryForm, unitCostBrl: Number(e.target.value) || 0 })}
+                    className={`${inputCls} tabular-nums`}
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className={labelCls}>Data de Validade (Opcional)</label>
+                  <input
+                    type="date"
+                    value={inventoryForm.expiryDate}
+                    onChange={e => setInventoryForm({ ...inventoryForm, expiryDate: e.target.value })}
+                    className={inputCls}
                   />
                 </div>
               </div>
 
-              <div className="pt-3 border-t flex justify-end gap-3">
+              <div className="pt-3 border-t border-slate-200 dark:border-zinc-800 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsInventoryModalOpen(false)}
-                  className="px-4 py-2 bg-stone-100 text-stone-700 font-bold rounded-xl cursor-pointer"
+                  className="h-8 px-3.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-600 dark:text-zinc-300 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-black rounded-xl shadow-md cursor-pointer"
+                  className="h-8 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium cursor-pointer"
                 >
                   Salvar Item
                 </button>

@@ -21,6 +21,22 @@ interface Props {
   onSalvarPontosGps: (pontos: PontoInteresseGps[]) => void;
 }
 
+const INPUT_CLASS =
+  'w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500';
+
+const LABEL_CLASS =
+  'block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1';
+
+const TIPO_FEICAO_LABEL: Record<PontoInteresseGps['tipo'], string> = {
+  erosao: 'Sulco de Erosão',
+  vocoroca: 'Voçoroca / Ravina',
+  amostra_solo: 'Amostragem de Solo',
+  nascente: 'Nascente',
+  monitoramento: 'Marco de Monitoramento',
+  benfeitoria: 'Benfeitoria',
+  marco: 'Marco de Divisa'
+};
+
 export const RecuperaMapasView: React.FC<Props> = ({
   areaAtiva,
   propriedade,
@@ -44,7 +60,6 @@ export const RecuperaMapasView: React.FC<Props> = ({
   const [gpsBuscando, setGpsBuscando] = useState(false);
   const [statusMsg, mostrarStatus] = useTimedValue<string>(4000);
 
-  // Atualiza campos somente se o usuário selecionar explicitamente um talhão com coordenadas válidas
   useEffect(() => {
     if (areaAtiva?.coordenadasCentroid?.latitude && areaAtiva?.coordenadasCentroid?.longitude) {
       setNovoPontoLat(String(areaAtiva.coordenadasCentroid.latitude));
@@ -53,9 +68,8 @@ export const RecuperaMapasView: React.FC<Props> = ({
       setNovoPontoLat('');
       setNovoPontoLng('');
     }
-  }, [areaAtiva?.id]);
+  }, [areaAtiva?.id, areaAtiva?.coordenadasCentroid?.latitude, areaAtiva?.coordenadasCentroid?.longitude]);
 
-  // Inicialização do Leaflet Map (sem coordenadas hardcoded de propriedade)
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
@@ -108,7 +122,6 @@ export const RecuperaMapasView: React.FC<Props> = ({
     };
   }, []);
 
-  // Atualização de Marcadores e Polígonos
   useEffect(() => {
     if (!mapInstanceRef.current || !layerGroupRef.current) return;
 
@@ -117,13 +130,12 @@ export const RecuperaMapasView: React.FC<Props> = ({
 
     const bounds: [number, number][] = [];
 
-    // 1. Marcador da Sede da Fazenda (apenas se cadastrada com nome e coordenadas reais)
     if (propriedade?.nome && propriedade.coordenadasSede?.latitude && propriedade.coordenadasSede?.longitude) {
       const sedeIcon = L.divIcon({
         className: 'custom-pin-sede',
-        html: `<div style="background-color: #0f172a; color: white; padding: 4px 8px; border-radius: 8px; font-weight: bold; font-size: 10px; border: 2px solid #10b981; box-shadow: 0 2px 6px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 4px;">🏢 Sede: ${propriedade.nome}</div>`,
-        iconSize: [120, 30],
-        iconAnchor: [60, 15]
+        html: `<div style="background-color:#18181b;color:#ffffff;padding:3px 8px;border-radius:6px;font-weight:600;font-size:10px;border:1.5px solid #10b981;white-space:nowrap;">Sede: ${propriedade.nome}</div>`,
+        iconSize: [128, 26],
+        iconAnchor: [64, 13]
       });
 
       L.marker([propriedade.coordenadasSede.latitude, propriedade.coordenadasSede.longitude], { icon: sedeIcon })
@@ -133,23 +145,23 @@ export const RecuperaMapasView: React.FC<Props> = ({
       bounds.push([propriedade.coordenadasSede.latitude, propriedade.coordenadasSede.longitude]);
     }
 
-    // 2. Marcador do Centróide do Talhão Degradado Ativo (somente se selecionado)
     if (areaAtiva?.coordenadasCentroid?.latitude && areaAtiva?.coordenadasCentroid?.longitude) {
       const areaIcon = L.divIcon({
         className: 'custom-pin-area',
-        html: `<div style="background-color: #e11d48; color: white; padding: 4px 8px; border-radius: 8px; font-weight: bold; font-size: 10px; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">📍 ${areaAtiva.nomeTalhao} (${areaAtiva.areaHa} ha)</div>`,
-        iconSize: [140, 30],
-        iconAnchor: [70, 15]
+        html: `<div style="background-color:#e11d48;color:#ffffff;padding:3px 8px;border-radius:6px;font-weight:600;font-size:10px;border:1.5px solid #ffffff;white-space:nowrap;">Talhão: ${areaAtiva.nomeTalhao} (${areaAtiva.areaHa} ha)</div>`,
+        iconSize: [152, 26],
+        iconAnchor: [76, 13]
       });
 
       L.marker([areaAtiva.coordenadasCentroid.latitude, areaAtiva.coordenadasCentroid.longitude], { icon: areaIcon })
         .addTo(layerGroup)
-        .bindPopup(`<b>Área Alvo de Recuperação</b><br/>${areaAtiva.nomeTalhao}<br/>Degradação: ${areaAtiva.tipoDegradacao}<br/>Severidade: ${areaAtiva.grauSeveridade}`);
+        .bindPopup(
+          `<b>Área Alvo de Recuperação</b><br/>${areaAtiva.nomeTalhao}<br/>Degradação: ${areaAtiva.tipoDegradacao}<br/>Severidade: ${areaAtiva.grauSeveridade}`
+        );
 
       bounds.push([areaAtiva.coordenadasCentroid.latitude, areaAtiva.coordenadasCentroid.longitude]);
     }
 
-    // 3. Polígono da Área Degradada (se houver vértices no talhão selecionado)
     if (areaAtiva?.verticesPoligono && areaAtiva.verticesPoligono.length >= 3) {
       const coords = areaAtiva.verticesPoligono.map(v => [v.latitude, v.longitude] as [number, number]);
       L.polygon(coords, {
@@ -158,14 +170,22 @@ export const RecuperaMapasView: React.FC<Props> = ({
         fillOpacity: 0.25,
         weight: 2,
         dashArray: '4, 4'
-      }).addTo(layerGroup).bindPopup(`<b>Polígono Delimitado: ${areaAtiva.nomeTalhao}</b><br/>Área: ${areaAtiva.areaHa} ha`);
+      })
+        .addTo(layerGroup)
+        .bindPopup(`<b>Polígono Delimitado: ${areaAtiva.nomeTalhao}</b><br/>Área: ${areaAtiva.areaHa} ha`);
 
       coords.forEach(c => bounds.push(c));
     }
 
-    // 4. Marcadores de Pontos de Interesse (Erosão, Voçoroca, Amostras)
     pontosGps.forEach(p => {
-      const cor = p.tipo === 'vocoroca' ? '#b91c1c' : p.tipo === 'erosao' ? '#ea580c' : p.tipo === 'nascente' ? '#0284c7' : '#059669';
+      const cor =
+        p.tipo === 'vocoroca'
+          ? '#b91c1c'
+          : p.tipo === 'erosao'
+            ? '#ea580c'
+            : p.tipo === 'nascente'
+              ? '#0284c7'
+              : '#059669';
       const iconePonto = L.circleMarker([p.latitude, p.longitude], {
         radius: 7,
         fillColor: cor,
@@ -196,7 +216,10 @@ export const RecuperaMapasView: React.FC<Props> = ({
           setNovoPontoLat(String(lat));
           setNovoPontoLng(String(lng));
           setGpsBuscando(false);
-          mostrarStatus(`GPS Atual Obtido: Lat ${lat}, Lng ${lng} (Precisão: ${pos.coords.accuracy?.toFixed(0) || 5}m)`, 5000);
+          mostrarStatus(
+            `GPS obtido: Lat ${lat}, Lng ${lng} (Precisão: ${pos.coords.accuracy?.toFixed(0) || 5}m)`,
+            5000
+          );
 
           if (mapInstanceRef.current) {
             mapInstanceRef.current.flyTo([lat, lng], 16);
@@ -233,7 +256,7 @@ export const RecuperaMapasView: React.FC<Props> = ({
 
     onSalvarPontosGps([...pontosGps, novo]);
     setNovoPontoTitulo('');
-    mostrarStatus('Ponto de interesse inserido no mapa!', 3000);
+    mostrarStatus('Ponto de interesse inserido no mapa.', 3000);
   };
 
   const handleRemoverPonto = (id: string) => {
@@ -241,29 +264,31 @@ export const RecuperaMapasView: React.FC<Props> = ({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+    <div className="space-y-4">
+      <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 border border-slate-200/80 dark:border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="min-w-0">
+          <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
             Fase 5 • Cartografia, GPS & Georreferenciamento
           </span>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Compass className="w-5 h-5 text-emerald-600" />
-            <span>
-              {areaAtiva ? `Mapa Técnico de Recuperação: ${areaAtiva.nomeTalhao}` : 'Mapa Técnico de Recuperação & Georreferenciamento'}
+          <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-2 mt-0.5">
+            <Compass className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span className="truncate">
+              {areaAtiva
+                ? `Mapa Técnico de Recuperação: ${areaAtiva.nomeTalhao}`
+                : 'Mapa Técnico de Recuperação & Georreferenciamento'}
             </span>
           </h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
             OpenStreetMap interativo: clique no mapa para capturar coordenadas ou vincule um talhão cadastrado
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto shrink-0">
           {onSelecionarArea && (
             <select
               value={areaAtiva?.id || ''}
               onChange={e => onSelecionarArea(e.target.value)}
-              className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white max-w-[220px]"
+              className="h-9 px-3 text-xs font-medium rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 text-slate-900 dark:text-zinc-100 max-w-[220px] focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
               title="Selecionar talhão no mapa"
             >
               <option value="">Nenhum talhão selecionado</option>
@@ -279,59 +304,59 @@ export const RecuperaMapasView: React.FC<Props> = ({
             type="button"
             onClick={handleCapturarGpsDispositivo}
             disabled={gpsBuscando}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow flex items-center gap-2 disabled:opacity-50"
+            className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-lg transition flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap"
           >
-            <Navigation className={`w-4 h-4 ${gpsBuscando ? 'animate-spin' : ''}`} />
+            <Navigation className={`w-3.5 h-3.5 ${gpsBuscando ? 'animate-spin' : ''}`} />
             <span>{gpsBuscando ? 'Obtendo GPS...' : 'Capturar Minha Posição'}</span>
           </button>
         </div>
       </div>
 
       {statusMsg && (
-        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+        <div className="px-3.5 py-2.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 rounded-xl text-xs font-medium flex items-center gap-2 tabular-nums">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span>{statusMsg}</span>
         </div>
       )}
 
-      {/* Grid: Mapa Leaflet (Esquerda) e Painel de POIs e Coordenadas (Direita) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Container do Mapa (8 colunas) */}
-        <div className="lg:col-span-8 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs relative">
+      {/* Mapa e Painel de POIs */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className="lg:col-span-8 bg-white dark:bg-zinc-900 rounded-xl border border-slate-200/80 dark:border-zinc-800 overflow-hidden relative">
           <div ref={mapContainerRef} className="w-full h-[480px] z-0" />
-          <div className="p-3 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-700 text-[11px] text-slate-500 flex items-center justify-between">
-            <span>Dica: clique em qualquer ponto do mapa para preencher latitude e longitude automaticamente.</span>
-            <span className="font-bold text-emerald-600">OpenStreetMap Oficial</span>
+          <div className="px-3.5 py-2.5 bg-slate-50/70 dark:bg-zinc-950/60 border-t border-slate-200/70 dark:border-zinc-800 text-[11px] text-slate-500 dark:text-zinc-400 flex flex-wrap items-center justify-between gap-2">
+            <span>Clique em qualquer ponto do mapa para preencher latitude e longitude automaticamente.</span>
+            <span className="font-semibold text-emerald-700 dark:text-emerald-400">OpenStreetMap Oficial</span>
           </div>
         </div>
 
-        {/* Painel de Pontos de Interesse & Coordenadas (4 colunas) */}
         <div className="lg:col-span-4 space-y-4">
-          {/* Adicionar Ponto GPS */}
-          <form onSubmit={handleAdicionarPonto} className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3 text-xs">
-            <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
-              <Plus className="w-4 h-4 text-emerald-600" />
+          <form
+            onSubmit={handleAdicionarPonto}
+            className="bg-white dark:bg-zinc-900 rounded-xl p-4 border border-slate-200/80 dark:border-zinc-800 space-y-3"
+          >
+            <h3 className="text-xs font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5 border-b border-slate-200/70 dark:border-zinc-800 pb-2.5">
+              <Plus className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>Marcar Ponto de Campo</span>
             </h3>
 
             <div>
-              <label className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">Título do Ponto</label>
+              <label className={LABEL_CLASS}>Título do Ponto</label>
               <input
                 type="text"
                 value={novoPontoTitulo}
                 onChange={e => setNovoPontoTitulo(e.target.value)}
                 placeholder="Ex: Cabeceira de voçoroca 01"
                 required
-                className="w-full px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                className={INPUT_CLASS}
               />
             </div>
 
             <div>
-              <label className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">Tipo de Feição</label>
+              <label className={LABEL_CLASS}>Tipo de Feição</label>
               <select
                 value={novoPontoTipo}
                 onChange={e => setNovoPontoTipo(e.target.value as PontoInteresseGps['tipo'])}
-                className="w-full px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold"
+                className={INPUT_CLASS}
               >
                 <option value="erosao">Sulco de Erosão</option>
                 <option value="vocoroca">Voçoroca / Ravina</option>
@@ -341,9 +366,9 @@ export const RecuperaMapasView: React.FC<Props> = ({
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label className="block text-[11px] text-slate-500 mb-0.5">Latitude</label>
+                <label className={LABEL_CLASS}>Latitude</label>
                 <input
                   type="number"
                   step="0.000001"
@@ -351,11 +376,11 @@ export const RecuperaMapasView: React.FC<Props> = ({
                   onChange={e => setNovoPontoLat(e.target.value)}
                   placeholder="Ex: -20.4715"
                   required
-                  className="w-full px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-[11px]"
+                  className={`${INPUT_CLASS} tabular-nums`}
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-slate-500 mb-0.5">Longitude</label>
+                <label className={LABEL_CLASS}>Longitude</label>
                 <input
                   type="number"
                   step="0.000001"
@@ -363,40 +388,49 @@ export const RecuperaMapasView: React.FC<Props> = ({
                   onChange={e => setNovoPontoLng(e.target.value)}
                   placeholder="Ex: -54.6225"
                   required
-                  className="w-full px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-[11px]"
+                  className={`${INPUT_CLASS} tabular-nums`}
                 />
               </div>
             </div>
 
             <button
               type="submit"
-              className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow"
+              className="w-full h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg text-xs transition flex items-center justify-center gap-1.5"
             >
               <MapPin className="w-3.5 h-3.5" />
               <span>Inserir Marcador no Mapa</span>
             </button>
           </form>
 
-          {/* Lista de Pontos Cadastrados */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-xs space-y-2 text-xs">
-            <h4 className="font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 border border-slate-200/80 dark:border-zinc-800 space-y-2.5">
+            <h4 className="text-xs font-semibold text-slate-900 dark:text-zinc-100 border-b border-slate-200/70 dark:border-zinc-800 pb-2.5 tabular-nums">
               Pontos Registrados no Mapa ({pontosGps.length})
             </h4>
 
             <div className="space-y-2 max-h-56 overflow-y-auto scrollbar-thin">
               {pontosGps.length === 0 ? (
-                <p className="text-slate-400 text-center py-4 text-[11px]">Nenhum ponto registrado.</p>
+                <p className="text-slate-400 dark:text-zinc-500 text-center py-4 text-[11px]">
+                  Nenhum ponto registrado.
+                </p>
               ) : (
                 pontosGps.map(p => (
-                  <div key={p.id} className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2">
+                  <div
+                    key={p.id}
+                    className="p-2.5 bg-slate-50/70 dark:bg-zinc-950/60 rounded-lg border border-slate-200/70 dark:border-zinc-800 flex items-center justify-between gap-2"
+                  >
                     <div className="min-w-0">
-                      <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{p.titulo}</p>
-                      <p className="text-[10px] text-slate-400 capitalize">{p.tipo} • Lat {p.latitude.toFixed(4)}°, Lng {p.longitude.toFixed(4)}°</p>
+                      <p className="text-xs font-medium text-slate-800 dark:text-zinc-200 truncate">
+                        {p.titulo}
+                      </p>
+                      <p className="text-[10px] text-slate-500 dark:text-zinc-400 tabular-nums mt-0.5">
+                        {TIPO_FEICAO_LABEL[p.tipo] || p.tipo} • Lat {p.latitude.toFixed(4)}°, Lng {p.longitude.toFixed(4)}°
+                      </p>
                     </div>
                     <button
                       type="button"
                       onClick={() => handleRemoverPonto(p.id)}
-                      className="text-slate-400 hover:text-rose-600 p-1"
+                      title="Remover ponto"
+                      className="p-1 rounded-md text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition shrink-0"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

@@ -28,6 +28,7 @@ export const AvaliacaoFrutosTab: React.FC<AvaliacaoFrutosTabProps> = ({
   const items: PericiaAvaliacaoFruto[] = avaliacao.frutos || [];
 
   const [showForm, setShowForm] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<PericiaAvaliacaoFruto>>({
     cultura: 'Soja em Grãos (Safra de Verão)',
     areaCultivadaHa: 300,
@@ -67,7 +68,7 @@ export const AvaliacaoFrutosTab: React.FC<AvaliacaoFrutosTabProps> = ({
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.cultura?.trim() || !formData.areaCultivadaHa) {
-      alert('Informe a cultura e a área cultivada em hectares.');
+      onShowNotification('Informe a cultura e a área cultivada em hectares.');
       return;
     }
 
@@ -104,14 +105,19 @@ export const AvaliacaoFrutosTab: React.FC<AvaliacaoFrutosTabProps> = ({
   };
 
   const handleDeleteItem = (id: string) => {
-    if (confirm('Deseja excluir esta cultura da avaliação?')) {
-      const updated = items.filter(item => item.id !== id);
-      onUpdateAvaliacao({
-        ...avaliacao,
-        frutos: updated,
-      });
-      onShowNotification('Cultura pendente removida.');
+    if (pendingDeleteId !== id) {
+      setPendingDeleteId(id);
+      onShowNotification('Clique novamente em excluir para confirmar a remoção desta cultura.');
+      setTimeout(() => setPendingDeleteId((prev) => (prev === id ? null : prev)), 4000);
+      return;
     }
+    const updated = items.filter(item => item.id !== id);
+    onUpdateAvaliacao({
+      ...avaliacao,
+      frutos: updated,
+    });
+    setPendingDeleteId(null);
+    onShowNotification('Cultura pendente removida.');
   };
 
   const handleExportCSV = () => {

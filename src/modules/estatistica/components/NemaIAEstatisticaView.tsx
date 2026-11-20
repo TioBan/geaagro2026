@@ -371,13 +371,13 @@ const ChatChartCard: React.FC<ChatChartCardProps> = ({ chart, onSaveToExperiment
   };
 
   return (
-    <div className="rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 p-3 shadow-sm space-y-3">
+    <div className="rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 p-3 space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-800 dark:text-zinc-100">
-          <BarChart3 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <BarChart3 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
           <span>{chart.title}</span>
         </div>
-        <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-[10px] font-semibold uppercase">
+        <span className="text-[11px] font-mono uppercase text-slate-500 dark:text-zinc-400">
           {chart.chartType}
         </span>
       </div>
@@ -386,27 +386,27 @@ const ChatChartCard: React.FC<ChatChartCardProps> = ({ chart, onSaveToExperiment
         <ScientificChartCanvas ref={svgRef} config={chartConfig} data={normalizedData} />
       </div>
 
-      <div className="flex items-center justify-between gap-2 flex-wrap pt-1 border-t border-slate-100 dark:border-zinc-800">
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center justify-between gap-2 flex-wrap pt-2 border-t border-slate-100 dark:border-zinc-800">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <button
             type="button"
             onClick={() => {
               if (svgRef.current) downloadSvgElementAsPng(svgRef.current, safeSlug);
             }}
-            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 flex items-center gap-1.5 transition cursor-pointer"
+            className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
           >
             <ImageIcon className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Baixar PNG</span>
+            <span>PNG</span>
           </button>
           <button
             type="button"
             onClick={() => {
               if (svgRef.current) downloadSvgElement(svgRef.current, safeSlug);
             }}
-            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 flex items-center gap-1.5 transition cursor-pointer"
+            className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-teal-600" />
-            <span>Baixar SVG</span>
+            <span>SVG</span>
           </button>
         </div>
 
@@ -414,10 +414,10 @@ const ChatChartCard: React.FC<ChatChartCardProps> = ({ chart, onSaveToExperiment
           type="button"
           onClick={handleSave}
           disabled={isSaving}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer ${
             saved
-              ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
-              : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+              ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+              : 'bg-emerald-600 hover:bg-emerald-700 text-white'
           }`}
         >
           {isSaving ? (
@@ -427,7 +427,7 @@ const ChatChartCard: React.FC<ChatChartCardProps> = ({ chart, onSaveToExperiment
           ) : (
             <BookmarkPlus className="w-3.5 h-3.5" />
           )}
-          <span>{saved ? 'Salvo na Galeria!' : 'Salvar no Experimento'}</span>
+          <span>{saved ? 'Salvo na Galeria' : 'Salvar no Experimento'}</span>
         </button>
       </div>
     </div>
@@ -500,6 +500,7 @@ export const NemaIAEstatisticaView: React.FC<NemaIAEstatisticaViewProps> = ({
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
   const [savedMessageIds, setSavedMessageIds] = useState<Record<string, boolean>>({});
   const [importStatus, setImportStatus] = useState<{ message: string; success: boolean } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<'clear_chat' | 'clear_all_history' | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -591,8 +592,8 @@ export const NemaIAEstatisticaView: React.FC<NemaIAEstatisticaViewProps> = ({
     });
   };
 
-  const handleClearAllHistory = () => {
-    if (confirm('Deseja apagar todas as conversas salvas no histórico da Nema IA Estatística?')) {
+  const executeConfirmedClear = () => {
+    if (confirmAction === 'clear_all_history') {
       const fresh = createEmptySession(
         selectedDomain,
         activeExperimento?.nome,
@@ -603,11 +604,7 @@ export const NemaIAEstatisticaView: React.FC<NemaIAEstatisticaViewProps> = ({
       localStorage.removeItem(LEGACY_STORAGE_KEY);
       setAttachments([]);
       setImportStatus(null);
-    }
-  };
-
-  const handleClearHistory = () => {
-    if (confirm('Deseja reiniciar a conversa atual da Nema IA Estatística?')) {
+    } else if (confirmAction === 'clear_chat') {
       const targetId = activeSession?.id;
       const welcome = createWelcomeMessage(
         'Conversa reiniciada. Como posso colaborar com sua análise estatística hoje?'
@@ -631,6 +628,15 @@ export const NemaIAEstatisticaView: React.FC<NemaIAEstatisticaViewProps> = ({
       setAttachments([]);
       setImportStatus(null);
     }
+    setConfirmAction(null);
+  };
+
+  const handleClearAllHistory = () => {
+    setConfirmAction('clear_all_history');
+  };
+
+  const handleClearHistory = () => {
+    setConfirmAction('clear_chat');
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1032,7 +1038,10 @@ export const NemaIAEstatisticaView: React.FC<NemaIAEstatisticaViewProps> = ({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert('Erro ao baixar arquivo: ' + err.message);
+      setImportStatus({
+        message: 'Erro ao baixar arquivo: ' + (err?.message || 'Falha na exportação'),
+        success: false,
+      });
     }
   };
 
@@ -1319,57 +1328,48 @@ export const NemaIAEstatisticaView: React.FC<NemaIAEstatisticaViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Banner Superior Limpo & Moderno */}
-      <div className="bg-gradient-to-r from-emerald-950/80 via-slate-900 to-teal-950/70 border border-emerald-800/40 rounded-2xl p-6 shadow-xl relative overflow-hidden text-white">
-        <div className="absolute right-0 top-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-start gap-4">
+    <div className="space-y-4">
+      {/* Cabeçalho Plano & Barra de Contexto Integrada */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <NemaIAEstatisticaIcon
-              size={50}
+              size={34}
               variant="emblem"
-              className="rounded-2xl shadow-lg shadow-emerald-500/20"
+              className="rounded-lg shrink-0"
             />
-            <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="text-xl font-bold tracking-tight text-white">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <h2 className="text-sm font-semibold tracking-tight text-slate-900 dark:text-zinc-100">
                   Nema IA Estatística
-                </h1>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  Assistente Biométrico & Estatístico
-                </span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-800/80 text-slate-300 border border-slate-700/60">
-                  Multimodal • PDF • Planilhas • Imagens
+                </h2>
+                <span className="text-xs text-slate-400 dark:text-zinc-500">·</span>
+                <span className="text-xs text-slate-500 dark:text-zinc-400">
+                  Assistente Biométrico · PDF · Planilhas · Imagens
                 </span>
               </div>
-              <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
-                Consultoria estatística avançada para experimentação científica, ANOVA, contrastes de médias, modelos dose-resposta, pressupostos e multivariada.
+              <p className="text-xs text-slate-500 dark:text-zinc-400 truncate mt-0.5">
+                Consultoria para experimentação agrícola, ANOVA, contrastes, regressão, pressupostos e multivariada.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap self-start md:self-auto">
+          <div className="flex items-center gap-1.5 flex-wrap shrink-0">
             <button
               type="button"
               onClick={() => setIsHistoryMode((prev) => !prev)}
-              title="Alternar Modo Histórico de Conversas"
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition cursor-pointer border ${
+              title="Alternar Histórico de Conversas"
+              className={`px-2.5 py-1.5 text-xs font-medium rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer border ${
                 isHistoryMode
-                  ? 'bg-emerald-500 text-white border-emerald-400 shadow-md shadow-emerald-500/20'
-                  : 'text-slate-200 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 border-slate-700'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                  : 'text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 border-slate-200 dark:border-zinc-700'
               }`}
             >
               <History className="w-3.5 h-3.5" />
-              <span>Modo Histórico</span>
+              <span>Histórico</span>
               {savedHistoryCount > 0 && (
-                <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] tabular-nums font-bold ${
-                    isHistoryMode
-                      ? 'bg-white/20 text-white'
-                      : 'bg-emerald-500/20 text-emerald-300'
-                  }`}
-                >
-                  {savedHistoryCount}
+                <span className="font-mono tabular-nums text-[11px] text-slate-500 dark:text-zinc-400">
+                  ({savedHistoryCount})
                 </span>
               )}
             </button>
@@ -1377,7 +1377,7 @@ export const NemaIAEstatisticaView: React.FC<NemaIAEstatisticaViewProps> = ({
               type="button"
               onClick={handleNewConversation}
               title="Iniciar nova conversa"
-              className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 border border-emerald-500/40 rounded-lg flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+              className="px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Nova Conversa</span>
@@ -1386,71 +1386,88 @@ export const NemaIAEstatisticaView: React.FC<NemaIAEstatisticaViewProps> = ({
               type="button"
               onClick={handleClearHistory}
               title="Reiniciar conversa atual"
-              className="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
+              className="px-2.5 py-1.5 text-xs font-medium text-slate-600 dark:text-zinc-300 hover:text-rose-600 dark:hover:text-rose-400 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              <span>Limpar Chat</span>
+              <span>Limpar</span>
             </button>
           </div>
         </div>
 
-        {/* Barra de Contexto & Integração do Experimento Ativo */}
-        <div className="mt-4 pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex flex-wrap items-center gap-2.5 text-slate-300">
-            <Layers className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span className="font-medium">Experimento Ativo:</span>
-
-            {experimentos.length > 0 && onSelectExperimento ? (
+        {/* Barra Integrada: Especialidade (Menu Suspenso) + Experimento Ativo */}
+        <div className="px-4 py-2.5 border-t border-slate-100 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/40 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Menu Suspenso de Especialidade */}
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="nema-estatistica-domain-select"
+                className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 whitespace-nowrap"
+              >
+                Especialidade:
+              </label>
               <div className="relative">
                 <select
-                  value={activeExperimento?.id || ''}
-                  onChange={(e) => onSelectExperimento(e.target.value || null)}
-                  aria-label="Selecionar experimento ativo na Nema IA Estatística"
-                  className="appearance-none pl-2.5 pr-7 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-800 border border-emerald-500/40 text-emerald-300 font-semibold text-xs focus:outline-none focus:border-emerald-400 cursor-pointer"
+                  id="nema-estatistica-domain-select"
+                  value={selectedDomain}
+                  onChange={(e) => setSelectedDomain(e.target.value)}
+                  className="appearance-none h-8 pl-2.5 pr-7 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:border-emerald-500/60 focus:border-emerald-500 text-xs font-medium text-slate-800 dark:text-zinc-100 transition-colors cursor-pointer focus:outline-none max-w-[230px]"
                 >
-                  {experimentos.map((exp) => (
-                    <option key={exp.id} value={exp.id} className="bg-slate-900 text-white">
-                      {exp.nome} ({exp.delineamento})
+                  {DOMINIOS_ESTATISTICOS.map((dom) => (
+                    <option key={dom.id} value={dom.id}>
+                      {dom.label}
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="w-3.5 h-3.5 text-emerald-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
-            ) : (
-              <strong className="text-emerald-300">
-                {activeExperimento
-                  ? `${activeExperimento.nome} (${activeExperimento.delineamento})`
-                  : 'Nenhum selecionado'}
-              </strong>
-            )}
+            </div>
 
-            {activeExperimento && (
-              <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-300">
-                <span className="px-2 py-0.5 rounded-md bg-slate-800/80 border border-slate-700/70">
-                  {dataset ? dataset.linhasWorking.length : 0} parcelas
+            <span className="hidden sm:inline text-slate-300 dark:text-zinc-700">|</span>
+
+            {/* Contexto do Experimento Ativo */}
+            <div className="flex flex-wrap items-center gap-2 text-slate-600 dark:text-zinc-300">
+              <Layers className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              {experimentos.length > 0 && onSelectExperimento ? (
+                <div className="relative">
+                  <select
+                    value={activeExperimento?.id || ''}
+                    onChange={(e) => onSelectExperimento(e.target.value || null)}
+                    aria-label="Selecionar experimento ativo na Nema IA Estatística"
+                    className="appearance-none h-8 pl-2.5 pr-7 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:border-emerald-500/60 text-slate-800 dark:text-zinc-100 font-medium text-xs focus:outline-none focus:border-emerald-500 cursor-pointer max-w-[220px]"
+                  >
+                    {experimentos.map((exp) => (
+                      <option key={exp.id} value={exp.id}>
+                        {exp.nome} ({exp.delineamento})
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              ) : (
+                <span className="font-medium text-slate-700 dark:text-zinc-200">
+                  {activeExperimento
+                    ? `${activeExperimento.nome} (${activeExperimento.delineamento})`
+                    : 'Nenhum experimento'}
                 </span>
-                <span className="px-2 py-0.5 rounded-md bg-slate-800/80 border border-slate-700/70">
-                  {variaveis.length} variáveis
+              )}
+
+              {activeExperimento && (
+                <span className="text-[11px] font-mono tabular-nums text-slate-500 dark:text-zinc-400">
+                  {dataset ? dataset.linhasWorking.length : 0} parcelas · {variaveis.length} var. · {resultados.length} análises · {graficos.length} gráf.
                 </span>
-                <span className="px-2 py-0.5 rounded-md bg-slate-800/80 border border-slate-700/70">
-                  {resultados.length} análises
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-slate-800/80 border border-slate-700/70">
-                  {graficos.length} gráficos
-                </span>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             {!activeExperimento && onNavigateSubTab && (
               <button
                 type="button"
                 onClick={() => onNavigateSubTab('projetos')}
-                className="px-3 py-1 text-xs font-semibold text-emerald-300 bg-emerald-950/80 hover:bg-emerald-900/80 border border-emerald-700/60 rounded-lg flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+                className="px-2.5 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300 bg-white dark:bg-zinc-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Selecionar ou Criar Experimento</span>
+                <span>Criar Experimento</span>
               </button>
             )}
 
@@ -1458,10 +1475,10 @@ export const NemaIAEstatisticaView: React.FC<NemaIAEstatisticaViewProps> = ({
               <button
                 type="button"
                 onClick={handleAttachActiveDataset}
-                className="px-3 py-1 text-xs font-semibold text-emerald-300 bg-emerald-950/80 hover:bg-emerald-900/80 border border-emerald-700/60 rounded-lg flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+                className="px-2.5 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300 bg-white dark:bg-zinc-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
-                <span>Carregar Dados no Chat</span>
+                <span>Carregar Dados</span>
               </button>
             )}
 
@@ -1469,10 +1486,10 @@ export const NemaIAEstatisticaView: React.FC<NemaIAEstatisticaViewProps> = ({
               <button
                 type="button"
                 onClick={handleAttachActiveResults}
-                className="px-3 py-1 text-xs font-semibold text-teal-200 bg-teal-950/80 hover:bg-teal-900/80 border border-teal-700/60 rounded-lg flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+                className="px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
               >
-                <Calculator className="w-3.5 h-3.5" />
-                <span>Sincronizar Análises ({resultados.length})</span>
+                <Calculator className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Sincronizar ({resultados.length})</span>
               </button>
             )}
 
@@ -1480,10 +1497,10 @@ export const NemaIAEstatisticaView: React.FC<NemaIAEstatisticaViewProps> = ({
               <button
                 type="button"
                 onClick={() => onNavigateSubTab('relatorios')}
-                className="px-2.5 py-1 text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 rounded-lg flex items-center gap-1 transition cursor-pointer"
+                className="px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
                 title="Abrir Relatórios Científicos do Experimento"
               >
-                <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                <FileText className="w-3.5 h-3.5 text-slate-500" />
                 <span>Relatórios</span>
               </button>
             )}
@@ -1491,70 +1508,55 @@ export const NemaIAEstatisticaView: React.FC<NemaIAEstatisticaViewProps> = ({
         </div>
       </div>
 
-      {/* Notificação de Status de Importação */}
+      {/* Notificação de Status de Importação / Exportação */}
       {importStatus && (
         <div
-          className={`p-4 rounded-xl border flex items-center justify-between gap-3 text-xs ${
+          className={`px-3.5 py-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs ${
             importStatus.success
-              ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
-              : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200'
+              ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-200'
+              : 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-200'
           }`}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             {importStatus.success ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             ) : (
               <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
             )}
-            <span>{importStatus.message}</span>
+            <span className="truncate">{importStatus.message}</span>
           </div>
-          {importStatus.success && onNavigateSubTab && (
+          <div className="flex items-center gap-2 shrink-0">
+            {importStatus.success && onNavigateSubTab && (
+              <button
+                type="button"
+                onClick={() => onNavigateSubTab('dados')}
+                className="px-2.5 py-1 text-[11px] font-medium bg-emerald-600 text-white rounded-md hover:bg-emerald-700 whitespace-nowrap transition-colors cursor-pointer"
+              >
+                Ver na aba Dados
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => onNavigateSubTab('dados')}
-              className="px-2.5 py-1 text-[11px] font-semibold bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition cursor-pointer"
+              onClick={() => setImportStatus(null)}
+              className="p-0.5 opacity-70 hover:opacity-100 cursor-pointer"
+              aria-label="Fechar notificação"
             >
-              Ver na aba Dados
+              <X className="w-3.5 h-3.5" />
             </button>
-          )}
+          </div>
         </div>
       )}
-
-      {/* Seletor de Especialidade / Função Estatística (Menu Suspenso) */}
-      <div className="flex flex-wrap items-center gap-2.5 text-xs">
-        <label
-          htmlFor="nema-estatistica-domain-select"
-          className="text-slate-500 dark:text-zinc-400 font-semibold uppercase text-[10px] tracking-wider shrink-0"
-        >
-          Especialidade:
-        </label>
-        <div className="relative w-full sm:w-80">
-          <select
-            id="nema-estatistica-domain-select"
-            value={selectedDomain}
-            onChange={(e) => setSelectedDomain(e.target.value)}
-            className="w-full appearance-none pl-3.5 pr-9 py-2 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 hover:border-emerald-500/60 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs font-semibold text-slate-800 dark:text-zinc-100 shadow-sm transition cursor-pointer focus:outline-none"
-          >
-            {DOMINIOS_ESTATISTICOS.map((dom) => (
-              <option key={dom.id} value={dom.id}>
-                {dom.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="w-4 h-4 text-emerald-600 dark:text-emerald-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
-      </div>
 
       {/* Área Principal: Modo Histórico + Conversa */}
       <div className={isHistoryMode ? 'grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch' : ''}>
         {isHistoryMode && (
-          <aside className="lg:col-span-4 bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800 flex flex-col h-[360px] lg:h-[750px] min-w-0 overflow-hidden shadow-sm">
-            <div className="p-3.5 border-b border-slate-200 dark:border-zinc-800 space-y-2.5">
+          <aside className="lg:col-span-4 bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800 flex flex-col h-[340px] lg:h-[680px] min-w-0 overflow-hidden">
+            <div className="p-3 border-b border-slate-200 dark:border-zinc-800 space-y-2.5">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <History className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <h3 className="text-xs font-bold text-slate-900 dark:text-white">
-                    Histórico de Conversas
+                <div className="flex items-center gap-1.5">
+                  <History className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <h3 className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                    Conversas Salvas
                   </h3>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -1571,17 +1573,17 @@ export const NemaIAEstatisticaView: React.FC<NemaIAEstatisticaViewProps> = ({
                   <button
                     type="button"
                     onClick={handleNewConversation}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-medium whitespace-nowrap transition-colors cursor-pointer"
                     title="Iniciar nova conversa"
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-3 h-3" />
                     <span>Nova</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsHistoryMode(false)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-                    title="Fechar Modo Histórico"
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                    title="Fechar Histórico"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -1596,13 +1598,13 @@ export const NemaIAEstatisticaView: React.FC<NemaIAEstatisticaViewProps> = ({
                     value={historySearch}
                     onChange={(e) => setHistorySearch(e.target.value)}
                     placeholder="Buscar conversa..."
-                    className="w-full pl-8 pr-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-slate-800 dark:text-zinc-200 placeholder-slate-400 focus:outline-none focus:border-emerald-500"
+                    className="w-full h-8 pl-8 pr-2.5 text-xs rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-slate-800 dark:text-zinc-200 placeholder-slate-400 focus:outline-none focus:border-emerald-500"
                   />
                 </div>
                 <select
                   value={historyDomainFilter}
                   onChange={(e) => setHistoryDomainFilter(e.target.value)}
-                  className="w-28 px-2 py-1.5 text-[11px] rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-slate-700 dark:text-zinc-300 focus:outline-none focus:border-emerald-500"
+                  className="w-28 h-8 px-2 text-[11px] rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-slate-700 dark:text-zinc-300 focus:outline-none focus:border-emerald-500"
                   title="Filtrar por especialidade"
                 >
                   <option value="all">Todas</option>
@@ -1615,15 +1617,15 @@ export const NemaIAEstatisticaView: React.FC<NemaIAEstatisticaViewProps> = ({
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5">
+            <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-zinc-800/80">
               {filteredSessions.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center px-4">
-                  <Clock className="w-7 h-7 text-slate-300 dark:text-zinc-700 mb-2" />
-                  <p className="text-xs font-semibold text-slate-500 dark:text-zinc-400">
-                    {savedHistoryCount === 0 ? 'Sem conversas salvas' : 'Nenhum resultado encontrado'}
+                  <Clock className="w-6 h-6 text-slate-300 dark:text-zinc-700 mb-2" />
+                  <p className="text-xs font-medium text-slate-500 dark:text-zinc-400">
+                    {savedHistoryCount === 0 ? 'Sem conversas salvas' : 'Nenhum resultado'}
                   </p>
-                  <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-1">
-                    Suas análises e consultas com a Nema IA Estatística ficam salvas aqui localmente.
+                  <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5">
+                    Suas consultas estatísticas ficam salvas localmente.
                   </p>
                 </div>
               ) : (
@@ -1644,18 +1646,20 @@ export const NemaIAEstatisticaView: React.FC<NemaIAEstatisticaViewProps> = ({
                     <div
                       key={sess.id}
                       onClick={() => handleSelectSession(sess)}
-                      className={`relative group p-3 rounded-xl border transition-colors cursor-pointer text-xs space-y-1.5 ${
+                      className={`relative group px-3 py-2.5 transition-colors cursor-pointer text-xs space-y-1 border-l-2 ${
                         isSelected
-                          ? 'bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-500/60'
-                          : 'bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-950/60 border-slate-200/80 dark:border-zinc-800/80'
+                          ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-l-emerald-600'
+                          : 'border-l-transparent hover:bg-slate-50 dark:hover:bg-zinc-800/40'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 truncate">
+                        <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 truncate">
                           {domainLabel}
                         </span>
                         <div className="flex items-center gap-1 shrink-0">
-                          <span className="text-[10px] text-slate-400">{dateStr}</span>
+                          <span className="text-[10px] font-mono tabular-nums text-slate-400">
+                            {dateStr}
+                          </span>
                           <button
                             type="button"
                             onClick={(e) => handleDeleteSession(e, sess.id)}
@@ -1667,16 +1671,16 @@ export const NemaIAEstatisticaView: React.FC<NemaIAEstatisticaViewProps> = ({
                         </div>
                       </div>
 
-                      <p className="font-semibold text-slate-900 dark:text-white line-clamp-2 leading-snug">
+                      <p className="font-medium text-slate-900 dark:text-zinc-100 line-clamp-2 leading-snug">
                         {sess.title}
                       </p>
 
-                      <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-zinc-400">
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-zinc-400">
                         <span className="truncate flex items-center gap-1">
                           <MessageSquare className="w-3 h-3 shrink-0 text-slate-400" />
                           <span>{sess.experimentName || 'Consultoria Estatística'}</span>
                         </span>
-                        <span className="shrink-0 ml-1 tabular-nums">{msgCount} msgs</span>
+                        <span className="shrink-0 ml-1 font-mono tabular-nums">{msgCount} msgs</span>
                       </div>
                     </div>
                   );
@@ -1690,447 +1694,511 @@ export const NemaIAEstatisticaView: React.FC<NemaIAEstatisticaViewProps> = ({
         <div
           className={`${
             isHistoryMode ? 'lg:col-span-8' : ''
-          } bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-sm flex flex-col min-h-[500px] max-h-[750px]`}
+          } bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl flex flex-col min-h-[460px] max-h-[680px] overflow-hidden`}
         >
-        {/* Histórico das Mensagens */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-          {messages.map((msg) => {
-            const isUser = msg.role === 'user';
-            return (
-              <div
-                key={msg.id}
-                className={`flex gap-3 sm:gap-4 ${isUser ? 'justify-end' : 'justify-start'}`}
-              >
-                {!isUser && (
-                  <NemaIAEstatisticaIcon
-                    size={36}
-                    variant="emblem"
-                    className="rounded-xl shadow-md shadow-emerald-500/20"
-                  />
-                )}
-
+          {/* Histórico das Mensagens */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {messages.map((msg) => {
+              const isUser = msg.role === 'user';
+              return (
                 <div
-                  className={`max-w-3xl rounded-2xl p-4 sm:p-5 text-xs sm:text-sm leading-relaxed ${
-                    isUser
-                      ? 'bg-emerald-600 text-white rounded-br-none shadow-md'
-                      : 'bg-slate-50 dark:bg-zinc-950/80 border border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-zinc-100 rounded-bl-none'
-                  }`}
+                  key={msg.id}
+                  className={`flex gap-2.5 ${isUser ? 'justify-end' : 'justify-start'}`}
                 >
-                  {/* Cabeçalho da Mensagem */}
-                  <div className="flex items-center justify-between gap-3 mb-2 pb-2 border-b border-black/10 dark:border-white/10 text-[11px] opacity-80">
-                    <span className="font-semibold">
-                      {isUser ? 'Você (Pesquisador)' : 'Nema IA Estatística'}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      {msg.domainArea && (
-                        <span className="px-2 py-0.5 rounded bg-black/10 dark:bg-white/10 text-[10px]">
-                          {msg.domainArea}
-                        </span>
-                      )}
-                      <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
-                  </div>
-
-                  {/* Anexos da Mensagem */}
-                  {msg.attachments && msg.attachments.length > 0 && (
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      {msg.attachments.map((att, idx) => (
-                        <div
-                          key={idx}
-                          className="px-2.5 py-1 rounded-lg bg-black/10 dark:bg-white/10 text-[11px] flex items-center gap-1.5"
-                        >
-                          <Paperclip className="w-3 h-3" />
-                          <span className="truncate max-w-[200px]">{att.name}</span>
-                          <span className="opacity-70 text-[10px]">({Math.round(att.sizeBytes / 1024)} KB)</span>
-                        </div>
-                      ))}
-                    </div>
+                  {!isUser && (
+                    <NemaIAEstatisticaIcon
+                      size={28}
+                      variant="emblem"
+                      className="rounded-lg shrink-0 mt-0.5"
+                    />
                   )}
 
-                  {/* Conteúdo Markdown Formatado */}
-                  <div className="space-y-3 prose dark:prose-invert max-w-none text-xs sm:text-sm">
-                    {msg.content.split('\n\n').map((paragraph, pIdx) => {
-                      // Se for título Markdown
-                      if (paragraph.startsWith('### ')) {
-                        return (
-                          <h3 key={pIdx} className="text-sm sm:text-base font-bold text-emerald-700 dark:text-emerald-400 mt-2 mb-1">
-                            {paragraph.replace('### ', '')}
-                          </h3>
-                        );
-                      }
-                      if (paragraph.startsWith('## ')) {
-                        return (
-                          <h2 key={pIdx} className="text-base sm:text-lg font-bold text-emerald-700 dark:text-emerald-400 mt-3 mb-1">
-                            {paragraph.replace('## ', '')}
-                          </h2>
-                        );
-                      }
-                      // Se for tabela Markdown
-                      if (paragraph.includes('|') && paragraph.includes('\n|')) {
-                        const lines = paragraph.trim().split('\n');
-                        const headers = lines[0].split('|').map((c) => c.trim()).filter(Boolean);
-                        const dataLines = lines.slice(2).filter((l) => l.includes('|'));
-                        return (
-                          <div key={pIdx} className="overflow-x-auto my-3 rounded-lg border border-slate-200 dark:border-zinc-800">
-                            <table className="w-full text-left text-xs divide-y divide-slate-200 dark:divide-zinc-800">
-                              <thead className="bg-slate-100 dark:bg-zinc-800/80 font-semibold text-slate-700 dark:text-zinc-200">
-                                <tr>
-                                  {headers.map((h, hIdx) => (
-                                    <th key={hIdx} className="px-3 py-2 whitespace-nowrap">
-                                      {h}
-                                    </th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/50 bg-white dark:bg-zinc-900">
-                                {dataLines.map((rowStr, rIdx) => {
-                                  const cells = rowStr.split('|').map((c) => c.trim()).filter(Boolean);
-                                  return (
-                                    <tr key={rIdx} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40">
-                                      {cells.map((cell, cIdx) => (
-                                        <td key={cIdx} className="px-3 py-1.5 whitespace-nowrap">
-                                          {cell}
-                                        </td>
-                                      ))}
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
+                  <div
+                    className={`max-w-3xl rounded-xl px-4 py-3 text-xs sm:text-[13px] leading-relaxed ${
+                      isUser
+                        ? 'bg-emerald-50/80 dark:bg-emerald-950/35 border border-emerald-200/80 dark:border-emerald-900/60 text-slate-900 dark:text-zinc-100'
+                        : 'bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/80 dark:border-zinc-800 text-slate-900 dark:text-zinc-100'
+                    }`}
+                  >
+                    {/* Cabeçalho da Mensagem */}
+                    <div className="flex items-center justify-between gap-3 mb-2 pb-1.5 border-b border-slate-200/70 dark:border-zinc-800 text-[11px] text-slate-500 dark:text-zinc-400">
+                      <span className="font-semibold text-slate-700 dark:text-zinc-200">
+                        {isUser ? 'Você' : 'Nema IA Estatística'}
+                      </span>
+                      <span className="font-mono tabular-nums">
+                        {msg.domainArea ? `${msg.domainArea} · ` : ''}
+                        {new Date(msg.timestamp).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+
+                    {/* Anexos da Mensagem */}
+                    {msg.attachments && msg.attachments.length > 0 && (
+                      <div className="mb-2.5 flex flex-wrap gap-1.5">
+                        {msg.attachments.map((att, idx) => (
+                          <div
+                            key={idx}
+                            className="px-2 py-1 rounded-md bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-[11px] text-slate-700 dark:text-zinc-300 flex items-center gap-1.5"
+                          >
+                            <Paperclip className="w-3 h-3 text-slate-400" />
+                            <span className="truncate max-w-[180px]">{att.name}</span>
+                            <span className="text-slate-400 font-mono tabular-nums text-[10px]">
+                              {Math.round(att.sizeBytes / 1024)} KB
+                            </span>
                           </div>
-                        );
-                      }
-                      // Se for bloco de código
-                      if (paragraph.startsWith('```')) {
-                        const cleanCode = paragraph.replace(/```[a-z]*\n?/g, '').replace(/```$/g, '');
-                        const codeId = `code-${msg.id}-${pIdx}`;
-                        return (
-                          <div key={pIdx} className="my-2 rounded-xl bg-slate-900 text-slate-100 p-3 font-mono text-xs overflow-x-auto relative group">
-                            <button
-                              type="button"
-                              onClick={() => handleCopyCode(cleanCode, codeId)}
-                              className="absolute top-2 right-2 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300 flex items-center gap-1 transition"
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Conteúdo Markdown Formatado */}
+                    <div className="space-y-2.5 prose dark:prose-invert max-w-none text-xs sm:text-[13px]">
+                      {msg.content.split('\n\n').map((paragraph, pIdx) => {
+                        if (paragraph.startsWith('### ')) {
+                          return (
+                            <h3
+                              key={pIdx}
+                              className="text-xs sm:text-sm font-semibold text-emerald-700 dark:text-emerald-400 mt-2 mb-1"
                             >
-                              {copiedCodeId === codeId ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                              <span>{copiedCodeId === codeId ? 'Copiado!' : 'Copiar'}</span>
-                            </button>
-                            <pre className="pr-12">{cleanCode}</pre>
-                          </div>
-                        );
-                      }
-                      // Se for lista com bullet
-                      if (paragraph.startsWith('- ') || paragraph.startsWith('* ')) {
-                        const items = paragraph.split('\n').filter(Boolean);
+                              {paragraph.replace('### ', '')}
+                            </h3>
+                          );
+                        }
+                        if (paragraph.startsWith('## ')) {
+                          return (
+                            <h2
+                              key={pIdx}
+                              className="text-sm sm:text-base font-semibold text-emerald-700 dark:text-emerald-400 mt-3 mb-1"
+                            >
+                              {paragraph.replace('## ', '')}
+                            </h2>
+                          );
+                        }
+                        if (paragraph.includes('|') && paragraph.includes('\n|')) {
+                          const lines = paragraph.trim().split('\n');
+                          const headers = lines[0]
+                            .split('|')
+                            .map((c) => c.trim())
+                            .filter(Boolean);
+                          const dataLines = lines.slice(2).filter((l) => l.includes('|'));
+                          return (
+                            <div
+                              key={pIdx}
+                              className="overflow-x-auto my-2.5 rounded-lg border border-slate-200 dark:border-zinc-800"
+                            >
+                              <table className="w-full text-left text-xs divide-y divide-slate-200 dark:divide-zinc-800">
+                                <thead className="bg-slate-100/80 dark:bg-zinc-900 font-semibold text-slate-700 dark:text-zinc-200">
+                                  <tr>
+                                    {headers.map((h, hIdx) => (
+                                      <th key={hIdx} className="px-3 py-2 whitespace-nowrap">
+                                        {h}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/60 bg-white dark:bg-zinc-900">
+                                  {dataLines.map((rowStr, rIdx) => {
+                                    const cells = rowStr
+                                      .split('|')
+                                      .map((c) => c.trim())
+                                      .filter(Boolean);
+                                    return (
+                                      <tr
+                                        key={rIdx}
+                                        className="hover:bg-slate-50 dark:hover:bg-zinc-800/40"
+                                      >
+                                        {cells.map((cell, cIdx) => (
+                                          <td key={cIdx} className="px-3 py-1.5 whitespace-nowrap">
+                                            {cell}
+                                          </td>
+                                        ))}
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          );
+                        }
+                        if (paragraph.startsWith('```')) {
+                          const cleanCode = paragraph
+                            .replace(/```[a-z]*\n?/g, '')
+                            .replace(/```$/g, '');
+                          const codeId = `code-${msg.id}-${pIdx}`;
+                          return (
+                            <div
+                              key={pIdx}
+                              className="my-2 rounded-lg bg-slate-900 text-slate-100 p-3 font-mono text-xs overflow-x-auto relative"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => handleCopyCode(cleanCode, codeId)}
+                                className="absolute top-2 right-2 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300 flex items-center gap-1 transition-colors cursor-pointer"
+                              >
+                                {copiedCodeId === codeId ? (
+                                  <Check className="w-3 h-3 text-emerald-400" />
+                                ) : (
+                                  <Copy className="w-3 h-3" />
+                                )}
+                                <span>{copiedCodeId === codeId ? 'Copiado' : 'Copiar'}</span>
+                              </button>
+                              <pre className="pr-14">{cleanCode}</pre>
+                            </div>
+                          );
+                        }
+                        if (paragraph.startsWith('- ') || paragraph.startsWith('* ')) {
+                          const items = paragraph.split('\n').filter(Boolean);
+                          return (
+                            <ul key={pIdx} className="list-disc pl-4 space-y-1">
+                              {items.map((it, iIdx) => (
+                                <li key={iIdx}>
+                                  <span
+                                    dangerouslySetInnerHTML={{
+                                      __html: it
+                                        .replace(/^[-*]\s*/, '')
+                                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                        .replace(/\*(.*?)\*/g, '<em>$1</em>'),
+                                    }}
+                                  />
+                                </li>
+                              ))}
+                            </ul>
+                          );
+                        }
                         return (
-                          <ul key={pIdx} className="list-disc pl-4 space-y-1">
-                            {items.map((it, iIdx) => (
-                              <li key={iIdx}>
-                                <span
-                                  dangerouslySetInnerHTML={{
-                                    __html: it
-                                      .replace(/^[-*]\s*/, '')
-                                      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                                      .replace(/\*(.*?)\*/g, '<em>$1</em>'),
-                                  }}
-                                />
-                              </li>
-                            ))}
-                          </ul>
+                          <p
+                            key={pIdx}
+                            className="leading-relaxed"
+                            dangerouslySetInnerHTML={{
+                              __html: paragraph
+                                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                .replace(/\*(.*?)\*/g, '<em>$1</em>'),
+                            }}
+                          />
                         );
-                      }
-                      // Parágrafo comum
-                      return (
-                        <p
-                          key={pIdx}
-                          className="leading-relaxed"
-                          dangerouslySetInnerHTML={{
-                            __html: paragraph
-                              .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                              .replace(/\*(.*?)\*/g, '<em>$1</em>'),
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
+                      })}
+                    </div>
 
-                  {/* Resumo Estatístico Estruturado */}
-                  {msg.statisticalSummary && (
-                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-zinc-800">
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-1.5">
-                        <Calculator className="w-3.5 h-3.5" />
-                        <span>Resumo dos Indicadores Biométricos</span>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                        {msg.statisticalSummary.fCalculado && (
-                          <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
-                            <span className="text-[10px] text-slate-400 block">F Calculado</span>
-                            <strong className="text-slate-900 dark:text-white font-mono">{msg.statisticalSummary.fCalculado}</strong>
-                          </div>
-                        )}
-                        {msg.statisticalSummary.pValor && (
-                          <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
-                            <span className="text-[10px] text-slate-400 block">p-valor</span>
-                            <strong className="text-slate-900 dark:text-white font-mono">{msg.statisticalSummary.pValor}</strong>
-                          </div>
-                        )}
-                        {msg.statisticalSummary.cvExperimental && (
-                          <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
-                            <span className="text-[10px] text-slate-400 block">CV Experimental</span>
-                            <strong className="text-slate-900 dark:text-white font-mono">{msg.statisticalSummary.cvExperimental}</strong>
-                          </div>
-                        )}
-                        {msg.statisticalSummary.r2 && (
-                          <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
-                            <span className="text-[10px] text-slate-400 block">R² Ajustado</span>
-                            <strong className="text-slate-900 dark:text-white font-mono">{msg.statisticalSummary.r2}</strong>
-                          </div>
-                        )}
-                      </div>
-                      {msg.statisticalSummary.conclusaoCientifica && (
-                        <p className="mt-2 text-[11px] text-slate-600 dark:text-zinc-400 italic">
-                          "{msg.statisticalSummary.conclusaoCientifica}"
-                        </p>
-                      )}
-
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleSaveAnalysisToExperiment(msg)}
-                          disabled={Boolean(savedMessageIds[msg.id])}
-                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 transition cursor-pointer ${
-                            savedMessageIds[msg.id]
-                              ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
-                              : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
-                          }`}
-                        >
-                          {savedMessageIds[msg.id] ? (
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                          ) : (
-                            <BookmarkPlus className="w-3.5 h-3.5" />
+                    {/* Resumo Estatístico Estruturado (Faixa Plana com Divisórias) */}
+                    {msg.statisticalSummary && (
+                      <div className="mt-3.5 pt-3 border-t border-slate-200 dark:border-zinc-800 space-y-2.5">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                          <Calculator className="w-3.5 h-3.5" />
+                          <span>Indicadores Biométricos</span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-zinc-800 rounded-lg border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs overflow-hidden">
+                          {msg.statisticalSummary.fCalculado && (
+                            <div className="px-3 py-2">
+                              <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">
+                                F Calculado
+                              </span>
+                              <strong className="text-slate-900 dark:text-zinc-100 font-mono tabular-nums">
+                                {msg.statisticalSummary.fCalculado}
+                              </strong>
+                            </div>
                           )}
-                          <span>
-                            {savedMessageIds[msg.id]
-                              ? 'Salvo nos Relatórios do Experimento'
-                              : 'Salvar Análise no Experimento'}
-                          </span>
-                        </button>
+                          {msg.statisticalSummary.pValor && (
+                            <div className="px-3 py-2">
+                              <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">
+                                p-valor
+                              </span>
+                              <strong className="text-slate-900 dark:text-zinc-100 font-mono tabular-nums">
+                                {msg.statisticalSummary.pValor}
+                              </strong>
+                            </div>
+                          )}
+                          {msg.statisticalSummary.cvExperimental && (
+                            <div className="px-3 py-2">
+                              <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">
+                                CV Experimental
+                              </span>
+                              <strong className="text-slate-900 dark:text-zinc-100 font-mono tabular-nums">
+                                {msg.statisticalSummary.cvExperimental}
+                              </strong>
+                            </div>
+                          )}
+                          {msg.statisticalSummary.r2 && (
+                            <div className="px-3 py-2">
+                              <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">
+                                R² Ajustado
+                              </span>
+                              <strong className="text-slate-900 dark:text-zinc-100 font-mono tabular-nums">
+                                {msg.statisticalSummary.r2}
+                              </strong>
+                            </div>
+                          )}
+                        </div>
+                        {msg.statisticalSummary.conclusaoCientifica && (
+                          <p className="text-[11px] text-slate-600 dark:text-zinc-400 italic">
+                            &ldquo;{msg.statisticalSummary.conclusaoCientifica}&rdquo;
+                          </p>
+                        )}
 
-                        {onNavigateSubTab && (
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
-                            onClick={() =>
-                              onNavigateSubTab(getSuggestedSubTabForDomain(msg.domainArea).tab)
-                            }
-                            className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:border-emerald-500 text-slate-700 dark:text-zinc-200 flex items-center gap-1 transition cursor-pointer"
+                            onClick={() => handleSaveAnalysisToExperiment(msg)}
+                            disabled={Boolean(savedMessageIds[msg.id])}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer ${
+                              savedMessageIds[msg.id]
+                                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            }`}
                           >
-                            <span>{getSuggestedSubTabForDomain(msg.domainArea).label}</span>
-                            <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600" />
+                            {savedMessageIds[msg.id] ? (
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                            ) : (
+                              <BookmarkPlus className="w-3.5 h-3.5" />
+                            )}
+                            <span>
+                              {savedMessageIds[msg.id]
+                                ? 'Salvo nos Relatórios'
+                                : 'Salvar no Experimento'}
+                            </span>
                           </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
 
-                  {/* Cartão de Arquivos Gerados pela IA */}
-                  {msg.generatedFiles && msg.generatedFiles.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-zinc-800 space-y-2.5">
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400 flex items-center gap-1.5">
-                        <FileSpreadsheet className="w-3.5 h-3.5" />
-                        <span>Arquivos Gerados para Download & Uso</span>
+                          {onNavigateSubTab && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onNavigateSubTab(getSuggestedSubTabForDomain(msg.domainArea).tab)
+                              }
+                              className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 flex items-center gap-1 whitespace-nowrap transition-colors cursor-pointer"
+                            >
+                              <span>{getSuggestedSubTabForDomain(msg.domainArea).label}</span>
+                              <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        {msg.generatedFiles.map((file, fIdx) => (
-                          <div
-                            key={fIdx}
-                            className="p-3.5 rounded-xl bg-teal-50/50 dark:bg-teal-950/30 border border-teal-200/80 dark:border-teal-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
-                          >
-                            <div className="flex items-start gap-2.5">
-                              <div className="p-2 rounded-lg bg-teal-600 text-white shrink-0 mt-0.5">
-                                {file.fileType === 'r' ? <FileCode className="w-4 h-4" /> : <FileSpreadsheet className="w-4 h-4" />}
-                              </div>
-                              <div>
-                                <strong className="text-slate-900 dark:text-white block font-mono text-xs">
-                                  {file.fileName}
-                                </strong>
-                                <p className="text-[11px] text-slate-500 dark:text-zinc-400">
-                                  {file.description}
-                                </p>
-                              </div>
-                            </div>
+                    )}
 
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <button
-                                type="button"
-                                onClick={() => handleDownloadFile(file, 'csv')}
-                                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 text-slate-800 dark:text-zinc-200 flex items-center gap-1 shadow-sm transition cursor-pointer"
-                              >
-                                <Download className="w-3.5 h-3.5 text-emerald-600" />
-                                <span>Baixar CSV</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDownloadFile(file, 'xlsx')}
-                                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 text-slate-800 dark:text-zinc-200 flex items-center gap-1 shadow-sm transition cursor-pointer"
-                              >
-                                <FileSpreadsheet className="w-3.5 h-3.5 text-teal-600" />
-                                <span>Baixar Excel</span>
-                              </button>
-                              {file.canImportToDataset && (
+                    {/* Arquivos Gerados pela IA */}
+                    {msg.generatedFiles && msg.generatedFiles.length > 0 && (
+                      <div className="mt-3.5 pt-3 border-t border-slate-200 dark:border-zinc-800 space-y-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-zinc-400 flex items-center gap-1.5">
+                          <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Arquivos Gerados</span>
+                        </div>
+                        <div className="divide-y divide-slate-200 dark:divide-zinc-800 rounded-lg border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
+                          {msg.generatedFiles.map((file, fIdx) => (
+                            <div
+                              key={fIdx}
+                              className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs"
+                            >
+                              <div className="flex items-start gap-2 min-w-0">
+                                {file.fileType === 'r' ? (
+                                  <FileCode className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                ) : (
+                                  <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                )}
+                                <div className="min-w-0">
+                                  <strong className="text-slate-900 dark:text-zinc-100 block font-mono text-xs truncate">
+                                    {file.fileName}
+                                  </strong>
+                                  <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                                    {file.description}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 flex-wrap shrink-0">
                                 <button
                                   type="button"
-                                  onClick={() => handleImportToDataset(file)}
-                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                                  onClick={() => handleDownloadFile(file, 'csv')}
+                                  className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 flex items-center gap-1 whitespace-nowrap transition-colors cursor-pointer"
                                 >
-                                  <Database className="w-3.5 h-3.5" />
-                                  <span>Importar para Experimento</span>
+                                  <Download className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>CSV</span>
                                 </button>
-                              )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadFile(file, 'xlsx')}
+                                  className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 flex items-center gap-1 whitespace-nowrap transition-colors cursor-pointer"
+                                >
+                                  <FileSpreadsheet className="w-3.5 h-3.5 text-teal-600" />
+                                  <span>Excel</span>
+                                </button>
+                                {file.canImportToDataset && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleImportToDataset(file)}
+                                    className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
+                                  >
+                                    <Database className="w-3.5 h-3.5" />
+                                    <span>Importar</span>
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Gráficos Científicos Gerados pela IA */}
-                  {msg.generatedCharts && msg.generatedCharts.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-zinc-800 space-y-3">
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                        <BarChart3 className="w-3.5 h-3.5" />
-                        <span>Gráficos Científicos Gerados</span>
+                    {/* Gráficos Científicos Gerados pela IA */}
+                    {msg.generatedCharts && msg.generatedCharts.length > 0 && (
+                      <div className="mt-3.5 pt-3 border-t border-slate-200 dark:border-zinc-800 space-y-2.5">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-zinc-400 flex items-center gap-1.5">
+                          <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Gráficos Científicos Gerados</span>
+                        </div>
+                        <div className="space-y-2.5">
+                          {msg.generatedCharts.map((chart, cIdx) => (
+                            <ChatChartCard
+                              key={chart.chartId || `chart-${msg.id}-${cIdx}`}
+                              chart={chart}
+                              onSaveToExperiment={handleSaveChartToExperiment}
+                            />
+                          ))}
+                        </div>
                       </div>
-                      <div className="space-y-3">
-                        {msg.generatedCharts.map((chart, cIdx) => (
-                          <ChatChartCard
-                            key={chart.chartId || `chart-${msg.id}-${cIdx}`}
-                            chart={chart}
-                            onSaveToExperiment={handleSaveChartToExperiment}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {isUser && (
-                  <div className="w-9 h-9 rounded-xl bg-slate-800 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow">
-                    EU
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                </div>
+              );
+            })}
 
-          {isLoading && (
-            <div className="flex gap-3 items-center text-slate-500 dark:text-zinc-400 text-xs py-2">
-              <NemaIAEstatisticaIcon
-                size={32}
-                variant="emblem"
-                className="rounded-xl animate-pulse"
-              />
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
-                <span>Nema IA Estatística processando matriz de dados e cálculos biométricos...</span>
+            {isLoading && (
+              <div className="flex gap-2.5 items-center text-slate-500 dark:text-zinc-400 text-xs py-1">
+                <Loader2 className="w-4 h-4 animate-spin text-emerald-600 shrink-0" />
+                <span>Processando matriz de dados e cálculos biométricos...</span>
               </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Prévia de Anexos Pendentes */}
+          {attachments.length > 0 && (
+            <div className="px-3.5 py-2 bg-slate-50 dark:bg-zinc-950/60 border-t border-slate-200 dark:border-zinc-800 flex flex-wrap gap-1.5 text-xs">
+              {attachments.map((att) => (
+                <div
+                  key={att.id}
+                  className="px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 flex items-center gap-1.5"
+                >
+                  {att.kind === 'pdf' && <FileText className="w-3.5 h-3.5 text-rose-500" />}
+                  {att.kind === 'spreadsheet' && <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />}
+                  {att.kind === 'image' && <ImageIcon className="w-3.5 h-3.5 text-blue-500" />}
+                  {att.kind === 'doc' && <FileText className="w-3.5 h-3.5 text-indigo-500" />}
+                  {att.kind === 'text' && <FileCode className="w-3.5 h-3.5 text-amber-500" />}
+                  <span className="font-medium truncate max-w-[150px]">{att.name}</span>
+                  {att.rowCount && att.colCount && (
+                    <span className="text-[10px] font-mono tabular-nums text-slate-400">
+                      {att.rowCount}×{att.colCount}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAttachment(att.id)}
+                    className="text-slate-400 hover:text-rose-500 p-0.5 rounded cursor-pointer"
+                    aria-label="Remover anexo"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
 
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Prévia de Anexos Pendentes */}
-        {attachments.length > 0 && (
-          <div className="p-3 bg-slate-100 dark:bg-zinc-800/60 border-t border-slate-200 dark:border-zinc-800 flex flex-wrap gap-2 text-xs">
-            {attachments.map((att) => (
-              <div
-                key={att.id}
-                className="px-3 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 flex items-center gap-2 shadow-sm"
-              >
-                {att.kind === 'pdf' && <FileText className="w-3.5 h-3.5 text-rose-500" />}
-                {att.kind === 'spreadsheet' && <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />}
-                {att.kind === 'image' && <ImageIcon className="w-3.5 h-3.5 text-blue-500" />}
-                {att.kind === 'doc' && <FileText className="w-3.5 h-3.5 text-indigo-500" />}
-                {att.kind === 'text' && <FileCode className="w-3.5 h-3.5 text-amber-500" />}
-                <span className="font-medium truncate max-w-[160px]">{att.name}</span>
-                {att.rowCount && att.colCount && (
-                  <span className="text-[10px] text-slate-400">
-                    ({att.rowCount} lin x {att.colCount} col)
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={() => handleRemoveAttachment(att.id)}
-                  className="text-slate-400 hover:text-rose-500 p-0.5 rounded cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Caixa de Entrada e Envio */}
-        <div className="p-3 sm:p-4 bg-white dark:bg-zinc-900 border-t border-slate-200 dark:border-zinc-800 rounded-b-2xl">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSendMessage();
-            }}
-            className="flex items-end gap-2"
-          >
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              multiple
-              accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.png,.jpg,.jpeg,.webp,.txt"
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              title="Anexar arquivo (PDF, XLSX, CSV, DOC, Imagem)"
-              className="p-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 transition cursor-pointer shrink-0"
-            >
-              <Paperclip className="w-5 h-5" />
-            </button>
-
-            <textarea
-              value={inputPrompt}
-              onChange={(e) => setInputPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
-                }
+          {/* Caixa de Entrada e Envio */}
+          <div className="p-3 bg-white dark:bg-zinc-900 border-t border-slate-200 dark:border-zinc-800">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSendMessage();
               }}
-              rows={2}
-              placeholder="Digite sua dúvida estatística, peça para calcular ANOVA, ajustar regressão, gerar gráficos científicos ou planilhas com resultados..."
-              className="flex-1 resize-none px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-xs sm:text-sm text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-
-            <button
-              type="submit"
-              disabled={isLoading || (!inputPrompt.trim() && attachments.length === 0)}
-              className="p-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white transition shadow-md cursor-pointer shrink-0 flex items-center justify-center"
+              className="flex items-end gap-2"
             >
-              {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Send className="w-5 h-5" />
-              )}
-            </button>
-          </form>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                multiple
+                accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.png,.jpg,.jpeg,.webp,.txt"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                title="Anexar arquivo (PDF, XLSX, CSV, DOC, Imagem)"
+                className="h-9 w-9 rounded-lg border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              >
+                <Paperclip className="w-4 h-4" />
+              </button>
 
-          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400 px-1">
-            <span>
-              Suporta: <strong>PDF, Excel (XLSX), CSV, Word (DOC), Fotos e Cadernos de Campo</strong>
-            </span>
-            <span>Pressione Enter para enviar (Shift+Enter para nova linha)</span>
+              <textarea
+                value={inputPrompt}
+                onChange={(e) => setInputPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                rows={2}
+                placeholder="Digite sua dúvida estatística, solicite ANOVA, regressão, gráficos ou planilhas..."
+                className="flex-1 resize-none px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500"
+              />
+
+              <button
+                type="submit"
+                disabled={isLoading || (!inputPrompt.trim() && attachments.length === 0)}
+                className="h-9 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-medium transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+                <span className="hidden sm:inline">Enviar</span>
+              </button>
+            </form>
+
+            <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 dark:text-zinc-500 px-0.5">
+              <span>Anexos: PDF, XLSX, CSV, DOC e imagens de caderno de campo</span>
+              <span>Enter envia · Shift+Enter quebra linha</span>
+            </div>
           </div>
         </div>
       </div>
-      </div>
+
+      {/* Modal de Confirmação Local (Sem window.confirm) */}
+      {confirmAction && (
+        <div className="fixed inset-0 z-[1500] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl w-full max-w-sm p-5 space-y-4">
+            <div className="space-y-1">
+              <h4 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                {confirmAction === 'clear_all_history'
+                  ? 'Limpar histórico completo?'
+                  : 'Reiniciar conversa atual?'}
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-zinc-400">
+                {confirmAction === 'clear_all_history'
+                  ? 'Todas as conversas salvas localmente da Nema IA Estatística serão removidas.'
+                  : 'As mensagens da conversa atual serão limpas e uma nova sessão será iniciada.'}
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmAction(null)}
+                className="px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-lg cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={executeConfirmedClear}
+                className="px-3 py-1.5 text-xs font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg cursor-pointer"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

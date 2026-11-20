@@ -8,6 +8,8 @@ import {
   RotateCcw,
   Bookmark,
   Tractor,
+  Search,
+  X,
 } from 'lucide-react';
 import {
   TankMixProduct,
@@ -34,6 +36,16 @@ interface Props {
   onOpenTraceabilityModal?: () => void;
   onNavigateToWaterQuality?: () => void;
 }
+
+const CLASS_FILTERS = [
+  { id: 'todos', label: 'Todos' },
+  { id: 'herbicida', label: 'Herbicidas' },
+  { id: 'fungicida', label: 'Fungicidas' },
+  { id: 'inseticida', label: 'Inseticidas' },
+  { id: 'adjuvante', label: 'Adjuvantes' },
+  { id: 'fertilizante_foliar', label: 'Foliares' },
+  { id: 'condicionador_calda', label: 'Condicionadores' },
+];
 
 export const TankMixVirtualLabView: React.FC<Props> = ({
   allProducts = [],
@@ -70,10 +82,11 @@ export const TankMixVirtualLabView: React.FC<Props> = ({
   const [recipeNotes, setRecipeNotes] = useState('');
   const [isAgitatorOn, setIsAgitatorOn] = useState(true);
 
+  const catalogSource = allProducts.length > 0 ? allProducts : TANKMIX_PRODUCTS_DATABASE;
+
   // Compute live tank evaluation
   const evaluation = calculateTankMixEvaluation(selectedProducts, waterQuality, tankVolumeL, sprayVolumeLHa);
 
-  // Helper to add product
   const handleAddProduct = (product: TankMixProduct) => {
     if (!product || !product.id) return;
     if ((selectedProducts || []).some(p => p?.productId === product.id || p?.product?.id === product.id)) return;
@@ -97,370 +110,409 @@ export const TankMixVirtualLabView: React.FC<Props> = ({
   const handleUpdateDose = (productId: string, dose: number) => {
     setSelectedProducts(prev =>
       (prev || []).map(p =>
-        (p?.productId === productId || p?.product?.id === productId)
+        p?.productId === productId || p?.product?.id === productId
           ? { ...p, dose: Math.max(0.01, dose) }
           : p
       )
     );
   };
 
-  // Filter products for modal
-  const filteredCatalog = (TANKMIX_PRODUCTS_DATABASE || []).filter(p => {
+  const filteredCatalog = (catalogSource || []).filter(p => {
     if (!p || !p.id) return false;
+    const q = (productSearch || '').toLowerCase();
     const matchSearch =
-      (p.commercialName || '').toLowerCase().includes((productSearch || '').toLowerCase()) ||
-      (p.activeIngredient || '').toLowerCase().includes((productSearch || '').toLowerCase()) ||
-      (p.formulation || '').toLowerCase().includes((productSearch || '').toLowerCase());
+      (p.commercialName || '').toLowerCase().includes(q) ||
+      (p.activeIngredient || '').toLowerCase().includes(q) ||
+      (p.formulation || '').toLowerCase().includes(q);
     const matchClass = selectedClassFilter === 'todos' || p.agrochemicalClass === selectedClassFilter;
     const matchFormulation = selectedFormulationFilter === 'todas' || p.formulation === selectedFormulationFilter;
     return matchSearch && matchClass && matchFormulation;
   });
 
-  // Calculate visual appearance of tank fluid
   const hasPrecipitate = (evaluation?.detectedRules || []).some(r => r?.precipitateRisk);
   const hasPhaseSeparation = (evaluation?.detectedRules || []).some(r => r?.phaseSeparationRisk);
-  const hasEc = (evaluation?.loadedProducts || []).some(p => p?.product?.formulation === 'EC' || p?.product?.formulation === 'EW');
+  const hasEc = (evaluation?.loadedProducts || []).some(
+    p => p?.product?.formulation === 'EC' || p?.product?.formulation === 'EW'
+  );
   const hasCopper = (evaluation?.loadedProducts || []).some(p => p?.product?.id === 'oxicloreto_de_cobre_wp');
   const hasMancozebe = (evaluation?.loadedProducts || []).some(p => p?.product?.id === 'mancozebe_750_wg');
 
-  let fluidColorClass = 'bg-cyan-100/70 border-cyan-300';
-  if (hasCopper) fluidColorClass = 'bg-teal-500/80 border-teal-600';
-  else if (hasMancozebe) fluidColorClass = 'bg-amber-100/90 border-amber-300';
-  else if (hasEc) fluidColorClass = 'bg-emerald-50/90 border-emerald-200';
+  let fluidColorClass = 'bg-sky-100/80 dark:bg-sky-900/40 border-sky-300 dark:border-sky-700';
+  if (hasCopper) fluidColorClass = 'bg-teal-500/75 dark:bg-teal-600/70 border-teal-600 dark:border-teal-500';
+  else if (hasMancozebe) fluidColorClass = 'bg-amber-100/90 dark:bg-amber-900/45 border-amber-300 dark:border-amber-700';
+  else if (hasEc) fluidColorClass = 'bg-emerald-100/80 dark:bg-emerald-900/40 border-emerald-300 dark:border-emerald-700';
 
   const jarTest = getJarTestProtocol(evaluation.loadedProducts, sprayVolumeLHa);
 
+  const icgLabel =
+    selectedProducts.length === 0
+      ? 'Aguardando insumos'
+      : evaluation.worstRating === 'compativel'
+      ? 'Compatibilidade elevada'
+      : evaluation.worstRating === 'compativel_restricoes'
+      ? 'Compatível com cuidados'
+      : evaluation.worstRating === 'restricao_severa'
+      ? 'Restrição severa'
+      : 'Incompatível';
+
+  const icgTextTone =
+    selectedProducts.length === 0
+      ? 'text-slate-500 dark:text-zinc-400'
+      : evaluation.icgScore >= 85
+      ? 'text-emerald-700 dark:text-emerald-400'
+      : evaluation.icgScore >= 70
+      ? 'text-amber-700 dark:text-amber-400'
+      : evaluation.icgScore >= 50
+      ? 'text-orange-700 dark:text-orange-400'
+      : 'text-rose-700 dark:text-rose-400';
+
+  const icgBarTone =
+    selectedProducts.length === 0
+      ? 'bg-slate-300 dark:bg-zinc-700'
+      : evaluation.icgScore >= 85
+      ? 'bg-emerald-500'
+      : evaluation.icgScore >= 70
+      ? 'bg-amber-500'
+      : evaluation.icgScore >= 50
+      ? 'bg-orange-500'
+      : 'bg-rose-500';
+
   return (
-    <div className="space-y-6">
-      {/* Top Header & Fast Config Bar */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+    <div className="space-y-5">
+      {/* Cabeçalho da Seção e Ações */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-0.5 rounded-full">
-              Laboratório Virtual Interativo
-            </span>
-            <span className="text-xs text-gray-500">• Validação Físico-Química em Tempo Real</span>
-          </div>
-          <h1 className="text-xl font-extrabold text-gray-900 mt-1">Simulador de Tanque de Pulverização</h1>
+          <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100">
+            Simulador de Tanque de Pulverização
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+            Validação físico-química em tempo real · Sequência técnica WALES
+          </p>
         </div>
 
-        {/* Global Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          {evaluation.jarTestRequired && (selectedProducts || []).length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {evaluation.jarTestRequired && selectedProducts.length > 0 && (
             <button
+              type="button"
               onClick={() => setShowJarTestModal(true)}
-              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold px-3.5 py-2 rounded-xl text-xs shadow-sm transition-colors"
+              className="h-8 px-3 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-950/70 text-amber-800 dark:text-amber-300 text-xs font-medium inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
-              <FlaskConical className="w-4 h-4" />
-              <span>Protocolo Teste de Jarra (1L)</span>
+              <FlaskConical className="w-3.5 h-3.5 shrink-0" />
+              <span>Teste de Jarra (1L)</span>
             </button>
           )}
 
           <button
+            type="button"
             onClick={() => setShowSaveRecipePrompt(true)}
-            disabled={(selectedProducts || []).length === 0}
-            className="flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold px-3.5 py-2 rounded-xl text-xs transition-colors disabled:opacity-50"
+            disabled={selectedProducts.length === 0}
+            className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-medium inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 disabled:opacity-40 cursor-pointer"
           >
-            <Bookmark className="w-4 h-4 text-teal-600" />
+            <Bookmark className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <span>Salvar Receita</span>
           </button>
 
           <button
+            type="button"
             onClick={onOpenTraceabilityModal}
-            disabled={(selectedProducts || []).length === 0}
-            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-sm transition-colors disabled:opacity-50"
+            disabled={selectedProducts.length === 0}
+            className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 disabled:opacity-40 cursor-pointer"
           >
-            <Tractor className="w-4 h-4" />
+            <Tractor className="w-3.5 h-3.5 shrink-0" />
             <span>Registrar Aplicação</span>
           </button>
 
           <button
+            type="button"
             onClick={() => setSelectedProducts([])}
-            disabled={(selectedProducts || []).length === 0}
-            className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors disabled:opacity-30"
-            title="Esvaziar Tanque"
+            disabled={selectedProducts.length === 0}
+            className="h-8 w-8 rounded-lg border border-slate-200 dark:border-zinc-800 text-slate-500 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-200 dark:hover:border-rose-900 inline-flex items-center justify-center transition-colors disabled:opacity-30 cursor-pointer"
+            title="Esvaziar tanque"
+            aria-label="Esvaziar tanque"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Tank Parameters Bar */}
-      <div className="bg-gray-900 text-white p-4 rounded-2xl shadow-md grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
-        <div>
-          <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-            Capacidade do Tanque
+      {/* Faixa de Parâmetros do Tanque */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-zinc-800">
+        <div className="p-3.5">
+          <label
+            htmlFor="tankmix-capacity"
+            className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block mb-1.5"
+          >
+            Capacidade do tanque
           </label>
           <select
+            id="tankmix-capacity"
             value={tankVolumeL}
             onChange={e => setTankVolumeL(Number(e.target.value))}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm font-bold text-emerald-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            className="w-full h-8 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg px-2.5 text-xs font-medium text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
           >
-            <option value={20}>20 Litros (Costal Manual)</option>
-            <option value={40}>40 Litros (Drone de Pulverização)</option>
-            <option value={600}>600 Litros (Tratorizado Barra)</option>
-            <option value={800}>800 Litros (Tratorizado Barra)</option>
-            <option value={2000}>2.000 Litros (Turbo Atomizador / Barra)</option>
-            <option value={3000}>3.000 Litros (Autopropelido)</option>
-            <option value={4000}>4.000 Litros (Autopropelido Grande Porte)</option>
+            <option value={20}>20 L · Costal manual</option>
+            <option value={40}>40 L · Drone de pulverização</option>
+            <option value={600}>600 L · Barra tratorizada</option>
+            <option value={800}>800 L · Barra tratorizada</option>
+            <option value={2000}>2.000 L · Turbo / Barra</option>
+            <option value={3000}>3.000 L · Autopropelido</option>
+            <option value={4000}>4.000 L · Autopropelido grande</option>
           </select>
         </div>
 
-        <div>
-          <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-            Taxa de Aplicação (L/ha)
+        <div className="p-3.5">
+          <label
+            htmlFor="tankmix-rate"
+            className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block mb-1.5"
+          >
+            Taxa de aplicação
           </label>
           <div className="flex items-center gap-2">
             <input
+              id="tankmix-rate"
               type="number"
               min={5}
               max={1000}
               value={sprayVolumeLHa}
               onChange={e => setSprayVolumeLHa(Math.max(5, Number(e.target.value)))}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm font-bold text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              className="w-full h-8 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg px-2.5 text-xs font-semibold tabular-nums text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
             />
-            <span className="text-xs text-gray-400 font-medium">L/ha</span>
+            <span className="text-xs text-slate-500 dark:text-zinc-400 whitespace-nowrap">L/ha</span>
           </div>
         </div>
 
-        <div>
-          <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-            Área Coberta / Tanque
-          </label>
-          <div className="text-base font-extrabold text-white">
+        <div className="p-3.5 flex flex-col justify-between">
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400">
+            Área coberta por tanque
+          </span>
+          <div className="text-base font-semibold tabular-nums text-slate-900 dark:text-zinc-100 mt-1">
             {evaluation.totalHectaresPerTank}{' '}
-            <span className="text-xs font-normal text-gray-400">ha / tanque cheio</span>
+            <span className="text-xs font-normal text-slate-500 dark:text-zinc-400">ha / carga</span>
           </div>
         </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-              Água Base da Fazenda
-            </label>
+        <div className="p-3.5 flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400">
+              Água base da fazenda
+            </span>
             <button
+              type="button"
               onClick={onNavigateToWaterQuality}
-              className="text-[11px] text-emerald-400 hover:underline font-medium"
+              className="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline whitespace-nowrap cursor-pointer"
             >
               Ajustar
             </button>
           </div>
-          <div className="text-xs font-medium text-gray-300">
-            pH <span className="font-bold text-white">{waterQuality.ph.toFixed(1)}</span> • Dureza{' '}
-            <span className="font-bold text-white">{waterQuality.hardnessMgL}</span> mg/L
+          <div className="text-xs text-slate-700 dark:text-zinc-300 mt-1 tabular-nums">
+            pH <strong className="font-semibold text-slate-900 dark:text-zinc-100">{waterQuality.ph.toFixed(1)}</strong>
+            <span className="mx-1.5 text-slate-300 dark:text-zinc-700">·</span>
+            Dureza <strong className="font-semibold text-slate-900 dark:text-zinc-100">{waterQuality.hardnessMgL}</strong> mg/L
           </div>
         </div>
       </div>
 
-      {/* Main Interactive Dual Pane: Left (Tank Animation & ICG) | Right (Products in Tank & Mix Order) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: Interactive Virtual Tank Visualizer */}
-        <div className="lg:col-span-5 space-y-6">
-          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col items-center">
-            <div className="w-full flex items-center justify-between mb-3">
-              <h2 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                <FlaskConical className="w-4 h-4 text-emerald-600" />
-                <span>Simulação Hidrodinâmica da Calda</span>
-              </h2>
+      {/* Área Principal: Esquerda (Simulador + Alertas) | Direita (Produtos + Ordem WALES) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Coluna Esquerda */}
+        <div className="lg:col-span-5 space-y-5">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <FlaskConical className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <h3 className="text-xs font-semibold text-slate-900 dark:text-zinc-100 truncate">
+                  Simulação Hidrodinâmica
+                </h3>
+              </div>
               <button
+                type="button"
                 onClick={() => setIsAgitatorOn(!isAgitatorOn)}
-                className={`text-xs px-2.5 py-1 rounded-full font-bold transition-colors ${
+                className={`h-7 px-2.5 rounded-lg text-[11px] font-medium border transition-colors whitespace-nowrap cursor-pointer ${
                   isAgitatorOn
-                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                    : 'bg-gray-100 text-gray-600 border border-gray-300'
+                    ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300'
+                    : 'border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300'
                 }`}
               >
                 Agitador: {isAgitatorOn ? 'Ligado' : 'Desligado'}
               </button>
             </div>
 
-            {/* Visual Tank Graphic */}
-            <div className="relative w-64 h-80 bg-gray-100 rounded-3xl border-4 border-gray-400/80 p-3 shadow-inner flex flex-col justify-end overflow-hidden">
-              {/* Level Markers on side */}
-              <div className="absolute right-2 top-4 bottom-4 flex flex-col justify-between text-[9px] font-mono text-gray-400 select-none pointer-events-none">
-                <span>{tankVolumeL} L (100%)</span>
-                <span>{(tankVolumeL * 0.75).toFixed(0)} L (75%)</span>
-                <span>{(tankVolumeL * 0.5).toFixed(0)} L (50%)</span>
-                <span>{(tankVolumeL * 0.25).toFixed(0)} L (25%)</span>
-                <span>0 L</span>
-              </div>
-
-              {/* Agitator shaft & blades */}
-              <div className="absolute top-2 left-1/2 -translate-x-1/2 w-1.5 h-64 bg-gray-600 rounded-full z-10 flex flex-col justify-end items-center pb-8">
-                <div
-                  className={`w-16 h-3 bg-gray-700 rounded-sm shadow-md transition-transform ${
-                    isAgitatorOn && (selectedProducts || []).length > 0 ? 'animate-spin' : ''
-                  }`}
-                />
-              </div>
-
-              {/* Foam Layer on Top */}
-              {(selectedProducts || []).length > 0 && (
-                <div className="w-full h-4 bg-white/80 backdrop-blur-sm rounded-t-xl z-20 flex items-center justify-center border-b border-gray-200">
-                  <span className="text-[9px] font-bold text-gray-500">Superfície da Calda</span>
-                </div>
-              )}
-
-              {/* Phase Separation (Oil on top) alert layer */}
-              {hasPhaseSeparation && (
-                <div className="w-full h-6 bg-amber-400/80 z-20 flex items-center justify-center border-b border-amber-600 animate-pulse">
-                  <span className="text-[9px] font-extrabold text-amber-950">Nata / Separação de Fase</span>
-                </div>
-              )}
-
-              {/* Liquid Body */}
-              <div
-                className={`w-full transition-all duration-700 rounded-b-2xl border-t-2 relative overflow-hidden flex flex-col justify-between ${
-                  (selectedProducts || []).length === 0
-                    ? 'h-16 bg-blue-100/50 border-blue-200'
-                    : `h-64 ${fluidColorClass}`
-                }`}
-              >
-                {/* Agitation wave animation */}
-                {isAgitatorOn && (selectedProducts || []).length > 0 && (
-                  <div className="absolute inset-0 opacity-30 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px] animate-pulse" />
-                )}
-
-                <div className="p-2 text-center text-xs font-bold text-gray-800 z-10">
-                  {(selectedProducts || []).length === 0 ? (
-                    <span className="text-gray-400">Água Pura ({waterQuality.ph} pH)</span>
-                  ) : (
-                    <span>Calda Homogeneizada ({(selectedProducts || []).length} produtos)</span>
-                  )}
+            {/* Tanque Visual */}
+            <div className="p-5 flex flex-col items-center">
+              <div className="relative w-56 h-72 bg-slate-100 dark:bg-zinc-950 rounded-2xl border-2 border-slate-300 dark:border-zinc-700 p-2.5 flex flex-col justify-end overflow-hidden">
+                <div className="absolute right-2 top-3 bottom-3 flex flex-col justify-between text-[10px] font-mono tabular-nums text-slate-400 dark:text-zinc-500 select-none pointer-events-none z-20">
+                  <span>{tankVolumeL} L</span>
+                  <span>{(tankVolumeL * 0.75).toFixed(0)} L</span>
+                  <span>{(tankVolumeL * 0.5).toFixed(0)} L</span>
+                  <span>{(tankVolumeL * 0.25).toFixed(0)} L</span>
+                  <span>0 L</span>
                 </div>
 
-                {/* Precipitates Sediments on bottom */}
-                {hasPrecipitate && (
-                  <div className="w-full h-5 bg-rose-700 text-white text-[9px] font-extrabold flex items-center justify-center z-20 animate-bounce">
-                    ⚠️ Precipitado / Cristais Decantados!
+                {/* Eixo e hélice */}
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 w-1 h-56 bg-slate-500 dark:bg-zinc-600 rounded-full z-10 flex flex-col justify-end items-center pb-6">
+                  <div
+                    className={`w-14 h-2.5 bg-slate-600 dark:bg-zinc-500 rounded-xs transition-transform ${
+                      isAgitatorOn && selectedProducts.length > 0 ? 'animate-spin' : ''
+                    }`}
+                  />
+                </div>
+
+                {/* Superfície */}
+                {selectedProducts.length > 0 && (
+                  <div className="w-full h-4 bg-white/80 dark:bg-zinc-800/80 rounded-t-lg z-20 flex items-center justify-center border-b border-slate-200 dark:border-zinc-700">
+                    <span className="text-[10px] font-medium text-slate-500 dark:text-zinc-400">
+                      Superfície da calda
+                    </span>
                   </div>
                 )}
+
+                {/* Separação de fase */}
+                {hasPhaseSeparation && (
+                  <div className="w-full h-5 bg-amber-400/90 dark:bg-amber-500/85 z-20 flex items-center justify-center border-b border-amber-600">
+                    <span className="text-[10px] font-semibold text-amber-950">
+                      Nata / Separação de fase
+                    </span>
+                  </div>
+                )}
+
+                {/* Líquido */}
+                <div
+                  className={`w-full transition-all duration-500 rounded-b-xl border-t relative overflow-hidden flex flex-col justify-between ${
+                    selectedProducts.length === 0
+                      ? 'h-16 bg-sky-100/60 dark:bg-sky-950/40 border-sky-200 dark:border-sky-800'
+                      : `h-56 ${fluidColorClass}`
+                  }`}
+                >
+                  <div className="p-2 text-center text-[11px] font-medium text-slate-800 dark:text-zinc-100 z-10">
+                    {selectedProducts.length === 0 ? (
+                      <span className="text-slate-500 dark:text-zinc-400 tabular-nums">
+                        Água pura (pH {waterQuality.ph.toFixed(1)})
+                      </span>
+                    ) : (
+                      <span className="tabular-nums">
+                        Calda ({selectedProducts.length} {selectedProducts.length === 1 ? 'insumo' : 'insumos'})
+                      </span>
+                    )}
+                  </div>
+
+                  {hasPrecipitate && (
+                    <div className="w-full py-1 bg-rose-700 text-white text-[10px] font-semibold flex items-center justify-center gap-1 z-20">
+                      <AlertTriangle className="w-3 h-3 shrink-0" />
+                      <span>Precipitado decantado</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* ICG Gauge Score */}
-            <div className="w-full mt-4 p-4 rounded-xl border border-gray-100 bg-gray-50">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-bold text-gray-700">Índice de Compatibilidade (ICG)</span>
-                <span
-                  className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full ${
-                    (selectedProducts || []).length === 0
-                      ? 'bg-gray-100 text-gray-600'
-                      : evaluation.icgScore >= 85
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : evaluation.icgScore >= 70
-                      ? 'bg-amber-100 text-amber-800'
-                      : evaluation.icgScore >= 50
-                      ? 'bg-orange-100 text-orange-800'
-                      : 'bg-rose-100 text-rose-800'
-                  }`}
-                >
-                  {(selectedProducts || []).length === 0
-                    ? 'Aguardando Insumos'
-                    : `${evaluation.icgScore}% • ${
-                        evaluation.worstRating === 'compativel'
-                          ? 'Elevada'
-                          : evaluation.worstRating === 'compativel_restricoes'
-                          ? 'Com Cuidados'
-                          : evaluation.worstRating === 'restricao_severa'
-                          ? 'Restrições'
-                          : 'Incompatível'
-                      }`}
+            {/* Indicador ICG */}
+            <div className="px-4 py-3.5 border-t border-slate-100 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/40">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <span className="text-xs font-medium text-slate-700 dark:text-zinc-300">
+                  Índice de Compatibilidade (ICG)
+                </span>
+                <span className={`text-xs font-semibold tabular-nums ${icgTextTone}`}>
+                  {selectedProducts.length === 0 ? icgLabel : `${evaluation.icgScore}% · ${icgLabel}`}
                 </span>
               </div>
-              <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden">
+              <div className="w-full bg-slate-200 dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
                 <div
-                  className={`h-full transition-all duration-500 ${
-                    (selectedProducts || []).length === 0
-                      ? 'bg-gray-300'
-                      : evaluation.icgScore >= 85
-                      ? 'bg-emerald-500'
-                      : evaluation.icgScore >= 70
-                      ? 'bg-amber-500'
-                      : evaluation.icgScore >= 50
-                      ? 'bg-orange-500'
-                      : 'bg-rose-500'
-                  }`}
-                  style={{ width: (selectedProducts || []).length === 0 ? '0%' : `${evaluation.icgScore}%` }}
+                  className={`h-full transition-all duration-300 ${icgBarTone}`}
+                  style={{ width: selectedProducts.length === 0 ? '0%' : `${evaluation.icgScore}%` }}
                 />
               </div>
             </div>
           </div>
 
-          {/* Active Incompatibility Alerts */}
+          {/* Alertas de Incompatibilidade */}
           {(evaluation.detectedRules || []).length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                Interações Físico-Químicas Detectadas
-              </h3>
-              {(evaluation.detectedRules || []).map(rule => (
-                <div
-                  key={rule.id}
-                  className={`p-4 rounded-xl border text-xs leading-relaxed ${
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-slate-100 dark:border-zinc-800">
+                <h3 className="text-xs font-semibold text-slate-800 dark:text-zinc-200">
+                  Interações Físico-Químicas Detectadas ({evaluation.detectedRules.length})
+                </h3>
+              </div>
+              <div className="divide-y divide-slate-100 dark:divide-zinc-800">
+                {evaluation.detectedRules.map(rule => {
+                  const iconColor =
                     rule.rating === 'incompativel'
-                      ? 'bg-rose-50 border-rose-200 text-rose-900'
+                      ? 'text-rose-600 dark:text-rose-400'
                       : rule.rating === 'restricao_severa'
-                      ? 'bg-orange-50 border-orange-200 text-orange-900'
-                      : 'bg-amber-50 border-amber-200 text-amber-900'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 font-bold mb-1">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    <span>{rule.issueSummary}</span>
-                  </div>
-                  <p className="mt-1 text-gray-700">{rule.technicalDetails}</p>
-                  <div className="mt-2 pt-2 border-t border-gray-200/60 font-semibold text-gray-900">
-                    Ação recomendada: <span className="font-normal">{rule.recommendedAction}</span>
-                  </div>
-                  {rule.scientificReference && (
-                    <div className="mt-1 text-[10px] text-gray-500 italic">
-                      Fonte: {rule.scientificReference}
+                      ? 'text-orange-600 dark:text-orange-400'
+                      : 'text-amber-600 dark:text-amber-400';
+
+                  return (
+                    <div key={rule.id} className="p-4 space-y-1.5 text-xs">
+                      <div className="flex items-start gap-2 font-semibold text-slate-900 dark:text-zinc-100">
+                        <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${iconColor}`} />
+                        <span>{rule.issueSummary}</span>
+                      </div>
+                      <p className="text-slate-600 dark:text-zinc-400 leading-relaxed pl-6">
+                        {rule.technicalDetails}
+                      </p>
+                      <div className="pl-6 pt-1 text-slate-800 dark:text-zinc-200">
+                        <span className="font-semibold text-emerald-700 dark:text-emerald-400">Ação recomendada:</span>{' '}
+                        {rule.recommendedAction}
+                      </div>
+                      {rule.scientificReference && (
+                        <div className="pl-6 text-[11px] text-slate-400 dark:text-zinc-500">
+                          Fonte: {rule.scientificReference}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
 
-        {/* Right: Products Added in Tank + Mixing Sequence WALES */}
-        <div className="lg:col-span-7 space-y-6">
-          {/* Products List in Tank */}
-          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
+        {/* Coluna Direita */}
+        <div className="lg:col-span-7 space-y-5">
+          {/* Produtos no Tanque */}
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h2 className="font-bold text-gray-900 text-base">Produtos Adicionados na Calda</h2>
-                <p className="text-xs text-gray-500">
-                  Defina as doses por hectare. O sistema calcula automaticamente o total por tanque.
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                  Produtos na Calda
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-zinc-400">
+                  Ajuste a dose por hectare para calcular o total por carga automaticamente.
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => setShowProductModal(true)}
-                className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3.5 py-2 rounded-xl text-xs shadow-sm transition-colors"
+                className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5 shrink-0" />
                 <span>Adicionar Defensivo</span>
               </button>
             </div>
 
-            {(selectedProducts || []).length === 0 ? (
-              <div className="text-center py-10 border border-dashed border-gray-300 rounded-xl bg-gray-50">
-                <FlaskConical className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm font-semibold text-gray-700">O tanque está vazio</p>
-                <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
-                  Clique em "Adicionar Defensivo" para selecionar herbicidas, fungicidas, inseticidas, adjuvantes ou fertilizantes foliares.
-                </p>
+            {selectedProducts.length === 0 ? (
+              <div className="px-6 py-10 text-center space-y-2.5">
+                <FlaskConical className="w-7 h-7 text-slate-400 dark:text-zinc-500 mx-auto" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-slate-800 dark:text-zinc-200">
+                    O tanque está vazio
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-sm mx-auto">
+                    Adicione herbicidas, fungicidas, inseticidas, adjuvantes ou fertilizantes foliares para simular a mistura.
+                  </p>
+                </div>
                 <button
+                  type="button"
                   onClick={() => setShowProductModal(true)}
-                  className="mt-4 inline-flex items-center gap-1.5 bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors"
+                  className="h-8 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-3.5 h-3.5" />
                   <span>Escolher Produto</span>
                 </button>
               </div>
             ) : (
-              <div className="space-y-3">
-                {(selectedProducts || []).map((sp, index) => {
+              <div className="divide-y divide-slate-100 dark:divide-zinc-800">
+                {selectedProducts.map((sp, index) => {
                   const prodId = sp?.productId || sp?.product?.id || '';
                   const product =
                     sp?.product ||
@@ -468,61 +520,63 @@ export const TankMixVirtualLabView: React.FC<Props> = ({
                     (allProducts || []).find(p => p?.id === prodId);
                   if (!product) return null;
 
-                  // Total amount for the whole tank:
-                  // Total Dose = Dose/ha * TotalHectares
                   const totalForTank = (sp.dose * evaluation.totalHectaresPerTank).toFixed(2);
+                  const totalUnit = sp.doseUnit.includes('kg') || sp.doseUnit.includes('g') ? 'kg' : 'L';
 
                   return (
                     <div
                       key={prodId || `sp_${index}`}
-                      className="p-4 rounded-xl border border-gray-200 bg-white hover:border-emerald-300 transition-all shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3"
+                      className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/70 dark:hover:bg-zinc-800/40 transition-colors"
                     >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-gray-900">{product.commercialName}</span>
-                          <span className="text-[11px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-mono font-bold">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                          <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                            {product.commercialName}
+                          </span>
+                          <span className="text-[11px] font-mono font-medium text-slate-500 dark:text-zinc-400">
                             {product.formulation}
                           </span>
-                          <span className="text-[11px] bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded font-medium capitalize">
+                          <span className="text-slate-300 dark:text-zinc-700 text-xs">·</span>
+                          <span className="text-[11px] text-slate-500 dark:text-zinc-400 capitalize">
                             {product.agrochemicalClass.replace('_', ' ')}
                           </span>
                         </div>
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          i.a.: {product.activeIngredient} • {product.actionMechanism}
+                        <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 truncate">
+                          i.a.: {product.activeIngredient} · {product.actionMechanism}
                         </div>
                       </div>
 
-                      {/* Dosage Controls */}
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5">
-                          <label className="text-[11px] text-gray-500 font-medium">Dose:</label>
+                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                        <div className="flex items-center gap-1.5">
+                          <label className="text-[11px] text-slate-500 dark:text-zinc-400">Dose</label>
                           <input
                             type="number"
                             step={0.05}
                             min={0.01}
                             value={sp.dose}
                             onChange={e => handleUpdateDose(prodId, Number(e.target.value))}
-                            className="w-16 bg-white border border-gray-300 rounded px-1.5 py-0.5 text-xs font-bold text-gray-900 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-center"
+                            className="w-16 h-7 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-700 rounded-md px-1.5 text-xs font-semibold tabular-nums text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500 text-center"
                           />
-                          <span className="text-xs font-semibold text-gray-700">{sp.doseUnit}</span>
+                          <span className="text-[11px] text-slate-600 dark:text-zinc-400 min-w-[34px]">
+                            {sp.doseUnit}
+                          </span>
                         </div>
 
-                        <div className="text-right min-w-[100px]">
-                          <div className="text-[11px] text-gray-400">Total no Tanque</div>
-                          <div className="text-xs font-extrabold text-emerald-700">
-                            {totalForTank}{' '}
-                            <span className="font-normal text-gray-600">
-                              {sp.doseUnit.includes('kg') || sp.doseUnit.includes('g') ? 'kg' : 'L'}
-                            </span>
+                        <div className="text-right min-w-[82px]">
+                          <div className="text-[10px] text-slate-400 dark:text-zinc-500">Por tanque</div>
+                          <div className="text-xs font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+                            {totalForTank} <span className="font-normal text-slate-500 dark:text-zinc-400">{totalUnit}</span>
                           </div>
                         </div>
 
                         <button
+                          type="button"
                           onClick={() => handleRemoveProduct(prodId)}
-                          className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          className="h-7 w-7 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 inline-flex items-center justify-center transition-colors cursor-pointer"
                           title="Remover produto"
+                          aria-label={`Remover ${product.commercialName}`}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -532,72 +586,75 @@ export const TankMixVirtualLabView: React.FC<Props> = ({
             )}
           </div>
 
-          {/* Sequential Mixing Order (Ordem de Adição W-A-L-E-S) */}
-          {(selectedProducts || []).length > 0 && (
-            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
+          {/* Ordem de Adição WALES */}
+          {selectedProducts.length > 0 && (
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <Layers className="w-5 h-5 text-emerald-600" />
-                  <h2 className="font-bold text-gray-900 text-base">Ordem Técnica de Adição no Tanque</h2>
+                  <Layers className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                    Ordem Técnica de Adição
+                  </h3>
                 </div>
-                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                  Sequência WALES Oficial
+                <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400">
+                  Sequência WALES
                 </span>
               </div>
 
-              <div className="space-y-2.5 mt-3">
-                {/* Step 0: Water Base */}
-                <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-blue-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0">
+              <div className="divide-y divide-slate-100 dark:divide-zinc-800">
+                <div className="px-4 py-3 flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 font-semibold text-[11px] tabular-nums flex items-center justify-center shrink-0 mt-0.5">
                     1
-                  </div>
+                  </span>
                   <div>
-                    <div className="text-xs font-bold text-gray-900">Abastecimento de Água Inicial (50% a 70%)</div>
-                    <p className="text-[11px] text-gray-500 mt-0.5">
-                      Encher o tanque com pelo menos 60% da água limpa e ligar a agitação mecânica/hidráulica antes de colocar qualquer produto.
+                    <div className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                      Abastecimento inicial de água (50% a 70%)
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+                      Encher o tanque com água limpa e acionar a agitação contínua antes de inserir os insumos.
                     </p>
                   </div>
                 </div>
 
-                {/* Ordered Products Steps */}
                 {evaluation.sortedByMixingOrder.map((item, idx) => (
-                  <div
-                    key={item.product.id}
-                    className="p-3 rounded-xl bg-white border border-emerald-100 hover:border-emerald-300 transition-colors flex items-start gap-3 shadow-xs"
-                  >
-                    <div className="w-6 h-6 rounded-full bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0">
+                  <div key={item.product.id} className="px-4 py-3 flex items-start gap-3">
+                    <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-semibold text-[11px] tabular-nums flex items-center justify-center shrink-0 mt-0.5">
                       {idx + 2}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-gray-900">
-                          {item.product.commercialName} ({item.product.formulation})
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100 truncate">
+                          {item.product.commercialName}{' '}
+                          <span className="font-mono font-normal text-slate-500 dark:text-zinc-400">
+                            ({item.product.formulation})
+                          </span>
                         </span>
-                        <span className="text-xs font-bold text-emerald-700">
+                        <span className="text-xs font-semibold tabular-nums text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
                           {(item.dose * evaluation.totalHectaresPerTank).toFixed(2)}{' '}
                           {item.doseUnit.includes('kg') || item.doseUnit.includes('g') ? 'kg' : 'L'}
                         </span>
                       </div>
-                      <p className="text-[11px] text-gray-600 mt-0.5">
+                      <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
                         {item.product.formulation === 'WP' || item.product.formulation === 'WG'
                           ? 'Realizar pré-diluição em balde com água se necessário e aguardar 3 minutos de agitação.'
                           : item.product.agrochemicalClass === 'condicionador_calda'
-                          ? 'Condicionador: Adicionar no início para neutralizar cátions e tamponar o pH da água.'
-                          : `Adicionar lentamente com agitação constante. Formulação ${item.product.formulation}.`}
+                          ? 'Condicionador: adicionar no início para neutralizar cátions e ajustar o pH da água.'
+                          : `Adicionar lentamente com agitação constante (formulação ${item.product.formulation}).`}
                       </p>
                     </div>
                   </div>
                 ))}
 
-                {/* Final Step: Complete Water */}
-                <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-blue-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0">
+                <div className="px-4 py-3 flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 font-semibold text-[11px] tabular-nums flex items-center justify-center shrink-0 mt-0.5">
                     {(evaluation.sortedByMixingOrder || []).length + 2}
-                  </div>
+                  </span>
                   <div>
-                    <div className="text-xs font-bold text-gray-900">Completar o Volume Total do Tanque (100%)</div>
-                    <p className="text-[11px] text-gray-500 mt-0.5">
-                      Completar o volume restante com água e manter o agitador ligado por no mínimo 5 minutos antes do início da pulverização.
+                    <div className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                      Completar volume do tanque (100%)
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+                      Completar com água e manter o agitador ligado por pelo menos 5 minutos antes da pulverização.
                     </p>
                   </div>
                 </div>
@@ -607,51 +664,52 @@ export const TankMixVirtualLabView: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* MODAL: Seleção e Busca de Produtos */}
+      {/* MODAL: Seleção de Produtos */}
       {showProductModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-gray-200 overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-xl border border-slate-200 dark:border-zinc-800 shadow-xl overflow-hidden max-h-[88vh] flex flex-col">
+            <div className="px-5 py-3.5 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-bold text-gray-900">Adicionar Insumo ao Tanque</h3>
-                <p className="text-xs text-gray-500">Selecione defensivos, adjuvantes ou fertilizantes foliares</p>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                  Adicionar Insumo ao Tanque
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-zinc-400">
+                  Selecione defensivos, adjuvantes ou fertilizantes foliares
+                </p>
               </div>
               <button
+                type="button"
                 onClick={() => setShowProductModal(false)}
-                className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100"
+                className="h-7 w-7 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 inline-flex items-center justify-center cursor-pointer"
+                aria-label="Fechar"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Search and Filters */}
-            <div className="p-4 border-b border-gray-100 bg-gray-50 space-y-3">
-              <input
-                type="text"
-                placeholder="Buscar por nome comercial, ingrediente ativo ou formulação..."
-                value={productSearch}
-                onChange={e => setProductSearch(e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
+            <div className="p-4 border-b border-slate-100 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/40 space-y-3">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nome comercial, ingrediente ativo ou formulação..."
+                  value={productSearch}
+                  onChange={e => setProductSearch(e.target.value)}
+                  className="w-full h-8 pl-8 pr-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    { id: 'todos', label: 'Todos' },
-                    { id: 'herbicida', label: 'Herbicidas' },
-                    { id: 'fungicida', label: 'Fungicidas' },
-                    { id: 'inseticida', label: 'Inseticidas' },
-                    { id: 'adjuvante', label: 'Adjuvantes' },
-                    { id: 'fertilizante_foliar', label: 'Foliares' },
-                    { id: 'condicionador_calda', label: 'Condicionadores' },
-                  ].map(cat => (
+                <div className="inline-flex flex-wrap items-center gap-1 p-0.5 bg-slate-200/70 dark:bg-zinc-800 rounded-lg">
+                  {CLASS_FILTERS.map(cat => (
                     <button
                       key={cat.id}
+                      type="button"
                       onClick={() => setSelectedClassFilter(cat.id)}
-                      className={`text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors ${
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap cursor-pointer ${
                         selectedClassFilter === cat.id
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-100'
+                          ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-zinc-100 shadow-2xs'
+                          : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100'
                       }`}
                     >
                       {cat.label}
@@ -659,133 +717,155 @@ export const TankMixVirtualLabView: React.FC<Props> = ({
                   ))}
                 </div>
 
-                <div className="flex items-center gap-1.5 text-xs text-gray-600 shrink-0">
-                  <span className="font-semibold text-[11px] text-gray-500">Formulação:</span>
-                  <select
-                    value={selectedFormulationFilter}
-                    onChange={e => setSelectedFormulationFilter(e.target.value)}
-                    className="bg-white border border-gray-300 rounded-lg px-2 py-1 text-xs font-mono font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  >
-                    <option value="todas">Todas as Siglas</option>
-                    {FORMULATION_DATABASE.map(f => (
-                      <option key={f.code} value={f.code}>
-                        {f.code} - {f.fullName.split('(')[0]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  value={selectedFormulationFilter}
+                  onChange={e => setSelectedFormulationFilter(e.target.value)}
+                  aria-label="Filtrar por formulação"
+                  className="h-7 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg px-2 text-xs font-mono text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="todas">Todas formulações</option>
+                  {FORMULATION_DATABASE.map(f => (
+                    <option key={f.code} value={f.code}>
+                      {f.code} · {f.fullName.split('(')[0].trim()}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {/* Product List */}
-            <div className="p-4 overflow-y-auto flex-1 divide-y divide-gray-100">
-              {(filteredCatalog || []).length === 0 ? (
-                <div className="text-center py-8 text-gray-500 text-xs">Nenhum produto encontrado com estes filtros.</div>
+            <div className="overflow-y-auto flex-1 divide-y divide-slate-100 dark:divide-zinc-800">
+              {filteredCatalog.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 dark:text-zinc-400 text-xs">
+                  Nenhum produto encontrado com estes filtros.
+                </div>
               ) : (
-                (filteredCatalog || []).filter(product => product && product.id).map(product => {
-                  const isAdded = (selectedProducts || []).some(p => p?.productId === product.id);
-                  return (
-                    <div
-                      key={product.id}
-                      className="py-3 flex items-center justify-between gap-3 hover:bg-gray-50/80 px-2 rounded-xl transition-colors"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-gray-900">{product.commercialName}</span>
-                          <span className="text-[10px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-mono font-bold">
-                            {product.formulation}
-                          </span>
-                          <span className="text-[10px] bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded font-medium capitalize">
-                            {product.agrochemicalClass.replace('_', ' ')}
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-gray-500 mt-0.5">
-                          {product.activeIngredient} • Dose padrão: {product.defaultDose} {product.doseUnit}
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => handleAddProduct(product)}
-                        disabled={isAdded}
-                        className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${
-                          isAdded
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                        }`}
+                filteredCatalog
+                  .filter(product => product && product.id)
+                  .map(product => {
+                    const isAdded = (selectedProducts || []).some(
+                      p => p?.productId === product.id || p?.product?.id === product.id
+                    );
+                    return (
+                      <div
+                        key={product.id}
+                        className="px-4 py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-zinc-800/50 transition-colors"
                       >
-                        {isAdded ? 'Já no Tanque' : 'Adicionar'}
-                      </button>
-                    </div>
-                  );
-                })
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                              {product.commercialName}
+                            </span>
+                            <span className="text-[11px] font-mono text-slate-500 dark:text-zinc-400">
+                              {product.formulation}
+                            </span>
+                            <span className="text-slate-300 dark:text-zinc-700 text-xs">·</span>
+                            <span className="text-[11px] text-slate-500 dark:text-zinc-400 capitalize">
+                              {product.agrochemicalClass.replace('_', ' ')}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 truncate tabular-nums">
+                            {product.activeIngredient} · Dose padrão: {product.defaultDose} {product.doseUnit}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleAddProduct(product)}
+                          disabled={isAdded}
+                          className={`h-7 px-3 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                            isAdded
+                              ? 'bg-slate-100 dark:bg-zinc-800 text-slate-400 dark:text-zinc-500 cursor-not-allowed'
+                              : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                          }`}
+                        >
+                          {isAdded ? 'No tanque' : 'Adicionar'}
+                        </button>
+                      </div>
+                    );
+                  })
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL: Teste de Jarra (Jar Test) Passo a Passo */}
+      {/* MODAL: Teste de Jarra */}
       {showJarTestModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-gray-200 overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="p-5 border-b border-gray-100 bg-amber-500 text-gray-950 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-xl border border-slate-200 dark:border-zinc-800 shadow-xl overflow-hidden max-h-[88vh] flex flex-col">
+            <div className="px-5 py-3.5 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between gap-3">
               <div>
-                <div className="flex items-center gap-2 font-bold text-sm">
-                  <FlaskConical className="w-5 h-5" />
-                  <span>Protocolo Técnico de Teste de Jarra (Jar Test - 1 Litro)</span>
-                </div>
-                <p className="text-xs text-amber-950/80 mt-0.5">
-                  Proporções milimétricas calculadas para validação em frasco graduado antes de abastecer o tanque
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                  Protocolo de Teste de Jarra (1 Litro)
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-zinc-400">
+                  Proporções calculadas para validação em frasco graduado antes do preparo no tanque
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => setShowJarTestModal(false)}
-                className="text-amber-950 hover:bg-amber-600/30 p-1.5 rounded-lg font-bold"
+                className="h-7 w-7 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 inline-flex items-center justify-center cursor-pointer"
+                aria-label="Fechar"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="p-5 overflow-y-auto space-y-4">
-              <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs text-amber-900 leading-relaxed">
-                <strong>Instrução Prática:</strong> Utilize um béquer ou jarro transparente de 1.000 mL (1 Litro) e a mesma água que será utilizada no abastecimento do pulverizador.
+              <div className="px-3.5 py-2.5 rounded-lg border border-amber-200 dark:border-amber-800/70 bg-amber-50/70 dark:bg-amber-950/30 text-xs text-amber-900 dark:text-amber-200 leading-relaxed">
+                <strong>Instrução prática:</strong> Utilize um béquer ou jarro transparente de 1.000 mL com a mesma água que abastecerá o pulverizador.
+              </div>
+
+              <div className="border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+                <div className="px-3.5 py-2 bg-slate-50 dark:bg-zinc-950/60 border-b border-slate-200 dark:border-zinc-800 text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                  Ordem de adição no jarro (1 L)
+                </div>
+                <div className="divide-y divide-slate-100 dark:divide-zinc-800">
+                  {jarTest.steps.map(step => (
+                    <div key={step.stepNumber} className="px-3.5 py-2.5 flex items-start gap-3">
+                      <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-semibold text-[11px] tabular-nums flex items-center justify-center shrink-0 mt-0.5">
+                        {step.stepNumber}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                          {step.productName}{' '}
+                          <span className="font-mono font-normal text-slate-500 dark:text-zinc-400">
+                            ({step.formulation})
+                          </span>
+                        </div>
+                        <div className="text-xs font-medium tabular-nums text-emerald-700 dark:text-emerald-400 mt-0.5">
+                          {step.jarDoseText}
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">{step.instructions}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="space-y-2">
-                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Ordem de Adição no Jarro (1L)</h4>
-                {jarTest.steps.map(step => (
-                  <div key={step.stepNumber} className="p-3 rounded-xl border border-gray-200 bg-white flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0">
-                      {step.stepNumber}
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-gray-900">
-                        {step.productName} ({step.formulation})
-                      </div>
-                      <div className="text-xs font-bold text-emerald-700 mt-0.5">{step.jarDoseText}</div>
-                      <p className="text-[11px] text-gray-500 mt-0.5">{step.instructions}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="space-y-2 pt-2 border-t border-gray-100">
-                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Tempos de Leitura e Avaliação</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <h4 className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                  Tempos de leitura e avaliação
+                </h4>
+                <div className="border border-slate-200 dark:border-zinc-800 rounded-xl grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200 dark:divide-zinc-800">
                   {jarTest.checkpoints.map(cp => (
-                    <div key={cp.timeMinutes} className="p-3 rounded-lg bg-gray-50 border border-gray-200 text-xs">
-                      <span className="font-bold text-emerald-700">{cp.timeMinutes} minutos:</span>
-                      <p className="text-gray-600 text-[11px] mt-0.5">{cp.criteria}</p>
+                    <div key={cp.timeMinutes} className="p-3 text-xs">
+                      <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+                        {cp.timeMinutes} min
+                      </span>
+                      <p className="text-slate-600 dark:text-zinc-400 text-[11px] mt-0.5">{cp.criteria}</p>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+            <div className="px-5 py-3 border-t border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950/40 flex justify-end">
               <button
+                type="button"
                 onClick={() => setShowJarTestModal(false)}
-                className="bg-gray-900 text-white font-bold text-xs px-5 py-2 rounded-xl hover:bg-gray-800"
+                className="h-8 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium transition-colors cursor-pointer"
               >
                 Concluir Leitura
               </button>
@@ -796,37 +876,57 @@ export const TankMixVirtualLabView: React.FC<Props> = ({
 
       {/* MODAL: Salvar Receita */}
       {showSaveRecipePrompt && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 p-5 space-y-4">
-            <h3 className="font-bold text-gray-900 text-base">Salvar Receita de Calda</h3>
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1">Nome da Receita</label>
-              <input
-                type="text"
-                placeholder="Ex: Dessecação Buva e Amargoso 2026"
-                value={recipeName}
-                onChange={e => setRecipeName(e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1">Observações Técnicas</label>
-              <textarea
-                rows={3}
-                placeholder="Ex: Aplicar nas primeiras horas da manhã com umidade > 60%..."
-                value={recipeNotes}
-                onChange={e => setRecipeNotes(e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-xl border border-slate-200 dark:border-zinc-800 shadow-xl overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Salvar Receita de Calda
+              </h3>
               <button
+                type="button"
                 onClick={() => setShowSaveRecipePrompt(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100"
+                className="h-7 w-7 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 inline-flex items-center justify-center cursor-pointer"
+                aria-label="Fechar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-3.5">
+              <div>
+                <label className="text-xs font-medium text-slate-700 dark:text-zinc-300 block mb-1">
+                  Nome da receita
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Dessecação Buva e Amargoso"
+                  value={recipeName}
+                  onChange={e => setRecipeName(e.target.value)}
+                  className="w-full h-8 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-700 rounded-lg px-2.5 text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-700 dark:text-zinc-300 block mb-1">
+                  Observações técnicas
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Ex: Aplicar nas primeiras horas da manhã com umidade > 60%..."
+                  value={recipeNotes}
+                  onChange={e => setRecipeNotes(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-700 rounded-lg px-2.5 py-2 text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+            <div className="px-5 py-3 border-t border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950/40 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowSaveRecipePrompt(false)}
+                className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer"
               >
                 Cancelar
               </button>
               <button
+                type="button"
                 onClick={() => {
                   if (!recipeName) return;
                   onSaveRecipe(recipeName, recipeNotes);
@@ -835,9 +935,9 @@ export const TankMixVirtualLabView: React.FC<Props> = ({
                   setRecipeNotes('');
                 }}
                 disabled={!recipeName}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
+                className="h-8 px-3.5 rounded-lg text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 cursor-pointer"
               >
-                Salvar no Banco
+                Salvar Receita
               </button>
             </div>
           </div>

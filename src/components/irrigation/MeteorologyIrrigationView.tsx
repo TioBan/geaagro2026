@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
 import { ClimateDayRecord } from '../../types/irrigation';
 import { calculateET0PenmanMonteith } from '../../utils/irrigationStorage';
-import { Sun, CloudRain, Wind, Thermometer, Calendar, Plus, Radio, Calculator } from 'lucide-react';
+import { Sun, Calendar, Plus, Calculator } from 'lucide-react';
+import {
+  formatBrDate,
+  IRRIGATION_INPUT_CLASS,
+  IRRIGATION_LABEL_CLASS,
+} from './irrigationUi';
 
 interface Props {
   climate: ClimateDayRecord[];
@@ -12,6 +17,7 @@ export const MeteorologyIrrigationView: React.FC<Props> = ({
   climate,
   onAddClimateRecord,
 }) => {
+  const [recordDate, setRecordDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [tMax, setTMax] = useState(33.5);
   const [tMin, setTMin] = useState(21.0);
   const [humidity, setHumidity] = useState(60);
@@ -25,7 +31,7 @@ export const MeteorologyIrrigationView: React.FC<Props> = ({
     e.preventDefault();
     const newRecord: ClimateDayRecord = {
       id: `clim-${Date.now()}`,
-      date: new Date().toISOString().split('T')[0],
+      date: recordDate || new Date().toISOString().split('T')[0],
       farmId: 'farm-1',
       tempMaxC: tMax,
       tempMinC: tMin,
@@ -36,7 +42,7 @@ export const MeteorologyIrrigationView: React.FC<Props> = ({
       atmosphericPressureKpa: 96.5,
       rainfallMm: rainfall,
       effectiveRainfallMm: Math.max(0, rainfall - 5),
-      evaporationMm: calculatedEt0 * 0.9,
+      evaporationMm: Math.round(calculatedEt0 * 0.9 * 10) / 10,
       et0MmDay: calculatedEt0,
     };
 
@@ -44,169 +50,188 @@ export const MeteorologyIrrigationView: React.FC<Props> = ({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Sun className="w-5 h-5 text-amber-500" />
-            Meteorologia & Cálculo de Evapotranspiração (ET₀)
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+            <Sun className="w-4 h-4 text-amber-500" />
+            Meteorologia &amp; Evapotranspiração de Referência (ET₀)
           </h3>
           <p className="text-xs text-slate-500 dark:text-zinc-400">
-            Monitoramento de temperatura, radiação, umidade e vento com cálculo Penman-Monteith (FAO-56)
+            Registro diário de temperatura, radiação, umidade, vento e precipitação com cálculo Penman-Monteith (FAO-56).
           </p>
         </div>
-
-        {/* Badge de Integração de Sensores */}
-        <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-800 dark:text-emerald-300">
-          <Radio className="w-4 h-4 text-emerald-500 animate-pulse" />
-          <span>Estação Meteorológica GeaAgro Sincronizada</span>
-        </div>
+        <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums shrink-0">
+          {climate.length} {climate.length === 1 ? 'leitura registrada' : 'leituras registradas'}
+        </span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Formulário / Calculadora de ET0 */}
-        <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-3">
-            <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-              <Calculator className="w-4 h-4 text-cyan-600" />
-              Lançar Leitura Diária & ET₀
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* ET0 Calculator Form */}
+        <div className="lg:col-span-4 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-3.5">
+          <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-zinc-800">
+            <h4 className="font-semibold text-xs text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+              <Calculator className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              Lançar Leitura Diária
             </h4>
-            <span className="text-[10px] text-cyan-600 font-bold uppercase">Penman-Monteith</span>
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400">FAO-56</span>
           </div>
 
-          <form onSubmit={handleCreateRecord} className="space-y-3 text-xs">
-            <div className="grid grid-cols-2 gap-3">
+          <form onSubmit={handleCreateRecord} className="space-y-3">
+            <div>
+              <label className={IRRIGATION_LABEL_CLASS}>Data da Leitura</label>
+              <input
+                type="date"
+                value={recordDate}
+                onChange={(e) => setRecordDate(e.target.value)}
+                className={IRRIGATION_INPUT_CLASS}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label className="block text-slate-600 dark:text-zinc-400 font-bold mb-1">Temp. Máx (°C)</label>
+                <label className={IRRIGATION_LABEL_CLASS}>Temp. Máx (°C)</label>
                 <input
                   type="number"
                   step="0.1"
                   value={tMax}
-                  onChange={e => setTMax(Number(e.target.value))}
-                  className="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white"
+                  onChange={(e) => setTMax(Number(e.target.value))}
+                  className={IRRIGATION_INPUT_CLASS}
                 />
               </div>
-
               <div>
-                <label className="block text-slate-600 dark:text-zinc-400 font-bold mb-1">Temp. Mín (°C)</label>
+                <label className={IRRIGATION_LABEL_CLASS}>Temp. Mín (°C)</label>
                 <input
                   type="number"
                   step="0.1"
                   value={tMin}
-                  onChange={e => setTMin(Number(e.target.value))}
-                  className="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white"
+                  onChange={(e) => setTMin(Number(e.target.value))}
+                  className={IRRIGATION_INPUT_CLASS}
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label className="block text-slate-600 dark:text-zinc-400 font-bold mb-1">Umidade Relat. (%)</label>
+                <label className={IRRIGATION_LABEL_CLASS}>Umidade Relat. (%)</label>
                 <input
                   type="number"
                   value={humidity}
-                  onChange={e => setHumidity(Number(e.target.value))}
-                  className="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white"
+                  onChange={(e) => setHumidity(Number(e.target.value))}
+                  className={IRRIGATION_INPUT_CLASS}
                 />
               </div>
-
               <div>
-                <label className="block text-slate-600 dark:text-zinc-400 font-bold mb-1">Vento u2 (m/s)</label>
+                <label className={IRRIGATION_LABEL_CLASS}>Vento u2 (m/s)</label>
                 <input
                   type="number"
                   step="0.1"
                   value={windSpeed}
-                  onChange={e => setWindSpeed(Number(e.target.value))}
-                  className="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white"
+                  onChange={(e) => setWindSpeed(Number(e.target.value))}
+                  className={IRRIGATION_INPUT_CLASS}
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label className="block text-slate-600 dark:text-zinc-400 font-bold mb-1">Radiação Solar (MJ/m²)</label>
+                <label className={IRRIGATION_LABEL_CLASS}>Radiação (MJ/m²)</label>
                 <input
                   type="number"
                   step="0.1"
                   value={solarRad}
-                  onChange={e => setSolarRad(Number(e.target.value))}
-                  className="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white"
+                  onChange={(e) => setSolarRad(Number(e.target.value))}
+                  className={IRRIGATION_INPUT_CLASS}
                 />
               </div>
-
               <div>
-                <label className="block text-slate-600 dark:text-zinc-400 font-bold mb-1">Chuva / Pluviômetro (mm)</label>
+                <label className={IRRIGATION_LABEL_CLASS}>Chuva (mm)</label>
                 <input
                   type="number"
                   step="0.5"
+                  min="0"
                   value={rainfall}
-                  onChange={e => setRainfall(Number(e.target.value))}
-                  className="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white"
+                  onChange={(e) => setRainfall(Number(e.target.value))}
+                  className={IRRIGATION_INPUT_CLASS}
                 />
               </div>
             </div>
 
-            {/* Resultado da ET0 Calculada em tempo real */}
-            <div className="bg-cyan-950/30 border border-cyan-800/50 p-4 rounded-xl text-center space-y-1">
-              <span className="text-[10px] text-cyan-300 font-black uppercase tracking-wider block">
-                Evapotranspiração Calculada
+            <div className="rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 p-3 flex items-center justify-between">
+              <span className="text-[11px] font-medium text-slate-600 dark:text-zinc-400">
+                ET₀ Calculada
               </span>
-              <div className="text-2xl font-black text-white">
-                ET₀ = {calculatedEt0} mm/dia
-              </div>
+              <span className="text-base font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
+                {calculatedEt0.toFixed(1)} mm/dia
+              </span>
             </div>
 
             <button
               type="submit"
-              className="w-full py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2"
+              className="w-full h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
-              <Plus className="w-4 h-4" /> Registar Leitura Diária
+              <Plus className="w-3.5 h-3.5" />
+              Registrar Leitura Diária
             </button>
           </form>
         </div>
 
-        {/* Histórico Climatológico */}
-        <div className="lg:col-span-2 bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-cyan-600" />
-              Histórico de Registros Meteorológicos ({climate.length})
-            </h4>
-          </div>
+        {/* Climate History */}
+        <div className="lg:col-span-8 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-3">
+          <h4 className="font-semibold text-xs text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
+            Histórico Meteorológico ({climate.length})
+          </h4>
 
-          <div className="space-y-3">
-            {climate.map(c => (
-              <div
-                key={c.id}
-                className="p-4 bg-slate-50 dark:bg-zinc-950/60 rounded-xl border border-slate-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
-              >
-                <div>
-                  <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400">
-                    {new Date(c.date).toLocaleDateString('pt-BR')}
-                  </span>
-                  <div className="flex items-center gap-3 mt-1 text-slate-700 dark:text-zinc-300">
-                    <span>Temp: <strong>{c.tempMaxC}°C / {c.tempMinC}°C</strong></span>
-                    <span>UR: <strong>{c.humidityRelativePct}%</strong></span>
-                    <span>Vento: <strong>{c.windSpeedMs} m/s</strong></span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 text-right">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block font-bold">Chuva</span>
-                    <strong className="text-blue-600 dark:text-blue-400 text-sm">{c.rainfallMm} mm</strong>
-                  </div>
-
-                  <div className="bg-cyan-100 dark:bg-cyan-950 px-3 py-1.5 rounded-lg border border-cyan-200 dark:border-cyan-800">
-                    <span className="text-[10px] text-cyan-800 dark:text-cyan-300 block font-bold">ET₀</span>
-                    <strong className="text-cyan-700 dark:text-cyan-300 text-sm">{c.et0MmDay} mm/dia</strong>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          {climate.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-slate-200 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/60 p-8 text-center">
+              <p className="text-xs font-semibold text-slate-800 dark:text-zinc-200">
+                Nenhuma leitura climática registrada
+              </p>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+                Preencha os dados diários ao lado para calcular a ET₀ e alimentar o balanço hídrico.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto border border-slate-200 dark:border-zinc-800 rounded-lg">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+                    <th className="py-2 px-3">Data</th>
+                    <th className="py-2 px-3">Temp (Máx/Mín)</th>
+                    <th className="py-2 px-3">UR / Vento</th>
+                    <th className="py-2 px-3 text-right">Chuva</th>
+                    <th className="py-2 px-3 text-right">ET₀</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-zinc-800 tabular-nums">
+                  {[...climate].reverse().map((c) => (
+                    <tr key={c.id} className="hover:bg-slate-50/70 dark:hover:bg-zinc-800/40">
+                      <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-zinc-100 whitespace-nowrap">
+                        {formatBrDate(c.date)}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-700 dark:text-zinc-300 whitespace-nowrap">
+                        {c.tempMaxC}°C / {c.tempMinC}°C
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-600 dark:text-zinc-400 whitespace-nowrap">
+                        {c.humidityRelativePct}% · {c.windSpeedMs} m/s
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-medium text-sky-700 dark:text-sky-400 whitespace-nowrap">
+                        {c.rainfallMm} mm
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-semibold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
+                        {c.et0MmDay} mm/dia
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 };
+
+export default MeteorologyIrrigationView;

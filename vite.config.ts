@@ -106,6 +106,7 @@ export default defineConfig(() => {
       dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime'],
     },
     optimizeDeps: {
+      holdUntilCrawlEnd: true,
       include: [
         'react',
         'react-dom',
@@ -113,6 +114,17 @@ export default defineConfig(() => {
         'react/jsx-runtime',
         'react/jsx-dev-runtime',
         'lucide-react',
+        'recharts',
+        'leaflet',
+        'leaflet-draw',
+        'jspdf',
+        'html2canvas-pro',
+        'dompurify',
+        'jszip',
+        'papaparse',
+        'qrcode',
+        'xlsx',
+        'geotiff',
       ],
     },
     build: {

@@ -1,40 +1,50 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Droplets,
-  Plus,
   Activity,
-  Calendar,
-  Layers,
-  Thermometer,
-  ShieldCheck,
-  CheckCircle2,
-  Sparkles,
-  Filter,
-  Search,
   BookOpen,
-  FlaskConical,
-  X,
-  User,
+  Calendar,
   Check,
-  Zap,
+  CheckCircle2,
+  Droplets,
+  Filter,
+  FlaskConical,
+  Layers,
   Leaf,
+  Plus,
   Scale,
+  Search,
   Share2,
+  ShieldCheck,
+  Thermometer,
+  User,
+  X,
+  Zap,
 } from 'lucide-react';
 import {
+  HydroponicAnnotation,
   HydroponicBench,
   NutrientSolutionReservoir,
-  HydroponicAnnotation,
 } from '../../types/hydroponics';
 import {
-  getHydroponicBenches,
-  getHydroponicReservoirs,
-  getHydroponicAnnotations,
-  saveHydroponicReservoirs,
   addHydroponicAnnotationAndSync,
   ensureInitialHydroponicSync,
+  getHydroponicAnnotations,
+  getHydroponicBenches,
+  getHydroponicReservoirs,
+  saveHydroponicReservoirs,
 } from '../../utils/hydroponicsFieldBookSync';
 import { hydroponicRecipesCatalog } from '../../data/hydroponicsData';
+import {
+  BENCH_STATUS_META,
+  calculateHydroponicFertilizers,
+  formatBrDate,
+  getCurrentTimeHHMM,
+  getTodayIsoDate,
+  HYDRO_INPUT_CLASS,
+  HYDRO_LABEL_CLASS,
+  HYDRO_TEXTAREA_CLASS,
+  PUMP_STATUS_META,
+} from '../hydroponics/hydroponicsUi';
 
 interface HydroponicsFieldBookIntegrationProps {
   onNavigateToOperations?: () => void;
@@ -42,16 +52,26 @@ interface HydroponicsFieldBookIntegrationProps {
   farmId?: string;
 }
 
-export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookIntegrationProps> = ({
-  onNavigateToOperations,
-  onOpenFullHydroponicsModule,
-  farmId = 'farm-1',
-}) => {
+const CATEGORY_LABELS: Record<HydroponicAnnotation['category'], string> = {
+  manejo_solucao: 'Solução Nutritiva',
+  bancada_transplante: 'Bancadas & Transplante',
+  colheita: 'Colheita',
+  sanidade_pragas: 'Sanidade',
+  clima_estufa: 'Clima & Estufa',
+  limpeza_manutencao: 'Limpeza & Manutenção',
+  geral: 'Observação Geral',
+};
+
+export const HydroponicsFieldBookIntegration: React.FC<
+  HydroponicsFieldBookIntegrationProps
+> = ({ onNavigateToOperations, onOpenFullHydroponicsModule, farmId = 'farm-1' }) => {
   const [benches, setBenches] = useState<HydroponicBench[]>([]);
   const [reservoirs, setReservoirs] = useState<NutrientSolutionReservoir[]>([]);
   const [annotations, setAnnotations] = useState<HydroponicAnnotation[]>([]);
-  const [activeTab, setActiveTab] = useState<'anotacoes' | 'bancadas' | 'reservatorios' | 'calculadora'>('anotacoes');
-  
+  const [activeTab, setActiveTab] = useState<
+    'anotacoes' | 'bancadas' | 'reservatorios' | 'calculadora'
+  >('anotacoes');
+
   // Search & Filter state for annotations
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('todos');
@@ -59,10 +79,11 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
   // Modal state for new annotation
   const [isNewAnnotationModalOpen, setIsNewAnnotationModalOpen] = useState(false);
   const [annTitle, setAnnTitle] = useState('');
-  const [annCategory, setAnnCategory] = useState<HydroponicAnnotation['category']>('manejo_solucao');
+  const [annCategory, setAnnCategory] =
+    useState<HydroponicAnnotation['category']>('manejo_solucao');
   const [annAuthor, setAnnAuthor] = useState('');
-  const [annDate, setAnnDate] = useState('');
-  const [annTime, setAnnTime] = useState('');
+  const [annDate, setAnnDate] = useState<string>(() => getTodayIsoDate());
+  const [annTime, setAnnTime] = useState<string>(() => getCurrentTimeHHMM());
   const [annNotes, setAnnNotes] = useState('');
   const [annBenchId, setAnnBenchId] = useState('');
   const [annReservoirId, setAnnReservoirId] = useState('');
@@ -75,7 +96,9 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Quick Nutrient Calculator state
-  const [calcCropId, setCalcCropId] = useState('recipe-alface-crespa');
+  const [calcCropId, setCalcCropId] = useState(
+    () => hydroponicRecipesCatalog[0]?.id || 'rec-alface'
+  );
   const [calcVolume, setCalcVolume] = useState<number>(1000);
 
   const showToast = (msg: string) => {
@@ -84,7 +107,6 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
     toastTimerRef.current = setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Load initial data and setup listeners
   const refreshData = () => {
     setBenches(getHydroponicBenches());
     setReservoirs(getHydroponicReservoirs());
@@ -106,40 +128,27 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
     };
   }, [farmId]);
 
-  // Selected recipe calculation
-  const currentRecipe = useMemo(() => {
-    return hydroponicRecipesCatalog.find(r => r.id === calcCropId) || hydroponicRecipesCatalog[0];
-  }, [calcCropId]);
-
-  const fertilizerCalc = useMemo(() => {
-    const factor = calcVolume / 1000;
-    const base = currentRecipe.fertilizerStockGramsPer1000L;
-    return {
-      tankA: {
-        calciumNitrate: Math.round(base.calciumNitrate * factor),
-        ironEDDHA: Math.round(base.ironChelateEDDHA * factor),
-      },
-      tankB: {
-        potassiumNitrate: Math.round(base.potassiumNitrate * factor),
-        mkp: Math.round(base.monopotassiumPhosphate * factor),
-        magnesiumSulfate: Math.round(base.magnesiumSulfate * factor),
-        micros: Math.round(base.micronutrientsConMicros * factor),
-      },
-      total: Math.round(
-        (base.calciumNitrate +
-          base.ironChelateEDDHA +
-          base.potassiumNitrate +
-          base.monopotassiumPhosphate +
-          base.magnesiumSulfate +
-          base.micronutrientsConMicros) *
-          factor
-      ),
+  useEffect(() => {
+    if (!isNewAnnotationModalOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsNewAnnotationModalOpen(false);
     };
-  }, [currentRecipe, calcVolume]);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isNewAnnotationModalOpen]);
 
-  // Filtered annotations
+  const currentRecipe = useMemo(
+    () => hydroponicRecipesCatalog.find((r) => r.id === calcCropId) || hydroponicRecipesCatalog[0],
+    [calcCropId]
+  );
+
+  const fertilizerCalc = useMemo(
+    () => calculateHydroponicFertilizers(currentRecipe, calcVolume, 'desenvolvimento_engorda'),
+    [currentRecipe, calcVolume]
+  );
+
   const filteredAnnotations = useMemo(() => {
-    return annotations.filter(ann => {
+    return annotations.filter((ann) => {
       if (categoryFilter !== 'todos' && ann.category !== categoryFilter) return false;
       if (!searchTerm.trim()) return true;
       const term = searchTerm.toLowerCase();
@@ -153,21 +162,47 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
     });
   }, [annotations, categoryFilter, searchTerm]);
 
-  // Handle submit new annotation
+  const openModalWithDefaults = (overrides?: {
+    benchId?: string;
+    reservoirId?: string;
+    category?: HydroponicAnnotation['category'];
+    title?: string;
+    notes?: string;
+    ph?: string;
+    ec?: string;
+    fertilizers?: string;
+  }) => {
+    setAnnDate(getTodayIsoDate());
+    setAnnTime(getCurrentTimeHHMM());
+    setAnnBenchId(overrides?.benchId || '');
+    setAnnReservoirId(overrides?.reservoirId || '');
+    setAnnCategory(overrides?.category || 'manejo_solucao');
+    setAnnTitle(overrides?.title || '');
+    setAnnNotes(overrides?.notes || '');
+    setAnnPH(overrides?.ph || '');
+    setAnnEC(overrides?.ec || '');
+    setAnnFertilizers(overrides?.fertilizers || '');
+    setAnnWaterRefill('');
+    setAnnTemp('');
+    setIsNewAnnotationModalOpen(true);
+  };
+
   const handleSubmitAnnotation = (e: React.FormEvent) => {
     e.preventDefault();
     if (!annTitle.trim() || !annNotes.trim()) {
-      showToast('Por favor, preencha o título e as observações.');
+      showToast('Preencha o título e as observações técnicas.');
       return;
     }
 
-    const selectedBench = benches.find(b => b.id === annBenchId);
-    const selectedReservoir = reservoirs.find(r => r.id === annReservoirId);
+    const selectedBench = benches.find((b) => b.id === annBenchId);
+    const selectedReservoir = reservoirs.find((r) => r.id === annReservoirId);
+    const finalDate = annDate || getTodayIsoDate();
+    const finalTime = annTime || getCurrentTimeHHMM();
 
     addHydroponicAnnotationAndSync(
       {
-        date: annDate,
-        time: annTime,
+        date: finalDate,
+        time: finalTime,
         author: annAuthor.trim() || 'Equipe de Manejo Hidropônico',
         category: annCategory,
         title: annTitle.trim(),
@@ -185,289 +220,249 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
       farmId
     );
 
-    // If pH or EC was provided and a reservoir was selected, update reservoir values
     if (selectedReservoir && (annPH || annEC)) {
-      const updatedReservoirs = reservoirs.map(r => {
-        if (r.id === selectedReservoir.id) {
-          return {
-            ...r,
-            currentPH: annPH ? parseFloat(annPH) : r.currentPH,
-            currentEC: annEC ? parseFloat(annEC) : r.currentEC,
-            lastNutrientAdjustmentDate: `${annDate} ${annTime}`,
-          };
-        }
-        return r;
-      });
+      const updatedReservoirs = reservoirs.map((r) =>
+        r.id === selectedReservoir.id
+          ? {
+              ...r,
+              currentPH: annPH ? parseFloat(annPH) : r.currentPH,
+              currentEC: annEC ? parseFloat(annEC) : r.currentEC,
+              lastNutrientAdjustmentDate: `${formatBrDate(finalDate)} ${finalTime}`,
+            }
+          : r
+      );
       setReservoirs(updatedReservoirs);
       saveHydroponicReservoirs(updatedReservoirs);
     }
 
     refreshData();
     setIsNewAnnotationModalOpen(false);
-    
-    // Reset form
-    setAnnTitle('');
-    setAnnNotes('');
-    setAnnPH('');
-    setAnnEC('');
-    setAnnWaterRefill('');
-    setAnnFertilizers('');
-    setAnnTemp('');
-    setAnnBenchId('');
-    setAnnReservoirId('');
-
-    showToast(`✅ Anotação registrada e sincronizada com o Caderno de Campo com sucesso!`);
+    showToast('Anotação registrada e sincronizada com o Caderno de Campo.');
   };
 
-  // Open modal with pre-fills
-  const openNewAnnotationForBench = (bench: HydroponicBench) => {
-    setAnnBenchId(bench.id);
-    setAnnReservoirId(bench.reservoirId || '');
-    setAnnCategory('bancada_transplante');
-    setAnnTitle(`Manejo da Bancada ${bench.code} (${bench.cropName})`);
-    setIsNewAnnotationModalOpen(true);
-  };
-
-  const openNewAnnotationForReservoir = (reservoir: NutrientSolutionReservoir) => {
-    setAnnReservoirId(reservoir.id);
-    setAnnPH(reservoir.currentPH.toString());
-    setAnnEC(reservoir.currentEC.toString());
-    setAnnCategory('manejo_solucao');
-    setAnnTitle(`Leitura & Calibração do ${reservoir.name}`);
-    setIsNewAnnotationModalOpen(true);
-  };
-
-  // KPIs
-  const totalActivePlants = useMemo(() => benches.reduce((sum, b) => sum + b.currentPlantsCount, 0), [benches]);
-  const readyForHarvestCount = useMemo(() => benches.filter(b => b.status === 'pronto_colheita').length, [benches]);
+  const totalActivePlants = useMemo(
+    () => benches.reduce((sum, b) => sum + b.currentPlantsCount, 0),
+    [benches]
+  );
+  const readyForHarvestCount = useMemo(
+    () => benches.filter((b) => b.status === 'pronto_colheita').length,
+    [benches]
+  );
   const avgReservoirPH = useMemo(() => {
-    if (reservoirs.length === 0) return '--';
+    if (reservoirs.length === 0) return '—';
     return (reservoirs.reduce((s, r) => s + r.currentPH, 0) / reservoirs.length).toFixed(2);
   }, [reservoirs]);
   const avgReservoirEC = useMemo(() => {
-    if (reservoirs.length === 0) return '--';
+    if (reservoirs.length === 0) return '—';
     return (reservoirs.reduce((s, r) => s + r.currentEC, 0) / reservoirs.length).toFixed(2);
   }, [reservoirs]);
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Toast Notification */}
+    <div className="space-y-4">
+      {/* Inline Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3.5 rounded-xl shadow-2xl border border-teal-500/40 flex items-center gap-3 animate-bounce">
-          <Sparkles className="w-5 h-5 text-teal-400 shrink-0" />
-          <span className="text-xs sm:text-sm font-semibold">{toastMessage}</span>
+        <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/80 dark:bg-emerald-950/30 px-3.5 py-2.5 text-xs font-medium text-emerald-900 dark:text-emerald-200 flex items-center justify-between gap-2">
+          <span>{toastMessage}</span>
+          <button
+            type="button"
+            onClick={() => setToastMessage(null)}
+            className="p-0.5 text-emerald-700 dark:text-emerald-300 cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-teal-950 via-cyan-950 to-slate-900 text-white p-6 rounded-2xl border border-teal-700/50 shadow-lg relative overflow-hidden">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
-          <div>
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className="p-1.5 bg-teal-500/20 text-teal-300 rounded-lg border border-teal-400/30 flex items-center gap-1.5 text-xs font-black uppercase tracking-wide">
-                <Droplets className="w-4 h-4 text-teal-400" />
-                Hidroponia &amp; Estufas Conectadas
-              </span>
-              <span className="text-[11px] bg-emerald-500/20 text-emerald-300 font-mono font-bold px-2.5 py-0.5 rounded-full border border-emerald-400/30 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                Sincronização Ativa com Caderno de Campo
-              </span>
+      {/* Compact Header Card */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-3.5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <Droplets className="w-4 h-4" />
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-              Anotações Técnicas &amp; Manejo Hidropônico
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl mt-1 leading-relaxed">
-              Todas as medições de pH, Condutividade Elétrica (CE), reposição de solução nutritiva, transplantes e despescas ficam centralizadas diretamente no seu Caderno de Campo.
-            </p>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-zinc-400">
+                <span>Hidroponia &amp; Estufas</span>
+                <span aria-hidden="true">·</span>
+                <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                  Sincronizado ao Caderno de Campo
+                </span>
+              </div>
+              <h2 className="text-base font-semibold tracking-tight text-slate-900 dark:text-zinc-100 truncate">
+                Anotações Técnicas &amp; Manejo Hidropônico
+              </h2>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
-              onClick={() => {
-                setAnnBenchId('');
-                setAnnReservoirId('');
-                setAnnTitle('');
-                setAnnNotes('');
-                setIsNewAnnotationModalOpen(true);
-              }}
-              className="px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-md"
+              type="button"
+              onClick={() => openModalWithDefaults()}
+              className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
-              <span>Nova Anotação Hidropônica</span>
+              <Plus className="w-3.5 h-3.5" />
+              Nova Anotação
             </button>
 
             {onNavigateToOperations && (
               <button
+                type="button"
                 onClick={onNavigateToOperations}
-                className="px-3.5 py-2.5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 border border-white/20 cursor-pointer"
-                title="Ver todas as operações no Caderno de Campo"
+                className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <BookOpen className="w-4 h-4 text-emerald-400" />
-                <span>Ver no Histórico Geral</span>
+                <BookOpen className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                Histórico Geral
               </button>
             )}
 
             {onOpenFullHydroponicsModule && (
               <button
+                type="button"
                 onClick={onOpenFullHydroponicsModule}
-                className="px-3.5 py-2.5 bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-200 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 border border-cyan-500/40 cursor-pointer"
-                title="Abrir Módulo de Hidroponia Dedicado"
+                className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <Share2 className="w-4 h-4 text-cyan-300" />
-                <span>Módulo Dedicado</span>
+                <Share2 className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+                Módulo Dedicado
               </button>
             )}
           </div>
         </div>
-      </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white dark:bg-zinc-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm">
-          <div className="flex items-center justify-between text-slate-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider">
-            <span>Plantas em Cultivo</span>
-            <Leaf className="w-4 h-4 text-emerald-500" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
-              {totalActivePlants.toLocaleString()}
+        {/* 4-KPI Strip */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 pt-3 border-t border-slate-100 dark:border-zinc-800 text-xs tabular-nums">
+          <div className="rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/70 px-3 py-2">
+            <div className="flex items-center justify-between text-slate-500 dark:text-zinc-400">
+              <span className="text-[11px]">Plantas em Cultivo</span>
+              <Leaf className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <strong className="text-sm text-slate-900 dark:text-zinc-100 block mt-0.5">
+              {totalActivePlants.toLocaleString('pt-BR')} pés
+            </strong>
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400">
+              {benches.length} bancadas
             </span>
-            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">pés</span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">{benches.length} bancadas monitoradas</p>
-        </div>
 
-        <div className="bg-white dark:bg-zinc-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm">
-          <div className="flex items-center justify-between text-slate-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider">
-            <span>Média de pH</span>
-            <FlaskConical className="w-4 h-4 text-teal-500" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-black text-teal-600 dark:text-teal-400">
+          <div className="rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/70 px-3 py-2">
+            <div className="flex items-center justify-between text-slate-500 dark:text-zinc-400">
+              <span className="text-[11px]">Média de pH</span>
+              <FlaskConical className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+            </div>
+            <strong className="text-sm text-slate-900 dark:text-zinc-100 block mt-0.5">
               {avgReservoirPH}
+            </strong>
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400">
+              Faixa ideal 5,8–6,5
             </span>
-            <span className="text-[11px] font-bold text-slate-500">Faixa Ideal (5.8 - 6.5)</span>
           </div>
-          <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-1">
-            {reservoirs.length > 0 ? '✓ Estável nos tanques' : 'Sem medições registradas'}
-          </p>
-        </div>
 
-        <div className="bg-white dark:bg-zinc-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm">
-          <div className="flex items-center justify-between text-slate-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider">
-            <span>Condutividade (CE)</span>
-            <Zap className="w-4 h-4 text-amber-500" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-black text-amber-600 dark:text-amber-400">
-              {avgReservoirEC}
+          <div className="rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/70 px-3 py-2">
+            <div className="flex items-center justify-between text-slate-500 dark:text-zinc-400">
+              <span className="text-[11px]">Condutividade (CE)</span>
+              <Zap className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <strong className="text-sm text-emerald-700 dark:text-emerald-400 block mt-0.5">
+              {avgReservoirEC} mS/cm
+            </strong>
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400">
+              {reservoirs.length} reservatórios
             </span>
-            <span className="text-xs font-semibold text-slate-500">mS/cm</span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">{reservoirs.length} reservatórios ativos</p>
-        </div>
 
-        <div className="bg-white dark:bg-zinc-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm">
-          <div className="flex items-center justify-between text-slate-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider">
-            <span>Pronto p/ Colheita</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400">
-              {readyForHarvestCount}
+          <div className="rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/70 px-3 py-2">
+            <div className="flex items-center justify-between text-slate-500 dark:text-zinc-400">
+              <span className="text-[11px]">Pronto p/ Colheita</span>
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <strong className="text-sm text-slate-900 dark:text-zinc-100 block mt-0.5">
+              {readyForHarvestCount} bancadas
+            </strong>
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400">
+              {annotations.length} anotações
             </span>
-            <span className="text-xs font-semibold text-slate-500">bancadas</span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">{annotations.length} anotações arquivadas</p>
         </div>
       </div>
 
-      {/* Subtabs Bar inside Caderno de Campo */}
-      <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-zinc-800/80 rounded-xl border border-slate-200 dark:border-zinc-700/60 overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('anotacoes')}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === 'anotacoes'
-              ? 'bg-white dark:bg-zinc-900 text-teal-700 dark:text-teal-300 shadow-xs border border-slate-200/80 dark:border-zinc-700'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <BookOpen className="w-4 h-4" />
-          <span>Diário de Anotações &amp; Manejo ({annotations.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('bancadas')}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === 'bancadas'
-              ? 'bg-white dark:bg-zinc-900 text-teal-700 dark:text-teal-300 shadow-xs border border-slate-200/80 dark:border-zinc-700'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Layers className="w-4 h-4" />
-          <span>Bancadas &amp; Cultivos ({benches.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('reservatorios')}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === 'reservatorios'
-              ? 'bg-white dark:bg-zinc-900 text-teal-700 dark:text-teal-300 shadow-xs border border-slate-200/80 dark:border-zinc-700'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <FlaskConical className="w-4 h-4" />
-          <span>Solução Nutritiva &amp; Reservatórios ({reservoirs.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('calculadora')}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === 'calculadora'
-              ? 'bg-white dark:bg-zinc-900 text-teal-700 dark:text-teal-300 shadow-xs border border-slate-200/80 dark:border-zinc-700'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Scale className="w-4 h-4" />
-          <span>Simulador de Dosagem Nutritiva</span>
-        </button>
+      {/* Subtabs Bar */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-1 flex items-center gap-1 overflow-x-auto">
+        {[
+          {
+            id: 'anotacoes' as const,
+            label: `Diário de Anotações (${annotations.length})`,
+            icon: BookOpen,
+          },
+          {
+            id: 'bancadas' as const,
+            label: `Bancadas & Cultivos (${benches.length})`,
+            icon: Layers,
+          },
+          {
+            id: 'reservatorios' as const,
+            label: `Reservatórios (${reservoirs.length})`,
+            icon: FlaskConical,
+          },
+          {
+            id: 'calculadora' as const,
+            label: 'Simulador de Dosagem',
+            icon: Scale,
+          },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`h-8 px-2.5 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+                active
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 hover:text-slate-900 dark:hover:text-zinc-100'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5 shrink-0" />
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* TAB 1: DIÁRIO DE ANOTAÇÕES & MANEJO */}
+      {/* TAB 1: DIÁRIO DE ANOTAÇÕES */}
       {activeTab === 'anotacoes' && (
-        <div className="space-y-4">
-          {/* Filter and Search Bar */}
-          <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
-            <div className="relative w-full md:w-80">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <div className="space-y-3">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-3 flex flex-col md:flex-row items-center justify-between gap-2.5">
+            <div className="relative w-full md:w-72">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Buscar por título, nota, autor ou bancada..."
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar título, nota, autor ou bancada..."
+                className={`${HYDRO_INPUT_CLASS} pl-8`}
               />
             </div>
 
-            <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto">
-              <span className="text-xs text-slate-500 font-semibold flex items-center gap-1 shrink-0">
-                <Filter className="w-3.5 h-3.5" /> Filtrar:
+            <div className="flex items-center gap-1 overflow-x-auto w-full md:w-auto">
+              <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium inline-flex items-center gap-1 mr-1 shrink-0">
+                <Filter className="w-3 h-3" /> Filtrar:
               </span>
               {[
                 { id: 'todos', label: 'Todos' },
-                { id: 'manejo_solucao', label: '💧 Solução Nutritiva' },
-                { id: 'bancada_transplante', label: '🌱 Bancadas' },
-                { id: 'colheita', label: '🧺 Colheita' },
-                { id: 'sanidade_pragas', label: '🛡️ Sanidade' },
-                { id: 'limpeza_manutencao', label: '🧹 Limpeza' },
-              ].map(cat => (
+                { id: 'manejo_solucao', label: 'Solução' },
+                { id: 'bancada_transplante', label: 'Bancadas' },
+                { id: 'colheita', label: 'Colheita' },
+                { id: 'sanidade_pragas', label: 'Sanidade' },
+                { id: 'limpeza_manutencao', label: 'Limpeza' },
+              ].map((cat) => (
                 <button
                   key={cat.id}
+                  type="button"
                   onClick={() => setCategoryFilter(cat.id)}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors shrink-0 cursor-pointer ${
+                  className={`h-7 px-2.5 rounded-md text-xs font-medium whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
                     categoryFilter === cat.id
-                      ? 'bg-teal-600 text-white'
-                      : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-zinc-700'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100'
                   }`}
                 >
                   {cat.label}
@@ -476,63 +471,57 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
             </div>
           </div>
 
-          {/* Annotations Timeline */}
           {filteredAnnotations.length === 0 ? (
-            <div className="bg-white dark:bg-zinc-900 p-12 text-center rounded-2xl border border-slate-200 dark:border-zinc-800 space-y-3">
-              <BookOpen className="w-10 h-10 text-slate-400 mx-auto" />
-              <h4 className="text-base font-bold text-slate-700 dark:text-zinc-300">
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-8 text-center space-y-2.5">
+              <BookOpen className="w-7 h-7 text-slate-400 mx-auto" />
+              <h4 className="text-xs font-semibold text-slate-800 dark:text-zinc-200">
                 Nenhuma anotação hidropônica encontrada
               </h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
-                Registre sua primeira observação técnica, leitura de sensores ou manejo de solução nutritiva para sincronizar com o Caderno de Campo.
+              <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto">
+                Registre leituras de pH/CE, reposição de solução ou manejos de bancada para sincronizar automaticamente com o Caderno de Campo.
               </p>
               <button
-                onClick={() => setIsNewAnnotationModalOpen(true)}
-                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl inline-flex items-center gap-2 cursor-pointer shadow-xs"
+                type="button"
+                onClick={() => openModalWithDefaults()}
+                className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
               >
-                <Plus className="w-4 h-4" />
-                <span>Criar Primeira Anotação</span>
+                <Plus className="w-3.5 h-3.5" />
+                Criar Primeira Anotação
               </button>
             </div>
           ) : (
-            <div className="space-y-3">
-              {filteredAnnotations.map(ann => (
+            <div className="space-y-2.5">
+              {filteredAnnotations.map((ann) => (
                 <div
                   key={ann.id}
-                  className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs hover:border-teal-500/50 transition-all space-y-3"
+                  className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-2.5"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3 border-slate-100 dark:border-zinc-800">
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className={`p-2 rounded-xl text-xs ${
-                          ann.category === 'manejo_solucao'
-                            ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 border border-blue-200 dark:border-blue-800'
-                            : ann.category === 'colheita'
-                            ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 border border-emerald-200 dark:border-emerald-800'
-                            : ann.category === 'sanidade_pragas'
-                            ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 border border-amber-200 dark:border-amber-800'
-                            : 'bg-teal-50 dark:bg-teal-950/50 text-teal-600 border border-teal-200 dark:border-teal-800'
-                        }`}
-                      >
-                        {ann.category === 'manejo_solucao' && <Droplets className="w-4 h-4" />}
-                        {ann.category === 'bancada_transplante' && <Leaf className="w-4 h-4" />}
-                        {ann.category === 'colheita' && <CheckCircle2 className="w-4 h-4" />}
-                        {ann.category === 'sanidade_pragas' && <ShieldCheck className="w-4 h-4" />}
-                        {ann.category === 'limpeza_manutencao' && <Zap className="w-4 h-4" />}
-                        {ann.category === 'geral' && <BookOpen className="w-4 h-4" />}
-                      </span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-zinc-800">
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <div className="w-7 h-7 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                        {ann.category === 'manejo_solucao' && <Droplets className="w-3.5 h-3.5" />}
+                        {ann.category === 'bancada_transplante' && <Leaf className="w-3.5 h-3.5" />}
+                        {ann.category === 'colheita' && <CheckCircle2 className="w-3.5 h-3.5" />}
+                        {ann.category === 'sanidade_pragas' && <ShieldCheck className="w-3.5 h-3.5" />}
+                        {ann.category === 'limpeza_manutencao' && <Zap className="w-3.5 h-3.5" />}
+                        {(ann.category === 'geral' || ann.category === 'clima_estufa') && (
+                          <BookOpen className="w-3.5 h-3.5" />
+                        )}
+                      </div>
 
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-semibold text-slate-900 dark:text-zinc-100 truncate">
                           {ann.title}
                         </h4>
-                        <div className="flex items-center gap-3 text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
-                          <span className="flex items-center gap-1 font-mono">
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 tabular-nums">
+                          <span>{CATEGORY_LABELS[ann.category]}</span>
+                          <span aria-hidden="true">·</span>
+                          <span className="inline-flex items-center gap-1 font-mono">
                             <Calendar className="w-3 h-3" />
-                            {new Date(ann.date).toLocaleDateString('pt-BR')} às {ann.time}
+                            {formatBrDate(ann.date)} {ann.time && `às ${ann.time}`}
                           </span>
-                          <span>•</span>
-                          <span className="flex items-center gap-1">
+                          <span aria-hidden="true">·</span>
+                          <span className="inline-flex items-center gap-1">
                             <User className="w-3 h-3" />
                             {ann.author}
                           </span>
@@ -540,58 +529,52 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      {ann.syncedWithFieldBook && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                          <Check className="w-3 h-3" />
-                          Sincronizado Caderno de Campo
-                        </span>
-                      )}
-                    </div>
+                    {ann.syncedWithFieldBook && (
+                      <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 inline-flex items-center gap-1 shrink-0">
+                        <Check className="w-3 h-3" />
+                        Sincronizado Caderno de Campo
+                      </span>
+                    )}
                   </div>
 
                   <p className="text-xs text-slate-700 dark:text-zinc-300 leading-relaxed">
                     {ann.notes}
                   </p>
 
-                  {/* Param badges */}
-                  <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
-                    {ann.benchCode && (
-                      <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-mono font-semibold">
-                        Bancada: {ann.benchCode}
-                      </span>
-                    )}
-                    {ann.reservoirName && (
-                      <span className="px-2 py-0.5 rounded-md bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 font-semibold">
-                        {ann.reservoirName}
-                      </span>
-                    )}
-                    {ann.phValue !== undefined && (
-                      <span className="px-2 py-0.5 rounded-md bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 font-bold font-mono">
-                        pH: {ann.phValue}
-                      </span>
-                    )}
-                    {ann.ecValue !== undefined && (
-                      <span className="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-bold font-mono">
-                        CE: {ann.ecValue} mS/cm
-                      </span>
-                    )}
-                    {ann.temperatureC !== undefined && (
-                      <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-mono">
-                        Temp: {ann.temperatureC}°C
-                      </span>
-                    )}
-                    {ann.waterRefilledLiters !== undefined && (
-                      <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-semibold">
-                        Reposição: {ann.waterRefilledLiters}L
-                      </span>
-                    )}
-                    {ann.fertilizersAddedSummary && (
-                      <span className="px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300">
-                        {ann.fertilizersAddedSummary}
-                      </span>
-                    )}
-                  </div>
+                  {/* Unboxed Metadata Line */}
+                  {(ann.benchCode ||
+                    ann.reservoirName ||
+                    ann.phValue !== undefined ||
+                    ann.ecValue !== undefined ||
+                    ann.temperatureC !== undefined ||
+                    ann.waterRefilledLiters !== undefined ||
+                    ann.fertilizersAddedSummary) && (
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pt-1 text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+                      {ann.benchCode && (
+                        <span className="font-mono font-medium text-slate-700 dark:text-zinc-300">
+                          Bancada {ann.benchCode}
+                        </span>
+                      )}
+                      {ann.reservoirName && <span>{ann.reservoirName}</span>}
+                      {ann.phValue !== undefined && (
+                        <span className="font-mono font-medium text-emerald-700 dark:text-emerald-400">
+                          pH {ann.phValue}
+                        </span>
+                      )}
+                      {ann.ecValue !== undefined && (
+                        <span className="font-mono font-medium text-sky-700 dark:text-sky-400">
+                          CE {ann.ecValue} mS/cm
+                        </span>
+                      )}
+                      {ann.temperatureC !== undefined && (
+                        <span className="font-mono">Temp {ann.temperatureC} °C</span>
+                      )}
+                      {ann.waterRefilledLiters !== undefined && (
+                        <span>Reposição {ann.waterRefilledLiters} L</span>
+                      )}
+                      {ann.fertilizersAddedSummary && <span>{ann.fertilizersAddedSummary}</span>}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -601,348 +584,344 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
 
       {/* TAB 2: BANCADAS & CULTIVOS */}
       {activeTab === 'bancadas' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
-              <Layers className="w-4 h-4 text-teal-600" />
-              Bancadas em Produção ({benches.length})
-            </h3>
-            <span className="text-xs text-slate-500">
-              {totalActivePlants.toLocaleString()} plantas em desenvolvimento
-            </span>
-          </div>
-
+        <div className="space-y-3">
           {benches.length === 0 ? (
-            <div className="bg-white dark:bg-zinc-900 p-10 text-center rounded-2xl border border-slate-200 dark:border-zinc-800 space-y-2">
-              <Layers className="w-8 h-8 text-slate-400 mx-auto" />
-              <h4 className="text-sm font-bold text-slate-700 dark:text-zinc-300">Nenhuma bancada cadastrada</h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
-                Cadastre suas bancadas no módulo dedicado de Hidroponia para acompanhar lotação, idade e colheitas aqui.
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-8 text-center space-y-2">
+              <Layers className="w-7 h-7 text-slate-400 mx-auto" />
+              <h4 className="text-xs font-semibold text-slate-800 dark:text-zinc-200">
+                Nenhuma bancada cadastrada
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto">
+                Cadastre bancadas no módulo dedicado de Hidroponia para acompanhar lotação, idade e colheitas aqui.
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {benches.map(bench => {
-              const res = reservoirs.find(r => r.id === bench.reservoirId);
-              return (
-                <div
-                  key={bench.id}
-                  className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs hover:border-teal-500/50 transition-all space-y-3"
-                >
-                  <div className="flex items-center justify-between border-b pb-2.5 border-slate-100 dark:border-zinc-800">
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono font-black text-sm text-slate-900 dark:text-white">
-                          {bench.code}
-                        </span>
-                        <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400">
-                          {bench.systemType}
-                        </span>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {benches.map((bench) => {
+                const res = reservoirs.find((r) => r.id === bench.reservoirId);
+                const statusMeta = BENCH_STATUS_META[bench.status];
+                return (
+                  <div
+                    key={bench.id}
+                    className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-zinc-800">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-zinc-400">
+                          <span className="font-mono font-semibold text-slate-900 dark:text-zinc-100">
+                            {bench.code}
+                          </span>
+                          <span aria-hidden="true">·</span>
+                          <span>{bench.systemType.replace('_', ' ')}</span>
+                        </div>
+                        <p className="text-xs font-semibold text-slate-900 dark:text-zinc-100 mt-0.5 truncate">
+                          {bench.cropName}{' '}
+                          <span className="font-normal text-slate-500 dark:text-zinc-400">
+                            ({bench.cultivar})
+                          </span>
+                        </p>
                       </div>
-                      <p className="text-xs font-bold text-teal-700 dark:text-teal-400 mt-0.5">
-                        {bench.cropName} <span className="font-normal text-slate-500">({bench.cultivar})</span>
-                      </p>
-                    </div>
-
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                        bench.status === 'pronto_colheita'
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-                          : bench.status === 'maternidade'
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
-                          : 'bg-teal-100 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300'
-                      }`}
-                    >
-                      {bench.status === 'pronto_colheita'
-                        ? 'Pronto p/ Colheita'
-                        : bench.status === 'maternidade'
-                        ? 'Berçário'
-                        : 'Desenvolvimento'}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="p-2 bg-slate-50 dark:bg-zinc-800/60 rounded-xl">
-                      <span className="text-[10px] text-slate-400 uppercase font-semibold block">População</span>
-                      <span className="font-bold text-slate-800 dark:text-zinc-200">
-                        {bench.currentPlantsCount} / {bench.totalCapacityPlants}
+                      <span className={`text-[11px] font-medium shrink-0 ${statusMeta.textClass}`}>
+                        {statusMeta.label}
                       </span>
                     </div>
-                    <div className="p-2 bg-slate-50 dark:bg-zinc-800/60 rounded-xl">
-                      <span className="text-[10px] text-slate-400 uppercase font-semibold block">Idade (DAT)</span>
-                      <span className="font-bold text-slate-800 dark:text-zinc-200">
-                        {bench.daysAfterTransplant} dias
-                      </span>
-                    </div>
-                  </div>
 
-                  <div className="text-[11px] text-slate-600 dark:text-zinc-400 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span>Transplante:</span>
-                      <span className="font-mono font-medium">{bench.transplantDate}</span>
+                    <div className="grid grid-cols-2 gap-2 text-xs tabular-nums">
+                      <div className="rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/70 p-2">
+                        <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">
+                          População
+                        </span>
+                        <strong className="text-slate-900 dark:text-zinc-100">
+                          {bench.currentPlantsCount} / {bench.totalCapacityPlants}
+                        </strong>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/70 p-2">
+                        <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">
+                          Idade (DAT)
+                        </span>
+                        <strong className="text-slate-900 dark:text-zinc-100">
+                          {bench.daysAfterTransplant} dias
+                        </strong>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span>Previsão Colheita:</span>
-                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{bench.expectedHarvestDate}</span>
-                    </div>
-                    {res && (
+
+                    <div className="text-[11px] text-slate-600 dark:text-zinc-400 space-y-1 tabular-nums">
                       <div className="flex items-center justify-between">
-                        <span>Reservatório:</span>
-                        <span className="font-semibold text-teal-700 dark:text-teal-300">{res.name.split('-')[0]}</span>
+                        <span>Transplante:</span>
+                        <span className="font-mono">{formatBrDate(bench.transplantDate)}</span>
                       </div>
-                    )}
-                  </div>
+                      <div className="flex items-center justify-between">
+                        <span>Previsão Colheita:</span>
+                        <span className="font-mono font-medium text-emerald-700 dark:text-emerald-400">
+                          {formatBrDate(bench.expectedHarvestDate)}
+                        </span>
+                      </div>
+                      {res && (
+                        <div className="flex items-center justify-between">
+                          <span>Reservatório:</span>
+                          <span className="font-medium text-slate-800 dark:text-zinc-200 truncate max-w-[160px]">
+                            {res.name}
+                          </span>
+                        </div>
+                      )}
+                    </div>
 
-                  {bench.notes && (
-                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 italic bg-slate-50 dark:bg-zinc-800/40 p-2 rounded-lg border border-slate-100 dark:border-zinc-800">
-                      "{bench.notes}"
-                    </p>
-                  )}
-
-                  <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => openNewAnnotationForBench(bench)}
-                      className="px-3 py-1.5 bg-teal-50 dark:bg-teal-950/40 hover:bg-teal-100 text-teal-700 dark:text-teal-300 font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Nova Anotação</span>
-                    </button>
+                    <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openModalWithDefaults({
+                            benchId: bench.id,
+                            reservoirId: bench.reservoirId,
+                            category: 'bancada_transplante',
+                            title: `Manejo da Bancada ${bench.code} (${bench.cropName})`,
+                          })
+                        }
+                        className="h-7 px-2.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 hover:border-emerald-500 text-xs font-medium text-emerald-700 dark:text-emerald-400 inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Nova Anotação
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
             </div>
           )}
         </div>
       )}
 
-      {/* TAB 3: RESERVATÓRIOS & SOLUÇÃO NUTRITIVA */}
+      {/* TAB 3: RESERVATÓRIOS */}
       {activeTab === 'reservatorios' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
-              <FlaskConical className="w-4 h-4 text-teal-600" />
-              Monitoramento dos Reservatórios de Solução Nutritiva
-            </h3>
-            <span className="text-xs text-slate-500">Leituras em tempo real</span>
-          </div>
-
+        <div className="space-y-3">
           {reservoirs.length === 0 ? (
-            <div className="bg-white dark:bg-zinc-900 p-10 text-center rounded-2xl border border-slate-200 dark:border-zinc-800 space-y-2">
-              <FlaskConical className="w-8 h-8 text-slate-400 mx-auto" />
-              <h4 className="text-sm font-bold text-slate-700 dark:text-zinc-300">Nenhum reservatório cadastrado</h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-8 text-center space-y-2">
+              <FlaskConical className="w-7 h-7 text-slate-400 mx-auto" />
+              <h4 className="text-xs font-semibold text-slate-800 dark:text-zinc-200">
+                Nenhum reservatório cadastrado
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto">
                 Cadastre reservatórios de solução nutritiva para monitorar pH, condutividade elétrica (CE) e oxigenação.
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {reservoirs.map(res => (
-              <div
-                key={res.id}
-                className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs space-y-4"
-              >
-                <div className="flex items-start justify-between border-b pb-3 border-slate-100 dark:border-zinc-800">
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">{res.name}</h4>
-                    <p className="text-[11px] text-slate-500">
-                      Capacidade: {res.capacityLiters}L • Atual: {res.currentVolumeLiters}L
-                    </p>
-                  </div>
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                      res.pumpStatus === 'ligada'
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-                        : 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
-                    }`}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 tabular-nums">
+              {reservoirs.map((res) => {
+                const pumpMeta = PUMP_STATUS_META[res.pumpStatus];
+                return (
+                  <div
+                    key={res.id}
+                    className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-3"
                   >
-                    Bomba {res.pumpStatus}
-                  </span>
-                </div>
+                    <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-zinc-800">
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-semibold text-slate-900 dark:text-zinc-100 truncate">
+                          {res.name}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                          {res.currentVolumeLiters} / {res.capacityLiters} L
+                        </p>
+                      </div>
+                      <span className={`text-[11px] font-medium shrink-0 ${pumpMeta.textClass}`}>
+                        {pumpMeta.label}
+                      </span>
+                    </div>
 
-                {/* Gauges */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-teal-50 dark:bg-teal-950/30 rounded-xl border border-teal-200/60 dark:border-teal-800/40 text-center">
-                    <span className="text-[10px] text-teal-800 dark:text-teal-300 font-bold uppercase block">
-                      Potencial Hidrogênico (pH)
-                    </span>
-                    <p className="text-2xl font-black text-teal-950 dark:text-teal-200 mt-0.5">
-                      {res.currentPH.toFixed(2)}
-                    </p>
-                    <span className="text-[10px] text-teal-700 dark:text-teal-400 block mt-0.5">
-                      Alvo: {res.targetPHMin} - {res.targetPHMax}
-                    </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/70 p-2.5">
+                        <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">
+                          pH Atual
+                        </span>
+                        <strong className="text-base font-bold text-slate-900 dark:text-zinc-100">
+                          {res.currentPH.toFixed(2)}
+                        </strong>
+                        <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">
+                          Alvo {res.targetPHMin}–{res.targetPHMax}
+                        </span>
+                      </div>
+
+                      <div className="rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/70 p-2.5">
+                        <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">
+                          CE (mS/cm)
+                        </span>
+                        <strong className="text-base font-bold text-emerald-700 dark:text-emerald-400">
+                          {res.currentEC.toFixed(2)}
+                        </strong>
+                        <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">
+                          Alvo {res.targetECMin}–{res.targetECMax}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-600 dark:text-zinc-400">
+                      <span className="inline-flex items-center gap-1">
+                        <Thermometer className="w-3.5 h-3.5 text-amber-500" />
+                        {res.solutionTempC} °C
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <Activity className="w-3.5 h-3.5 text-sky-500" />
+                        O₂ {res.dissolvedOxygenPpm} mg/L
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openModalWithDefaults({
+                          reservoirId: res.id,
+                          category: 'manejo_solucao',
+                          title: `Leitura & Calibração — ${res.name}`,
+                          ph: res.currentPH.toString(),
+                          ec: res.currentEC.toString(),
+                        })
+                      }
+                      className="h-8 w-full rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Anotar Manejo / Calibração
+                    </button>
                   </div>
-
-                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200/60 dark:border-amber-800/40 text-center">
-                    <span className="text-[10px] text-amber-800 dark:text-amber-300 font-bold uppercase block">
-                      Condutividade (CE)
-                    </span>
-                    <p className="text-2xl font-black text-amber-950 dark:text-amber-200 mt-0.5">
-                      {res.currentEC.toFixed(2)}
-                    </p>
-                    <span className="text-[10px] text-amber-700 dark:text-amber-400 block mt-0.5">
-                      mS/cm (Alvo: {res.targetECMin}-{res.targetECMax})
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-zinc-300">
-                  <div className="flex items-center gap-1.5">
-                    <Thermometer className="w-3.5 h-3.5 text-rose-500" />
-                    <span>Temp: <strong>{res.solutionTempC}°C</strong></span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Activity className="w-3.5 h-3.5 text-cyan-500" />
-                    <span>O₂: <strong>{res.dissolvedOxygenPpm} mg/L</strong></span>
-                  </div>
-                </div>
-
-                <div className="text-[11px] text-slate-500 dark:text-zinc-400 border-t pt-2 border-slate-100 dark:border-zinc-800">
-                  <p>Último ajuste: {res.lastNutrientAdjustmentDate}</p>
-                </div>
-
-                <button
-                  onClick={() => openNewAnnotationForReservoir(res)}
-                  className="w-full py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Anotar Manejo / Calibração</span>
-                </button>
-              </div>
-            ))}
+                );
+              })}
             </div>
           )}
         </div>
       )}
 
-      {/* TAB 4: SIMULADOR DE DOSAGEM NUTRITIVA */}
+      {/* TAB 4: SIMULADOR DE DOSAGEM */}
       {activeTab === 'calculadora' && (
-        <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4 border-slate-200 dark:border-zinc-800">
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-zinc-800">
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Scale className="w-5 h-5 text-teal-600" />
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+                <Scale className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 Calculadora Rápida de Solução Nutritiva
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Formulação balanceada de sais para Tanque A (Cálcio + Ferro) e Tanque B (Potássio, Fósforo, Magnésio e Micros)
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                Formulação balanceada de sais para Tanque A (Cálcio + Ferro) e Tanque B (N-P-K, Mg, S e Micros).
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2.5">
               <div>
-                <label className="text-[11px] font-bold text-slate-600 dark:text-zinc-400 block mb-1">
-                  Cultura &amp; Fórmula:
-                </label>
+                <label className={HYDRO_LABEL_CLASS}>Cultura &amp; Fórmula</label>
                 <select
                   value={calcCropId}
-                  onChange={e => setCalcCropId(e.target.value)}
-                  className="px-3 py-1.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg text-xs font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500"
+                  onChange={(e) => setCalcCropId(e.target.value)}
+                  className={HYDRO_INPUT_CLASS}
                 >
-                  {hydroponicRecipesCatalog.map(recipe => (
+                  {hydroponicRecipesCatalog.map((recipe) => (
                     <option key={recipe.id} value={recipe.id}>
-                      {recipe.cropName} ({recipe.stage === 'bercario' ? 'Berçário' : recipe.stage === 'frutificacao' ? 'Frutificação' : 'Engorda'})
+                      {recipe.cropName}
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div>
-                <label className="text-[11px] font-bold text-slate-600 dark:text-zinc-400 block mb-1">
-                  Volume (Litros):
-                </label>
+              <div className="w-28">
+                <label className={HYDRO_LABEL_CLASS}>Volume (L)</label>
                 <input
                   type="number"
                   value={calcVolume}
-                  onChange={e => setCalcVolume(Math.max(50, parseInt(e.target.value) || 100))}
+                  onChange={(e) => setCalcVolume(Math.max(50, parseInt(e.target.value, 10) || 100))}
                   step="50"
-                  className="w-24 px-3 py-1.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg text-xs font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500"
+                  className={`${HYDRO_INPUT_CLASS} font-mono tabular-nums`}
                 />
               </div>
             </div>
           </div>
 
-          {/* Sais Calculados */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Tanque A */}
-            <div className="p-4 bg-teal-50/50 dark:bg-teal-950/20 rounded-2xl border border-teal-200/80 dark:border-teal-800/40 space-y-3">
-              <div className="flex items-center justify-between border-b pb-2 border-teal-200/60 dark:border-teal-800/40">
-                <span className="font-extrabold text-sm text-teal-950 dark:text-teal-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 tabular-nums">
+            <div className="rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/60 dark:bg-zinc-950/60 p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200/70 dark:border-zinc-800">
+                <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
                   Tanque Concentrado A (Cálcio &amp; Ferro)
                 </span>
-                <span className="text-xs bg-teal-100 dark:bg-teal-900/60 text-teal-800 dark:text-teal-300 font-bold px-2 py-0.5 rounded">
-                  {fertilizerCalc.tankA.calciumNitrate + fertilizerCalc.tankA.ironEDDHA}g total
+                <span className="text-xs font-mono font-semibold text-emerald-700 dark:text-emerald-400">
+                  {fertilizerCalc.tankATotal} g total
                 </span>
               </div>
-              <ul className="space-y-2 text-xs">
+              <ul className="space-y-1.5 text-xs">
                 <li className="flex items-center justify-between">
-                  <span className="text-slate-700 dark:text-zinc-300 font-medium">Nitrato de Cálcio [Ca(NO₃)₂]:</span>
-                  <span className="font-bold font-mono text-teal-900 dark:text-teal-200">
-                    {fertilizerCalc.tankA.calciumNitrate} g
+                  <span className="text-slate-600 dark:text-zinc-300">
+                    Nitrato de Cálcio [Ca(NO₃)₂]:
                   </span>
+                  <strong className="font-mono text-slate-900 dark:text-zinc-100">
+                    {fertilizerCalc.tankA.calciumNitrate} g
+                  </strong>
                 </li>
                 <li className="flex items-center justify-between">
-                  <span className="text-slate-700 dark:text-zinc-300 font-medium">Quelato de Ferro (Fe-EDDHA / DTPA 6%):</span>
-                  <span className="font-bold font-mono text-teal-900 dark:text-teal-200">
-                    {fertilizerCalc.tankA.ironEDDHA} g
+                  <span className="text-slate-600 dark:text-zinc-300">
+                    Quelato de Ferro (Fe-EDDHA / DTPA 6%):
                   </span>
+                  <strong className="font-mono text-slate-900 dark:text-zinc-100">
+                    {fertilizerCalc.tankA.ironChelateEDDHA} g
+                  </strong>
                 </li>
               </ul>
             </div>
 
-            {/* Tanque B */}
-            <div className="p-4 bg-cyan-50/50 dark:bg-cyan-950/20 rounded-2xl border border-cyan-200/80 dark:border-cyan-800/40 space-y-3">
-              <div className="flex items-center justify-between border-b pb-2 border-cyan-200/60 dark:border-cyan-800/40">
-                <span className="font-extrabold text-sm text-cyan-950 dark:text-cyan-200">
+            <div className="rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/60 dark:bg-zinc-950/60 p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200/70 dark:border-zinc-800">
+                <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
                   Tanque Concentrado B (N-P-K, Mg, S e Micros)
                 </span>
-                <span className="text-xs bg-cyan-100 dark:bg-cyan-900/60 text-cyan-800 dark:text-cyan-300 font-bold px-2 py-0.5 rounded">
-                  {fertilizerCalc.tankB.potassiumNitrate + fertilizerCalc.tankB.mkp + fertilizerCalc.tankB.magnesiumSulfate + fertilizerCalc.tankB.micros}g total
+                <span className="text-xs font-mono font-semibold text-sky-700 dark:text-sky-400">
+                  {fertilizerCalc.tankBTotal} g total
                 </span>
               </div>
-              <ul className="space-y-2 text-xs">
+              <ul className="space-y-1.5 text-xs">
                 <li className="flex items-center justify-between">
-                  <span className="text-slate-700 dark:text-zinc-300 font-medium">Nitrato de Potássio (KNO₃):</span>
-                  <span className="font-bold font-mono text-cyan-900 dark:text-cyan-200">
+                  <span className="text-slate-600 dark:text-zinc-300">
+                    Nitrato de Potássio (KNO₃):
+                  </span>
+                  <strong className="font-mono text-slate-900 dark:text-zinc-100">
                     {fertilizerCalc.tankB.potassiumNitrate} g
-                  </span>
+                  </strong>
                 </li>
                 <li className="flex items-center justify-between">
-                  <span className="text-slate-700 dark:text-zinc-300 font-medium">Fosfato Monopotássico (MKP - KH₂PO₄):</span>
-                  <span className="font-bold font-mono text-cyan-900 dark:text-cyan-200">
-                    {fertilizerCalc.tankB.mkp} g
+                  <span className="text-slate-600 dark:text-zinc-300">
+                    Fosfato Monopotássico (MKP):
                   </span>
+                  <strong className="font-mono text-slate-900 dark:text-zinc-100">
+                    {fertilizerCalc.tankB.monopotassiumPhosphate} g
+                  </strong>
                 </li>
                 <li className="flex items-center justify-between">
-                  <span className="text-slate-700 dark:text-zinc-300 font-medium">Sulfato de Magnésio (MgSO₄·7H₂O):</span>
-                  <span className="font-bold font-mono text-cyan-900 dark:text-cyan-200">
+                  <span className="text-slate-600 dark:text-zinc-300">
+                    Sulfato de Magnésio (MgSO₄):
+                  </span>
+                  <strong className="font-mono text-slate-900 dark:text-zinc-100">
                     {fertilizerCalc.tankB.magnesiumSulfate} g
-                  </span>
+                  </strong>
                 </li>
                 <li className="flex items-center justify-between">
-                  <span className="text-slate-700 dark:text-zinc-300 font-medium">Complexo de Micronutrientes (B, Zn, Mn, Cu, Mo):</span>
-                  <span className="font-bold font-mono text-cyan-900 dark:text-cyan-200">
-                    {fertilizerCalc.tankB.micros} g
+                  <span className="text-slate-600 dark:text-zinc-300">
+                    Complexo de Micronutrientes:
                   </span>
+                  <strong className="font-mono text-slate-900 dark:text-zinc-100">
+                    {fertilizerCalc.tankB.micronutrients} g
+                  </strong>
                 </li>
               </ul>
             </div>
           </div>
 
-          <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-zinc-800 rounded-xl text-xs">
-            <span className="text-slate-600 dark:text-zinc-300 font-medium">
-              💡 Deseja registrar a aplicação desta fórmula no Caderno de Campo?
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100 dark:border-zinc-800 text-xs">
+            <span className="text-slate-600 dark:text-zinc-400">
+              Deseja registrar a aplicação desta fórmula diretamente no Caderno de Campo?
             </span>
             <button
-              onClick={() => {
-                setAnnCategory('manejo_solucao');
-                setAnnTitle(`Preparo de ${calcVolume}L de Solução Nutritiva - ${currentRecipe.cropName}`);
-                setAnnFertilizers(`Tanque A: Nitrato de Cálcio ${fertilizerCalc.tankA.calciumNitrate}g, Fe-EDDHA ${fertilizerCalc.tankA.ironEDDHA}g. Tanque B: Nitrato de Potássio ${fertilizerCalc.tankB.potassiumNitrate}g, MKP ${fertilizerCalc.tankB.mkp}g, MgSO4 ${fertilizerCalc.tankB.magnesiumSulfate}g, Micros ${fertilizerCalc.tankB.micros}g.`);
-                setAnnNotes(`Preparo e aplicação de solução nutritiva completa para ${calcVolume} litros para cultivo de ${currentRecipe.cropName}. CE esperada: ${currentRecipe.targetEC.min}-${currentRecipe.targetEC.max} mS/cm.`);
-                setIsNewAnnotationModalOpen(true);
-              }}
-              className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg transition-colors cursor-pointer"
+              type="button"
+              onClick={() =>
+                openModalWithDefaults({
+                  category: 'manejo_solucao',
+                  title: `Preparo de ${calcVolume} L de Solução — ${currentRecipe.cropName}`,
+                  fertilizers: `Tanque A: Ca(NO3)2 ${fertilizerCalc.tankA.calciumNitrate}g, Fe-EDDHA ${fertilizerCalc.tankA.ironChelateEDDHA}g. Tanque B: KNO3 ${fertilizerCalc.tankB.potassiumNitrate}g, MKP ${fertilizerCalc.tankB.monopotassiumPhosphate}g, MgSO4 ${fertilizerCalc.tankB.magnesiumSulfate}g, Micros ${fertilizerCalc.tankB.micronutrients}g.`,
+                  notes: `Preparo e aplicação de solução nutritiva completa para ${calcVolume} L (${currentRecipe.cropName}). CE alvo: ${currentRecipe.targetEC.min}–${currentRecipe.targetEC.max} mS/cm.`,
+                })
+              }
+              className="h-8 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer"
             >
               Registrar no Caderno de Campo
             </button>
@@ -950,140 +929,131 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
         </div>
       )}
 
-      {/* MODAL: NOVA ANOTAÇÃO / MANEJO HIDROPÔNICO */}
+      {/* MODAL: NOVA ANOTAÇÃO */}
       {isNewAnnotationModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-fade-in overflow-y-auto">
-          <div className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-zinc-800 my-8 overflow-hidden">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-teal-950 via-cyan-950 to-slate-900 text-white p-5 flex items-center justify-between border-b border-teal-800/40">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-teal-500/20 text-teal-300 rounded-xl border border-teal-500/30">
-                  <Droplets className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-white">Nova Anotação de Hidroponia</h3>
-                  <p className="text-xs text-teal-200 font-medium">
-                    Sincronização em tempo real com o Caderno de Campo
-                  </p>
-                </div>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto"
+          onClick={() => setIsNewAnnotationModalOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800 p-5 space-y-4 my-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                  Nova Anotação de Hidroponia
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-zinc-400">
+                  Sincronização imediata com as operações do Caderno de Campo
+                </p>
               </div>
-
               <button
+                type="button"
                 onClick={() => setIsNewAnnotationModalOpen(false)}
-                className="p-1.5 text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleSubmitAnnotation} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+            <form
+              onSubmit={handleSubmitAnnotation}
+              className="space-y-3.5 max-h-[75vh] overflow-y-auto text-xs"
+            >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-zinc-300 block mb-1">
-                    Categoria da Anotação *
-                  </label>
+                  <label className={HYDRO_LABEL_CLASS}>Categoria da Anotação *</label>
                   <select
                     value={annCategory}
-                    onChange={e => setAnnCategory(e.target.value as any)}
-                    className="w-full p-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-900 dark:text-white font-semibold focus:ring-2 focus:ring-teal-500"
+                    onChange={(e) =>
+                      setAnnCategory(e.target.value as HydroponicAnnotation['category'])
+                    }
+                    className={HYDRO_INPUT_CLASS}
                   >
-                    <option value="manejo_solucao">💧 Manejo da Solução Nutritiva / Correção</option>
-                    <option value="bancada_transplante">🌱 Bancada &amp; Transplante / Germinação</option>
-                    <option value="colheita">🧺 Colheita / Despesca Comercial</option>
-                    <option value="sanidade_pragas">🛡️ Sanidade / Inspeção de Raízes &amp; Copas</option>
-                    <option value="clima_estufa">☀️ Clima, Ventilação &amp; Temperatura</option>
-                    <option value="limpeza_manutencao">🧹 Limpeza de Perfis &amp; Reservatórios</option>
-                    <option value="geral">📝 Outras Observações Gerais</option>
+                    <option value="manejo_solucao">Manejo da Solução Nutritiva / Correção</option>
+                    <option value="bancada_transplante">Bancada &amp; Transplante / Germinação</option>
+                    <option value="colheita">Colheita / Despesca Comercial</option>
+                    <option value="sanidade_pragas">Sanidade / Inspeção de Raízes &amp; Copas</option>
+                    <option value="clima_estufa">Clima, Ventilação &amp; Temperatura</option>
+                    <option value="limpeza_manutencao">Limpeza de Perfis &amp; Reservatórios</option>
+                    <option value="geral">Outras Observações Gerais</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-zinc-300 block mb-1">
-                    Título do Registro *
-                  </label>
+                  <label className={HYDRO_LABEL_CLASS}>Título do Registro *</label>
                   <input
                     type="text"
                     value={annTitle}
-                    onChange={e => setAnnTitle(e.target.value)}
+                    onChange={(e) => setAnnTitle(e.target.value)}
                     placeholder="Ex: Calibração de pH & CE - Reservatório 01"
                     required
-                    className="w-full p-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-teal-500"
+                    className={HYDRO_INPUT_CLASS}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-zinc-300 block mb-1">
-                    Data *
-                  </label>
+                  <label className={HYDRO_LABEL_CLASS}>Data *</label>
                   <input
                     type="date"
                     value={annDate}
-                    onChange={e => setAnnDate(e.target.value)}
+                    onChange={(e) => setAnnDate(e.target.value)}
                     required
-                    className="w-full p-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-900 dark:text-white font-mono focus:ring-2 focus:ring-teal-500"
+                    className={`${HYDRO_INPUT_CLASS} font-mono`}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-zinc-300 block mb-1">
-                    Horário
-                  </label>
+                  <label className={HYDRO_LABEL_CLASS}>Horário</label>
                   <input
                     type="time"
                     value={annTime}
-                    onChange={e => setAnnTime(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-900 dark:text-white font-mono focus:ring-2 focus:ring-teal-500"
+                    onChange={(e) => setAnnTime(e.target.value)}
+                    className={`${HYDRO_INPUT_CLASS} font-mono`}
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-zinc-300 block mb-1">
-                    Responsável Técnico
-                  </label>
+                  <label className={HYDRO_LABEL_CLASS}>Responsável Técnico</label>
                   <input
                     type="text"
                     value={annAuthor}
-                    onChange={e => setAnnAuthor(e.target.value)}
-                    placeholder="Ex: Nome do responsável técnico"
-                    className="w-full p-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500"
+                    onChange={(e) => setAnnAuthor(e.target.value)}
+                    placeholder="Nome do responsável"
+                    className={HYDRO_INPUT_CLASS}
                   />
                 </div>
               </div>
 
-              {/* Associations */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-zinc-300 block mb-1">
-                    Vincular a Reservatório (Opcional)
-                  </label>
+                  <label className={HYDRO_LABEL_CLASS}>Vincular a Reservatório (Opcional)</label>
                   <select
                     value={annReservoirId}
-                    onChange={e => setAnnReservoirId(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-900 dark:text-white"
+                    onChange={(e) => setAnnReservoirId(e.target.value)}
+                    className={HYDRO_INPUT_CLASS}
                   >
                     <option value="">Nenhum reservatório específico</option>
-                    {reservoirs.map(r => (
+                    {reservoirs.map((r) => (
                       <option key={r.id} value={r.id}>
-                        {r.name} (Atual: pH {r.currentPH} | CE {r.currentEC})
+                        {r.name} (pH {r.currentPH} · CE {r.currentEC})
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-zinc-300 block mb-1">
-                    Vincular a Bancada (Opcional)
-                  </label>
+                  <label className={HYDRO_LABEL_CLASS}>Vincular a Bancada (Opcional)</label>
                   <select
                     value={annBenchId}
-                    onChange={e => setAnnBenchId(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-900 dark:text-white"
+                    onChange={(e) => setAnnBenchId(e.target.value)}
+                    className={HYDRO_INPUT_CLASS}
                   >
                     <option value="">Nenhuma bancada específica</option>
-                    {benches.map(b => (
+                    {benches.map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.code} - {b.cropName} ({b.systemType})
                       </option>
@@ -1092,111 +1062,96 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
                 </div>
               </div>
 
-              {/* Technical Measurements */}
-              <div className="p-3.5 bg-teal-50/50 dark:bg-teal-950/20 rounded-xl border border-teal-200 dark:border-teal-800/40 space-y-3">
-                <span className="font-bold text-teal-900 dark:text-teal-200 block">
-                  🔬 Parâmetros Químicos e Físicos (Opcional)
+              <div className="rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/70 p-3 space-y-3">
+                <span className="text-xs font-semibold text-slate-800 dark:text-zinc-200 block">
+                  Parâmetros Químicos e Físicos (Opcional)
                 </span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   <div>
-                    <label className="text-[10px] font-bold text-slate-600 dark:text-zinc-400 block mb-0.5">
-                      pH Medido
-                    </label>
+                    <label className={HYDRO_LABEL_CLASS}>pH Medido</label>
                     <input
                       type="number"
                       step="0.05"
-                      placeholder="Ex: 6.1"
+                      placeholder="6.0"
                       value={annPH}
-                      onChange={e => setAnnPH(e.target.value)}
-                      className="w-full p-2 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg text-slate-900 dark:text-white font-mono"
+                      onChange={(e) => setAnnPH(e.target.value)}
+                      className={`${HYDRO_INPUT_CLASS} font-mono tabular-nums`}
                     />
                   </div>
-
                   <div>
-                    <label className="text-[10px] font-bold text-slate-600 dark:text-zinc-400 block mb-0.5">
-                      CE (mS/cm)
-                    </label>
+                    <label className={HYDRO_LABEL_CLASS}>CE (mS/cm)</label>
                     <input
                       type="number"
                       step="0.05"
-                      placeholder="Ex: 1.55"
+                      placeholder="1.50"
                       value={annEC}
-                      onChange={e => setAnnEC(e.target.value)}
-                      className="w-full p-2 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg text-slate-900 dark:text-white font-mono"
+                      onChange={(e) => setAnnEC(e.target.value)}
+                      className={`${HYDRO_INPUT_CLASS} font-mono tabular-nums`}
                     />
                   </div>
-
                   <div>
-                    <label className="text-[10px] font-bold text-slate-600 dark:text-zinc-400 block mb-0.5">
-                      Reposição Água (L)
-                    </label>
+                    <label className={HYDRO_LABEL_CLASS}>Reposição Água (L)</label>
                     <input
                       type="number"
-                      placeholder="Ex: 250"
+                      placeholder="200"
                       value={annWaterRefill}
-                      onChange={e => setAnnWaterRefill(e.target.value)}
-                      className="w-full p-2 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg text-slate-900 dark:text-white font-mono"
+                      onChange={(e) => setAnnWaterRefill(e.target.value)}
+                      className={`${HYDRO_INPUT_CLASS} font-mono tabular-nums`}
                     />
                   </div>
-
                   <div>
-                    <label className="text-[10px] font-bold text-slate-600 dark:text-zinc-400 block mb-0.5">
-                      Temp. Solução (°C)
-                    </label>
+                    <label className={HYDRO_LABEL_CLASS}>Temp. Solução (°C)</label>
                     <input
                       type="number"
                       step="0.1"
-                      placeholder="Ex: 21.5"
+                      placeholder="21.5"
                       value={annTemp}
-                      onChange={e => setAnnTemp(e.target.value)}
-                      className="w-full p-2 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg text-slate-900 dark:text-white font-mono"
+                      onChange={(e) => setAnnTemp(e.target.value)}
+                      className={`${HYDRO_INPUT_CLASS} font-mono tabular-nums`}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-slate-600 dark:text-zinc-400 block mb-0.5">
+                  <label className={HYDRO_LABEL_CLASS}>
                     Fertilizantes / Corretivos Adicionados
                   </label>
                   <input
                     type="text"
                     placeholder="Ex: 180g Nitrato de Cálcio, 120g Nitrato de Potássio, 50ml Ácido Fosfórico"
                     value={annFertilizers}
-                    onChange={e => setAnnFertilizers(e.target.value)}
-                    className="w-full p-2 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg text-slate-900 dark:text-white"
+                    onChange={(e) => setAnnFertilizers(e.target.value)}
+                    className={HYDRO_INPUT_CLASS}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 dark:text-zinc-300 block mb-1">
-                  Observações Detalhadas de Manejo *
-                </label>
+                <label className={HYDRO_LABEL_CLASS}>Observações Detalhadas de Manejo *</label>
                 <textarea
-                  rows={4}
+                  rows={3}
                   value={annNotes}
-                  onChange={e => setAnnNotes(e.target.value)}
+                  onChange={(e) => setAnnNotes(e.target.value)}
                   required
-                  placeholder="Descreva as ações executadas, estado das raízes, vigor das folhas, acionamento de bomba ou recomendações para os próximos turnos..."
-                  className="w-full p-3 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-900 dark:text-white leading-relaxed focus:ring-2 focus:ring-teal-500"
+                  placeholder="Descreva as ações executadas, estado das raízes, vigor das folhas ou recomendações..."
+                  className={HYDRO_TEXTAREA_CLASS}
                 />
               </div>
 
-              {/* Footer */}
-              <div className="pt-3 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsNewAnnotationModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 text-slate-700 dark:text-zinc-300 font-bold rounded-xl cursor-pointer"
+                  className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-600 dark:text-zinc-300 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-teal-600 hover:bg-teal-500 text-white font-black rounded-xl transition-all shadow-md cursor-pointer flex items-center gap-2"
+                  className="h-8 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
                 >
-                  <Check className="w-4 h-4" />
-                  <span>Salvar &amp; Sincronizar</span>
+                  <Check className="w-3.5 h-3.5" />
+                  Salvar &amp; Sincronizar
                 </button>
               </div>
             </form>
@@ -1206,4 +1161,5 @@ export const HydroponicsFieldBookIntegration: React.FC<HydroponicsFieldBookInteg
     </div>
   );
 };
+
 export default HydroponicsFieldBookIntegration;

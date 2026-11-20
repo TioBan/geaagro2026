@@ -1,11 +1,7 @@
 import {
-  HydroponicBench,
-  NutrientSolutionReservoir,
   HydroponicNutrientRecipe,
   IrrigationTimerSchedule,
   HydroponicEnvironmentSensors,
-  HydroponicAlert,
-  HydroponicCustomerOrder,
   HydroponicFinancialSummary,
   HydroponicPestDiseaseGuide,
 } from '../types/hydroponics';
@@ -255,10 +251,6 @@ export const hydroponicRecipesCatalog: HydroponicNutrientRecipe[] = [
   },
 ];
 
-export const initialReservoirs: NutrientSolutionReservoir[] = [];
-
-export const initialHydroponicBenches: HydroponicBench[] = [];
-
 export const initialIrrigationSchedule: IrrigationTimerSchedule = {
   id: 'sched-01',
   reservoirId: 'res-01',
@@ -285,10 +277,6 @@ export const initialHydroponicSensors: HydroponicEnvironmentSensors = {
   foggingActive: false,
   shadingScreenPercent: 0,
 };
-
-export const initialHydroponicAlerts: HydroponicAlert[] = [];
-
-export const initialHydroponicOrders: HydroponicCustomerOrder[] = [];
 
 export const initialHydroponicFinancials: HydroponicFinancialSummary = {
   monthYear: '--',
@@ -399,5 +387,64 @@ export const hydroponicPestDiseaseCatalog: HydroponicPestDiseaseGuide[] = [
       'Adição controlada de peróxido de hidrogênio para oxidar biomassa algal',
     ],
     solutionAdjustmentTip: 'Algas consomem CO2 e elevam o pH da água para >7.0 no meio do dia; monitorar pH às 14h.',
+  },
+];
+
+export interface HydroponicLibraryEntry {
+  id: string;
+  category: 'sistemas' | 'nutricao' | 'sanidade' | 'manejo';
+  title: string;
+  summary: string;
+  keyParameter: string;
+}
+
+export const hydroponicTechnicalLibrary: HydroponicLibraryEntry[] = [
+  {
+    id: 'lib-nft',
+    category: 'sistemas',
+    title: 'Sistema NFT (Nutrient Film Technique)',
+    summary:
+      'Fluxo laminar fino contínuo ou intermitente nos perfis de polipropileno com declividade de 2% a 4% para ótima oxigenação das raízes.',
+    keyParameter: 'Declividade 2–4% · Vazão 1,5–2,0 L/min por canal',
+  },
+  {
+    id: 'lib-dft',
+    category: 'sistemas',
+    title: 'Sistema DFT (Deep Flow / Piscina)',
+    summary:
+      'Mudas flutuando sobre placas de isopor com lâmina de 10 a 20 cm de solução nutritiva e aeração forçada contínua por soprador ou venturi.',
+    keyParameter: 'Lâmina 10–20 cm · O₂ > 6,0 mg/L',
+  },
+  {
+    id: 'lib-substrato',
+    category: 'sistemas',
+    title: 'Cultivo em Substrato com Gotejo',
+    summary:
+      'Morangos, tomates e pimentões em slabs de fibra de coco ou perlita com fertirrigação por pulso e drenagem controlada de 15% a 25%.',
+    keyParameter: 'Fração de drenagem 15–25% · Pulsos frequentes',
+  },
+  {
+    id: 'lib-sanitizacao',
+    category: 'sanidade',
+    title: 'Sanitização & Peróxido de Hidrogênio',
+    summary:
+      'Dosagem segura de H₂O₂ a 30–50 ppm para oxigenação e combate preventivo a patógenos de raiz (Pythium) sem causar fitotoxicidade.',
+    keyParameter: 'H₂O₂ 30–50 ppm · Troca total a cada 14 dias',
+  },
+  {
+    id: 'lib-verao',
+    category: 'manejo',
+    title: 'Manejo de Solução no Verão',
+    summary:
+      'Redução preventiva da CE em 15% a 20% nos períodos de pico térmico, proteção térmica dos reservatórios e reforço na ventilação da estufa.',
+    keyParameter: 'Temp. solução < 24 °C · Redução CE 15–20%',
+  },
+  {
+    id: 'lib-quelatos',
+    category: 'nutricao',
+    title: 'Nutrição com Quelatos de Alta Estabilidade',
+    summary:
+      'Uso de Fe-EDDHA e Fe-DTPA para prevenir clorose férrica quando a água bruta apresenta pH acima de 6,5 ou bicarbonatos elevados.',
+    keyParameter: 'Fe-EDDHA estável até pH 9,0 · Tanque A separado',
   },
 ];

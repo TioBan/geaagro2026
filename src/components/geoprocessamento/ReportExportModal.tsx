@@ -1,24 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   FileText,
   Download,
   CheckCircle2,
-  Calendar,
   X,
   FileSpreadsheet,
   Layers,
   Sparkles,
   Leaf,
-  Droplets,
-  HardDrive,
   Building2,
   UserCheck,
   MapPin,
   Camera,
-  Activity,
   ShieldCheck,
-  BarChart3,
-  Compass
+  BarChart3
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { GeoprocessamentoPlotState, GeoprocessamentoInspectionPoint } from '../../data/geoprocessamentoData';
@@ -28,8 +23,9 @@ import { TraceabilityPhotoDiaryItem, TraceabilityProperty } from '../../types/tr
 interface ReportExportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  plot: GeoprocessamentoPlotState;
-  allPlots: GeoprocessamentoPlotState[];
+  plot?: GeoprocessamentoPlotState;
+  allPlots?: GeoprocessamentoPlotState[];
+  initialFormat?: 'pdf' | 'csv' | 'excel' | 'geotiff';
   company?: Company;
   agronomist?: Agronomist;
   producer?: RuralProducer;
@@ -347,25 +343,42 @@ export const ReportExportModal: React.FC<ReportExportModalProps> = ({
   isOpen,
   onClose,
   plot,
-  allPlots,
+  initialFormat = 'pdf',
   company: propCompany,
   agronomist: propAgronomist,
   producer: propProducer,
   farm: propFarm,
-  photos,
 }) => {
-  const [format, setFormat] = useState<'pdf' | 'csv' | 'excel' | 'geotiff'>('pdf');
+  const [format, setFormat] = useState<'pdf' | 'csv' | 'excel' | 'geotiff'>(initialFormat);
   const [includeNDVI, setIncludeNDVI] = useState(true);
-  const [includeNDRE, setIncludeNDRE] = useState(true);
-  const [includeNDWI, setIncludeNDWI] = useState(true);
   const [includePhotos, setIncludePhotos] = useState(true);
   const [includeZoning, setIncludeZoning] = useState(true);
   const [includeRecommendations, setIncludeRecommendations] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [exportComplete, setExportComplete] = useState(false);
 
-  if (!isOpen) return null;
-  if (!plot) return null;
+  const timersRef = useRef<number[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setFormat(initialFormat);
+      setExportComplete(false);
+    }
+  }, [isOpen, initialFormat]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen && !isExporting) onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      timersRef.current.forEach(t => window.clearTimeout(t));
+      timersRef.current = [];
+    };
+  }, [isOpen, isExporting, onClose]);
+
+  if (!isOpen || !plot) return null;
 
   // Retrieve technical registration entities with safe fallbacks
   const getCompany = (): Company => {
@@ -476,7 +489,7 @@ export const ReportExportModal: React.FC<ReportExportModalProps> = ({
   const handleExport = () => {
     setIsExporting(true);
 
-    setTimeout(() => {
+    const t1 = window.setTimeout(() => {
       if (format === 'pdf') {
         const company = getCompany();
         const agronomist = getAgronomist();
@@ -1296,6 +1309,7 @@ export const ReportExportModal: React.FC<ReportExportModalProps> = ({
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(url);
       } else if (format === 'excel') {
         const content = `Relatorio de Geoprocessamento - ${plot.name} (${plot.code})\n\n` +
           `Cultura: ${plot.crop}\n` +
@@ -1318,6 +1332,7 @@ export const ReportExportModal: React.FC<ReportExportModalProps> = ({
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(url);
       } else if (format === 'geotiff') {
         const mockRasterMetadata = `GEOTIFF_METADATA_HEADER\n` +
           `Projection: EPSG:4326 - WGS 84\n` +
@@ -1335,15 +1350,18 @@ export const ReportExportModal: React.FC<ReportExportModalProps> = ({
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(url);
       }
 
       setIsExporting(false);
       setExportComplete(true);
-      setTimeout(() => {
+      const t2 = window.setTimeout(() => {
         setExportComplete(false);
         onClose();
-      }, 1500);
-    }, 600);
+      }, 1400);
+      timersRef.current.push(t2);
+    }, 500);
+    timersRef.current.push(t1);
   };
 
   const company = getCompany();
@@ -1352,226 +1370,202 @@ export const ReportExportModal: React.FC<ReportExportModalProps> = ({
   const farm = getFarm();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh]">
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+      onClick={() => !isExporting && onClose()}
+    >
+      <div
+        className="bg-white dark:bg-zinc-900 rounded-xl border border-slate-200/80 dark:border-zinc-800 w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh]"
+        onClick={e => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="p-6 bg-gradient-to-r from-emerald-800 to-teal-900 text-white flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center border border-white/20">
-              <FileText className="w-5 h-5 text-emerald-300" />
+        <div className="px-5 py-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <FileText className="w-4 h-4" />
             </div>
-            <div>
-              <h3 className="text-lg font-bold">Exportação de Laudo Técnico & SIG</h3>
-              <p className="text-xs text-emerald-200">
-                Talhão: {plot.code} ({plot.name}) • Fazenda: {farm.name}
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Exportar Laudo Técnico e SIG
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 truncate">
+                Talhão {plot.code} ({plot.name}) · {farm.name}
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="text-white/70 hover:text-white hover:bg-white/10 p-2 rounded-xl transition-colors"
+            disabled={isExporting}
+            className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
+            aria-label="Fechar modal"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto space-y-6">
+        <div className="p-5 overflow-y-auto space-y-5">
           {/* Format Selection */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
+            <label className="block text-[11px] font-medium text-slate-500 dark:text-zinc-400 mb-2">
               Formato de Exportação
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <button
-                type="button"
-                onClick={() => setFormat('pdf')}
-                className={`p-4 rounded-xl border flex flex-col items-center gap-2 text-center transition-all ${
-                  format === 'pdf'
-                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 shadow-sm'
-                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                <FileText className="w-6 h-6 text-red-500" />
-                <span className="text-xs font-bold">Laudo PDF Executivo</span>
-                <span className="text-[10px] text-slate-400">4 Páginas • RT & GIS</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFormat('geotiff')}
-                className={`p-4 rounded-xl border flex flex-col items-center gap-2 text-center transition-all ${
-                  format === 'geotiff'
-                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 shadow-sm'
-                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                <Layers className="w-6 h-6 text-emerald-500" />
-                <span className="text-xs font-bold">GeoTIFF L2A</span>
-                <span className="text-[10px] text-slate-400">Raster Multiespectral</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFormat('csv')}
-                className={`p-4 rounded-xl border flex flex-col items-center gap-2 text-center transition-all ${
-                  format === 'csv'
-                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 shadow-sm'
-                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                <FileSpreadsheet className="w-6 h-6 text-blue-500" />
-                <span className="text-xs font-bold">CSV / Tabela</span>
-                <span className="text-[10px] text-slate-400">Séries e Histórico</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFormat('excel')}
-                className={`p-4 rounded-xl border flex flex-col items-center gap-2 text-center transition-all ${
-                  format === 'excel'
-                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 shadow-sm'
-                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                <BarChart3 className="w-6 h-6 text-emerald-600" />
-                <span className="text-xs font-bold">Planilha XLS</span>
-                <span className="text-[10px] text-slate-400">Índices e Métricas</span>
-              </button>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {([
+                { id: 'pdf', label: 'Laudo PDF', sub: '4 páginas · RT e SIG', icon: FileText, iconColor: 'text-rose-600 dark:text-rose-400' },
+                { id: 'geotiff', label: 'GeoTIFF L2A', sub: 'Raster multiespectral', icon: Layers, iconColor: 'text-emerald-600 dark:text-emerald-400' },
+                { id: 'csv', label: 'Tabela CSV', sub: 'Séries e histórico', icon: FileSpreadsheet, iconColor: 'text-sky-600 dark:text-sky-400' },
+                { id: 'excel', label: 'Planilha XLS', sub: 'Índices e métricas', icon: BarChart3, iconColor: 'text-teal-600 dark:text-teal-400' },
+              ] as const).map(item => {
+                const Icon = item.icon;
+                const active = format === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setFormat(item.id)}
+                    className={`p-3 rounded-lg border flex flex-col items-center gap-1.5 text-center transition-colors cursor-pointer ${
+                      active
+                        ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200'
+                        : 'border-slate-200 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700 text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-900'
+                    }`}
+                  >
+                    <Icon className={`w-5 h-5 ${item.iconColor}`} />
+                    <span className="text-xs font-semibold">{item.label}</span>
+                    <span className="text-[10px] text-slate-500 dark:text-zinc-400">{item.sub}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Technical Integration Summary */}
+          {/* Technical Registration Summary */}
           {format === 'pdf' && (
-            <div className="bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 rounded-xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  Integração Automática ao Cadastro Técnico
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-200 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200">
-                  4 Páginas Executivas
+            <div className="bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/80 dark:border-zinc-800 rounded-lg p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-semibold">
+                  <ShieldCheck className="w-4 h-4 shrink-0" />
+                  <span>Integração com Cadastro Técnico</span>
+                </span>
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+                  4 páginas executivas
                 </span>
               </div>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-                  <Building2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span className="truncate"><strong>Empresa:</strong> {company.tradingName || company.name}</span>
+                <div className="flex items-center gap-2 text-slate-700 dark:text-zinc-300 min-w-0">
+                  <Building2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span className="truncate"><strong className="font-medium">Empresa:</strong> {company.tradingName || company.name}</span>
                 </div>
-                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-                  <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span className="truncate"><strong>RT:</strong> {agronomist.name} (CREA {agronomist.creaState} {agronomist.crea})</span>
+                <div className="flex items-center gap-2 text-slate-700 dark:text-zinc-300 min-w-0">
+                  <UserCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span className="truncate"><strong className="font-medium">RT:</strong> {agronomist.name}</span>
                 </div>
-                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-                  <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span className="truncate"><strong>Produtor & Fazenda:</strong> {producer.name} • {farm.name}</span>
+                <div className="flex items-center gap-2 text-slate-700 dark:text-zinc-300 min-w-0">
+                  <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span className="truncate"><strong className="font-medium">Produtor:</strong> {producer.name} · {farm.name}</span>
                 </div>
-                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-                  <Leaf className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span className="truncate"><strong>Cultura:</strong> {plot.crop} ({plot.areaHa} ha)</span>
+                <div className="flex items-center gap-2 text-slate-700 dark:text-zinc-300 min-w-0">
+                  <Leaf className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span className="truncate tabular-nums"><strong className="font-medium">Cultura:</strong> {plot.crop} ({plot.areaHa} ha)</span>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Included Layers and Sections */}
+          {/* Included Sections */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
+            <label className="block text-[11px] font-medium text-slate-500 dark:text-zinc-400 mb-2">
               Camadas e Seções do Laudo
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label className="flex items-center gap-2.5 p-2.5 rounded-lg border border-slate-200/80 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/60 cursor-pointer transition-colors">
                 <input
                   type="checkbox"
                   checked={includeNDVI}
                   onChange={(e) => setIncludeNDVI(e.target.checked)}
-                  className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                  className="rounded accent-emerald-600 h-4 w-4"
                 />
-                <div className="flex items-center gap-2">
-                  <Leaf className="w-4 h-4 text-emerald-500" />
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Índices Espectrais Apurados (NDVI, NDRE, EVI, SPAD)
-                  </span>
-                </div>
+                <Leaf className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span className="text-xs text-slate-700 dark:text-zinc-300">
+                  Índices Espectrais (NDVI, NDRE, EVI, SPAD)
+                </span>
               </label>
 
-              <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+              <label className="flex items-center gap-2.5 p-2.5 rounded-lg border border-slate-200/80 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/60 cursor-pointer transition-colors">
                 <input
                   type="checkbox"
                   checked={includeZoning}
                   onChange={(e) => setIncludeZoning(e.target.checked)}
-                  className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                  className="rounded accent-emerald-600 h-4 w-4"
                 />
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-amber-500" />
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Zoneamento de Vigor (Classes A, B, C & Hectares)
-                  </span>
-                </div>
+                <BarChart3 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span className="text-xs text-slate-700 dark:text-zinc-300">
+                  Zoneamento de Vigor (Classes A, B, C)
+                </span>
               </label>
 
-              <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+              <label className="flex items-center gap-2.5 p-2.5 rounded-lg border border-slate-200/80 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/60 cursor-pointer transition-colors">
                 <input
                   type="checkbox"
                   checked={includePhotos}
                   onChange={(e) => setIncludePhotos(e.target.checked)}
-                  className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                  className="rounded accent-emerald-600 h-4 w-4"
                 />
-                <div className="flex items-center gap-2">
-                  <Camera className="w-4 h-4 text-blue-500" />
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Fotos da Propriedade (+50% Maiores com Explicação)
-                  </span>
-                </div>
+                <Camera className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+                <span className="text-xs text-slate-700 dark:text-zinc-300">
+                  Evidências Fotográficas com Parecer Técnico
+                </span>
               </label>
 
-              <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+              <label className="flex items-center gap-2.5 p-2.5 rounded-lg border border-slate-200/80 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/60 cursor-pointer transition-colors">
                 <input
                   type="checkbox"
                   checked={includeRecommendations}
                   onChange={(e) => setIncludeRecommendations(e.target.checked)}
-                  className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                  className="rounded accent-emerald-600 h-4 w-4"
                 />
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-purple-500" />
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Série Temporal 30 Dias & Tomadas de Decisão
-                  </span>
-                </div>
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span className="text-xs text-slate-700 dark:text-zinc-300">
+                  Série Temporal 30 Dias e Plano de Ação
+                </span>
               </label>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="p-6 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div className="px-5 py-3.5 bg-slate-50/70 dark:bg-zinc-950/60 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-end gap-2">
           <button
+            type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+            disabled={isExporting}
+            className="h-9 px-3.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
           >
             Cancelar
           </button>
 
           <button
+            type="button"
             onClick={handleExport}
             disabled={isExporting}
-            className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/20 flex items-center gap-2 transition-all disabled:opacity-50"
+            className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap"
           >
             {isExporting ? (
               <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Processando Relatório...
+                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Processando Relatório...</span>
               </>
             ) : exportComplete ? (
               <>
-                <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-                Laudo Gerado com Sucesso!
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Laudo Gerado com Sucesso</span>
               </>
             ) : (
               <>
-                <Download className="w-4 h-4" />
-                Gerar & Baixar {format.toUpperCase()}
+                <Download className="w-3.5 h-3.5" />
+                <span>Gerar e Baixar {format.toUpperCase()}</span>
               </>
             )}
           </button>

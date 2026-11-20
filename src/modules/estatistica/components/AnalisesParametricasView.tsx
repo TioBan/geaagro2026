@@ -1,20 +1,12 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
-  Activity,
   AlertTriangle,
-  BarChart2,
   Calculator,
   CheckCircle2,
-  FlaskConical,
-  GitBranch,
-  Layers,
   Play,
   Save,
   ShieldCheck,
-  Sliders,
-  Sparkles,
   Square,
-  TrendingUp,
   XCircle,
 } from 'lucide-react';
 import {
@@ -204,20 +196,22 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
 
   if (!dataset || rows.length === 0) {
     return (
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-10 text-center space-y-3">
-        <Calculator className="w-8 h-8 text-slate-400 mx-auto" />
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-          Nenhum dado carregado no experimento "{experimento.nome}"
-        </h3>
-        <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto">
-          Importe uma planilha Excel/CSV ou crie uma grade manual na aba Banco de Dados antes de executar análises estatísticas.
-        </p>
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl px-6 py-8 text-center space-y-3">
+        <Calculator className="w-6 h-6 text-slate-400 dark:text-zinc-500 mx-auto" />
+        <div className="space-y-1">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+            Nenhum dado carregado no experimento &ldquo;{experimento.nome}&rdquo;
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto">
+            Importe uma planilha Excel/CSV ou crie uma grade manual na aba Dados antes de executar análises.
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => onNavigateSubTab('dados')}
-          className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer"
+          className="px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg whitespace-nowrap transition-colors cursor-pointer"
         >
-          Ir para Importação & Dados
+          Ir para Dados &amp; Planilhas
         </button>
       </div>
     );
@@ -697,15 +691,15 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
   }, [rows, activeGroup]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {errMsg && (
-        <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 text-xs text-rose-800 dark:text-rose-300">
+        <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 text-xs text-rose-800 dark:text-rose-300">
           <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{errMsg}</span>
         </div>
       )}
       {okMsg && (
-        <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-xs text-emerald-800 dark:text-emerald-300">
+        <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-xs text-emerald-800 dark:text-emerald-300">
           <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{okMsg}</span>
         </div>
@@ -713,16 +707,16 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
 
       {/* Barra comum de parâmetros globais para análises */}
       {section !== 'delineamentos' && (
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 flex flex-wrap items-end gap-4">
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-3.5 flex flex-wrap items-end gap-3">
           {section !== 'correlacao' && (
             <div className="min-w-[180px] flex-1">
-              <label className="block text-[11px] font-semibold text-slate-600 dark:text-zinc-400 mb-1">
+              <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">
                 Variável Resposta (Y)
               </label>
               <select
                 value={activeResp}
                 onChange={(e) => setRespCol(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-white"
+                className="w-full h-8 px-2.5 text-xs rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
               >
                 {(numericCols.length > 0 ? numericCols : cols).map((c) => (
                   <option key={c} value={c}>
@@ -735,13 +729,13 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
 
           {(section === 'descritiva' || section === 'medias' || section === 'pressupostos') && (
             <div className="min-w-[180px] flex-1">
-              <label className="block text-[11px] font-semibold text-slate-600 dark:text-zinc-400 mb-1">
+              <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">
                 {section === 'descritiva' ? 'Estratificar por Fator (Opcional)' : 'Coluna de Tratamento / Grupo'}
               </label>
               <select
                 value={activeGroup}
                 onChange={(e) => setGroupCol(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-white"
+                className="w-full h-8 px-2.5 text-xs rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
               >
                 {section === 'descritiva' && <option value="">Conjunto completo (sem grupos)</option>}
                 {cols.map((c) => (
@@ -754,13 +748,13 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
           )}
 
           <div className="w-32">
-            <label className="block text-[11px] font-semibold text-slate-600 dark:text-zinc-400 mb-1">
+            <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">
               Nível α
             </label>
             <select
               value={alpha}
               onChange={(e) => setAlpha(Number(e.target.value))}
-              className="w-full px-3 py-2 text-xs font-mono tabular-nums rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-white"
+              className="w-full h-8 px-2.5 text-xs font-mono tabular-nums rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
             >
               <option value={0.01}>0,01 (1%)</option>
               <option value={0.05}>0,05 (5%)</option>
@@ -772,10 +766,10 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
             <button
               type="button"
               onClick={handleCancelWorker}
-              className="px-3.5 py-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-1.5 cursor-pointer"
+              className="h-8 px-3 text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
             >
               <Square className="w-3.5 h-3.5" />
-              <span>Cancelar Cálculo</span>
+              <span>Cancelar</span>
             </button>
           )}
         </div>
@@ -785,20 +779,20 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
       {/* 1. ESTATÍSTICA DESCRITIVA                                              */}
       {/* ====================================================================== */}
       {section === 'descritiva' && (
-        <div className="space-y-5">
-          <div className="flex items-center justify-between gap-3">
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Estatística Descritiva Completa (Global & Estratificada)
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Estatística Descritiva Completa (Global &amp; Estratificada)
               </h3>
               <p className="text-xs text-slate-500 dark:text-zinc-400">
-                Tendência central, dispersão, quartis, percentis, assimetria (g1), curtose (g2) e IC t de Student.
+                Tendência central, dispersão, quartis, assimetria (g1), curtose (g2) e IC t de Student.
               </p>
             </div>
             <button
               type="button"
               onClick={handleRunDescriptive}
-              className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
             >
               <Play className="w-3.5 h-3.5" />
               <span>Calcular Descritiva</span>
@@ -806,20 +800,20 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
           </div>
 
           {descRes && (
-            <div className="space-y-5">
-              {/* Indicadores globais */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="space-y-4">
+              {/* Indicadores globais em faixa única com divisórias */}
+              <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-zinc-800 overflow-hidden">
                 {[
                   { lbl: 'n Válidas / Ausentes', val: `${descRes.geral.nValidas} / ${descRes.geral.nAusentes}` },
                   { lbl: 'Média ± DP', val: `${fmt(descRes.geral.media)} ± ${fmt(descRes.geral.desvioPadrao)}` },
                   { lbl: 'Mediana / IQR', val: `${fmt(descRes.geral.mediana)} / ${fmt(descRes.geral.iqr)}` },
-                  { lbl: 'CV Experimental (%)', val: `${fmt(descRes.geral.cvPercent, 2)}%` },
+                  { lbl: 'CV Experimental', val: `${fmt(descRes.geral.cvPercent, 2)}%` },
                   { lbl: `IC ${((1 - alpha) * 100).toFixed(0)}%`, val: `[${fmt(descRes.geral.icInferior, 2)}; ${fmt(descRes.geral.icSuperior, 2)}]` },
                   { lbl: 'Assimetria / Curtose', val: `${fmt(descRes.geral.assimetria, 2)} / ${fmt(descRes.geral.curtoseExcesso, 2)}` },
                 ].map((k) => (
-                  <div key={k.lbl} className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-3">
+                  <div key={k.lbl} className="px-3.5 py-3">
                     <div className="text-[11px] text-slate-500 dark:text-zinc-400">{k.lbl}</div>
-                    <div className="text-xs font-bold font-mono tabular-nums text-slate-900 dark:text-white mt-1">
+                    <div className="text-xs font-semibold font-mono tabular-nums text-slate-900 dark:text-zinc-100 mt-1">
                       {k.val}
                     </div>
                   </div>
@@ -935,13 +929,23 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
                 </p>
               </div>
               <span
-                className={`text-xs font-semibold ${
+                className={`inline-flex items-center gap-1.5 text-xs font-medium ${
                   designCompat.compativel
                     ? 'text-emerald-600 dark:text-emerald-400'
                     : 'text-rose-600 dark:text-rose-400'
                 }`}
               >
-                {designCompat.compativel ? '● Estrutura Compatível' : '✖ Incompatível'}
+                {designCompat.compativel ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Estrutura Compatível</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-3.5 h-3.5" />
+                    <span>Incompatível</span>
+                  </>
+                )}
               </span>
             </div>
 
@@ -1202,35 +1206,38 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
             </div>
 
             {/* Diagnóstico de compatibilidade ao vivo */}
-            <div className="bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-2 text-xs">
+            <div className="bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl p-3.5 space-y-1.5 text-xs">
               <div className="font-semibold text-slate-800 dark:text-zinc-200">
-                Validação Matemática Estrita ({designCompat.validRowsCount} linhas válidas para resposta)
+                Validação Matemática Estrita ({designCompat.validRowsCount} linhas válidas)
               </div>
               {designCompat.motivos.map((m, i) => (
-                <div key={i} className="text-rose-700 dark:text-rose-400">
-                  ✖ {m}
+                <div key={i} className="flex items-start gap-1.5 text-rose-700 dark:text-rose-400">
+                  <XCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>{m}</span>
                 </div>
               ))}
               {designCompat.avisos.map((a, i) => (
-                <div key={i} className="text-amber-700 dark:text-amber-400">
-                  ▲ {a}
+                <div key={i} className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>{a}</span>
                 </div>
               ))}
               {designCompat.compativel && designCompat.avisos.length === 0 && (
-                <div className="text-emerald-700 dark:text-emerald-400">
-                  ● Estrutura de dados totalmente compatível com {EXPERIMENTAL_DESIGNS_CATALOG[designDraft].sigla}.
+                <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>Estrutura de dados compatível com {EXPERIMENTAL_DESIGNS_CATALOG[designDraft].sigla}.</span>
                 </div>
               )}
             </div>
 
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
               <button
                 type="button"
                 onClick={handleSaveDesignMapping}
-                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>Salvar Delineamento e Mapeamento</span>
+                <span>Salvar Mapeamento</span>
               </button>
               <button
                 type="button"
@@ -1239,7 +1246,7 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
                   await handleSaveDesignMapping();
                   onNavigateSubTab('anova');
                 }}
-                className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-zinc-200 bg-slate-100 dark:bg-zinc-800 rounded-lg disabled:opacity-40 cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-lg disabled:opacity-40 whitespace-nowrap transition-colors cursor-pointer"
               >
                 Avançar para ANOVA →
               </button>
@@ -1252,17 +1259,17 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
       {/* 3. ANÁLISE DE VARIÂNCIA (ANOVA)                                        */}
       {/* ====================================================================== */}
       {section === 'anova' && (
-        <div className="space-y-5">
+        <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
                 Análise de Variância (ANOVA) — {EXPERIMENTAL_DESIGNS_CATALOG[experimento.delineamento].nome}
               </h3>
               <p className="text-xs text-slate-500 dark:text-zinc-400">
                 {prefs.exibirFormulas && (
                   <span className="font-mono mr-2">{EXPERIMENTAL_DESIGNS_CATALOG[experimento.delineamento].formulaModelo} ·</span>
                 )}
-                GL, SQ, QM, F, p-valor exato, CV% e estratos de erro específicos.
+                GL, SQ, QM, F, p-valor exato, CV% e estratos de erro.
               </p>
             </div>
 
@@ -1270,25 +1277,25 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
               <button
                 type="button"
                 onClick={() => onNavigateSubTab('delineamentos')}
-                className="px-3 py-2 text-xs font-medium text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg cursor-pointer"
+                className="px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-lg whitespace-nowrap transition-colors cursor-pointer"
               >
-                Configurar Delineamento
+                Delineamento
               </button>
               <button
                 type="button"
                 disabled={isRunning}
                 onClick={handleRunAnova}
-                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap transition-colors cursor-pointer"
               >
                 <Play className="w-3.5 h-3.5" />
-                <span>{isRunning ? 'Processando no Worker...' : 'Executar ANOVA'}</span>
+                <span>{isRunning ? 'Calculando...' : 'Executar ANOVA'}</span>
               </button>
             </div>
           </div>
 
           {!designCompat.compativel && (
-            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl p-4 text-xs text-amber-800 dark:text-amber-300 space-y-1">
-              <div className="font-bold">Delineamento incompatível com o banco atual:</div>
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl p-3.5 text-xs text-amber-800 dark:text-amber-300 space-y-1">
+              <div className="font-semibold">Delineamento incompatível com o banco atual:</div>
               {designCompat.motivos.map((m, i) => (
                 <div key={i}>• {m}</div>
               ))}
@@ -1296,19 +1303,19 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
           )}
 
           {effectiveAnova && (
-            <div className="space-y-5">
-              {/* Resumo métrico */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="space-y-4">
+              {/* Resumo métrico em faixa única com divisórias */}
+              <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl grid grid-cols-2 sm:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-zinc-800 overflow-hidden">
                 {[
                   { lbl: 'Observações (N)', val: String(effectiveAnova.nObservacoes) },
                   { lbl: 'Média Geral', val: fmt(effectiveAnova.mediaGeral) },
                   { lbl: 'CV Experimental', val: `${fmt(effectiveAnova.cvExperimental, 2)}%` },
-                  { lbl: 'QM Resíduo Principal', val: fmt(effectiveAnova.qmErroPrincipal) },
+                  { lbl: 'QM Resíduo', val: fmt(effectiveAnova.qmErroPrincipal) },
                   { lbl: 'R² do Modelo', val: `${(effectiveAnova.rSquared * 100).toFixed(2)}%` },
                 ].map((m) => (
-                  <div key={m.lbl} className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-3">
+                  <div key={m.lbl} className="px-3.5 py-3">
                     <div className="text-[11px] text-slate-500 dark:text-zinc-400">{m.lbl}</div>
-                    <div className="text-sm font-bold font-mono tabular-nums text-slate-900 dark:text-white mt-0.5">
+                    <div className="text-sm font-semibold font-mono tabular-nums text-slate-900 dark:text-zinc-100 mt-0.5">
                       {m.val}
                     </div>
                   </div>
@@ -1397,20 +1404,22 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
 
               {/* Desdobramento de efeitos simples (Fatorial / Split-Plot) */}
               {effectiveAnova.desdobramentos.length > 0 && (
-                <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-4">
-                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-slate-200 dark:border-zinc-800 text-xs font-semibold text-slate-900 dark:text-zinc-100">
                     Desdobramento de Efeitos Simples (Interação Fatorial / Subdividida)
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200 dark:divide-zinc-800">
                     {effectiveAnova.desdobramentos.map((sl, i) => (
-                      <div key={i} className="border border-slate-200 dark:border-zinc-800 rounded-lg p-3 space-y-2">
-                        <div className="text-xs font-semibold text-slate-800 dark:text-zinc-200">{sl.titulo}</div>
-                        <div className="text-[11px] font-mono text-slate-600 dark:text-zinc-400">
-                          F = {fmt(sl.tabela[0]?.fValor, 3)} · p = {fmtP(sl.tabela[0]?.pValor)} ({sl.tabela[0]?.significancia})
+                      <div key={i} className="p-3.5 space-y-2 border-b border-slate-100 dark:border-zinc-800/70">
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <span className="font-semibold text-slate-800 dark:text-zinc-200">{sl.titulo}</span>
+                          <span className="text-[11px] font-mono tabular-nums text-slate-500 dark:text-zinc-400">
+                            F = {fmt(sl.tabela[0]?.fValor, 3)} · p = {fmtP(sl.tabela[0]?.pValor)} ({sl.tabela[0]?.significancia})
+                          </span>
                         </div>
-                        <div className="grid grid-cols-2 gap-1 text-[11px] font-mono">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] font-mono tabular-nums">
                           {sl.mediasGrupo.map((mg) => (
-                            <div key={mg.nivel} className="flex justify-between px-2 py-1 bg-slate-50 dark:bg-zinc-950 rounded">
+                            <div key={mg.nivel} className="flex justify-between py-0.5 border-b border-slate-100 dark:border-zinc-800/60">
                               <span className="font-sans text-slate-700 dark:text-zinc-300">{mg.nivel}</span>
                               <span>{fmt(mg.media)} ± {fmt(mg.dp, 2)}</span>
                             </div>
@@ -1522,7 +1531,7 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
               <button
                 type="button"
                 onClick={handleRunMeanComparison}
-                className="w-full px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer"
+                className="h-8 px-3.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
               >
                 <Play className="w-3.5 h-3.5" />
                 <span>Comparar Médias</span>
@@ -1630,9 +1639,14 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
                     })),
                   }}
                 />
-                <div className="bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-1.5 text-xs text-slate-600 dark:text-zinc-400">
+                <div className="bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl p-3.5 space-y-1.5 text-xs text-slate-600 dark:text-zinc-400">
                   {mcResult.interpretacao.map((t, i) => <div key={i}>• {t}</div>)}
-                  {mcResult.observacoes.map((o, i) => <div key={`o-${i}`} className="text-amber-700 dark:text-amber-400">▲ {o}</div>)}
+                  {mcResult.observacoes.map((o, i) => (
+                    <div key={`o-${i}`} className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      <span>{o}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1704,7 +1718,7 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
                 type="button"
                 disabled={isRunning}
                 onClick={handleRunRegression}
-                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer"
+                className="h-8 px-3.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
               >
                 <Play className="w-3.5 h-3.5" />
                 <span>Ajustar Regressão</span>
@@ -1808,8 +1822,9 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
                   </div>
 
                   {regResult.avisos.map((w, i) => (
-                    <div key={i} className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl p-3 text-xs text-amber-800 dark:text-amber-300">
-                      ▲ {w}
+                    <div key={i} className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl p-3 text-xs text-amber-800 dark:text-amber-300">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      <span>{w}</span>
                     </div>
                   ))}
                   {regResult.doseResposta && (
@@ -1870,8 +1885,13 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
                       <tbody className="divide-y divide-slate-100 dark:divide-zinc-800 font-mono tabular-nums">
                         {regComparison.map((c) => (
                           <tr key={c.modelo} className={c.recomendadoPorCriterio ? 'bg-emerald-50/50 dark:bg-emerald-950/20' : ''}>
-                            <td className="py-2 px-3 font-sans font-semibold text-slate-900 dark:text-white">
-                              {c.nomeModelo} {c.recomendadoPorCriterio && <span className="text-emerald-600 ml-1">● Recomendado</span>}
+                            <td className="py-2 px-3 font-sans font-semibold text-slate-900 dark:text-zinc-100">
+                              {c.nomeModelo}{' '}
+                              {c.recomendadoPorCriterio && (
+                                <span className="text-emerald-600 dark:text-emerald-400 font-medium ml-1">
+                                  · Recomendado
+                                </span>
+                              )}
                             </td>
                             <td className="py-2 px-3 text-right">{(c.rSquared * 100).toFixed(2)}%</td>
                             <td className="py-2 px-3 text-right">{(c.adjRSquared * 100).toFixed(2)}%</td>
@@ -1911,13 +1931,13 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
               <button
                 type="button"
                 onClick={handleRunCorrelation}
-                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
               >
                 <Play className="w-3.5 h-3.5" />
-                <span>Calcular Matriz de Correlação</span>
+                <span>Calcular Matriz</span>
               </button>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {numericCols.map((c) => {
                 const active = corrVars.includes(c);
                 return (
@@ -1929,10 +1949,10 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
                         active ? prev.filter((x) => x !== c) : [...prev, c]
                       )
                     }
-                    className={`px-3 py-1.5 text-xs rounded-lg border cursor-pointer ${
+                    className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
                       active
-                        ? 'bg-emerald-600 text-white border-emerald-600'
-                        : 'bg-slate-50 dark:bg-zinc-950 border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                        : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800'
                     }`}
                   >
                     {c}
@@ -1943,10 +1963,11 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
           </div>
 
           {corrResult && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
               <div className="lg:col-span-6 space-y-4">
-                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl p-3 text-xs text-amber-800 dark:text-amber-300">
-                  ▲ {corrResult.avisoCausalidade}
+                <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl p-3 text-xs text-amber-800 dark:text-amber-300">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>{corrResult.avisoCausalidade}</span>
                 </div>
 
                 <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
@@ -2017,20 +2038,20 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
       {/* 7. PRESSUPOSTOS, DIAGNÓSTICOS & TRANSFORMAÇÕES                         */}
       {/* ====================================================================== */}
       {section === 'pressupostos' && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Verificação de Pressupostos, Diagnóstico de Resíduos & Transformação Controlada
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Pressupostos, Diagnóstico de Resíduos &amp; Transformação
               </h3>
               <p className="text-xs text-slate-500 dark:text-zinc-400">
-                Shapiro-Wilk, Levene (média e mediana), Bartlett, Durbin-Watson, Distância de Cook e transformações sem alterar os dados brutos.
+                Shapiro-Wilk, Levene, Bartlett, Durbin-Watson, Distância de Cook e transformações sem alterar os dados brutos.
               </p>
             </div>
             <button
               type="button"
               onClick={handleRunAssumptions}
-              className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
             >
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Auditar Pressupostos</span>
@@ -2038,41 +2059,41 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
           </div>
 
           {assumpResult && (
-            <div className="space-y-5">
-              {/* Cards dos 3 pressupostos */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-1.5">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-slate-900 dark:text-white">Normalidade (Shapiro-Wilk)</span>
-                    <span className={assumpResult.normalidade.atendido ? 'text-emerald-600 font-semibold' : 'text-rose-600 font-semibold'}>
-                      {assumpResult.normalidade.atendido ? '● Atendido' : '▲ Desvio'}
+            <div className="space-y-4">
+              {/* Faixa unificada dos 3 pressupostos */}
+              <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 dark:divide-zinc-800 overflow-hidden">
+                <div className="p-3.5 space-y-1">
+                  <div className="flex justify-between items-center text-xs gap-2">
+                    <span className="font-semibold text-slate-900 dark:text-zinc-100">Normalidade (Shapiro-Wilk)</span>
+                    <span className={assumpResult.normalidade.atendido ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-rose-600 dark:text-rose-400 font-medium'}>
+                      {assumpResult.normalidade.atendido ? 'Atendido' : 'Desvio'}
                     </span>
                   </div>
-                  <div className="text-xs font-mono tabular-nums text-slate-600 dark:text-zinc-400">
+                  <div className="text-xs font-mono tabular-nums text-slate-500 dark:text-zinc-400">
                     W = {fmt(assumpResult.normalidade.estatisticaW, 4)} · p = {fmtP(assumpResult.normalidade.pValor)}
                   </div>
                 </div>
 
-                <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-1.5">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-slate-900 dark:text-white">Homocedasticidade (Levene / Bartlett)</span>
-                    <span className={assumpResult.homogeneidade.leveneMedia?.atendido !== false ? 'text-emerald-600 font-semibold' : 'text-rose-600 font-semibold'}>
-                      {assumpResult.homogeneidade.leveneMedia?.atendido !== false ? '● Atendido' : '▲ Desvio'}
+                <div className="p-3.5 space-y-1">
+                  <div className="flex justify-between items-center text-xs gap-2">
+                    <span className="font-semibold text-slate-900 dark:text-zinc-100">Homocedasticidade</span>
+                    <span className={assumpResult.homogeneidade.leveneMedia?.atendido !== false ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-rose-600 dark:text-rose-400 font-medium'}>
+                      {assumpResult.homogeneidade.leveneMedia?.atendido !== false ? 'Atendido' : 'Desvio'}
                     </span>
                   </div>
-                  <div className="text-xs font-mono tabular-nums text-slate-600 dark:text-zinc-400">
-                    Levene(média): p = {fmtP(assumpResult.homogeneidade.leveneMedia?.pValor)} · Mediana: p = {fmtP(assumpResult.homogeneidade.leveneMediana?.pValor)} · Bartlett: p = {fmtP(assumpResult.homogeneidade.bartlett?.pValor)}
+                  <div className="text-xs font-mono tabular-nums text-slate-500 dark:text-zinc-400">
+                    Levene p = {fmtP(assumpResult.homogeneidade.leveneMedia?.pValor)} · Med. p = {fmtP(assumpResult.homogeneidade.leveneMediana?.pValor)} · Bart. p = {fmtP(assumpResult.homogeneidade.bartlett?.pValor)}
                   </div>
                 </div>
 
-                <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-1.5">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-slate-900 dark:text-white">Independência (Durbin-Watson)</span>
-                    <span className={!assumpResult.independencia.alertaDependencia ? 'text-emerald-600 font-semibold' : 'text-amber-600 font-semibold'}>
-                      {!assumpResult.independencia.alertaDependencia ? '● Atendido' : '▲ Alerta'}
+                <div className="p-3.5 space-y-1">
+                  <div className="flex justify-between items-center text-xs gap-2">
+                    <span className="font-semibold text-slate-900 dark:text-zinc-100">Independência (DW)</span>
+                    <span className={!assumpResult.independencia.alertaDependencia ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-amber-600 dark:text-amber-400 font-medium'}>
+                      {!assumpResult.independencia.alertaDependencia ? 'Atendido' : 'Alerta'}
                     </span>
                   </div>
-                  <div className="text-xs font-mono tabular-nums text-slate-600 dark:text-zinc-400">
+                  <div className="text-xs font-mono tabular-nums text-slate-500 dark:text-zinc-400">
                     DW = {fmt(assumpResult.independencia.durbinWatson, 3)} · ρ₁ = {fmt(assumpResult.independencia.autocorrelacaoLag1, 3)}
                   </div>
                 </div>
@@ -2197,7 +2218,7 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
               <button
                 type="button"
                 onClick={handlePreviewTransform}
-                className="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-zinc-200 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 rounded-lg cursor-pointer"
+                className="h-8 px-3 text-xs font-medium text-slate-700 dark:text-zinc-200 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 rounded-lg whitespace-nowrap transition-colors cursor-pointer"
               >
                 Pré-visualizar
               </button>
@@ -2206,7 +2227,7 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
                 type="button"
                 disabled={!transPreviewStats}
                 onClick={handleApplyTransformAsNewColumn}
-                className="px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-40 cursor-pointer"
+                className="h-8 px-3 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-40 whitespace-nowrap transition-colors cursor-pointer"
               >
                 Salvar Nova Coluna
               </button>
@@ -2219,7 +2240,10 @@ export const AnalisesParametricasView: React.FC<AnalisesParametricasViewProps> =
                   {transPreviewStats.lambdaUsed !== undefined && ` · λ ótimo MLE = ${transPreviewStats.lambdaUsed}`}
                 </div>
                 {transPreviewStats.warnings.map((w, i) => (
-                  <div key={i} className="font-sans text-amber-700 dark:text-amber-400">▲ {w}</div>
+                  <div key={i} className="font-sans flex items-start gap-1.5 text-amber-700 dark:text-amber-400">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span>{w}</span>
+                  </div>
                 ))}
               </div>
             )}

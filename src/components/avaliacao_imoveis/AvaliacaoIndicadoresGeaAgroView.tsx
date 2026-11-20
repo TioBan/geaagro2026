@@ -18,179 +18,146 @@ export const AvaliacaoIndicadoresGeaAgroView: React.FC<Props> = ({
   indicadores,
   propriedadeNome
 }) => {
+  const cards = [
+    {
+      sigla: 'IPR · Potencial Rural',
+      score: indicadores.iprScore,
+      classificacao: indicadores.iprClassificacao,
+      descricao: 'Avalia classe de solo, mecanização, disponibilidade de água e histórico produtivo.',
+      icon: Sparkles,
+      textTone: 'text-emerald-600 dark:text-emerald-400',
+      barTone: 'bg-emerald-500'
+    },
+    {
+      sigla: 'ICV · Conservação',
+      score: indicadores.icvScore,
+      classificacao: indicadores.icvClassificacao,
+      descricao: 'Mede a integridade física média das construções calculada via Ross-Heidecke.',
+      icon: Building,
+      textTone: 'text-sky-600 dark:text-sky-400',
+      barTone: 'bg-sky-500'
+    },
+    {
+      sigla: 'IGM · Mercado',
+      score: indicadores.igmScore,
+      classificacao: indicadores.igmClassificacao,
+      descricao: 'Homogeneidade dos dados de mercado e coeficiente de variação amostral.',
+      icon: TrendingUp,
+      textTone: 'text-amber-600 dark:text-amber-400',
+      barTone: 'bg-amber-500'
+    },
+    {
+      sigla: 'IGT · Territorial',
+      score: indicadores.igtScore,
+      classificacao: indicadores.igtClassificacao,
+      descricao: 'Proporção de uso eficiente do solo entre lavouras e conformidade ambiental (CAR).',
+      icon: Layers,
+      textTone: 'text-violet-600 dark:text-violet-400',
+      barTone: 'bg-violet-500'
+    }
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 text-white p-6 rounded-2xl border border-emerald-500/30 shadow-xl space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-            Inteligência Exclusiva GeaAgro
-          </span>
-          <span className="text-xs text-slate-400">Rural Property Scorecard</span>
-        </div>
-        <h2 className="text-2xl font-bold tracking-tight">
-          Índices Proprietários GeaAgro • {propriedadeNome}
-        </h2>
-        <p className="text-xs text-slate-300 max-w-2xl">
-          Matriz multidimensional desenvolvida para quantificar vocação produtiva, estado de conservação, consistência mercadológica e equilíbrio fundiário.
-        </p>
-      </div>
-
-      {/* Grid dos 4 Índices GeaAgro */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* 1. IPR */}
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">IPR - Potencial Rural</span>
-            <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600">
-              <Sparkles className="w-5 h-5" />
-            </div>
-          </div>
-          <div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">
-                {indicadores.iprScore}
-              </span>
-              <span className="text-sm font-semibold text-slate-400">/ 100</span>
-            </div>
-            <span className="text-xs font-bold text-emerald-600 block mt-0.5">
-              {indicadores.iprClassificacao}
+    <div className="space-y-5">
+      {/* Cabeçalho + Faixa dos 4 Índices */}
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-slate-200/80 dark:border-zinc-800 overflow-hidden">
+        <div className="p-5 space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/70 dark:border-emerald-800/60">
+              Inteligência GeaAgro
+            </span>
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400">
+              Scorecard Multidimensional
             </span>
           </div>
-          <div className="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-            <div
-              className="bg-emerald-500 h-full rounded-full transition-all"
-              style={{ width: `${indicadores.iprScore}%` }}
-            />
-          </div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-            Avalia classe de solo, mecanização, disponibilidade de água e histórico produtivo.
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-zinc-100">
+            Índices Proprietários · {propriedadeNome || 'Imóvel Rural'}
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-2xl">
+            Matriz técnica para quantificar vocação produtiva, estado de conservação, consistência mercadológica e equilíbrio fundiário.
           </p>
         </div>
 
-        {/* 2. ICV */}
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">ICV - Conservação</span>
-            <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600">
-              <Building className="w-5 h-5" />
-            </div>
-          </div>
-          <div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-extrabold text-blue-600 dark:text-blue-400">
-                {indicadores.icvScore}
-              </span>
-              <span className="text-sm font-semibold text-slate-400">/ 100</span>
-            </div>
-            <span className="text-xs font-bold text-blue-600 block mt-0.5">
-              {indicadores.icvClassificacao}
-            </span>
-          </div>
-          <div className="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-            <div
-              className="bg-blue-500 h-full rounded-full transition-all"
-              style={{ width: `${indicadores.icvScore}%` }}
-            />
-          </div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-            Mede a integridade física média das construções calculada via Ross-Heidecke.
-          </p>
-        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border-t border-slate-200/80 dark:border-zinc-800 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80 dark:divide-zinc-800">
+          {cards.map((item) => {
+            const Icon = item.icon;
+            return (
+              <div key={item.sigla} className="p-4 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
+                    {item.sigla}
+                  </span>
+                  <Icon className={`w-4 h-4 ${item.textTone}`} />
+                </div>
 
-        {/* 3. IGM */}
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">IGM - Mercado</span>
-            <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-          </div>
-          <div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-extrabold text-amber-600 dark:text-amber-400">
-                {indicadores.igmScore}
-              </span>
-              <span className="text-sm font-semibold text-slate-400">/ 100</span>
-            </div>
-            <span className="text-xs font-bold text-amber-600 block mt-0.5">
-              {indicadores.igmClassificacao}
-            </span>
-          </div>
-          <div className="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-            <div
-              className="bg-amber-500 h-full rounded-full transition-all"
-              style={{ width: `${indicadores.igmScore}%` }}
-            />
-          </div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-            Homogeneidade dos dados de mercado e coeficiente de variação amostral.
-          </p>
-        </div>
+                <div>
+                  <div className="flex items-baseline gap-1">
+                    <span className={`text-2xl font-bold tabular-nums ${item.textTone}`}>
+                      {item.score}
+                    </span>
+                    <span className="text-xs text-slate-400 dark:text-zinc-500 tabular-nums">/ 100</span>
+                  </div>
+                  <span className={`text-xs font-medium block mt-0.5 ${item.textTone}`}>
+                    {item.classificacao}
+                  </span>
+                </div>
 
-        {/* 4. IGT */}
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">IGT - Territorial</span>
-            <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600">
-              <Layers className="w-5 h-5" />
-            </div>
-          </div>
-          <div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-extrabold text-purple-600 dark:text-purple-400">
-                {indicadores.igtScore}
-              </span>
-              <span className="text-sm font-semibold text-slate-400">/ 100</span>
-            </div>
-            <span className="text-xs font-bold text-purple-600 block mt-0.5">
-              {indicadores.igtClassificacao}
-            </span>
-          </div>
-          <div className="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-            <div
-              className="bg-purple-500 h-full rounded-full transition-all"
-              style={{ width: `${indicadores.igtScore}%` }}
-            />
-          </div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-            Proporção de uso eficiente do solo entre lavouras e conformidade ambiental (CAR).
-          </p>
+                <div className="w-full bg-slate-100 dark:bg-zinc-800 h-1.5 rounded-sm overflow-hidden">
+                  <div
+                    className={`${item.barTone} h-full transition-all`}
+                    style={{ width: `${Math.max(0, Math.min(100, item.score))}%` }}
+                  />
+                </div>
+
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
+                  {item.descricao}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </div>
 
       {/* Pontos Fortes e Pontos de Atenção */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Pontos Fortes */}
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
-          <h3 className="text-sm font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-2 uppercase tracking-wider">
+        <div className="bg-white dark:bg-zinc-900 p-5 rounded-xl border border-slate-200/80 dark:border-zinc-800 space-y-3">
+          <h3 className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-2 uppercase tracking-wider">
             <CheckCircle2 className="w-4 h-4" />
-            Pontos Fortes Identificados no Diagnóstico
+            Pontos Fortes Identificados
           </h3>
-          <ul className="space-y-2">
-            {indicadores.pontosFortes.map((pf, idx) => (
-              <li key={idx} className="text-xs text-slate-700 dark:text-slate-300 flex items-start gap-2 bg-emerald-50/50 dark:bg-emerald-950/20 p-2.5 rounded-lg border border-emerald-100 dark:border-emerald-900/40">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 mt-1.5" />
-                <span>{pf}</span>
-              </li>
-            ))}
-          </ul>
+          {indicadores.pontosFortes.length === 0 ? (
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Preencha os dados do imóvel, solos e mercado para consolidar o diagnóstico.
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100 dark:divide-zinc-800/80">
+              {indicadores.pontosFortes.map((pf, idx) => (
+                <li key={idx} className="py-2 first:pt-0 last:pb-0 text-xs text-slate-700 dark:text-zinc-300 leading-relaxed">
+                  {pf}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
-        {/* Pontos de Atenção */}
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
-          <h3 className="text-sm font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2 uppercase tracking-wider">
+        <div className="bg-white dark:bg-zinc-900 p-5 rounded-xl border border-slate-200/80 dark:border-zinc-800 space-y-3">
+          <h3 className="text-xs font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-2 uppercase tracking-wider">
             <AlertCircle className="w-4 h-4" />
-            Pontos de Atenção & Recomendações Periciais
+            Pontos de Atenção & Recomendações
           </h3>
-          <ul className="space-y-2">
-            {indicadores.pontosAtencao.map((pa, idx) => (
-              <li key={idx} className="text-xs text-slate-700 dark:text-slate-300 flex items-start gap-2 bg-amber-50/50 dark:bg-amber-950/20 p-2.5 rounded-lg border border-amber-100 dark:border-amber-900/40">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 mt-1.5" />
-                <span>{pa}</span>
-              </li>
-            ))}
-          </ul>
+          {indicadores.pontosAtencao.length === 0 ? (
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Nenhum alerta técnico identificado com os dados atuais.
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100 dark:divide-zinc-800/80">
+              {indicadores.pontosAtencao.map((pa, idx) => (
+                <li key={idx} className="py-2 first:pt-0 last:pb-0 text-xs text-slate-700 dark:text-zinc-300 leading-relaxed">
+                  {pa}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </div>

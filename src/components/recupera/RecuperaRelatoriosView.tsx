@@ -32,7 +32,12 @@ interface Props {
   cronogramas: AtividadeCronograma[];
 }
 
-const RELATORIOS_DISPONIVEIS: { id: TipoRelatorioPdf; nome: string; desc: string; icon: any }[] = [
+const RELATORIOS_DISPONIVEIS: {
+  id: TipoRelatorioPdf;
+  nome: string;
+  desc: string;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
   {
     id: 'diagnostico_inicial',
     nome: '1. Diagnóstico Técnico Inicial de Degradação',
@@ -135,6 +140,8 @@ export const RecuperaRelatoriosView: React.FC<Props> = ({
     };
   }, []);
 
+  const modeloAtivo = RELATORIOS_DISPONIVEIS.find(r => r.id === relatorioSelecionado);
+
   const handleEmitirPdf = () => {
     setGerando(true);
     setErroPdf(null);
@@ -167,18 +174,18 @@ export const RecuperaRelatoriosView: React.FC<Props> = ({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+    <div className="space-y-4">
+      <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 border border-slate-200/80 dark:border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="min-w-0">
+          <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
             Fase 6 • Emissão de Relatórios & Laudos Oficiais
           </span>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <FileText className="w-5 h-5 text-emerald-600" />
-            <span>Central de Emissão de Documentos PDF: {areaAtiva.nomeTalhao}</span>
+          <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-2 mt-0.5">
+            <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span className="truncate">Central de Emissão de Documentos PDF: {areaAtiva.nomeTalhao}</span>
           </h2>
-          <p className="text-xs text-slate-500">
-            Geração local 100% offline de 13 modelos profissionais com cabeçalho oficial, memória de cálculo e ART
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+            Geração local offline de 13 modelos profissionais com cabeçalho oficial, memória de cálculo e ART
           </p>
         </div>
 
@@ -186,91 +193,104 @@ export const RecuperaRelatoriosView: React.FC<Props> = ({
           type="button"
           onClick={handleEmitirPdf}
           disabled={gerando}
-          className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow flex items-center gap-2 self-start md:self-auto disabled:opacity-50"
+          className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-lg transition flex items-center gap-1.5 self-start md:self-auto disabled:opacity-50 whitespace-nowrap shrink-0"
         >
-          <Download className="w-4 h-4" />
-          <span>{gerando ? 'Gerando Documento PDF...' : 'Baixar Relatório em PDF'}</span>
+          <Download className="w-3.5 h-3.5" />
+          <span>{gerando ? 'Gerando PDF...' : 'Baixar Relatório PDF'}</span>
         </button>
       </div>
 
       {erroPdf && (
-        <div className="p-3 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800 rounded-xl text-xs font-semibold flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+        <div className="px-3.5 py-2.5 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 rounded-xl text-xs font-medium flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
           <span>{erroPdf}</span>
         </div>
       )}
 
-      {/* Grid: 13 Modelos Disponíveis (Esquerda) e Prévia / Configuração (Direita) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Lista de Modelos (5 colunas) */}
-        <div className="lg:col-span-5 space-y-2">
+      {/* Grid: 13 Modelos e Prévia */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className="lg:col-span-5 space-y-1.5">
           {RELATORIOS_DISPONIVEIS.map(rel => {
             const Icon = rel.icon;
             const isSelected = relatorioSelecionado === rel.id;
             return (
-              <div
+              <button
                 key={rel.id}
+                type="button"
                 onClick={() => setRelatorioSelecionado(rel.id)}
-                className={`p-3.5 rounded-xl border transition cursor-pointer text-xs ${
+                className={`w-full text-left p-3 rounded-xl border transition text-xs ${
                   isSelected
-                    ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 ring-2 ring-emerald-500/20'
-                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-emerald-300'
+                    ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/30'
+                    : 'border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-emerald-300 dark:hover:border-emerald-800'
                 }`}
               >
-                <div className="flex items-center gap-2 mb-1">
-                  <Icon className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <h4 className="font-bold text-slate-900 dark:text-white truncate">{rel.nome}</h4>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <Icon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span className="font-semibold text-slate-900 dark:text-zinc-100 truncate">
+                    {rel.nome}
+                  </span>
                 </div>
-                <p className="text-[11px] text-slate-500 line-clamp-2">{rel.desc}</p>
-              </div>
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400 line-clamp-2 pl-5.5">
+                  {rel.desc}
+                </p>
+              </button>
             );
           })}
         </div>
 
-        {/* Painel de Prévia e Configurações de Emissão (7 colunas) */}
-        <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4 text-xs">
-          <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
-            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">
+        <div className="lg:col-span-7 bg-white dark:bg-zinc-900 rounded-xl p-5 border border-slate-200/80 dark:border-zinc-800 space-y-4 text-xs h-fit">
+          <div className="border-b border-slate-200/70 dark:border-zinc-800 pb-3">
+            <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
               Documento Selecionado
             </span>
-            <h3 className="text-base font-extrabold text-slate-900 dark:text-white mt-1">
-              {RELATORIOS_DISPONIVEIS.find(r => r.id === relatorioSelecionado)?.nome}
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 mt-1">
+              {modeloAtivo?.nome}
             </h3>
-            <p className="text-slate-500 mt-1">
-              {RELATORIOS_DISPONIVEIS.find(r => r.id === relatorioSelecionado)?.desc}
+            <p className="text-slate-500 dark:text-zinc-400 mt-0.5 leading-relaxed">
+              {modeloAtivo?.desc}
             </p>
           </div>
 
-          <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl space-y-2 text-[11px] text-slate-600 dark:text-slate-400">
-            <p className="font-bold text-slate-800 dark:text-slate-200">Dados Inclusos no Documento:</p>
-            <p>• Identificação completa da fazenda ({propriedade.nome}) e do produtor ({propriedade.produtorNome || 'N/I'})</p>
-            <p>• Caracterização territorial: Talhão {areaAtiva.nomeTalhao} ({areaAtiva.areaHa} ha)</p>
-            <p>• Diagnóstico e Severidade: {areaAtiva.tipoDegradacao.toUpperCase()} ({areaAtiva.grauSeveridade.toUpperCase()})</p>
-            <p>• Responsável Técnico: {propriedade.responsavelTecnico || 'Eng. Agrônomo'} (CREA: {propriedade.creaNumero || 'N/I'})</p>
+          <div className="p-3.5 bg-slate-50/70 dark:bg-zinc-950/60 rounded-lg border border-slate-200/70 dark:border-zinc-800 space-y-1.5 text-[11px] text-slate-600 dark:text-zinc-400">
+            <p className="font-semibold text-slate-800 dark:text-zinc-200">
+              Dados Inclusos no Documento:
+            </p>
+            <p>
+              • Identificação da fazenda ({propriedade.nome || 'N/I'}) e produtor ({propriedade.produtorNome || 'N/I'})
+            </p>
+            <p className="tabular-nums">
+              • Caracterização territorial: Talhão {areaAtiva.nomeTalhao} ({areaAtiva.areaHa} ha)
+            </p>
+            <p>
+              • Diagnóstico e Severidade: {areaAtiva.tipoDegradacao.replace(/_/g, ' ').toUpperCase()} ({areaAtiva.grauSeveridade.replace(/_/g, ' ').toUpperCase()})
+            </p>
+            <p>
+              • Responsável Técnico: {propriedade.responsavelTecnico || 'Eng. Agrônomo'} (CREA: {propriedade.creaNumero || 'N/I'})
+            </p>
             <p>• Memória de cálculo agronômica auditável e tabelas orçamentárias</p>
           </div>
 
           <div>
-            <label className="block font-bold text-slate-900 dark:text-white mb-1">
+            <label className="block text-[11px] font-medium text-slate-700 dark:text-zinc-300 mb-1">
               Observações e Parecer Técnico Complementar (Opcional)
             </label>
             <textarea
               value={obsPersonalizada}
               onChange={e => setObsPersonalizada(e.target.value)}
               rows={4}
-              className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white resize-none"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 resize-none"
               placeholder="Digite recomendações adicionais ou ressalvas específicas para constarem no rodapé do laudo..."
             />
           </div>
 
-          <div className="pt-2">
+          <div className="pt-1">
             <button
               type="button"
               onClick={handleEmitirPdf}
               disabled={gerando}
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition shadow flex items-center justify-center gap-2"
+              className="w-full h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-3.5 h-3.5" />
               <span>{gerando ? 'Gerando Laudo PDF...' : 'Gerar e Fazer Download do Laudo Oficial'}</span>
             </button>
           </div>

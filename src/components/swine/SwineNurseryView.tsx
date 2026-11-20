@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { Activity, Plus, CheckCircle2, X } from 'lucide-react';
+import { SwineBatch, SwineBreedLineage } from '../../types/swine';
 import {
-  Activity,
-  TrendingUp,
-  Scale,
-  Plus,
-  ArrowRight,
-  Boxes,
-  Thermometer,
-  ShieldCheck,
-  AlertTriangle,
-} from 'lucide-react';
-import {
-  SwineBatch,
-} from '../../types/swine';
+  SWINE_CARD_CLASS,
+  SWINE_INPUT_CLASS,
+  SWINE_LABEL_CLASS,
+  SWINE_PRIMARY_BTN_CLASS,
+  SWINE_SECONDARY_BTN_CLASS,
+  SWINE_SUBCARD_CLASS,
+  addDaysIsoDate,
+  formatBrDate,
+  getTodayIsoDate,
+  useEscapeClose,
+} from './swineUi';
 
 interface SwineNurseryViewProps {
   batches: SwineBatch[];
@@ -25,28 +25,50 @@ export const SwineNurseryView: React.FC<SwineNurseryViewProps> = ({
   onAddBatch,
   onUpdateBatch,
 }) => {
-  const nurseryBatches = batches.filter(b => b.stage === 'creche');
+  const nurseryBatches = useMemo(() => batches.filter(b => b.stage === 'creche'), [batches]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Form state
-  const [code, setCode] = useState(`LOTE-CR-${new Date().getFullYear()}-05`);
-  const [lineage, setLineage] = useState('Camborough (Agroceres PIC)');
-  const [shedName, setShedName] = useState('Galpão 03 - Creche Climatizada');
-  const [animalsCount, setAnimalsCount] = useState(220);
+  const [code, setCode] = useState(`LOTE-CR-${new Date().getFullYear()}-01`);
+  const [lineage, setLineage] = useState<SwineBreedLineage>('Camborough (Agroceres PIC)');
+  const [shedName, setShedName] = useState('Galpão Creche 01');
+  const [animalsCount, setAnimalsCount] = useState(200);
   const [initialWeight, setInitialWeight] = useState(6.8);
   const [targetWeight, setTargetWeight] = useState(28.0);
+  const [gmd, setGmd] = useState(440);
+  const [ca, setCa] = useState(1.25);
+
+  useEscapeClose(isModalOpen, () => setIsModalOpen(false));
+
+  const kpis = useMemo(() => {
+    const active = nurseryBatches.filter(b => b.status === 'Ativo');
+    const avgCa =
+      active.length > 0
+        ? (active.reduce((a, b) => a + b.feedConversionRatio, 0) / active.length).toFixed(2)
+        : '—';
+    const avgGmd =
+      active.length > 0
+        ? `${Math.round(active.reduce((a, b) => a + b.averageDailyGainG, 0) / active.length)} g/dia`
+        : '—';
+    const initTotal = nurseryBatches.reduce((a, b) => a + b.initialAnimalsCount, 0);
+    const mortTotal = nurseryBatches.reduce((a, b) => a + b.mortalityCount, 0);
+    const mortPct = initTotal > 0 ? `${((mortTotal / initTotal) * 100).toFixed(1)}%` : '0%';
+    return { activeCount: active.length, avgCa, avgGmd, mortPct };
+  }, [nurseryBatches]);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!code.trim()) return;
+    const today = getTodayIsoDate();
     const newBatch: SwineBatch = {
       id: `batch_cr_${Date.now()}`,
-      code: code.trim(),
+      code: code.trim().toUpperCase(),
       stage: 'creche',
-      lineage: lineage as any,
-      shedId: 'shed_03',
-      shedName,
-      startDate: new Date().toISOString().split('T')[0],
-      expectedEndDate: new Date(Date.now() + 42 * 86400000).toISOString().split('T')[0],
+      lineage,
+      shedId: `shed_${Date.now()}`,
+      shedName: shedName.trim() || 'Galpão Creche',
+      startDate: today,
+      expectedEndDate: addDaysIsoDate(today, 42),
       initialAnimalsCount: Number(animalsCount),
       currentAnimalsCount: Number(animalsCount),
       mortalityCount: 0,
@@ -55,9 +77,9 @@ export const SwineNurseryView: React.FC<SwineNurseryViewProps> = ({
       targetWeightKg: Number(targetWeight),
       totalFeedConsumedKg: 0,
       totalWaterConsumedL: 0,
-      feedConversionRatio: 1.25,
-      averageDailyGainG: 440,
-      dailyFeedCostPerAnimal: 1.80,
+      feedConversionRatio: Number(ca),
+      averageDailyGainG: Number(gmd),
+      dailyFeedCostPerAnimal: 1.8,
       status: 'Ativo',
     };
 
@@ -65,199 +87,309 @@ export const SwineNurseryView: React.FC<SwineNurseryViewProps> = ({
     setIsModalOpen(false);
   };
 
+  const toggleBatchStatus = (batch: SwineBatch) => {
+    onUpdateBatch({
+      ...batch,
+      status: batch.status === 'Ativo' ? 'Fechado' : 'Ativo',
+    });
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className={`${SWINE_CARD_CLASS} p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
         <div>
-          <h2 className="text-xl font-black text-gray-900 flex items-center gap-2">
-            <Activity className="w-5 h-5 text-indigo-600" />
+          <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+            <Activity className="w-4 h-4 text-sky-600 dark:text-sky-400" />
             <span>Creche Suinícola Climatizada</span>
           </h2>
-          <p className="text-xs text-gray-500">
-            Acompanhamento zootécnico de lotes pós-desmame (6 a 28 kg), conversão alimentar e ganho de peso diário.
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Lotes pós-desmame (6 a 28 kg), conversão alimentar, GMD e previsão de saída para crescimento.
           </p>
         </div>
 
         <button
+          type="button"
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
+          className={`${SWINE_PRIMARY_BTN_CLASS} shrink-0`}
         >
-          <Plus className="w-4 h-4" />
-          <span>Alojamento de Novo Lote de Creche</span>
+          <Plus className="w-3.5 h-3.5" />
+          <span>Alojar Lote de Creche</span>
         </button>
       </div>
 
-      {/* Nursery KPI Cards */}
+      {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-4 bg-white rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs text-gray-500 font-semibold block">Lotes Ativos</span>
-          <div className="text-2xl font-black text-indigo-600 mt-1">{(nurseryBatches || []).length} lotes</div>
-          <span className="text-[11px] text-gray-500 font-medium">em desenvolvimento</span>
+        <div className={`${SWINE_CARD_CLASS} p-3.5`}>
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+            Lotes Ativos
+          </span>
+          <div className="text-xl font-bold text-sky-600 dark:text-sky-400 mt-0.5 tabular-nums">
+            {kpis.activeCount}
+          </div>
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400">
+            {nurseryBatches.length} total na creche
+          </span>
         </div>
-        <div className="p-4 bg-white rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs text-gray-500 font-semibold block">Conversão Alimentar (CA)</span>
-          <div className="text-2xl font-black text-emerald-600 mt-1">1.25</div>
-          <span className="text-[11px] text-emerald-600 font-medium">Meta &lt; 1.35 kg/kg</span>
+
+        <div className={`${SWINE_CARD_CLASS} p-3.5`}>
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+            Conversão Alimentar (CA)
+          </span>
+          <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 tabular-nums">
+            {kpis.avgCa}
+          </div>
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400">Meta &lt; 1,35 kg/kg</span>
         </div>
-        <div className="p-4 bg-white rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs text-gray-500 font-semibold block">Ganho Médio Diário</span>
-          <div className="text-2xl font-black text-gray-900 mt-1">440 g/dia</div>
-          <span className="text-[11px] text-gray-500 font-medium">GMD Creche</span>
+
+        <div className={`${SWINE_CARD_CLASS} p-3.5`}>
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+            GMD Médio Creche
+          </span>
+          <div className="text-xl font-bold text-slate-900 dark:text-zinc-100 mt-0.5 tabular-nums">
+            {kpis.avgGmd}
+          </div>
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400">Meta &gt; 420 g/dia</span>
         </div>
-        <div className="p-4 bg-white rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs text-gray-500 font-semibold block">Mortalidade Fase</span>
-          <div className="text-2xl font-black text-emerald-600 mt-1">1.4%</div>
-          <span className="text-[11px] text-emerald-600 font-medium">Padrão Ouro (&lt; 2.0%)</span>
+
+        <div className={`${SWINE_CARD_CLASS} p-3.5`}>
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+            Mortalidade Fase
+          </span>
+          <div className="text-xl font-bold text-slate-900 dark:text-zinc-100 mt-0.5 tabular-nums">
+            {kpis.mortPct}
+          </div>
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400">Meta &lt; 2,0%</span>
         </div>
       </div>
 
-      {/* Batches Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {nurseryBatches.map(batch => (
-          <div
-            key={batch.id}
-            className="bg-white rounded-2xl border border-gray-200 shadow-xs p-5 space-y-4 hover:border-indigo-300 transition-all"
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-base font-black text-gray-900">{batch.code}</h3>
-                <span className="text-xs text-gray-500 block">
-                  {batch.lineage} • {batch.shedName}
+      {/* Batches */}
+      {nurseryBatches.length === 0 ? (
+        <div className={`${SWINE_CARD_CLASS} p-10 text-center space-y-2`}>
+          <Activity className="w-8 h-8 text-slate-400 dark:text-zinc-500 mx-auto" />
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-zinc-200">
+            Nenhum lote na creche
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Cadastre um lote pós-desmame para acompanhar GMD, CA e data prevista de transferência.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {nurseryBatches.map(batch => (
+            <div key={batch.id} className={`${SWINE_CARD_CLASS} p-4 space-y-3`}>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                    {batch.code}
+                  </h3>
+                  <span className="text-xs text-slate-500 dark:text-zinc-400">
+                    {batch.lineage} · {batch.shedName}
+                  </span>
+                </div>
+                <span
+                  className={`text-[10px] font-medium px-2 py-0.5 rounded-md border shrink-0 ${
+                    batch.status === 'Ativo'
+                      ? 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800'
+                      : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border-slate-200 dark:border-zinc-700'
+                  }`}
+                >
+                  {batch.status}
                 </span>
               </div>
-              <span className="text-[10px] font-bold px-2.5 py-0.5 bg-indigo-100 text-indigo-800 rounded-full">
-                {batch.status}
-              </span>
-            </div>
 
-            <div className="grid grid-cols-4 gap-2 text-center text-xs">
-              <div className="p-2 bg-gray-50 rounded-xl border border-gray-100">
-                <span className="text-[10px] text-gray-500 block">Animais</span>
-                <span className="font-bold text-gray-900">{batch.currentAnimalsCount}</span>
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <div className={`${SWINE_SUBCARD_CLASS} p-2`}>
+                  <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Animais</span>
+                  <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100 tabular-nums">
+                    {batch.currentAnimalsCount}
+                  </span>
+                </div>
+                <div className={`${SWINE_SUBCARD_CLASS} p-2`}>
+                  <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Peso Méd.</span>
+                  <span className="text-xs font-semibold text-sky-600 dark:text-sky-400 tabular-nums">
+                    {batch.currentAvgWeightKg} kg
+                  </span>
+                </div>
+                <div className={`${SWINE_SUBCARD_CLASS} p-2`}>
+                  <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">GMD</span>
+                  <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                    {batch.averageDailyGainG} g
+                  </span>
+                </div>
+                <div className={`${SWINE_SUBCARD_CLASS} p-2`}>
+                  <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">CA</span>
+                  <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100 tabular-nums">
+                    {batch.feedConversionRatio}
+                  </span>
+                </div>
               </div>
-              <div className="p-2 bg-gray-50 rounded-xl border border-gray-100">
-                <span className="text-[10px] text-gray-500 block">Peso Méd.</span>
-                <span className="font-bold text-indigo-700">{batch.currentAvgWeightKg} kg</span>
-              </div>
-              <div className="p-2 bg-gray-50 rounded-xl border border-gray-100">
-                <span className="text-[10px] text-gray-500 block">GMD</span>
-                <span className="font-bold text-emerald-700">{batch.averageDailyGainG} g</span>
-              </div>
-              <div className="p-2 bg-gray-50 rounded-xl border border-gray-100">
-                <span className="text-[10px] text-gray-500 block">CA</span>
-                <span className="font-black text-gray-900">{batch.feedConversionRatio}</span>
-              </div>
-            </div>
 
-            <div className="p-3 bg-gray-50 rounded-xl text-xs space-y-1 text-gray-600">
-              <div className="flex justify-between">
-                <span>Início do Lote:</span>
-                <span className="font-bold text-gray-800">{batch.startDate}</span>
+              <div className={`${SWINE_SUBCARD_CLASS} p-2.5 text-xs space-y-1 text-slate-600 dark:text-zinc-400`}>
+                <div className="flex justify-between">
+                  <span>Início do lote</span>
+                  <span className="font-medium text-slate-900 dark:text-zinc-100 tabular-nums">
+                    {formatBrDate(batch.startDate)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Previsão saída ({batch.targetWeightKg} kg)</span>
+                  <span className="font-medium text-sky-600 dark:text-sky-400 tabular-nums">
+                    {formatBrDate(batch.expectedEndDate)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Consumo acumulado ração</span>
+                  <span className="font-medium text-slate-900 dark:text-zinc-100 tabular-nums">
+                    {batch.totalFeedConsumedKg} kg
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span>Previsão de Saída para Crescimento:</span>
-                <span className="font-bold text-indigo-700">{batch.expectedEndDate}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Consumo Total de Ração:</span>
-                <span className="font-bold text-gray-900">{batch.totalFeedConsumedKg} kg</span>
+
+              <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => toggleBatchStatus(batch)}
+                  className={SWINE_SECONDARY_BTN_CLASS}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>{batch.status === 'Ativo' ? 'Encerrar Lote' : 'Reativar Lote'}</span>
+                </button>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="text-base font-black text-gray-900">Alojamento de Lote de Creche</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400">✕</button>
+        <div
+          className="fixed inset-0 bg-zinc-950/60 z-50 flex items-center justify-center p-4"
+          onClick={() => setIsModalOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl max-w-lg w-full p-5 space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-3">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Alojamento de Lote de Creche
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
             <form onSubmit={handleSave} className="space-y-3">
               <div>
-                <label className="text-xs font-bold text-gray-700 block mb-1">Código do Lote *</label>
+                <label className={SWINE_LABEL_CLASS}>Código do Lote *</label>
                 <input
                   type="text"
                   required
                   value={code}
                   onChange={e => setCode(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs"
+                  className={SWINE_INPUT_CLASS}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">Linhagem</label>
+                  <label className={SWINE_LABEL_CLASS}>Linhagem</label>
                   <select
                     value={lineage}
-                    onChange={e => setLineage(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs"
+                    onChange={e => setLineage(e.target.value as SwineBreedLineage)}
+                    className={SWINE_INPUT_CLASS}
                   >
                     <option value="Camborough (Agroceres PIC)">Camborough (PIC)</option>
-                    <option value="Topigs Norsvin (TN70)">Topigs Norsvin</option>
+                    <option value="Topigs Norsvin (TN70)">Topigs Norsvin (TN70)</option>
                     <option value="DanBred">DanBred</option>
                     <option value="Landrace">Landrace</option>
+                    <option value="Large White">Large White</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">Galpão de Creche</label>
+                  <label className={SWINE_LABEL_CLASS}>Galpão de Creche</label>
                   <input
                     type="text"
                     value={shedName}
                     onChange={e => setShedName(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs"
+                    className={SWINE_INPUT_CLASS}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-2.5">
                 <div>
-                  <label className="text-[11px] font-bold text-gray-700 block mb-1">Quantidade</label>
+                  <label className={SWINE_LABEL_CLASS}>Quantidade</label>
                   <input
                     type="number"
+                    min="1"
                     value={animalsCount}
                     onChange={e => setAnimalsCount(Number(e.target.value))}
-                    className="w-full px-2 py-1.5 bg-gray-50 border rounded-xl text-xs"
+                    className={SWINE_INPUT_CLASS}
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-gray-700 block mb-1">Peso Entrada (kg)</label>
+                  <label className={SWINE_LABEL_CLASS}>Peso Entrada (kg)</label>
                   <input
                     type="number"
                     step="0.1"
+                    min="0"
                     value={initialWeight}
                     onChange={e => setInitialWeight(Number(e.target.value))}
-                    className="w-full px-2 py-1.5 bg-gray-50 border rounded-xl text-xs"
+                    className={SWINE_INPUT_CLASS}
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-gray-700 block mb-1">Peso Meta (kg)</label>
+                  <label className={SWINE_LABEL_CLASS}>Peso Meta (kg)</label>
                   <input
                     type="number"
                     step="0.5"
+                    min="0"
                     value={targetWeight}
                     onChange={e => setTargetWeight(Number(e.target.value))}
-                    className="w-full px-2 py-1.5 bg-gray-50 border rounded-xl text-xs"
+                    className={SWINE_INPUT_CLASS}
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={SWINE_LABEL_CLASS}>GMD Estimado (g/dia)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={gmd}
+                    onChange={e => setGmd(Number(e.target.value))}
+                    className={SWINE_INPUT_CLASS}
+                  />
+                </div>
+                <div>
+                  <label className={SWINE_LABEL_CLASS}>CA Estimada (kg/kg)</label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="0"
+                    value={ca}
+                    onChange={e => setCa(Number(e.target.value))}
+                    className={SWINE_INPUT_CLASS}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-gray-100 text-xs font-bold rounded-xl"
+                  className={SWINE_SECONDARY_BTN_CLASS}
                 >
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-pink-600 text-white text-xs font-bold rounded-xl shadow-xs"
-                >
+                <button type="submit" className={SWINE_PRIMARY_BTN_CLASS}>
                   Salvar Lote
                 </button>
               </div>

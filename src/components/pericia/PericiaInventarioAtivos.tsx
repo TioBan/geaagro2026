@@ -112,11 +112,17 @@ export const PericiaInventarioAtivos: React.FC<PericiaInventarioAtivosProps> = (
   };
 
   const [formData, setFormData] = useState<Partial<PericiaAtivoInventario>>(initialFormState);
+  const [localNotice, setLocalNotice] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [confirmLoadDemo, setConfirmLoadDemo] = useState(false);
 
   // Helper notification
   const notify = (msg: string) => {
     if (onShowNotification) {
       onShowNotification(msg);
+    } else {
+      setLocalNotice(msg);
+      setTimeout(() => setLocalNotice((prev) => (prev === msg ? null : prev)), 4000);
     }
   };
 
@@ -260,10 +266,15 @@ export const PericiaInventarioAtivos: React.FC<PericiaInventarioAtivosProps> = (
   const handleDelete = (id: string) => {
     const target = inventario.find(a => a.id === id);
     if (!target) return;
-    if (confirm(`Confirma a exclusão do ativo "${target.marca} ${target.modelo}" (Série: ${target.numeroSerie})?`)) {
-      const updated = inventario.filter(a => a.id !== id);
-      saveInventario(updated, 'Ativo removido do inventário.');
+    if (pendingDeleteId !== id) {
+      setPendingDeleteId(id);
+      notify(`Clique novamente em excluir para remover "${target.marca} ${target.modelo}" (Série: ${target.numeroSerie}).`);
+      setTimeout(() => setPendingDeleteId((prev) => (prev === id ? null : prev)), 4000);
+      return;
     }
+    const updated = inventario.filter(a => a.id !== id);
+    setPendingDeleteId(null);
+    saveInventario(updated, 'Ativo removido do inventário.');
   };
 
   const handleToggleLaudo = (id: string) => {
@@ -281,12 +292,13 @@ export const PericiaInventarioAtivos: React.FC<PericiaInventarioAtivosProps> = (
   };
 
   const handleLoadDemoDataset = () => {
-    if (
-      inventario.length > 0 &&
-      !confirm('Deseja carregar o inventário de ativos padrão de demonstração? Isso substituirá a lista atual.')
-    ) {
+    if (inventario.length > 0 && !confirmLoadDemo) {
+      setConfirmLoadDemo(true);
+      notify('Clique novamente em "Exemplo da Fazenda" para substituir a lista atual pelos ativos padrão.');
+      setTimeout(() => setConfirmLoadDemo(false), 4000);
       return;
     }
+    setConfirmLoadDemo(false);
     const defaults = createDefaultInventarioAtivos();
     saveInventario(defaults, `${defaults.length} ativos padrão carregados com sucesso!`);
   };
@@ -311,11 +323,11 @@ export const PericiaInventarioAtivos: React.FC<PericiaInventarioAtivosProps> = (
   const handleSaveModal = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.marca?.trim() || !formData.modelo?.trim()) {
-      alert('Por favor, informe a marca e o modelo do ativo.');
+      notify('Informe a marca e o modelo do ativo.');
       return;
     }
     if (!formData.numeroSerie?.trim()) {
-      alert('Por favor, informe o número de série do ativo (requisito do inventário).');
+      notify('Informe o número de série do ativo (requisito do inventário).');
       return;
     }
 
@@ -360,7 +372,7 @@ export const PericiaInventarioAtivos: React.FC<PericiaInventarioAtivosProps> = (
   // Export CSV
   const handleExportCsv = () => {
     if (inventario.length === 0) {
-      alert('Nenhum ativo para exportar.');
+      notify('Nenhum ativo disponível para exportar.');
       return;
     }
     const headers = [
@@ -479,116 +491,137 @@ export const PericiaInventarioAtivos: React.FC<PericiaInventarioAtivosProps> = (
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white rounded-2xl p-6 shadow-xl border border-emerald-800/40">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/30">
+    <div className="space-y-5">
+      {localNotice && (
+        <div className="px-3.5 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs font-medium flex items-center justify-between gap-2">
+          <span>{localNotice}</span>
+          <button
+            type="button"
+            onClick={() => setLocalNotice(null)}
+            className="text-emerald-600 dark:text-emerald-400 hover:underline text-[11px] cursor-pointer"
+          >
+            Fechar
+          </button>
+        </div>
+      )}
+
+      {/* Header & KPI Strip */}
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-slate-200/80 dark:border-zinc-800 overflow-hidden">
+        <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200/80 dark:border-zinc-800">
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
               <Layers className="w-3.5 h-3.5" />
-              Inventário Geral de Ativos Rurais
+              <span>Inventário Geral de Ativos Rurais</span>
             </div>
-            <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
-              Inventário de Ativos: Máquinas, Equipamentos e Veículos
+            <h2 className="text-base sm:text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+              Inventário de Máquinas, Equipamentos e Veículos
             </h2>
-            <p className="text-sm text-emerald-200/90 max-w-3xl">
-              Levantamento pericial estruturado com categorização, rastreamento por{' '}
-              <strong className="text-white">número de série</strong>, classificação técnica do{' '}
-              <strong className="text-white">estado de conservação</strong> e apuração do{' '}
-              <strong className="text-white">valor de mercado atualizado</strong> para fundamentação do laudo.
+            <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-3xl">
+              Levantamento estruturado com número de série, estado de conservação e valor de mercado atualizado para o laudo.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
+              type="button"
               onClick={handleLoadDemoDataset}
-              className="px-3.5 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition flex items-center gap-1.5 border border-white/20 shadow-sm"
-              title="Carregar inventário de demonstração com marcas de ponta do agro"
+              className="h-8 px-3 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-medium transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-zinc-700 cursor-pointer"
+              title="Carregar inventário de demonstração"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              Exemplo da Fazenda
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>{confirmLoadDemo ? 'Confirmar Substituição' : 'Exemplo da Fazenda'}</span>
             </button>
             <button
+              type="button"
               onClick={handleExportCsv}
-              className="px-3.5 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition flex items-center gap-1.5 border border-white/20 shadow-sm"
+              className="h-8 px-3 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-medium transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-zinc-700 cursor-pointer"
               title="Exportar planilha completa em CSV"
             >
-              <Download className="w-3.5 h-3.5 text-teal-300" />
-              Exportar CSV
+              <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Exportar CSV</span>
             </button>
             <button
+              type="button"
               onClick={handleOpenAddModal}
-              className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold transition flex items-center gap-2 shadow-lg shadow-emerald-500/30"
+              className="h-8 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
-              Novo Ativo
+              <Plus className="w-3.5 h-3.5" />
+              <span>Novo Ativo</span>
             </button>
           </div>
         </div>
 
-        {/* Top KPIs */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-6 pt-5 border-t border-emerald-800/60">
-          <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-            <span className="text-[11px] text-emerald-200 uppercase font-medium tracking-wider block">
+        {/* Hairline KPI Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80 dark:divide-zinc-800 bg-slate-50/40 dark:bg-zinc-950/30">
+          <div className="p-3.5">
+            <span className="text-[10px] text-slate-500 dark:text-zinc-400 uppercase font-semibold tracking-wider block">
               Total de Ativos
             </span>
-            <div className="text-2xl font-black text-white mt-0.5">{stats.total}</div>
-            <span className="text-[10px] text-emerald-300/80">
+            <div className="text-lg font-bold text-slate-900 dark:text-white mt-0.5 tabular-nums">
+              {stats.total}
+            </div>
+            <span className="text-[10px] text-slate-500 dark:text-zinc-400">
               {stats.operacionais} operacionais • {stats.emManutencao} oficina
             </span>
           </div>
 
-          <div className="bg-white/5 rounded-xl p-3 border border-white/10 col-span-2 sm:col-span-1 lg:col-span-2">
-            <span className="text-[11px] text-emerald-200 uppercase font-medium tracking-wider block">
+          <div className="p-3.5 col-span-2 sm:col-span-1 lg:col-span-2">
+            <span className="text-[10px] text-emerald-700 dark:text-emerald-400 uppercase font-semibold tracking-wider block">
               Valor de Mercado Atualizado
             </span>
-            <div className="text-2xl font-black text-emerald-300 mt-0.5">
+            <div className="text-lg font-bold text-emerald-700 dark:text-emerald-400 mt-0.5 tabular-nums">
               R$ {stats.totalValorMercado.toLocaleString('pt-BR')}
             </div>
-            <span className="text-[10px] text-emerald-300/80">
-              Valor Novo Reposição: R$ {stats.totalValorNovo.toLocaleString('pt-BR')} (-{stats.depreciacaoPercent}%)
+            <span className="text-[10px] text-slate-500 dark:text-zinc-400 tabular-nums">
+              Valor Novo: R$ {stats.totalValorNovo.toLocaleString('pt-BR')} (-{stats.depreciacaoPercent}%)
             </span>
           </div>
 
-          <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-            <div className="flex items-center gap-1.5 text-amber-300">
-              <Tractor className="w-3.5 h-3.5" />
-              <span className="text-[11px] uppercase font-medium tracking-wider">Máquinas ({stats.maquinasCount})</span>
+          <div className="p-3.5">
+            <div className="flex items-center gap-1 text-slate-600 dark:text-zinc-300">
+              <Tractor className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <span className="text-[10px] uppercase font-semibold tracking-wider">
+                Máquinas ({stats.maquinasCount})
+              </span>
             </div>
-            <div className="text-lg font-bold text-white mt-1">
+            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1 tabular-nums">
               R$ {stats.valorMaquinas.toLocaleString('pt-BR')}
             </div>
-            <span className="text-[10px] text-slate-300">
+            <span className="text-[10px] text-slate-500 dark:text-zinc-400 tabular-nums">
               {stats.totalValorMercado > 0
                 ? `${Math.round((stats.valorMaquinas / stats.totalValorMercado) * 100)}% do patrimônio`
                 : '0%'}
             </span>
           </div>
 
-          <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-            <div className="flex items-center gap-1.5 text-emerald-300">
-              <Wrench className="w-3.5 h-3.5" />
-              <span className="text-[11px] uppercase font-medium tracking-wider">Equipamentos ({stats.equipamentosCount})</span>
+          <div className="p-3.5">
+            <div className="flex items-center gap-1 text-slate-600 dark:text-zinc-300">
+              <Wrench className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-[10px] uppercase font-semibold tracking-wider">
+                Equipamentos ({stats.equipamentosCount})
+              </span>
             </div>
-            <div className="text-lg font-bold text-white mt-1">
+            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1 tabular-nums">
               R$ {stats.valorEquipamentos.toLocaleString('pt-BR')}
             </div>
-            <span className="text-[10px] text-slate-300">
+            <span className="text-[10px] text-slate-500 dark:text-zinc-400 tabular-nums">
               {stats.totalValorMercado > 0
                 ? `${Math.round((stats.valorEquipamentos / stats.totalValorMercado) * 100)}% do patrimônio`
                 : '0%'}
             </span>
           </div>
 
-          <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-            <div className="flex items-center gap-1.5 text-indigo-300">
-              <Truck className="w-3.5 h-3.5" />
-              <span className="text-[11px] uppercase font-medium tracking-wider">Veículos ({stats.veiculosCount})</span>
+          <div className="p-3.5">
+            <div className="flex items-center gap-1 text-slate-600 dark:text-zinc-300">
+              <Truck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span className="text-[10px] uppercase font-semibold tracking-wider">
+                Veículos ({stats.veiculosCount})
+              </span>
             </div>
-            <div className="text-lg font-bold text-white mt-1">
+            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1 tabular-nums">
               R$ {stats.valorVeiculos.toLocaleString('pt-BR')}
             </div>
-            <span className="text-[10px] text-slate-300">
+            <span className="text-[10px] text-slate-500 dark:text-zinc-400 tabular-nums">
               {stats.totalValorMercado > 0
                 ? `${Math.round((stats.valorVeiculos / stats.totalValorMercado) * 100)}% do patrimônio`
                 : '0%'}

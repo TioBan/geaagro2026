@@ -33,6 +33,7 @@ export const AvaliacaoBenfeitoriasTab: React.FC<AvaliacaoBenfeitoriasTabProps> =
 
   // New item form state
   const [showForm, setShowForm] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<PericiaAvaliacaoBenfeitoria>>({
     tipo: 'nao_reprodutiva',
     categoria: 'Edificações / Casas / Galpões',
@@ -92,7 +93,7 @@ export const AvaliacaoBenfeitoriasTab: React.FC<AvaliacaoBenfeitoriasTabProps> =
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.descricao?.trim()) {
-      alert('Informe a descrição da benfeitoria.');
+      onShowNotification('Informe a descrição da benfeitoria.');
       return;
     }
 
@@ -133,14 +134,19 @@ export const AvaliacaoBenfeitoriasTab: React.FC<AvaliacaoBenfeitoriasTabProps> =
   };
 
   const handleDeleteItem = (id: string) => {
-    if (confirm('Deseja excluir esta benfeitoria da avaliação?')) {
-      const updated = items.filter(item => item.id !== id);
-      onUpdateAvaliacao({
-        ...avaliacao,
-        benfeitorias: updated,
-      });
-      onShowNotification('Benfeitoria removida.');
+    if (pendingDeleteId !== id) {
+      setPendingDeleteId(id);
+      onShowNotification('Clique novamente em excluir para confirmar a remoção da benfeitoria.');
+      setTimeout(() => setPendingDeleteId((prev) => (prev === id ? null : prev)), 4000);
+      return;
     }
+    const updated = items.filter(item => item.id !== id);
+    onUpdateAvaliacao({
+      ...avaliacao,
+      benfeitorias: updated,
+    });
+    setPendingDeleteId(null);
+    onShowNotification('Benfeitoria removida.');
   };
 
   const handleExportCSV = () => {

@@ -108,6 +108,11 @@ import {
   UserProfileId,
 } from '../utils/userProfilesStorage';
 import { usePWAInstall } from '../hooks/usePWAInstall';
+import {
+  ThemeMode,
+  getSavedThemeMode,
+  setSystemThemeMode,
+} from '../utils/systemPreferences';
 
 const UserProfileCustomizationModal = lazyWithRetry(() =>
   import('./common/UserProfileCustomizationModal').then(m => ({ default: m.UserProfileCustomizationModal }))
@@ -143,6 +148,8 @@ interface NavbarProps {
   setSelectedFarmId: (id: string) => void;
   isDarkMode: boolean;
   setIsDarkMode: (val: boolean | ((prev: boolean) => boolean)) => void;
+  themeMode?: ThemeMode;
+  onChangeThemeMode?: (mode: ThemeMode) => void;
   isMobileMenuOpen: boolean;
   setIsMobileMenuOpen: (val: boolean | ((prev: boolean) => boolean)) => void;
   isSidebarCollapsed?: boolean;
@@ -679,16 +686,14 @@ const NAV_TECNICO: NavItem[] = [
       label: 'Bovinocultura (Pecuária)',
       icon: BovinoIcon,
       subItems: [
-        { id: 'dashboard', label: 'Dashboard Pecuário', icon: LayoutGrid },
-        { id: 'corte', label: 'Pecuária de Corte (GMD)', icon: Beef },
-        { id: 'leite', label: 'Pecuária de Leite & Tanque', icon: Droplets },
-        { id: 'reproducao', label: 'Reprodução, IATF & TE', icon: Heart },
-        { id: 'rebanho', label: 'Manejo do Rebanho & Brincos', icon: ShieldCheck },
-        { id: 'nutricao', label: 'Nutrição & Dieta Total', icon: Wheat },
+        { id: 'dashboard', label: 'Visão Geral Pecuária', icon: LayoutGrid },
+        { id: 'rebanho', label: 'Rebanho & Gêmeo Digital', icon: ShieldCheck },
+        { id: 'corte', label: 'Corte & Pesagens (GMD)', icon: Beef },
+        { id: 'leite', label: 'Leite & Controle Leiteiro', icon: Droplets },
+        { id: 'reproducao', label: 'Reprodução & IATF', icon: Heart },
+        { id: 'sanidade', label: 'Sanidade & Vacinações', icon: Syringe },
         { id: 'pastagens', label: 'Pastagens & Piquetes', icon: Leaf },
-        { id: 'sanidade', label: 'Sanidade, Vacinas & Parasitas', icon: Syringe },
-        { id: 'guia_doencas', label: 'Guia de Enfermidades', icon: BookOpen },
-        { id: 'relatorios', label: 'Relatórios Zootécnicos', icon: FileText },
+        { id: 'ispa', label: 'Simulador ISPA', icon: Activity },
       ],
     },
     {
@@ -696,13 +701,14 @@ const NAV_TECNICO: NavItem[] = [
       label: 'Nutrição Animal',
       icon: Wheat,
       subItems: [
-        { id: 'dashboard', label: 'Dashboard Nutricional', icon: LayoutGrid },
-        { id: 'formulacao', label: 'Formulação de Rações (Mínimo Custo)', icon: Calculator },
-        { id: 'ingredientes', label: 'Banco de Ingredientes & BROM', icon: Package },
-        { id: 'premistura', label: 'Misturas, Premix & Aditivos', icon: FlaskConical },
-        { id: 'dietas', label: 'Simulador de Dieta Total', icon: Sparkles },
-        { id: 'custos', label: 'Custos & Matéria-Prima', icon: DollarSign },
-        { id: 'laudo', label: 'Laudo Nutricional Oficial', icon: FileText },
+        { id: 'dashboard', label: 'Visão Geral Nutricional', icon: LayoutGrid },
+        { id: 'formulador', label: 'Formulador (Mínimo Custo)', icon: Calculator },
+        { id: 'animais', label: 'Lotes & Perfis Animais', icon: Users },
+        { id: 'alimentos', label: 'Banco de Ingredientes', icon: Package },
+        { id: 'custos', label: 'Custos & Margem IOFC', icon: DollarSign },
+        { id: 'cenarios', label: 'Simulador de Cenários', icon: Sparkles },
+        { id: 'forragens', label: 'Forragens & Estoque', icon: Wheat },
+        { id: 'gemeo_digital', label: 'Gêmeo Digital & Campo', icon: Activity },
       ],
     },
     {
@@ -981,30 +987,30 @@ const NavItemRow: React.FC<NavItemRowProps> = React.memo(({
     <div className="space-y-0.5 relative">
       {/* Main Module Button */}
       <div
-        className={`group w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs sm:text-sm transition-all text-left cursor-pointer ${
+        className={`group w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left cursor-pointer ${
           isActive
-            ? 'bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 font-bold border-l-3 border-emerald-600 dark:border-emerald-400 shadow-2xs'
-            : 'text-slate-700 dark:text-zinc-300 hover:bg-slate-100/80 dark:hover:bg-zinc-900/80 hover:text-slate-900 dark:hover:text-white'
+            ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 font-semibold'
+            : 'text-slate-700 dark:text-zinc-300 font-medium hover:bg-slate-100/80 dark:hover:bg-zinc-900 hover:text-slate-900 dark:hover:text-zinc-100'
         }`}
         onClick={() => {
           setIsTooltipOpen(false);
           onParentClick(item);
         }}
       >
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           {/* Module Icon Container with Interactive Tooltip Trigger on Hover */}
           <div
             ref={iconTriggerRef}
             onMouseEnter={handleIconMouseEnter}
             onMouseLeave={handleIconMouseLeave}
-            className="p-1 -m-1 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-950/80 hover:scale-110 transition-all shrink-0 cursor-help flex items-center justify-center"
+            className="p-0.5 -m-0.5 rounded hover:bg-emerald-100/80 dark:hover:bg-emerald-950/80 transition-colors shrink-0 cursor-help flex items-center justify-center"
             title={`Guia rápido: ${item.label}`}
           >
             <Icon
-              className={`w-4 h-4 shrink-0 transition-colors ${
+              className={`w-3.5 h-3.5 shrink-0 transition-colors ${
                 isActive
                   ? 'text-emerald-600 dark:text-emerald-400'
-                  : 'text-slate-500 dark:text-zinc-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400'
+                  : 'text-slate-400 dark:text-zinc-500 group-hover:text-slate-700 dark:group-hover:text-zinc-200'
               }`}
             />
           </div>
@@ -1014,14 +1020,14 @@ const NavItemRow: React.FC<NavItemRowProps> = React.memo(({
 
         <div className="flex items-center gap-1 shrink-0">
           {item.externalUrl && (
-            <ExternalLink className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 group-hover:text-emerald-600 dark:group-hover:text-emerald-400" />
+            <ExternalLink className="w-3 h-3 text-slate-400 dark:text-zinc-500" />
           )}
 
           {hasSubItems && !item.externalUrl && (
             <button
               type="button"
               onClick={e => onToggleExpand(item.id, e)}
-              className={`p-1 rounded-md transition-transform duration-200 text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-200 cursor-pointer ${
+              className={`p-0.5 rounded transition-transform duration-150 text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-200 cursor-pointer ${
                 isExpanded ? 'rotate-90 text-emerald-600 dark:text-emerald-400' : ''
               }`}
               aria-label={`Expandir funcionalidades de ${item.label}`}
@@ -1053,7 +1059,7 @@ const NavItemRow: React.FC<NavItemRowProps> = React.memo(({
 
       {/* Sub-menu Items (Expanded Accordion) */}
       {hasSubItems && isExpanded && (
-        <div className="ml-3.5 pl-3 border-l-2 border-slate-200 dark:border-zinc-800 space-y-0.5 pt-0.5 pb-1">
+        <div className="ml-3.5 pl-2.5 border-l border-slate-200 dark:border-zinc-800 space-y-0.5 py-0.5">
           {item.subItems!.map(sub => {
             const SubIcon = sub.icon || Target;
             const isSubActive = isActive && activeSubTab === sub.id;
@@ -1061,23 +1067,28 @@ const NavItemRow: React.FC<NavItemRowProps> = React.memo(({
             return (
               <button
                 key={sub.id}
+                type="button"
                 id={`nav-sub-${item.id}-${sub.id}`}
                 onClick={() => onSubClick(item.id, sub.id, sub.externalUrl)}
-                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors text-left cursor-pointer ${
+                className={`w-full flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition-colors text-left cursor-pointer ${
                   isSubActive
-                    ? 'bg-emerald-600 text-white font-bold shadow-xs'
-                    : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-900 hover:text-slate-900 dark:hover:text-zinc-200'
+                    ? 'bg-emerald-50/90 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-semibold'
+                    : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100/80 dark:hover:bg-zinc-900 hover:text-slate-900 dark:hover:text-zinc-200'
                 }`}
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <SubIcon className={`w-3.5 h-3.5 shrink-0 ${isSubActive ? 'text-white' : 'text-slate-400 dark:text-zinc-500'}`} />
+                  <SubIcon
+                    className={`w-3.5 h-3.5 shrink-0 ${
+                      isSubActive
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-slate-400 dark:text-zinc-500'
+                    }`}
+                  />
                   <span className="truncate">{sub.label}</span>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  {sub.externalUrl && (
-                    <ExternalLink className="w-3 h-3 text-slate-400 dark:text-zinc-500" />
-                  )}
-                </div>
+                {sub.externalUrl && (
+                  <ExternalLink className="w-3 h-3 text-slate-400 dark:text-zinc-500 shrink-0" />
+                )}
               </button>
             );
           })}
@@ -1098,6 +1109,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   selectedFarmId,
   isDarkMode,
   setIsDarkMode,
+  themeMode: propThemeMode,
+  onChangeThemeMode,
   isMobileMenuOpen,
   setIsMobileMenuOpen,
   isSidebarCollapsed = false,
@@ -1138,6 +1151,52 @@ export const Navbar: React.FC<NavbarProps> = ({
   // User Profile state (Agricultor, Pecuarista, Administrador, Perícia, Todos)
   const [activeProfileId, setActiveProfileIdState] = useState<UserProfileId>(() => getActiveProfileId());
   const [isProfileCustomizationOpen, setIsProfileCustomizationOpen] = useState(false);
+  const [menuSearch, setMenuSearch] = useState('');
+
+  // Reliable theme state synced with App.tsx and ConfiguracoesModule
+  const [localThemeMode, setLocalThemeMode] = useState<ThemeMode>(() =>
+    propThemeMode || getSavedThemeMode()
+  );
+  const effectiveThemeMode: ThemeMode = propThemeMode || localThemeMode;
+
+  useEffect(() => {
+    if (propThemeMode) {
+      setLocalThemeMode(propThemeMode);
+    }
+  }, [propThemeMode]);
+
+  useEffect(() => {
+    const syncTheme = (e: Event) => {
+      const detail = (e as CustomEvent<{ theme?: ThemeMode; mode?: ThemeMode }>).detail;
+      const next = detail?.theme || detail?.mode || getSavedThemeMode();
+      setLocalThemeMode(next);
+    };
+    window.addEventListener('geaagro:theme-changed', syncTheme);
+    return () => window.removeEventListener('geaagro:theme-changed', syncTheme);
+  }, []);
+
+  const handleSelectTheme = useCallback(
+    (nextMode: ThemeMode) => {
+      setLocalThemeMode(nextMode);
+      if (onChangeThemeMode) {
+        onChangeThemeMode(nextMode);
+      } else {
+        setSystemThemeMode(nextMode);
+        setIsDarkMode(nextMode !== 'light');
+      }
+    },
+    [onChangeThemeMode, setIsDarkMode]
+  );
+
+  const handleCycleTheme = useCallback(() => {
+    const nextMode: ThemeMode =
+      effectiveThemeMode === 'light'
+        ? 'dark'
+        : effectiveThemeMode === 'dark'
+          ? 'amoled'
+          : 'light';
+    handleSelectTheme(nextMode);
+  }, [effectiveThemeMode, handleSelectTheme]);
 
   useEffect(() => {
     const handleProfileChange = (e: any) => {
@@ -1150,20 +1209,42 @@ export const Navbar: React.FC<NavbarProps> = ({
     };
   }, []);
 
-  // Filter modules according to active user profile
+  // Filter modules according to active user profile + quick search
+  const normalizedMenuQuery = menuSearch.trim().toLowerCase();
+
+  const matchesMenuItem = useCallback(
+    (item: NavItem) => {
+      if (!normalizedMenuQuery) return true;
+      if (item.label.toLowerCase().includes(normalizedMenuQuery)) return true;
+      return Boolean(
+        item.subItems?.some((s) => s.label.toLowerCase().includes(normalizedMenuQuery))
+      );
+    },
+    [normalizedMenuQuery]
+  );
+
   const filteredNavPrincipal = useMemo(() => {
     return NAV_PRINCIPAL.filter(item => {
-      if (item.id === 'dashboard' || item.id === 'configuracoes' || item.id === 'avaliacao_imoveis' || item.id === 'recupera') return true;
-      return isModuleActiveInCurrentProfile(item.id, activeProfileId);
+      const visibleInProfile =
+        item.id === 'dashboard' ||
+        item.id === 'configuracoes' ||
+        item.id === 'avaliacao_imoveis' ||
+        item.id === 'recupera' ||
+        isModuleActiveInCurrentProfile(item.id, activeProfileId);
+      return visibleInProfile && matchesMenuItem(item);
     });
-  }, [activeProfileId]);
+  }, [activeProfileId, matchesMenuItem]);
 
   const filteredNavTecnico = useMemo(() => {
     return NAV_TECNICO.filter(item => {
-      if (item.id === 'avaliacao_imoveis' || item.id === 'recupera' || item.id === 'estatistica') return true;
-      return isModuleActiveInCurrentProfile(item.id, activeProfileId);
+      const visibleInProfile =
+        item.id === 'avaliacao_imoveis' ||
+        item.id === 'recupera' ||
+        item.id === 'estatistica' ||
+        isModuleActiveInCurrentProfile(item.id, activeProfileId);
+      return visibleInProfile && matchesMenuItem(item);
     });
-  }, [activeProfileId]);
+  }, [activeProfileId, matchesMenuItem]);
 
   const handleNavClick = useCallback((tabId: string, subTabId?: string, externalUrl?: string) => {
     if (externalUrl) {
@@ -1200,8 +1281,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         setActiveProfileId(subTabId as UserProfileId);
       }
       setActiveTab('configuracoes');
-      if (subTabId && setActiveSubTab) {
-        setActiveSubTab(subTabId);
+      if (setActiveSubTab) {
+        setActiveSubTab(subTabId || 'hub');
       }
       setExpandedMenus(prev => ({
         ...prev,
@@ -1248,6 +1329,21 @@ export const Navbar: React.FC<NavbarProps> = ({
       return;
     }
 
+    if (item.id === 'configuracoes') {
+      if (activeTab === 'configuracoes' && (!activeSubTab || activeSubTab === 'hub')) {
+        toggleExpand(item.id);
+      } else {
+        setActiveTab('configuracoes');
+        setActiveSubTab?.('hub');
+        setExpandedMenus(prev => ({
+          ...prev,
+          configuracoes: true,
+        }));
+        setIsMobileMenuOpen(false);
+      }
+      return;
+    }
+
     if (activeTab === item.id) {
       toggleExpand(item.id);
     } else {
@@ -1263,7 +1359,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         setIsMobileMenuOpen(false);
       }
     }
-  }, [activeTab, toggleExpand, setActiveTab, setActiveSubTab, setIsMobileMenuOpen]);
+  }, [activeTab, activeSubTab, toggleExpand, setActiveTab, setActiveSubTab, setIsMobileMenuOpen]);
 
   const renderNavGroup = (items: NavItem[]) => {
     return items.map(item => (
@@ -1271,7 +1367,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         key={item.id}
         item={item}
         isActive={activeTab === item.id}
-        isExpanded={!!expandedMenus[item.id]}
+        isExpanded={Boolean(normalizedMenuQuery) || !!expandedMenus[item.id]}
         activeSubTab={activeSubTab}
         onParentClick={handleParentItemClick}
         onToggleExpand={toggleExpand}
@@ -1280,90 +1376,88 @@ export const Navbar: React.FC<NavbarProps> = ({
     ));
   };
 
+  const themeLabel =
+    effectiveThemeMode === 'amoled'
+      ? 'AMOLED'
+      : effectiveThemeMode === 'dark'
+        ? 'Escuro'
+        : 'Claro';
+
   return (
     <>
-      {/* Mobile & Tablet Header with Hamburger Button on LEFT & Quick Actions on RIGHT */}
+      {/* Mobile & Tablet Header */}
       <header
         style={{
-          paddingTop: 'max(0.625rem, calc(env(safe-area-inset-top, 0px) + 0.375rem))',
+          paddingTop: 'max(0.5rem, calc(env(safe-area-inset-top, 0px) + 0.25rem))',
         }}
-        className="lg:hidden bg-white dark:bg-black border-b border-slate-200 dark:border-zinc-800 px-3 sm:px-4 pb-2.5 sm:pb-3 flex items-center justify-between sticky top-0 z-[1200] transition-colors"
+        className="lg:hidden bg-white dark:bg-zinc-950 border-b border-slate-200 dark:border-zinc-800 px-3 sm:px-4 pb-2 flex items-center justify-between gap-2 sticky top-0 z-[1200] transition-colors"
       >
-        {/* Left Section: Hamburger Menu Trigger + Brand & Logo */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* Hamburger Menu Trigger on Left */}
+        {/* Left: Hamburger + Brand */}
+        <div className="flex items-center gap-2 min-w-0">
           <button
+            type="button"
             id="mobile-hamburger-btn"
             onClick={() => setIsMobileMenuOpen(prev => !prev)}
-            className="p-2.5 -ml-1 rounded-lg text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-900 transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center active:scale-95"
+            className="h-9 w-9 -ml-1 rounded-lg text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-900 transition-colors cursor-pointer inline-flex items-center justify-center shrink-0"
             aria-label={isMobileMenuOpen ? 'Fechar menu' : 'Abrir menu de navegação'}
             aria-expanded={isMobileMenuOpen}
           >
-            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
 
-          {/* Brand & Logo */}
-          <div
-            className="flex items-center gap-2.5 cursor-pointer select-none group"
+          <button
+            type="button"
+            className="flex items-center gap-2 cursor-pointer select-none text-left min-w-0"
             onClick={(e) => {
               handleAgroLogoClick(e);
               handleNavClick('sobre');
             }}
           >
-            <div
-              className="w-8 h-8 bg-emerald-600 dark:bg-emerald-500 rounded-lg flex items-center justify-center text-white font-bold shadow-xs overflow-hidden p-0.5 shrink-0 transition-transform duration-200 active:scale-90 group-hover:scale-105"
-              title="GeaAgro CRM - Inteligência Agronômica"
-            >
+            <div className="w-7 h-7 bg-emerald-600 rounded-lg flex items-center justify-center text-white overflow-hidden p-0.5 shrink-0">
               <img
                 src="/icon.png"
-                alt="GeaAgro Logo"
-                className="w-full h-full object-contain rounded-md pointer-events-none"
+                alt="GeaAgro"
+                className="w-full h-full object-contain rounded pointer-events-none"
                 onError={(e) => {
                   (e.currentTarget as HTMLElement).style.display = 'none';
                   const fallback = e.currentTarget.nextElementSibling as HTMLElement;
                   if (fallback) fallback.style.display = 'block';
                 }}
               />
-              <Warehouse className="w-5 h-5 hidden" />
+              <Warehouse className="w-4 h-4 hidden" />
             </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h1 className="font-bold text-base tracking-tight text-emerald-950 dark:text-emerald-400 leading-none">
-                  GeaAgro CRM
-                </h1>
-                <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+            <div className="min-w-0">
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-semibold text-sm tracking-tight text-slate-900 dark:text-zinc-100 leading-none truncate">
+                  GeaAgro
+                </span>
+                <span className="text-[10px] text-slate-400 dark:text-zinc-500 tabular-nums">
                   4.2.3.8
                 </span>
               </div>
-              <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-medium">Inteligência Agronômica</p>
+              {company && (company.tradingName || company.name) && (
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400 truncate max-w-[140px]">
+                  {company.tradingName || company.name}
+                </p>
+              )}
             </div>
-          </div>
+          </button>
         </div>
 
-        {/* Right Actions: Company Name + Notifications Bell + Dark Mode Toggle */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        {/* Right: Install + Notifications + Theme Cycle */}
+        <div className="flex items-center gap-1.5 shrink-0">
           {!isInstalled && isInstallable && (
             <button
               type="button"
               onClick={install}
-              title="Instalar App GeaAgro no Dispositivo (PWA Offline)"
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all active:scale-95 cursor-pointer"
+              title="Instalar App GeaAgro no dispositivo"
+              className="hidden sm:inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium transition-colors cursor-pointer whitespace-nowrap"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Instalar App</span>
+              <span>Instalar</span>
             </button>
           )}
 
-          {company && (company.tradingName || company.name) && (
-            <div className="flex items-center gap-1.5 text-xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-              <span className="text-slate-600 dark:text-zinc-300 font-medium truncate max-w-[110px] sm:max-w-[180px]">
-                {company.tradingName || company.name}
-              </span>
-            </div>
-          )}
-
-          {/* Mobile Notification Bell */}
           <button
             type="button"
             onClick={() => {
@@ -1371,212 +1465,276 @@ export const Navbar: React.FC<NavbarProps> = ({
               onOpenNotifications?.();
             }}
             aria-label="Abrir central de notificações"
-            className="p-2.5 rounded-lg text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-900 transition-colors cursor-pointer relative min-w-[44px] min-h-[44px] flex items-center justify-center active:scale-95"
+            className="h-9 w-9 rounded-lg text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-900 border border-slate-200 dark:border-zinc-800 transition-colors cursor-pointer relative inline-flex items-center justify-center"
             title="Notificações"
           >
-            <Bell className="w-5 h-5" />
+            <Bell className="w-4 h-4" />
             {unreadNotificationsCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white dark:ring-black"></span>
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-rose-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center px-1 tabular-nums">
+                {unreadNotificationsCount}
+              </span>
             )}
           </button>
 
           <button
-            onClick={() => setIsDarkMode(prev => !prev)}
-            aria-label="Alternar modo escuro"
-            className="p-2 rounded-lg text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-900 transition-colors cursor-pointer"
-            title={isDarkMode ? 'Mudar para Modo Claro' : 'Ativar Modo Escuro'}
+            type="button"
+            onClick={handleCycleTheme}
+            aria-label={`Alternar tema (atual: ${themeLabel})`}
+            className="h-9 px-2.5 rounded-lg text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-900 border border-slate-200 dark:border-zinc-800 transition-colors cursor-pointer inline-flex items-center gap-1.5 whitespace-nowrap"
+            title={`Tema: ${themeLabel} — toque para alternar`}
           >
-            {isDarkMode ? (
-              <Sun className="w-5 h-5 text-amber-400" />
+            {effectiveThemeMode === 'light' ? (
+              <Sun className="w-4 h-4 text-amber-500 shrink-0" />
+            ) : effectiveThemeMode === 'dark' ? (
+              <Moon className="w-4 h-4 text-sky-400 shrink-0" />
             ) : (
-              <Moon className="w-5 h-5 text-slate-700" />
+              <Smartphone className="w-4 h-4 text-emerald-400 shrink-0" />
             )}
+            <span className="hidden sm:inline text-xs font-medium">{themeLabel}</span>
           </button>
         </div>
       </header>
-
 
       {/* Desktop Sidebar (Left Fixed) & Responsive Drawer for Mobile/Tablet */}
       <aside
         id="app-sidebar-drawer"
         style={{
           paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0px))',
-          paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))',
+          paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom, 0px))',
         }}
-        className={`fixed inset-y-0 left-0 z-[1200] w-72 lg:w-68 bg-white dark:bg-black border-r border-slate-200 dark:border-zinc-800 flex flex-col justify-between transition-transform duration-300 ease-in-out ${
-          isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
+        className={`fixed inset-y-0 left-0 z-[1200] w-72 lg:w-68 bg-white dark:bg-zinc-950 border-r border-slate-200 dark:border-zinc-800 flex flex-col justify-between transition-transform duration-200 ease-out ${
+          isMobileMenuOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full'
         } ${
           isSidebarCollapsed ? 'lg:-translate-x-full' : 'lg:translate-x-0'
         }`}
       >
-        <div className="p-4 sm:p-5 overflow-y-auto flex-1 scrollbar-thin">
-          {/* Top Brand & Close/Collapse button */}
-          <div className="flex items-center justify-between mb-5">
-            <div
-              className="flex items-center gap-2.5 cursor-pointer select-none group"
+        {/* Top Brand + Quick Search */}
+        <div className="px-3.5 pt-1 pb-3 border-b border-slate-200 dark:border-zinc-800 space-y-2.5 shrink-0">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              className="flex items-center gap-2 cursor-pointer select-none text-left min-w-0"
               onClick={(e) => {
                 handleAgroLogoClick(e);
                 handleNavClick('sobre');
               }}
             >
               <div
-                className="w-8 h-8 bg-emerald-600 dark:bg-emerald-500 rounded-lg flex items-center justify-center text-white font-bold shadow-xs overflow-hidden p-0.5 shrink-0 transition-transform duration-200 active:scale-90 group-hover:scale-105"
-                title="GeaAgro CRM - Inteligência Agronômica"
+                className="w-7 h-7 bg-emerald-600 rounded-lg flex items-center justify-center text-white overflow-hidden p-0.5 shrink-0"
+                title="GeaAgro CRM"
               >
                 <img
                   src="/icon.png"
                   alt="GeaAgro Logo"
-                  className="w-full h-full object-contain rounded-md pointer-events-none"
+                  className="w-full h-full object-contain rounded pointer-events-none"
                   onError={(e) => {
                     (e.currentTarget as HTMLElement).style.display = 'none';
                     const fallback = e.currentTarget.nextElementSibling as HTMLElement;
                     if (fallback) fallback.style.display = 'block';
                   }}
                 />
-                <Warehouse className="w-5 h-5 hidden" />
+                <Warehouse className="w-4 h-4 hidden" />
               </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <h1 className="font-bold text-lg tracking-tight text-emerald-950 dark:text-emerald-400 leading-none">
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="font-semibold text-sm tracking-tight text-slate-900 dark:text-zinc-100 leading-none">
                     GeaAgro CRM
-                  </h1>
-                  <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                  </span>
+                  <span className="text-[10px] text-slate-400 dark:text-zinc-500 tabular-nums">
                     4.2.3.8
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 dark:text-zinc-400 font-medium mt-0.5">
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-tight mt-0.5 truncate">
                   Inteligência Agronômica
                 </p>
               </div>
-            </div>
+            </button>
 
-            {/* Close button on Mobile with accessible 44px touch target */}
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen(false)}
-              className="lg:hidden p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-slate-100 dark:hover:bg-zinc-900 transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center active:scale-95"
+              className="lg:hidden h-9 w-9 rounded-lg text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-slate-100 dark:hover:bg-zinc-900 transition-colors cursor-pointer inline-flex items-center justify-center shrink-0"
               title="Fechar menu"
               aria-label="Fechar menu"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Group 1: Principal */}
+          {/* Busca rápida de módulos */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={menuSearch}
+              onChange={(e) => setMenuSearch(e.target.value)}
+              placeholder="Buscar módulo..."
+              aria-label="Buscar módulo no menu"
+              className="w-full h-8 pl-8 pr-7 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+            />
+            {menuSearch && (
+              <button
+                type="button"
+                onClick={() => setMenuSearch('')}
+                aria-label="Limpar busca de módulo"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Scrollable Navigation Groups */}
+        <div className="px-3 py-3 overflow-y-auto flex-1 space-y-4">
           {filteredNavPrincipal.length > 0 && (
-            <nav className="space-y-1 mb-4">
-              <div className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-2 px-2">
+            <nav aria-label="Navegação principal" className="space-y-0.5">
+              <div className="text-[11px] font-medium text-slate-400 dark:text-zinc-500 px-2 pb-1">
                 Principal
               </div>
               {renderNavGroup(filteredNavPrincipal)}
-
-
             </nav>
           )}
 
-          {/* Group 2: Análise Técnica / Módulos Operacionais */}
           {filteredNavTecnico.length > 0 && (
-            <nav className="mt-5 space-y-1">
-              <div className="flex items-center justify-between mb-2 px-2">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">
-                  Módulos Habilitados
+            <nav aria-label="Módulos técnicos" className="space-y-0.5">
+              <div className="flex items-center justify-between px-2 pb-1">
+                <span className="text-[11px] font-medium text-slate-400 dark:text-zinc-500">
+                  Módulos habilitados
                 </span>
                 <button
                   type="button"
                   onClick={() => setIsProfileCustomizationOpen(true)}
-                  title="Incluir ou Alterar Módulos deste Perfil"
-                  className="px-2 py-0.5 rounded-lg text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition flex items-center gap-1 cursor-pointer active:scale-95"
+                  title="Incluir ou alterar módulos deste perfil"
+                  className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
                 >
-                  <Sliders className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                  <Sliders className="w-3 h-3" />
                   <span>Ajustar</span>
                 </button>
               </div>
               {renderNavGroup(filteredNavTecnico)}
             </nav>
           )}
-        </div>
 
-        {/* Simplified Footer Bar: Notifications, Theme, User, About Icons */}
-        <div className="p-3 border-t border-slate-200 dark:border-zinc-800 bg-slate-50/90 dark:bg-zinc-950/90 flex items-center justify-around gap-2">
-          {/* 1. Ícone Notificações Push */}
-          <button
-            type="button"
-            onClick={() => {
-              setIsMobileMenuOpen(false);
-              onOpenNotifications?.();
-            }}
-            title="Central de Notificação (Tarefas & Laudos)"
-            className="p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center relative bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 hover:scale-105"
-          >
-            <Bell className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            {unreadNotificationsCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center">
-                {unreadNotificationsCount}
-              </span>
-            )}
-          </button>
-
-          {/* 2. Ícone do Tema */}
-          <button
-            type="button"
-            onClick={() => setIsDarkMode(prev => !prev)}
-            title={isDarkMode ? 'Modo Escuro (Ativo) - Clique para alternar' : 'Modo Claro (Ativo) - Clique para alternar'}
-            className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
-              isDarkMode
-                ? 'bg-zinc-900 text-amber-400 border border-zinc-800 hover:bg-zinc-800 hover:scale-105'
-                : 'bg-white text-amber-500 border border-slate-200 shadow-2xs hover:bg-slate-100 hover:scale-105'
-            }`}
-          >
-            {isDarkMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-          </button>
-
-          {/* 3. Ícone do Usuário */}
-          <button
-            type="button"
-            onClick={() => handleNavClick('cadastros')}
-            title={`${currentAgronomist?.name || 'Dr. Carlos Miranda'} | ${currentAgronomist?.profession || 'Responsável Técnico'} (${currentAgronomist?.councilType || 'CREA'}-${currentAgronomist?.creaState || 'MT'} nº ${currentAgronomist?.crea || '145.892/D'})`}
-            className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
-              activeTab === 'cadastros'
-                ? 'bg-emerald-600 text-white shadow-xs hover:scale-105'
-                : 'bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 hover:scale-105'
-            }`}
-          >
-            <User className="w-4 h-4" />
-          </button>
-
-          {/* 4. Ícone Sobre */}
-          <button
-            type="button"
-            onClick={() => handleNavClick('sobre')}
-            title="Sobre o GeaAgro 4.2.3.8"
-            className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
-              activeTab === 'sobre'
-                ? 'bg-emerald-600 text-white shadow-xs hover:scale-105'
-                : 'bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 hover:scale-105'
-            }`}
-          >
-            <Info className="w-4 h-4" />
-          </button>
-
-          {/* 5. Ícone Logout */}
-          {onLogout && (
-            <button
-              type="button"
-              onClick={onLogout}
-              title="Sair do Sistema"
-              className="p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 hover:scale-105"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+          {filteredNavPrincipal.length === 0 && filteredNavTecnico.length === 0 && (
+            <div className="px-3 py-6 text-center text-xs text-slate-500 dark:text-zinc-400">
+              Nenhum módulo encontrado para "{menuSearch}".
+            </div>
           )}
         </div>
 
+        {/* Compact Structured Footer: 3-Way Theme Switcher + Quick Actions */}
+        <div className="px-3 py-2.5 border-t border-slate-200 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950 space-y-2 shrink-0">
+          {/* Seletor direto de tema: Claro | Escuro | AMOLED */}
+          <div
+            role="group"
+            aria-label="Selecionar tema da interface"
+            className="grid grid-cols-3 gap-0.5 p-0.5 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg"
+          >
+            {(
+              [
+                { id: 'light' as ThemeMode, label: 'Claro', icon: Sun },
+                { id: 'dark' as ThemeMode, label: 'Escuro', icon: Moon },
+                { id: 'amoled' as ThemeMode, label: 'AMOLED', icon: Smartphone },
+              ] as const
+            ).map(({ id, label, icon: ThemeIcon }) => {
+              const active = effectiveThemeMode === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => handleSelectTheme(id)}
+                  aria-pressed={active}
+                  className={`h-7 px-1.5 rounded-md text-[11px] font-medium inline-flex items-center justify-center gap-1 transition-colors cursor-pointer whitespace-nowrap ${
+                    active
+                      ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 shadow-2xs'
+                      : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
+                  }`}
+                >
+                  <ThemeIcon
+                    className={`w-3 h-3 shrink-0 ${
+                      active
+                        ? id === 'light'
+                          ? 'text-amber-500'
+                          : id === 'dark'
+                            ? 'text-sky-400'
+                            : 'text-emerald-400'
+                        : ''
+                    }`}
+                  />
+                  <span>{label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Barra de utilidades */}
+          <div className="flex items-center justify-between gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                onOpenNotifications?.();
+              }}
+              title="Central de notificações"
+              aria-label="Central de notificações"
+              className="flex-1 h-8 rounded-lg text-slate-600 dark:text-zinc-300 hover:bg-slate-200/70 dark:hover:bg-zinc-900 transition-colors cursor-pointer inline-flex items-center justify-center relative"
+            >
+              <Bell className="w-4 h-4" />
+              {unreadNotificationsCount > 0 && (
+                <span className="ml-1 text-[10px] font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
+                  {unreadNotificationsCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleNavClick('cadastros')}
+              title={`${currentAgronomist?.name || 'Responsável Técnico'} (${currentAgronomist?.councilType || 'CREA'}-${currentAgronomist?.creaState || 'MT'})`}
+              aria-label="Cadastro técnico e responsável"
+              className={`flex-1 h-8 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center ${
+                activeTab === 'cadastros'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
+                  : 'text-slate-600 dark:text-zinc-300 hover:bg-slate-200/70 dark:hover:bg-zinc-900'
+              }`}
+            >
+              <User className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleNavClick('sobre')}
+              title="Sobre o GeaAgro 4.2.3.8"
+              aria-label="Sobre o GeaAgro"
+              className={`flex-1 h-8 rounded-lg transition-colors cursor-pointer inline-flex items-center justify-center ${
+                activeTab === 'configuracoes' && activeSubTab === 'sobre'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
+                  : 'text-slate-600 dark:text-zinc-300 hover:bg-slate-200/70 dark:hover:bg-zinc-900'
+              }`}
+            >
+              <Info className="w-4 h-4" />
+            </button>
+
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                title="Sair do sistema"
+                aria-label="Sair do sistema"
+                className="flex-1 h-8 rounded-lg text-slate-500 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer inline-flex items-center justify-center"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
       </aside>
 
       {/* Backdrop for Mobile Hamburger Drawer */}
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[1100] lg:hidden transition-opacity"
+          className="fixed inset-0 bg-slate-950/50 backdrop-blur-[2px] z-[1100] lg:hidden transition-opacity"
           onClick={() => setIsMobileMenuOpen(false)}
           aria-hidden="true"
         />

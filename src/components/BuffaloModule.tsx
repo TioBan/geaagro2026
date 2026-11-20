@@ -1,6 +1,6 @@
-// @ts-nocheck
 import React, { useState, useEffect } from 'react';
 import {
+  BuffaloTab,
   BuffaloAnimal,
   BuffaloPaddock,
   BuffaloWaterPoint,
@@ -20,11 +20,9 @@ import {
   loadBuffaloPharmacy,
   saveBuffaloPharmacy,
   loadBuffaloFacilities,
-  saveBuffaloFacilities,
-  resetBuffaloDataToDefaults
+  saveBuffaloFacilities
 } from '../utils/buffaloStorage';
 
-// Import Views
 import { BuffaloDashboardView } from './buffalo/BuffaloDashboardView';
 import { BuffaloIndividualRegistryView } from './buffalo/BuffaloIndividualRegistryView';
 import { BuffaloDigitalTwinView } from './buffalo/BuffaloDigitalTwinView';
@@ -44,10 +42,9 @@ import { BuffaloSmartMapView } from './buffalo/BuffaloSmartMapView';
 import { BuffaloReportsView } from './buffalo/BuffaloReportsView';
 import { BuffaloPhotoDiaryView } from './buffalo/BuffaloPhotoDiaryView';
 
-// Lucide Icons
 import {
   LayoutDashboard,
-  Shield,
+  ShieldCheck,
   Activity,
   Dna,
   HeartPulse,
@@ -57,76 +54,107 @@ import {
   Droplets,
   Wheat,
   Sprout,
-  ShieldCheck,
+  Syringe,
   BookOpen,
   Pill,
   Building2,
   Compass,
   FileText,
-  Sparkles,
-  Layers3
+  Camera
 } from 'lucide-react';
 
-export type BuffaloTab =
-  | 'dashboard'
-  | 'registry'
-  | 'digital_twin'
-  | 'genealogy'
-  | 'reproduction'
-  | 'calves'
-  | 'dairy'
-  | 'beef'
-  | 'welfare_water'
-  | 'nutrition'
-  | 'pastures'
-  | 'health'
-  | 'diseases_lib'
-  | 'pharmacy'
-  | 'facilities'
-  | 'smart_map'
-  | 'reports'
-  | 'photo_diary';
+export type { BuffaloTab };
 
 interface BuffaloModuleProps {
   activeSubTab?: string;
   setActiveSubTab?: (subTab: string) => void;
 }
 
+const VALID_TABS: BuffaloTab[] = [
+  'dashboard',
+  'registry',
+  'digital_twin',
+  'genealogy',
+  'reproduction',
+  'calves',
+  'dairy',
+  'beef',
+  'welfare_water',
+  'nutrition',
+  'pastures',
+  'health',
+  'diseases_lib',
+  'pharmacy',
+  'facilities',
+  'smart_map',
+  'reports',
+  'photo_diary'
+];
+
+const SUB_NAV_TABS: { id: BuffaloTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'dashboard', label: 'Painel & IEB', icon: LayoutDashboard },
+  { id: 'registry', label: 'Cadastro', icon: ShieldCheck },
+  { id: 'digital_twin', label: 'Gêmeo 360°', icon: Activity },
+  { id: 'genealogy', label: 'Genealogia', icon: Dna },
+  { id: 'reproduction', label: 'Reprodução', icon: HeartPulse },
+  { id: 'calves', label: 'Bezerreiro', icon: Baby },
+  { id: 'dairy', label: 'Leite & Mozzarella', icon: Milk },
+  { id: 'beef', label: 'Carne & GMD', icon: Beef },
+  { id: 'welfare_water', label: 'Bem-Estar & Água', icon: Droplets },
+  { id: 'nutrition', label: 'Nutrição', icon: Wheat },
+  { id: 'pastures', label: 'Pastagens', icon: Sprout },
+  { id: 'health', label: 'Sanidade', icon: Syringe },
+  { id: 'diseases_lib', label: 'Atlas Doenças', icon: BookOpen },
+  { id: 'pharmacy', label: 'Farmácia', icon: Pill },
+  { id: 'facilities', label: 'Instalações', icon: Building2 },
+  { id: 'smart_map', label: 'Mapa', icon: Compass },
+  { id: 'reports', label: 'Relatórios', icon: FileText },
+  { id: 'photo_diary', label: 'Diário Visual', icon: Camera }
+];
+
+function resolveTab(raw?: string): BuffaloTab {
+  if (raw && VALID_TABS.includes(raw as BuffaloTab)) {
+    return raw as BuffaloTab;
+  }
+  return 'dashboard';
+}
+
 export const BuffaloModule: React.FC<BuffaloModuleProps> = ({
-  activeSubTab = 'dashboard',
+  activeSubTab,
   setActiveSubTab
 }) => {
-  const [internalTab, setInternalTab] = useState<BuffaloTab>((activeSubTab as BuffaloTab) || 'dashboard');
-  const [selectedAnimalId, setSelectedAnimalId] = useState<string>('');
-
-  // Sync internal tab whenever activeSubTab prop changes from navbar
-  useEffect(() => {
-    if (activeSubTab && activeSubTab !== internalTab) {
-      setInternalTab(activeSubTab as BuffaloTab);
-    }
-  }, [activeSubTab]);
-
-  const activeTab = (activeSubTab as BuffaloTab) || internalTab;
-
-  const handleTabChange = (tab: BuffaloTab | string) => {
-    setInternalTab(tab as BuffaloTab);
-    if (setActiveSubTab) {
-      setActiveSubTab(tab);
-    }
-  };
-
-  // States com persistência 100% offline
+  const [internalTab, setInternalTab] = useState<BuffaloTab>(() => resolveTab(activeSubTab));
   const [animals, setAnimals] = useState<BuffaloAnimal[]>(() => loadBuffaloAnimals());
+  const [selectedAnimalId, setSelectedAnimalId] = useState<string>(() => loadBuffaloAnimals()[0]?.id || '');
+
   const [paddocks, setPaddocks] = useState<BuffaloPaddock[]>(() => loadBuffaloPaddocks());
   const [waterPoints, setWaterPoints] = useState<BuffaloWaterPoint[]>(() => loadBuffaloWaterPoints());
   const [thermalWelfare, setThermalWelfare] = useState<BuffaloThermalWelfareIndex>(() => loadBuffaloThermalWelfare());
   const [pharmacy, setPharmacy] = useState<BuffaloPharmacyItem[]>(() => loadBuffaloPharmacy());
   const [facilities, setFacilities] = useState<BuffaloFacility[]>(() => loadBuffaloFacilities());
 
-  // Salvar automaticamente ao alterar estado
+  useEffect(() => {
+    if (activeSubTab) {
+      const next = resolveTab(activeSubTab);
+      if (next !== internalTab) {
+        setInternalTab(next);
+      }
+    }
+  }, [activeSubTab, internalTab]);
+
+  const activeTab: BuffaloTab = activeSubTab ? resolveTab(activeSubTab) : internalTab;
+
+  const handleTabChange = (tab: string) => {
+    const resolved = resolveTab(tab);
+    setInternalTab(resolved);
+    if (setActiveSubTab) {
+      setActiveSubTab(resolved);
+    }
+  };
+
   useEffect(() => {
     saveBuffaloAnimals(animals);
-    if (!selectedAnimalId && animals.length > 0 && animals[0]?.id) {
+    if (!selectedAnimalId && animals.length > 0) {
       setSelectedAnimalId(animals[0].id);
     }
   }, [animals, selectedAnimalId]);
@@ -151,25 +179,33 @@ export const BuffaloModule: React.FC<BuffaloModuleProps> = ({
     saveBuffaloFacilities(facilities);
   }, [facilities]);
 
-  // Handlers
-  const handleSaveAnimal = (animal: BuffaloAnimal) => {
+  const handleAddAnimal = (newAnimal: BuffaloAnimal) => {
+    setAnimals(prev => [newAnimal, ...prev]);
+    if (!selectedAnimalId) {
+      setSelectedAnimalId(newAnimal.id);
+    }
+  };
+
+  const handleUpdateAnimal = (updated: BuffaloAnimal) => {
     setAnimals(prev => {
-      const idx = prev.findIndex(a => a.id === animal.id);
+      const idx = prev.findIndex(a => a.id === updated.id);
       if (idx >= 0) {
         const next = [...prev];
-        next[idx] = animal;
+        next[idx] = updated;
         return next;
       }
-      return [animal, ...prev];
+      return [updated, ...prev];
     });
   };
 
   const handleDeleteAnimal = (animalId: string) => {
-    setAnimals(prev => prev.filter(a => a.id !== animalId));
-    if (selectedAnimalId === animalId) {
-      const remaining = animals.filter(a => a.id !== animalId);
-      setSelectedAnimalId(remaining[0]?.id || '');
-    }
+    setAnimals(prev => {
+      const remaining = prev.filter(a => a.id !== animalId);
+      if (selectedAnimalId === animalId) {
+        setSelectedAnimalId(remaining[0]?.id || '');
+      }
+      return remaining;
+    });
   };
 
   const handleOpenDigitalTwin = (animalId: string) => {
@@ -177,163 +213,245 @@ export const BuffaloModule: React.FC<BuffaloModuleProps> = ({
     handleTabChange('digital_twin');
   };
 
-  const handleResetData = () => {
-    if (window.confirm('Deseja restaurar os dados de demonstração do módulo de Bubalinos? Todos os registros serão reinicializados.')) {
-      resetBuffaloDataToDefaults();
-      setAnimals(loadBuffaloAnimals());
-      setPaddocks(loadBuffaloPaddocks());
-      setWaterPoints(loadBuffaloWaterPoints());
-      setThermalWelfare(loadBuffaloThermalWelfare());
-      setPharmacy(loadBuffaloPharmacy());
-      setFacilities(loadBuffaloFacilities());
-      alert('Dados restaurados com sucesso!');
-    }
+  const handleSavePaddock = (paddock: BuffaloPaddock) => {
+    setPaddocks(prev => {
+      const idx = prev.findIndex(p => p.id === paddock.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = paddock;
+        return next;
+      }
+      return [paddock, ...prev];
+    });
   };
 
+  const handleDeletePaddock = (paddockId: string) => {
+    setPaddocks(prev => prev.filter(p => p.id !== paddockId));
+  };
+
+  const handleAddWaterPoint = (point: BuffaloWaterPoint) => {
+    setWaterPoints(prev => [point, ...prev]);
+  };
+
+  const handleDeleteWaterPoint = (pointId: string) => {
+    setWaterPoints(prev => prev.filter(p => p.id !== pointId));
+  };
+
+  const handleSaveFacility = (facility: BuffaloFacility) => {
+    setFacilities(prev => {
+      const idx = prev.findIndex(f => f.id === facility.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = facility;
+        return next;
+      }
+      return [facility, ...prev];
+    });
+  };
+
+  const handleDeleteFacility = (facilityId: string) => {
+    setFacilities(prev => prev.filter(f => f.id !== facilityId));
+  };
+
+  const lactatingCount = animals.filter(a => a.status === 'Em Lactação').length;
+
   return (
-    <div className="min-h-screen bg-slate-50/50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 p-4 sm:p-6 lg:p-8 space-y-6">
-      {/* Header Principal do Módulo (Unboxed para integração perfeita de UI) */}
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-2 border-b border-slate-200/60 dark:border-zinc-800/60">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-teal-700 via-teal-600 to-emerald-500 text-white flex items-center justify-center font-black text-2xl shadow-xs shrink-0">
-            🐃
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+    <div className="min-h-screen bg-slate-50/70 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-4">
+        {/* Cabeçalho compacto do módulo */}
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-zinc-800 print:hidden">
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
               Bubalinocultura de Precisão
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Gestão Zootécnica, Reprodutiva, Sanitária, Leiteira (Mozzarella &amp; Marajó), Corte e Bem-Estar Hídrico.
+            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+              Gestão zootécnica, reprodutiva, leiteira (Mozzarella), corte, sanidade e conforto térmico hídrico
             </p>
           </div>
-        </div>
-      </div>
+          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-zinc-400 tabular-nums shrink-0">
+            <span>
+              <strong className="font-semibold text-slate-800 dark:text-zinc-200">{animals.length}</strong> animais
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>
+              <strong className="font-semibold text-slate-800 dark:text-zinc-200">{lactatingCount}</strong> lactação
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>
+              ITU <strong className="font-semibold text-slate-800 dark:text-zinc-200">{thermalWelfare.thiCalculated}</strong>
+            </span>
+          </div>
+        </header>
 
-      {/* Renderização Condicional das Visualizações */}
-      <div className="max-w-7xl mx-auto transition-all duration-200">
-        {activeTab === 'dashboard' && (
-          <BuffaloDashboardView
-            animals={animals}
-            paddocks={paddocks}
-            thermalWelfare={thermalWelfare}
-            onOpenDigitalTwin={handleOpenDigitalTwin}
-            onNavigateTab={handleTabChange}
-          />
-        )}
+        {/* Sub-navegação horizontal compacta */}
+        <nav
+          aria-label="Submódulos de Bubalinocultura"
+          className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-slate-200 dark:border-zinc-800 no-scrollbar print:hidden"
+        >
+          {SUB_NAV_TABS.map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabChange(tab.id)}
+                className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs font-medium whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+                  isActive
+                    ? 'bg-teal-600 text-white'
+                    : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-200/70 dark:hover:bg-zinc-800 hover:text-slate-900 dark:hover:text-zinc-100'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
 
-        {activeTab === 'registry' && (
-          <BuffaloIndividualRegistryView
-            animals={animals}
-            onSaveAnimal={handleSaveAnimal}
-            onDeleteAnimal={handleDeleteAnimal}
-            onOpenDigitalTwin={handleOpenDigitalTwin}
-          />
-        )}
+        {/* Conteúdo da aba ativa */}
+        <main>
+          {activeTab === 'dashboard' && (
+            <BuffaloDashboardView
+              animals={animals}
+              paddocks={paddocks}
+              waterPoints={waterPoints}
+              thermalWelfare={thermalWelfare}
+              onSelectAnimalForTwin={handleOpenDigitalTwin}
+              onNavigateTab={handleTabChange}
+            />
+          )}
 
-        {activeTab === 'digital_twin' && (
-          <BuffaloDigitalTwinView
-            animals={animals}
-            selectedAnimalId={selectedAnimalId}
-            onSelectAnimal={setSelectedAnimalId}
-            onUpdateAnimal={handleSaveAnimal}
-          />
-        )}
+          {activeTab === 'registry' && (
+            <BuffaloIndividualRegistryView
+              animals={animals}
+              onAddAnimal={handleAddAnimal}
+              onUpdateAnimal={handleUpdateAnimal}
+              onDeleteAnimal={handleDeleteAnimal}
+              onOpenDigitalTwin={handleOpenDigitalTwin}
+            />
+          )}
 
-        {activeTab === 'genealogy' && (
-          <BuffaloGenealogyView
-            animals={animals}
-            onSelectAnimalForTwin={handleOpenDigitalTwin}
-          />
-        )}
+          {activeTab === 'digital_twin' && (
+            <BuffaloDigitalTwinView
+              animals={animals}
+              selectedAnimalId={selectedAnimalId}
+              onSelectAnimal={setSelectedAnimalId}
+              onBackToRegistry={() => handleTabChange('registry')}
+              onUpdateAnimal={handleUpdateAnimal}
+            />
+          )}
 
-        {activeTab === 'reproduction' && (
-          <BuffaloReproductionView
-            animals={animals}
-            onUpdateAnimal={handleSaveAnimal}
-            onOpenDigitalTwin={handleOpenDigitalTwin}
-          />
-        )}
+          {activeTab === 'genealogy' && (
+            <BuffaloGenealogyView
+              animals={animals}
+              onSelectAnimalForTwin={handleOpenDigitalTwin}
+            />
+          )}
 
-        {activeTab === 'calves' && (
-          <BuffaloCalfManagementView
-            animals={animals}
-            onOpenDigitalTwin={handleOpenDigitalTwin}
-          />
-        )}
+          {activeTab === 'reproduction' && (
+            <BuffaloReproductionView
+              animals={animals}
+              onUpdateAnimal={handleUpdateAnimal}
+              onOpenDigitalTwin={handleOpenDigitalTwin}
+            />
+          )}
 
-        {activeTab === 'dairy' && (
-          <BuffaloDairyProductionView
-            animals={animals}
-            onOpenDigitalTwin={handleOpenDigitalTwin}
-          />
-        )}
+          {activeTab === 'calves' && (
+            <BuffaloCalfManagementView
+              animals={animals}
+              onOpenDigitalTwin={handleOpenDigitalTwin}
+            />
+          )}
 
-        {activeTab === 'beef' && (
-          <BuffaloBeefProductionView
-            animals={animals}
-            onOpenDigitalTwin={handleOpenDigitalTwin}
-          />
-        )}
+          {activeTab === 'dairy' && (
+            <BuffaloDairyProductionView
+              animals={animals}
+              onOpenDigitalTwin={handleOpenDigitalTwin}
+            />
+          )}
 
-        {activeTab === 'welfare_water' && (
-          <BuffaloWelfareWaterView
-            waterPoints={waterPoints}
-            thermalWelfare={thermalWelfare}
-            onUpdateThermal={setThermalWelfare}
-            onAddWaterPoint={(pt) => setWaterPoints(prev => [...prev, pt])}
-          />
-        )}
+          {activeTab === 'beef' && (
+            <BuffaloBeefProductionView
+              animals={animals}
+              onOpenDigitalTwin={handleOpenDigitalTwin}
+            />
+          )}
 
-        {activeTab === 'nutrition' && (
-          <BuffaloNutritionView animals={animals} />
-        )}
+          {activeTab === 'welfare_water' && (
+            <BuffaloWelfareWaterView
+              waterPoints={waterPoints}
+              thermalWelfare={thermalWelfare}
+              onUpdateThermal={setThermalWelfare}
+              onAddWaterPoint={handleAddWaterPoint}
+              onDeleteWaterPoint={handleDeleteWaterPoint}
+            />
+          )}
 
-        {activeTab === 'pastures' && (
-          <BuffaloPasturesView paddocks={paddocks} />
-        )}
+          {activeTab === 'nutrition' && (
+            <BuffaloNutritionView animals={animals} />
+          )}
 
-        {activeTab === 'health' && (
-          <BuffaloHealthVaccinesView
-            animals={animals}
-            onOpenDigitalTwin={handleOpenDigitalTwin}
-          />
-        )}
+          {activeTab === 'pastures' && (
+            <BuffaloPasturesView
+              paddocks={paddocks}
+              onSavePaddock={handleSavePaddock}
+              onDeletePaddock={handleDeletePaddock}
+            />
+          )}
 
-        {activeTab === 'diseases_lib' && (
-          <BuffaloDiseasesLibraryView />
-        )}
+          {activeTab === 'health' && (
+            <BuffaloHealthVaccinesView
+              animals={animals}
+              onUpdateAnimal={handleUpdateAnimal}
+              onOpenDigitalTwin={handleOpenDigitalTwin}
+            />
+          )}
 
-        {activeTab === 'pharmacy' && (
-          <BuffaloPharmacyView
-            pharmacy={pharmacy}
-            onUpdatePharmacy={setPharmacy}
-          />
-        )}
+          {activeTab === 'diseases_lib' && (
+            <BuffaloDiseasesLibraryView />
+          )}
 
-        {activeTab === 'facilities' && (
-          <BuffaloFacilitiesView facilities={facilities} />
-        )}
+          {activeTab === 'pharmacy' && (
+            <BuffaloPharmacyView
+              pharmacy={pharmacy}
+              onUpdatePharmacy={setPharmacy}
+            />
+          )}
 
-        {activeTab === 'smart_map' && (
-          <BuffaloSmartMapView
-            paddocks={paddocks}
-            waterPoints={waterPoints}
-            animals={animals}
-            onOpenDigitalTwin={handleOpenDigitalTwin}
-          />
-        )}
+          {activeTab === 'facilities' && (
+            <BuffaloFacilitiesView
+              facilities={facilities}
+              onSaveFacility={handleSaveFacility}
+              onDeleteFacility={handleDeleteFacility}
+            />
+          )}
 
-        {activeTab === 'reports' && (
-          <BuffaloReportsView animals={animals} paddocks={paddocks} />
-        )}
+          {activeTab === 'smart_map' && (
+            <BuffaloSmartMapView
+              paddocks={paddocks}
+              waterPoints={waterPoints}
+              animals={animals}
+              onOpenDigitalTwin={handleOpenDigitalTwin}
+              onNavigateTab={handleTabChange}
+            />
+          )}
 
-        {activeTab === 'photo_diary' && (
-          <BuffaloPhotoDiaryView
-            animals={animals}
-            onOpenDigitalTwin={handleOpenDigitalTwin}
-          />
-        )}
+          {activeTab === 'reports' && (
+            <BuffaloReportsView animals={animals} paddocks={paddocks} />
+          )}
+
+          {activeTab === 'photo_diary' && (
+            <BuffaloPhotoDiaryView
+              animals={animals}
+              onUpdateAnimal={handleUpdateAnimal}
+              onOpenDigitalTwin={handleOpenDigitalTwin}
+            />
+          )}
+        </main>
       </div>
     </div>
   );
 };
+
+export default BuffaloModule;

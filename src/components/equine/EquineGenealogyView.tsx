@@ -1,18 +1,7 @@
-import React, { useState } from 'react';
-import {
-  Dna,
-  GitBranch,
-  Sparkles,
-  Heart,
-  Award,
-  Zap,
-  Info,
-  ChevronRight,
-  ShieldCheck,
-  Save,
-  CheckCircle2,
-} from 'lucide-react';
-import { EquineAnimal, EquinePedigree, EquinePedigreeNode } from '../../types/equine';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Dna, GitBranch, Sparkles, Save, Zap, X } from 'lucide-react';
+import { EquineAnimal, EquinePedigree } from '../../types/equine';
+import { EquinoIcon } from '../icons/EquinoIcon';
 
 interface Props {
   animals: EquineAnimal[];
@@ -20,17 +9,32 @@ interface Props {
   onUpdateAnimal: (animal: EquineAnimal) => void;
 }
 
+const inputCls =
+  'w-full h-8 px-2.5 rounded-lg bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500';
+
 export const EquineGenealogyView: React.FC<Props> = ({
   animals,
   selectedAnimalId,
   onUpdateAnimal,
 }) => {
-  const [currentId, setCurrentId] = useState<string>(selectedAnimalId || (animals[0]?.id ?? ''));
-  const animal = animals.find(a => a?.id === currentId) || animals[0];
+  const safeAnimals = useMemo(() => (animals || []).filter(a => a && a.id), [animals]);
+  const [currentId, setCurrentId] = useState<string>(selectedAnimalId || safeAnimals[0]?.id || '');
 
-  // Mating Simulator States
-  const [selectedSireId, setSelectedSireId] = useState<string>(animals.find(a => a?.sex === 'Garanhão')?.id || '');
-  const [selectedDamId, setSelectedDamId] = useState<string>(animals.find(a => a?.sex === 'Égua')?.id || '');
+  useEffect(() => {
+    if (selectedAnimalId && safeAnimals.some(a => a.id === selectedAnimalId)) {
+      setCurrentId(selectedAnimalId);
+    } else if (!safeAnimals.some(a => a.id === currentId)) {
+      setCurrentId(safeAnimals[0]?.id || '');
+    }
+  }, [selectedAnimalId, safeAnimals, currentId]);
+
+  const animal = safeAnimals.find(a => a.id === currentId) || safeAnimals[0];
+
+  const stallions = useMemo(() => safeAnimals.filter(a => a.sex === 'Garanhão'), [safeAnimals]);
+  const mares = useMemo(() => safeAnimals.filter(a => a.sex === 'Égua'), [safeAnimals]);
+
+  const [selectedSireId, setSelectedSireId] = useState<string>(stallions[0]?.id || '');
+  const [selectedDamId, setSelectedDamId] = useState<string>(mares[0]?.id || '');
   const [simulationResult, setSimulationResult] = useState<{
     inbreedingPct: number;
     predictedCoats: { coat: string; probability: number }[];
@@ -39,27 +43,38 @@ export const EquineGenealogyView: React.FC<Props> = ({
     notes: string;
   } | null>(null);
 
-  // Pedigree node editor
   const [isEditingPedigree, setIsEditingPedigree] = useState(false);
   const [pedigreeState, setPedigreeState] = useState<EquinePedigree>(animal?.pedigree || {});
 
+  useEffect(() => {
+    setPedigreeState(animal?.pedigree || {});
+    setIsEditingPedigree(false);
+  }, [animal?.id]);
+
+  useEffect(() => {
+    if (!stallions.some(s => s.id === selectedSireId)) {
+      setSelectedSireId(stallions[0]?.id || '');
+    }
+    if (!mares.some(m => m.id === selectedDamId)) {
+      setSelectedDamId(mares[0]?.id || '');
+    }
+  }, [stallions, mares, selectedSireId, selectedDamId]);
+
   const handleSavePedigree = () => {
     if (!animal) return;
-    const updated: EquineAnimal = {
+    onUpdateAnimal({
       ...animal,
       pedigree: pedigreeState,
       updatedAt: new Date().toISOString(),
-    };
-    onUpdateAnimal(updated);
+    });
     setIsEditingPedigree(false);
   };
 
   const handleRunSimulation = () => {
-    const sire = animals.find(a => a?.id === selectedSireId);
-    const dam = animals.find(a => a?.id === selectedDamId);
+    const sire = safeAnimals.find(a => a.id === selectedSireId);
+    const dam = safeAnimals.find(a => a.id === selectedDamId);
     if (!sire || !dam) return;
 
-    // Genetic coat prediction simulation
     let predictedCoats = [
       { coat: 'Castanha', probability: 45 },
       { coat: 'Alazã', probability: 30 },
@@ -81,23 +96,39 @@ export const EquineGenealogyView: React.FC<Props> = ({
       ];
     }
 
-    const calculatedF = Number(((Math.random() * 2) + 0.5).toFixed(2));
-    const morphScore = Number((((sire.bodyScore + dam.bodyScore) / 2) * 10 + 35).toFixed(1));
+    const sameBreedBonus = sire.breed === dam.breed ? 1.15 : 0.65;
+    const sharedSire =
+      sire.pedigree?.sire?.name &&
+      dam.pedigree?.sire?.name &&
+      sire.pedigree.sire.name.toLowerCase() === dam.pedigree.sire.name.toLowerCase();
+    const calculatedF = sharedSire ? 12.5 : Number(sameBreedBonus.toFixed(2));
+    const morphScore = Number(
+      Math.min(99, ((sire.bodyScore + dam.bodyScore) / 2) * 10 + 35).toFixed(1)
+    );
 
     setSimulationResult({
       inbreedingPct: calculatedF,
       predictedCoats,
       predictedDiscipline: sire.discipline,
       morphologyScore: morphScore,
-      notes: `Cruzamento com alto vigor híbrido (heterose) e baixo coeficiente de endogamia (F = ${calculatedF}%). Excelente direcionamento para ${sire.discipline.split('/')[0]}.`,
+      notes: sharedSire
+        ? `Atenção: ambos compartilham o mesmo pai (${sire.pedigree?.sire?.name}), elevando a consanguinidade estimada (F = ${calculatedF}%).`
+        : `Cruzamento com baixo coeficiente de endogamia estimado (F = ${calculatedF}%) e boa complementação para ${sire.discipline.split('/')[0].trim()}.`,
     });
   };
 
   if (!animal) {
     return (
-      <div className="bg-white p-8 rounded-2xl border border-stone-200 text-center">
-        <span className="text-4xl">🐎</span>
-        <h3 className="text-base font-black text-stone-900 mt-2">Nenhum animal cadastrado</h3>
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-10 text-center space-y-2">
+        <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-400 mx-auto flex items-center justify-center">
+          <EquinoIcon className="w-5 h-5" />
+        </div>
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+          Nenhum equino cadastrado
+        </h3>
+        <p className="text-xs text-slate-500 dark:text-zinc-400">
+          Cadastre animais no Plantel para mapear árvores genealógicas e simular acasalamentos.
+        </p>
       </div>
     );
   }
@@ -105,307 +136,379 @@ export const EquineGenealogyView: React.FC<Props> = ({
   const p = animal.pedigree || {};
 
   return (
-    <div className="space-y-6">
-      {/* Top Bar Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 shadow-xs">
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <div className="text-[10px] font-black uppercase text-amber-900 tracking-wider flex items-center gap-1">
-            <Dna className="w-3.5 h-3.5 text-amber-700" /> Genealogia & Árvore Genealógica (4 Gerações)
-          </div>
-          <h2 className="text-xl font-black text-stone-900">{animal.name}</h2>
-          <div className="text-xs text-stone-500 font-mono mt-0.5">
-            Registro: <strong>{animal.registrationNumber}</strong> • Coeficiente Wright (F): <strong>{animal.inbreedingCoefficient ?? 1.2}%</strong>
-          </div>
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+            <Dna className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span>Genealogia & Simulador de Acasalamento</span>
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-zinc-400 tabular-nums">
+            {animal.name} · Registro {animal.registrationNumber} · Endogamia (F):{' '}
+            {animal.inbreedingCoefficient !== undefined ? `${animal.inbreedingCoefficient}%` : 'Não informada'}
+          </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <select
-            value={currentId}
-            onChange={e => {
-              setCurrentId(e.target.value);
-              const found = animals.find(a => a?.id === e.target.value);
-              if (found) setPedigreeState(found.pedigree || {});
-            }}
-            className="px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden focus:border-amber-600"
+            value={animal.id}
+            onChange={e => setCurrentId(e.target.value)}
+            className="h-8 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs font-medium text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
           >
-            {animals.map(a => (
-              <option key={a?.id || Math.random()} value={a?.id || ''}>
-                {a?.name} ({a?.breed})
+            {safeAnimals.map((a, idx) => (
+              <option key={a.id || idx} value={a.id}>
+                {a.name} ({a.breed})
               </option>
             ))}
           </select>
 
-          <button
-            onClick={() => {
-              if (isEditingPedigree) handleSavePedigree();
-              else setIsEditingPedigree(true);
-            }}
-            className="flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
-          >
-            <Save className="w-4 h-4" />
-            <span>{isEditingPedigree ? 'Salvar Pedigree' : 'Editar Linhagem'}</span>
-          </button>
+          {isEditingPedigree ? (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setPedigreeState(animal.pedigree || {});
+                  setIsEditingPedigree(false);
+                }}
+                className="h-8 px-2.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-600 dark:text-zinc-300 inline-flex items-center gap-1 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Cancelar</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePedigree}
+                className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Salvar Pedigree</span>
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsEditingPedigree(true)}
+              className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-xs font-medium text-slate-700 dark:text-zinc-200 inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <GitBranch className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <span>Editar Linhagem</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* 4-Generation Visual Pedigree Tree */}
-      <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-xs space-y-4 overflow-x-auto">
-        <div className="flex items-center justify-between border-b pb-3">
+      {/* 4-Generation Pedigree Tree */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 sm:p-5 space-y-4 overflow-x-auto">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-3">
           <div>
-            <h3 className="text-sm font-black text-stone-900 uppercase tracking-wider flex items-center gap-2">
-              <GitBranch className="w-4 h-4 text-amber-700" />
-              <span>Quadro Genealógico Oficial de 4 Gerações</span>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+              <GitBranch className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <span>Quadro Genealógico (4 Gerações)</span>
             </h3>
-            <p className="text-xs text-stone-500">Mapeamento de reprodutores, matrizes, linhagens paternas e maternas consagradas</p>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+              Linhagens paterna e materna registradas
+            </p>
           </div>
-          <span className="text-xs font-mono bg-amber-50 text-amber-900 border border-amber-200 px-3 py-1 rounded-full font-bold">
-            Endogamia (F): {animal.inbreedingCoefficient ?? 1.2}%
+          <span className="text-xs font-medium text-slate-600 dark:text-zinc-300 tabular-nums">
+            Wright (F): {animal.inbreedingCoefficient !== undefined ? `${animal.inbreedingCoefficient}%` : '—'}
           </span>
         </div>
 
-        {/* The 4-Tier Interactive Tree */}
-        <div className="min-w-[760px] grid grid-cols-4 gap-4 pt-2 text-xs">
-          {/* Generation 1: Subject Animal */}
+        <div className="min-w-[760px] grid grid-cols-4 gap-3 text-xs">
+          {/* Gen 1: Subject */}
           <div className="flex flex-col justify-center">
-            <div className="p-4 bg-gradient-to-br from-amber-700 to-amber-900 text-white rounded-2xl shadow-md border-2 border-amber-500 space-y-2 text-center">
-              <div className="text-[10px] font-black uppercase tracking-widest text-amber-300">Animal em Foco</div>
-              <h4 className="font-black text-base leading-tight">{animal.name}</h4>
-              <div className="text-xs text-amber-100 font-mono">{animal.registrationNumber}</div>
-              <div className="text-[11px] text-amber-200 pt-1 border-t border-amber-600/60">
-                {animal.breed} • {animal.coatColor}
+            <div className="p-3.5 rounded-xl bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-950 space-y-1">
+              <div className="text-[10px] uppercase tracking-wider opacity-70">Animal em Foco</div>
+              <div className="font-semibold text-sm leading-tight">{animal.name}</div>
+              <div className="text-[11px] font-mono opacity-80">{animal.registrationNumber}</div>
+              <div className="text-[11px] opacity-75 pt-1 border-t border-white/15 dark:border-zinc-300">
+                {animal.breed} · {animal.coatColor}
               </div>
             </div>
           </div>
 
-          {/* Generation 2: Sire & Dam */}
-          <div className="flex flex-col justify-around gap-6">
-            {/* Sire (Pai) */}
-            <div className="p-3 bg-blue-50 rounded-xl border-2 border-blue-300 shadow-xs space-y-1">
-              <div className="flex items-center justify-between text-[10px] font-black text-blue-900 uppercase">
-                <span>Pai (Sire)</span>
-                <span>♂️</span>
-              </div>
-              {isEditingPedigree ? (
-                <input
-                  type="text"
-                  value={pedigreeState.sire?.name || ''}
-                  onChange={e => setPedigreeState({
-                    ...pedigreeState,
-                    sire: { ...pedigreeState.sire, name: e.target.value }
-                  })}
-                  placeholder="Nome do Pai"
-                  className="w-full px-2 py-1 bg-white border border-blue-300 rounded-md text-xs font-bold"
-                />
-              ) : (
-                <div className="font-black text-stone-900 text-xs">{p.sire?.name || 'Não cadastrado'}</div>
-              )}
-              <div className="text-[10px] text-stone-500 font-mono">{p.sire?.registrationNumber || 'Sem Registro'}</div>
-              {p.sire?.titles && <div className="text-[10px] text-blue-700 font-bold">{p.sire.titles}</div>}
-            </div>
-
-            {/* Dam (Mãe) */}
-            <div className="p-3 bg-rose-50 rounded-xl border-2 border-rose-300 shadow-xs space-y-1">
-              <div className="flex items-center justify-between text-[10px] font-black text-rose-900 uppercase">
-                <span>Mãe (Dam)</span>
-                <span>♀️</span>
+          {/* Gen 2: Parents */}
+          <div className="flex flex-col justify-around gap-4">
+            {/* Sire */}
+            <div className="p-3 rounded-xl border border-slate-200 dark:border-zinc-800 border-l-2 border-l-sky-500 bg-slate-50/50 dark:bg-zinc-950/50 space-y-1">
+              <div className="text-[10px] font-semibold uppercase text-sky-700 dark:text-sky-400">
+                Pai (Sire)
               </div>
               {isEditingPedigree ? (
-                <input
-                  type="text"
-                  value={pedigreeState.dam?.name || ''}
-                  onChange={e => setPedigreeState({
-                    ...pedigreeState,
-                    dam: { ...pedigreeState.dam, name: e.target.value }
-                  })}
-                  placeholder="Nome da Mãe"
-                  className="w-full px-2 py-1 bg-white border border-rose-300 rounded-md text-xs font-bold"
-                />
+                <div className="space-y-1.5">
+                  <input
+                    type="text"
+                    value={pedigreeState.sire?.name || ''}
+                    onChange={e =>
+                      setPedigreeState({
+                        ...pedigreeState,
+                        sire: { ...pedigreeState.sire, name: e.target.value },
+                      })
+                    }
+                    placeholder="Nome do Pai"
+                    className={inputCls}
+                  />
+                  <input
+                    type="text"
+                    value={pedigreeState.sire?.registrationNumber || ''}
+                    onChange={e =>
+                      setPedigreeState({
+                        ...pedigreeState,
+                        sire: {
+                          ...pedigreeState.sire,
+                          name: pedigreeState.sire?.name || '',
+                          registrationNumber: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="Registro"
+                    className={inputCls}
+                  />
+                </div>
               ) : (
-                <div className="font-black text-stone-900 text-xs">{p.dam?.name || 'Não cadastrada'}</div>
+                <>
+                  <div className="font-semibold text-slate-900 dark:text-zinc-100 truncate">
+                    {p.sire?.name || 'Não informado'}
+                  </div>
+                  <div className="text-[10px] text-slate-500 dark:text-zinc-400 font-mono">
+                    {p.sire?.registrationNumber || 'Sem registro'}
+                  </div>
+                </>
               )}
-              <div className="text-[10px] text-stone-500 font-mono">{p.dam?.registrationNumber || 'Sem Registro'}</div>
-              {p.dam?.titles && <div className="text-[10px] text-rose-700 font-bold">{p.dam.titles}</div>}
+            </div>
+
+            {/* Dam */}
+            <div className="p-3 rounded-xl border border-slate-200 dark:border-zinc-800 border-l-2 border-l-rose-500 bg-slate-50/50 dark:bg-zinc-950/50 space-y-1">
+              <div className="text-[10px] font-semibold uppercase text-rose-700 dark:text-rose-400">
+                Mãe (Dam)
+              </div>
+              {isEditingPedigree ? (
+                <div className="space-y-1.5">
+                  <input
+                    type="text"
+                    value={pedigreeState.dam?.name || ''}
+                    onChange={e =>
+                      setPedigreeState({
+                        ...pedigreeState,
+                        dam: { ...pedigreeState.dam, name: e.target.value },
+                      })
+                    }
+                    placeholder="Nome da Mãe"
+                    className={inputCls}
+                  />
+                  <input
+                    type="text"
+                    value={pedigreeState.dam?.registrationNumber || ''}
+                    onChange={e =>
+                      setPedigreeState({
+                        ...pedigreeState,
+                        dam: {
+                          ...pedigreeState.dam,
+                          name: pedigreeState.dam?.name || '',
+                          registrationNumber: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="Registro"
+                    className={inputCls}
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="font-semibold text-slate-900 dark:text-zinc-100 truncate">
+                    {p.dam?.name || 'Não informada'}
+                  </div>
+                  <div className="text-[10px] text-slate-500 dark:text-zinc-400 font-mono">
+                    {p.dam?.registrationNumber || 'Sem registro'}
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
-          {/* Generation 3: Grandparents (4 Nodes) */}
-          <div className="flex flex-col justify-between gap-3">
-            {/* Paternal Grandfather */}
-            <div className="p-2.5 bg-stone-50 rounded-xl border border-stone-300 space-y-0.5">
-              <div className="text-[9px] font-bold text-blue-800 uppercase">Avô Paterno</div>
-              <div className="font-bold text-stone-900 text-[11px] truncate">{p.paternalGrandsire?.name || 'Trilho da Zélia'}</div>
-              <div className="text-[9px] text-stone-500 font-mono">{p.paternalGrandsire?.registrationNumber || 'ABCCMM'}</div>
-            </div>
-
-            {/* Paternal Grandmother */}
-            <div className="p-2.5 bg-stone-50 rounded-xl border border-stone-300 space-y-0.5">
-              <div className="text-[9px] font-bold text-blue-800 uppercase">Avó Paterna</div>
-              <div className="font-bold text-stone-900 text-[11px] truncate">{p.paternalGranddam?.name || 'Dona Flor Bela Vista'}</div>
-              <div className="text-[9px] text-stone-500 font-mono">{p.paternalGranddam?.registrationNumber || 'ABCCMM'}</div>
-            </div>
-
-            {/* Maternal Grandfather */}
-            <div className="p-2.5 bg-stone-50 rounded-xl border border-stone-300 space-y-0.5">
-              <div className="text-[9px] font-bold text-rose-800 uppercase">Avô Materno</div>
-              <div className="font-bold text-stone-900 text-[11px] truncate">{p.maternalGrandsire?.name || 'Favacho Diamante'}</div>
-              <div className="text-[9px] text-stone-500 font-mono">{p.maternalGrandsire?.registrationNumber || 'ABCCMM'}</div>
-            </div>
-
-            {/* Maternal Grandmother */}
-            <div className="p-2.5 bg-stone-50 rounded-xl border border-stone-300 space-y-0.5">
-              <div className="text-[9px] font-bold text-rose-800 uppercase">Avó Materna</div>
-              <div className="font-bold text-stone-900 text-[11px] truncate">{p.maternalGranddam?.name || 'Serenata Círculo Ouro'}</div>
-              <div className="text-[9px] text-stone-500 font-mono">{p.maternalGranddam?.registrationNumber || 'ABCCMM'}</div>
-            </div>
+          {/* Gen 3: Grandparents */}
+          <div className="flex flex-col justify-between gap-2.5">
+            {(
+              [
+                { key: 'paternalGrandsire', label: 'Avô Paterno', tone: 'text-sky-700 dark:text-sky-400' },
+                { key: 'paternalGranddam', label: 'Avó Paterna', tone: 'text-sky-700 dark:text-sky-400' },
+                { key: 'maternalGrandsire', label: 'Avô Materno', tone: 'text-rose-700 dark:text-rose-400' },
+                { key: 'maternalGranddam', label: 'Avó Materna', tone: 'text-rose-700 dark:text-rose-400' },
+              ] as const
+            ).map(gp => {
+              const node = p[gp.key];
+              const editNode = pedigreeState[gp.key];
+              return (
+                <div
+                  key={gp.key}
+                  className="p-2.5 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/50 space-y-0.5"
+                >
+                  <div className={`text-[10px] font-medium ${gp.tone}`}>{gp.label}</div>
+                  {isEditingPedigree ? (
+                    <input
+                      type="text"
+                      value={editNode?.name || ''}
+                      onChange={e =>
+                        setPedigreeState({
+                          ...pedigreeState,
+                          [gp.key]: { ...editNode, name: e.target.value },
+                        })
+                      }
+                      placeholder={gp.label}
+                      className={inputCls}
+                    />
+                  ) : (
+                    <div className="font-medium text-slate-900 dark:text-zinc-100 truncate">
+                      {node?.name || 'Não informado'}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
-          {/* Generation 4: Great-Grandparents (8 Nodes) */}
-          <div className="flex flex-col justify-between gap-1 text-[10px]">
-            <div className="p-1.5 bg-white rounded-lg border border-stone-200 truncate font-semibold text-stone-800">
-              {p.paternalGreatGrandsire1?.name || 'Herdade Cadillac'}
-            </div>
-            <div className="p-1.5 bg-white rounded-lg border border-stone-200 truncate font-semibold text-stone-800">
-              {p.paternalGreatGranddam1?.name || 'Herdade Sina'}
-            </div>
-            <div className="p-1.5 bg-white rounded-lg border border-stone-200 truncate font-semibold text-stone-800">
-              {p.paternalGreatGrandsire2?.name || 'Original Passo Fino'}
-            </div>
-            <div className="p-1.5 bg-white rounded-lg border border-stone-200 truncate font-semibold text-stone-800">
-              {p.paternalGreatGranddam2?.name || 'Boneca Boa Vista'}
-            </div>
-            <div className="p-1.5 bg-white rounded-lg border border-stone-200 truncate font-semibold text-stone-800">
-              {p.maternalGreatGrandsire1?.name || 'Favacho Quociente'}
-            </div>
-            <div className="p-1.5 bg-white rounded-lg border border-stone-200 truncate font-semibold text-stone-800">
-              {p.maternalGreatGranddam1?.name || 'Favacho Jóia'}
-            </div>
-            <div className="p-1.5 bg-white rounded-lg border border-stone-200 truncate font-semibold text-stone-800">
-              {p.maternalGreatGrandsire2?.name || 'Sultão Canto Alegre'}
-            </div>
-            <div className="p-1.5 bg-white rounded-lg border border-stone-200 truncate font-semibold text-stone-800">
-              {p.maternalGreatGranddam2?.name || 'Estrela D’Alva'}
-            </div>
+          {/* Gen 4: Great-Grandparents */}
+          <div className="flex flex-col justify-between gap-1 text-[11px]">
+            {(
+              [
+                'paternalGreatGrandsire1',
+                'paternalGreatGranddam1',
+                'paternalGreatGrandsire2',
+                'paternalGreatGranddam2',
+                'maternalGreatGrandsire1',
+                'maternalGreatGranddam1',
+                'maternalGreatGrandsire2',
+                'maternalGreatGranddam2',
+              ] as const
+            ).map((key, idx) => (
+              <div
+                key={key}
+                className="px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 truncate"
+              >
+                {p[key]?.name || `Bisavô/Bisavó ${idx + 1} (—)`}
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Virtual Mating Simulator (Simulador de Acasalamento) */}
-      <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-xs space-y-5">
-        <div className="flex items-center justify-between border-b pb-3">
-          <div>
-            <h3 className="text-base font-black text-stone-900 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-600" />
-              <span>Simulador de Acasalamento & Predição Genética</span>
-            </h3>
-            <p className="text-xs text-stone-500">
-              Cruze garanhões e éguas para estimar probabilidade de pelagens do potro, consanguinidade (Wright) e aptidão morfológica
-            </p>
-          </div>
+      {/* Virtual Mating Simulator */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 sm:p-5 space-y-4">
+        <div className="border-b border-slate-100 dark:border-zinc-800 pb-3">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span>Simulador de Acasalamento & Predição de Pelagem</span>
+          </h3>
+          <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+            Selecione um garanhão e uma matriz do plantel para estimar consanguinidade, pelagens e aptidão
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Sire Selector */}
-          <div className="p-4 bg-blue-50/70 rounded-xl border border-blue-200 space-y-2">
-            <label className="text-xs font-black uppercase text-blue-900 block flex items-center justify-between">
-              <span>Garanhão Reprodutor (Macho)</span>
-              <span>♂️</span>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+          <div>
+            <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">
+              Garanhão Reprodutor
             </label>
             <select
               value={selectedSireId}
               onChange={e => setSelectedSireId(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-blue-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
+              className="w-full h-9 px-3 rounded-lg bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
             >
-              {animals.filter(a => a.sex === 'Garanhão').map(sire => (
-                <option key={sire.id} value={sire.id}>
-                  {sire.name} ({sire.breed} • {sire.coatColor})
-                </option>
-              ))}
+              {stallions.length === 0 ? (
+                <option value="">Nenhum garanhão cadastrado</option>
+              ) : (
+                stallions.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.breed} · {s.coatColor})
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
-          {/* Dam Selector */}
-          <div className="p-4 bg-rose-50/70 rounded-xl border border-rose-200 space-y-2">
-            <label className="text-xs font-black uppercase text-rose-900 block flex items-center justify-between">
-              <span>Matriz / Doadora (Fêmea)</span>
-              <span>♀️</span>
+          <div>
+            <label className="block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1">
+              Matriz / Doadora
             </label>
             <select
               value={selectedDamId}
               onChange={e => setSelectedDamId(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-rose-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
+              className="w-full h-9 px-3 rounded-lg bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
             >
-              {animals.filter(a => a.sex === 'Égua').map(dam => (
-                <option key={dam.id} value={dam.id}>
-                  {dam.name} ({dam.breed} • {dam.coatColor})
-                </option>
-              ))}
+              {mares.length === 0 ? (
+                <option value="">Nenhuma égua cadastrada</option>
+              ) : (
+                mares.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.breed} · {m.coatColor})
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
-          {/* Run Simulator Button */}
-          <div className="flex items-end">
-            <button
-              onClick={handleRunSimulation}
-              className="w-full py-3 px-4 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-xl shadow-md transition-colors flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Zap className="w-4 h-4" />
-              <span>Simular Genética do Potro</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleRunSimulation}
+            disabled={!selectedSireId || !selectedDamId}
+            className="h-9 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-medium inline-flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span>Simular Cruzamento</span>
+          </button>
         </div>
 
-        {/* Simulation Output Card */}
         {simulationResult && (
-          <div className="p-5 bg-gradient-to-br from-amber-50 to-stone-50 rounded-2xl border-2 border-amber-300 space-y-4">
-            <div className="flex items-center justify-between border-b border-amber-200 pb-2">
-              <span className="text-xs font-black uppercase text-amber-900 tracking-wider">
-                Resultado da Simulação Genética
-              </span>
-              <span className="bg-emerald-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full">
-                ACASALAMENTO APROVADO
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-              <div className="p-3 bg-white rounded-xl border border-amber-200 space-y-1">
-                <span className="text-[10px] text-stone-500 uppercase font-bold block">Consanguinidade (Wright F)</span>
-                <span className="text-xl font-black text-amber-900 font-mono">{simulationResult.inbreedingPct}%</span>
-                <span className="text-[10px] text-emerald-700 font-bold block">Excelente (F &lt; 3.0%)</span>
+          <div className="pt-4 border-t border-slate-200 dark:border-zinc-800 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-zinc-800 border border-slate-200 dark:border-zinc-800 rounded-lg bg-slate-50/50 dark:bg-zinc-950/50">
+              <div className="p-3">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Consanguinidade (F)</span>
+                <span className="text-base font-semibold text-slate-900 dark:text-zinc-100 tabular-nums">
+                  {simulationResult.inbreedingPct}%
+                </span>
               </div>
-
-              <div className="p-3 bg-white rounded-xl border border-amber-200 space-y-1">
-                <span className="text-[10px] text-stone-500 uppercase font-bold block">Índice Morfométrico Estimado</span>
-                <span className="text-xl font-black text-stone-900 font-mono">{simulationResult.morphologyScore} / 100</span>
-                <span className="text-[10px] text-stone-500 block">Alta conformação e aprumos</span>
+              <div className="p-3">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Índice Morfométrico</span>
+                <span className="text-base font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">
+                  {simulationResult.morphologyScore} / 100
+                </span>
               </div>
-
-              <div className="p-3 bg-white rounded-xl border border-amber-200 space-y-1">
-                <span className="text-[10px] text-stone-500 uppercase font-bold block">Aptidão Principal</span>
-                <span className="text-sm font-black text-stone-900 block">{simulationResult.predictedDiscipline}</span>
+              <div className="p-3">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Aptidão Prevista</span>
+                <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100 block mt-0.5 truncate">
+                  {simulationResult.predictedDiscipline}
+                </span>
               </div>
             </div>
 
-            {/* Coat color probability bars */}
             <div className="space-y-2">
-              <span className="text-xs font-bold text-stone-700 block">Probabilidade de Pelagens do Potro (Genética de Cores):</span>
-              <div className="space-y-1.5">
+              <div className="text-xs font-medium text-slate-700 dark:text-zinc-300">
+                Probabilidade de Pelagens do Potro
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {simulationResult.predictedCoats.map(c => (
-                  <div key={c.coat} className="space-y-0.5 text-xs">
-                    <div className="flex justify-between font-bold text-stone-800">
-                      <span>{c.coat}</span>
-                      <span>{c.probability}%</span>
+                  <div key={c.coat} className="space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-700 dark:text-zinc-300">{c.coat}</span>
+                      <span className="font-semibold text-slate-900 dark:text-zinc-100 tabular-nums">
+                        {c.probability}%
+                      </span>
                     </div>
-                    <div className="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-amber-600 rounded-full" style={{ width: `${c.probability}%` }}></div>
+                    <div className="w-full h-1.5 bg-slate-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-amber-600 dark:bg-amber-500 rounded-full"
+                        style={{ width: `${c.probability}%` }}
+                      />
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="text-xs text-stone-600 bg-white p-3 rounded-xl border border-stone-200">
+            <p className="text-xs text-slate-600 dark:text-zinc-300">
               <strong>Parecer Zootécnico:</strong> {simulationResult.notes}
-            </div>
+            </p>
           </div>
         )}
       </div>

@@ -1,237 +1,367 @@
 import React from 'react';
-import { ForageItem } from '../../types/forage';
 import { FORAGES_CATALOG } from '../../data/foragesCatalogData';
-import { Scale, X, ArrowRight } from 'lucide-react';
+import { ForageItem, SoilFertilityLevel } from '../../types/forage';
+import { Scale, X, Plus, Eye, Trash2, Sprout } from 'lucide-react';
 
 interface ForageComparatorProps {
-  selectedIds: string[];
-  onRemove: (id: string) => void;
+  selectedForageIds: string[];
+  onRemoveForage: (id: string) => void;
+  onAddForage?: (id: string) => void;
+  onClearAll?: () => void;
   onSelectForage: (forage: ForageItem) => void;
-  onAddMore: () => void;
+  onGoToCatalog: () => void;
 }
 
-export const ForageComparator: React.FC<ForageComparatorProps> = ({
-  selectedIds,
-  onRemove,
-  onSelectForage,
-  onAddMore,
-}) => {
-  const forages = selectedIds
-    .map(id => FORAGES_CATALOG.find(f => f.id === id))
-    .filter(Boolean) as ForageItem[];
+const FERTILITY_LABELS: Record<SoilFertilityLevel, string> = {
+  baixa: 'Baixa',
+  media: 'Média',
+  alta: 'Alta',
+  muito_alta: 'Muito Alta',
+};
 
-  if (forages.length === 0) {
+const SUSCEPTIBILITY_LABELS: Record<string, string> = {
+  alta: 'Alta',
+  moderada: 'Moderada',
+  tolerante: 'Tolerante',
+  resistente: 'Resistente',
+};
+
+export const ForageComparator: React.FC<ForageComparatorProps> = ({
+  selectedForageIds,
+  onRemoveForage,
+  onAddForage,
+  onClearAll,
+  onSelectForage,
+  onGoToCatalog,
+}) => {
+  const selectedForages = selectedForageIds
+    .map(id => FORAGES_CATALOG.find(f => f.id === id))
+    .filter((f): f is ForageItem => Boolean(f));
+
+  const availableToAdd = FORAGES_CATALOG.filter(f => !selectedForageIds.includes(f.id));
+
+  const renderQuickAddSelect = () => {
+    if (!onAddForage || selectedForages.length >= 4) return null;
     return (
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-8 text-center space-y-4">
-        <Scale className="w-12 h-12 text-slate-300 dark:text-zinc-600 mx-auto" />
-        <div className="space-y-1">
-          <h3 className="font-bold text-base text-slate-900 dark:text-white">
-            Nenhuma forrageira selecionada para comparação
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto">
-            Clique no botão <strong>"Comparar"</strong> nos cards do catálogo para comparar até 4 espécies lado a lado em tabela técnica.
+      <select
+        defaultValue=""
+        aria-label="Adicionar forrageira à comparação"
+        onChange={e => {
+          if (e.target.value) {
+            onAddForage(e.target.value);
+            e.target.value = '';
+          }
+        }}
+        className="h-8 px-2.5 rounded-lg bg-slate-50 dark:bg-zinc-950/60 border border-slate-200 dark:border-zinc-700 text-xs text-slate-700 dark:text-zinc-200 focus:outline-none focus:border-emerald-500 transition-colors"
+      >
+        <option value="">+ Adicionar espécie...</option>
+        {availableToAdd.map(f => (
+          <option key={f.id} value={f.id}>
+            {f.commonName} ({f.cultivar})
+          </option>
+        ))}
+      </select>
+    );
+  };
+
+  if (selectedForages.length === 0) {
+    return (
+      <section className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-10 text-center space-y-3">
+        <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 flex items-center justify-center mx-auto">
+          <Scale className="w-5 h-5" />
+        </div>
+        <div className="space-y-1 max-w-md mx-auto">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+            Comparador Lado a Lado
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
+            Selecione até 4 espécies para comparar bromatologia, produtividade de matéria seca, alturas de pastejo, exigência de solo e resistência fitossanitária.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onAddMore}
-          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
-        >
-          Explorar Catálogo de 30 Forrageiras
-        </button>
-      </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+          {renderQuickAddSelect()}
+          <button
+            type="button"
+            onClick={onGoToCatalog}
+            className="h-8 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <Sprout className="w-3.5 h-3.5" />
+            <span>Explorar Catálogo ({FORAGES_CATALOG.length} espécies)</span>
+          </button>
+        </div>
+      </section>
     );
   }
 
+  const rows: Array<{
+    label: string;
+    render: (f: ForageItem) => React.ReactNode;
+  }> = [
+    {
+      label: 'Proteína Bruta (PB)',
+      render: f => (
+        <span className="tabular-nums">
+          <strong className="font-semibold text-emerald-700 dark:text-emerald-400">
+            {f.bromatology.crudeProteinPercent.average}%
+          </strong>{' '}
+          <span className="text-slate-400 dark:text-zinc-500">
+            ({f.bromatology.crudeProteinPercent.min}–{f.bromatology.crudeProteinPercent.max}%)
+          </span>
+        </span>
+      ),
+    },
+    {
+      label: 'Digestibilidade (DIVMS)',
+      render: f => (
+        <span className="tabular-nums">
+          <strong className="font-semibold text-slate-900 dark:text-zinc-100">
+            {f.bromatology.inVitroDryMatterDigestibilityPercent.average}%
+          </strong>{' '}
+          <span className="text-slate-400 dark:text-zinc-500">
+            ({f.bromatology.inVitroDryMatterDigestibilityPercent.min}–
+            {f.bromatology.inVitroDryMatterDigestibilityPercent.max}%)
+          </span>
+        </span>
+      ),
+    },
+    {
+      label: 'FDN / NDT Médios',
+      render: f => (
+        <span className="tabular-nums text-slate-700 dark:text-zinc-300">
+          FDN {f.bromatology.neutralDetergentFiberPercent.average}% · NDT{' '}
+          {f.bromatology.totalDigestibleNutrientsPercent.average}%
+        </span>
+      ),
+    },
+    {
+      label: 'Produção MS (t/ha/ano)',
+      render: f => (
+        <span className="tabular-nums font-medium text-slate-900 dark:text-zinc-100">
+          {f.dryMatterYieldTonHaYear.min} a {f.dryMatterYieldTonHaYear.max} t
+        </span>
+      ),
+    },
+    {
+      label: 'Altura Rotacionado (Entrada / Saída)',
+      render: f => (
+        <span className="tabular-nums">
+          <strong className="text-emerald-700 dark:text-emerald-400">
+            {f.phenology.entryHeightRotationalCm} cm
+          </strong>{' '}
+          <span className="text-slate-400 dark:text-zinc-500">/</span>{' '}
+          <strong className="text-slate-800 dark:text-zinc-200">
+            {f.phenology.exitHeightRotationalCm} cm
+          </strong>
+        </span>
+      ),
+    },
+    {
+      label: 'Descanso (Águas / Seca)',
+      render: f => (
+        <span className="tabular-nums text-slate-700 dark:text-zinc-300">
+          {f.phenology.grazingRestPeriodDays.rainy.min}–{f.phenology.grazingRestPeriodDays.rainy.max} d ·{' '}
+          {f.phenology.grazingRestPeriodDays.dry.min}–{f.phenology.grazingRestPeriodDays.dry.max} d
+        </span>
+      ),
+    },
+    {
+      label: 'Exigência de Fertilidade',
+      render: f => (
+        <span className="font-medium text-slate-800 dark:text-zinc-200">
+          {FERTILITY_LABELS[f.soilAndClimate.fertilityRequirement]}
+        </span>
+      ),
+    },
+    {
+      label: 'Saturação por Bases (V% Alvo)',
+      render: f => (
+        <span className="tabular-nums font-medium text-slate-800 dark:text-zinc-200">
+          {f.fertilization.targetBaseSaturationPercent}% (pH {f.soilAndClimate.phRange.ideal})
+        </span>
+      ),
+    },
+    {
+      label: 'Tolerância a Encharcamento',
+      render: f => (
+        <span className="text-slate-700 dark:text-zinc-300">
+          {f.soilAndClimate.waterloggingTolerance}
+        </span>
+      ),
+    },
+    {
+      label: 'Tolerância à Seca / Geadas',
+      render: f => (
+        <span className="text-slate-700 dark:text-zinc-300">
+          Seca: <strong>{f.phenology.droughtTolerance}</strong> · Geada:{' '}
+          <strong>{f.phenology.frostTolerance}</strong>
+        </span>
+      ),
+    },
+    {
+      label: 'Aptidão ILPF / Sombra',
+      render: f => (
+        <span className="text-slate-700 dark:text-zinc-300">
+          {f.strengthsAndWeaknesses.ilpfCompatibilityRating}
+          {f.phenology.shadeTolerancePercent !== undefined && (
+            <span className="text-slate-400 dark:text-zinc-500 tabular-nums">
+              {' '}
+              ({f.phenology.shadeTolerancePercent}% sombra)
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      label: 'Estabelecimento / Pontos VC',
+      render: f => (
+        <span className="tabular-nums text-slate-700 dark:text-zinc-300">
+          {f.phenology.establishmentDays.min}–{f.phenology.establishmentDays.max} d ·{' '}
+          {f.seeding.pureLiveSeedPointsVC > 0
+            ? `${f.seeding.pureLiveSeedPointsVC} pts VC`
+            : 'Mudas'}
+        </span>
+      ),
+    },
+    {
+      label: 'Principal Doença / Praga',
+      render: f => {
+        const d = f.diseasesAndPests[0];
+        if (!d) return <span className="text-slate-400">—</span>;
+        return (
+          <span className="text-slate-700 dark:text-zinc-300">
+            {d.name}{' '}
+            <span
+              className={
+                d.susceptibilityLevel === 'alta'
+                  ? 'text-rose-600 dark:text-rose-400 font-medium'
+                  : d.susceptibilityLevel === 'moderada'
+                  ? 'text-amber-600 dark:text-amber-400 font-medium'
+                  : 'text-emerald-600 dark:text-emerald-400 font-medium'
+              }
+            >
+              ({SUSCEPTIBILITY_LABELS[d.susceptibilityLevel] || d.susceptibilityLevel})
+            </span>
+          </span>
+        );
+      },
+    },
+    {
+      label: 'Conservação (Feno / Silagem)',
+      render: f => (
+        <span className="text-slate-600 dark:text-zinc-400 leading-snug">
+          {f.strengthsAndWeaknesses.hayOrSilageSuitability}
+        </span>
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Scale className="w-5 h-5 text-emerald-600" />
-          <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
-            Comparador Lado a Lado ({forages.length} selecionadas)
-          </h3>
+    <div className="space-y-4">
+      {/* Toolbar */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-2.5">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+            Comparativo Técnico ({selectedForages.length}/4)
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Compare até 4 espécies simultaneamente por bromatologia, manejo e exigência edafoclimática.
+          </p>
         </div>
 
-        {forages.length < 4 && (
-          <button
-            type="button"
-            onClick={onAddMore}
-            className="px-3.5 py-2 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 text-xs font-bold rounded-xl transition-all cursor-pointer"
-          >
-            + Adicionar Mais Espécies
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {renderQuickAddSelect()}
+
+          {selectedForages.length < 4 && (
+            <button
+              type="button"
+              onClick={onGoToCatalog}
+              className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-800 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Catálogo</span>
+            </button>
+          )}
+
+          {onClearAll && (
+            <button
+              type="button"
+              onClick={onClearAll}
+              className="h-8 px-2.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-500 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-50 dark:hover:bg-zinc-800 inline-flex items-center gap-1 transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Limpar</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Comparison Table */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl overflow-x-auto shadow-xs">
-        <table className="w-full text-left text-xs border-collapse">
-          <thead>
-            <tr className="bg-slate-50 dark:bg-zinc-800/80 border-b border-slate-200 dark:border-zinc-800">
-              <th className="p-4 font-bold text-slate-500 dark:text-zinc-400 w-48 shrink-0">
-                Critério Agronômico
-              </th>
-              {forages.map(f => (
-                <th key={f.id} className="p-4 font-extrabold text-slate-900 dark:text-white min-w-[220px]">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm">{f.commonName}</span>
+      {/* Hairline Comparison Matrix */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-50 dark:bg-zinc-950/60 border-b border-slate-200/80 dark:border-zinc-800">
+                <th className="py-3 px-4 font-semibold text-slate-600 dark:text-zinc-400 w-52 min-w-[180px]">
+                  Parâmetro Agronômico
+                </th>
+                {selectedForages.map(forage => (
+                  <th
+                    key={forage.id}
+                    className="py-3 px-4 border-l border-slate-200/80 dark:border-zinc-800 min-w-[200px] align-top"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-slate-900 dark:text-zinc-100 truncate">
+                          {forage.commonName}
+                        </div>
+                        <div className="text-[11px] font-normal italic text-slate-500 dark:text-zinc-400 truncate">
+                          {forage.scientificName} · {forage.cultivar}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onRemoveForage(forage.id)}
+                        aria-label={`Remover ${forage.commonName}`}
+                        className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-slate-200/60 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => onRemove(f.id)}
-                      className="p-1 rounded-md text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                      title="Remover da comparação"
+                      onClick={() => onSelectForage(forage)}
+                      className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <Eye className="w-3 h-3" />
+                      <span>Ver ficha completa</span>
                     </button>
-                  </div>
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold block">
-                    {f.cultivar}
-                  </span>
-                </th>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
+              {rows.map((row, idx) => (
+                <tr
+                  key={row.label}
+                  className={idx % 2 === 1 ? 'bg-slate-50/40 dark:bg-zinc-950/30' : undefined}
+                >
+                  <td className="py-2.5 px-4 font-medium text-slate-600 dark:text-zinc-400 align-top">
+                    {row.label}
+                  </td>
+                  {selectedForages.map(forage => (
+                    <td
+                      key={forage.id}
+                      className="py-2.5 px-4 border-l border-slate-100 dark:border-zinc-800 align-top"
+                    >
+                      {row.render(forage)}
+                    </td>
+                  ))}
+                </tr>
               ))}
-            </tr>
-          </thead>
-
-          <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
-            {/* Nome Científico */}
-            <tr>
-              <td className="p-3.5 font-bold text-slate-500 dark:text-zinc-400 bg-slate-50/50 dark:bg-zinc-800/30">
-                Nome Científico
-              </td>
-              {forages.map(f => (
-                <td key={f.id} className="p-3.5 italic text-slate-700 dark:text-zinc-300">
-                  {f.scientificName}
-                </td>
-              ))}
-            </tr>
-
-            {/* Proteína Bruta */}
-            <tr>
-              <td className="p-3.5 font-bold text-slate-500 dark:text-zinc-400 bg-slate-50/50 dark:bg-zinc-800/30">
-                Proteína Bruta (PB)
-              </td>
-              {forages.map(f => (
-                <td key={f.id} className="p-3.5 font-black text-emerald-700 dark:text-emerald-400 text-sm">
-                  {f.bromatology.crudeProteinPercent.average}% <span className="text-[10px] text-slate-400 font-normal">({f.bromatology.crudeProteinPercent.min}-{f.bromatology.crudeProteinPercent.max}%)</span>
-                </td>
-              ))}
-            </tr>
-
-            {/* Digestibilidade DIVMS */}
-            <tr>
-              <td className="p-3.5 font-bold text-slate-500 dark:text-zinc-400 bg-slate-50/50 dark:bg-zinc-800/30">
-                Digestibilidade (DIVMS)
-              </td>
-              {forages.map(f => (
-                <td key={f.id} className="p-3.5 font-bold text-blue-700 dark:text-blue-400">
-                  {f.bromatology.inVitroDryMatterDigestibilityPercent.average}%
-                </td>
-              ))}
-            </tr>
-
-            {/* Produção Matéria Seca */}
-            <tr>
-              <td className="p-3.5 font-bold text-slate-500 dark:text-zinc-400 bg-slate-50/50 dark:bg-zinc-800/30">
-                Produção t MS/ha/ano
-              </td>
-              {forages.map(f => (
-                <td key={f.id} className="p-3.5 font-bold text-amber-700 dark:text-amber-400">
-                  {f.dryMatterYieldTonHaYear.average} t/ha
-                </td>
-              ))}
-            </tr>
-
-            {/* Manejo de Entrada e Saída */}
-            <tr>
-              <td className="p-3.5 font-bold text-slate-500 dark:text-zinc-400 bg-slate-50/50 dark:bg-zinc-800/30">
-                Manejo Rotacionado
-              </td>
-              {forages.map(f => (
-                <td key={f.id} className="p-3.5 text-slate-800 dark:text-zinc-200">
-                  Entrada: <strong>{f.phenology.entryHeightRotationalCm} cm</strong> &bull; Saída: <strong>{f.phenology.exitHeightRotationalCm} cm</strong>
-                </td>
-              ))}
-            </tr>
-
-            {/* Fertilidade e Calagem V% */}
-            <tr>
-              <td className="p-3.5 font-bold text-slate-500 dark:text-zinc-400 bg-slate-50/50 dark:bg-zinc-800/30">
-                Fertilidade & V% Alvo
-              </td>
-              {forages.map(f => (
-                <td key={f.id} className="p-3.5 text-slate-800 dark:text-zinc-200 capitalize">
-                  {f.soilAndClimate.fertilityRequirement} (V = {f.fertilization.targetBaseSaturationPercent}%)
-                </td>
-              ))}
-            </tr>
-
-            {/* Tolerância a Encharcamento */}
-            <tr>
-              <td className="p-3.5 font-bold text-slate-500 dark:text-zinc-400 bg-slate-50/50 dark:bg-zinc-800/30">
-                Encharcamento / Várzea
-              </td>
-              {forages.map(f => (
-                <td key={f.id} className="p-3.5 text-slate-800 dark:text-zinc-200">
-                  {f.soilAndClimate.waterloggingTolerance}
-                </td>
-              ))}
-            </tr>
-
-            {/* Tolerância à Seca */}
-            <tr>
-              <td className="p-3.5 font-bold text-slate-500 dark:text-zinc-400 bg-slate-50/50 dark:bg-zinc-800/30">
-                Tolerância à Seca
-              </td>
-              {forages.map(f => (
-                <td key={f.id} className="p-3.5 text-slate-800 dark:text-zinc-200">
-                  {f.phenology.droughtTolerance}
-                </td>
-              ))}
-            </tr>
-
-            {/* Principais Vantagens */}
-            <tr>
-              <td className="p-3.5 font-bold text-slate-500 dark:text-zinc-400 bg-slate-50/50 dark:bg-zinc-800/30">
-                Ponto Forte Principal
-              </td>
-              {forages.map(f => (
-                <td key={f.id} className="p-3.5 text-slate-700 dark:text-zinc-300 text-[11.5px]">
-                  {f.strengthsAndWeaknesses.strengths[0]}
-                </td>
-              ))}
-            </tr>
-
-            {/* Limitação */}
-            <tr>
-              <td className="p-3.5 font-bold text-slate-500 dark:text-zinc-400 bg-slate-50/50 dark:bg-zinc-800/30">
-                Limitação / Atenção
-              </td>
-              {forages.map(f => (
-                <td key={f.id} className="p-3.5 text-rose-700 dark:text-rose-400 text-[11.5px]">
-                  {f.strengthsAndWeaknesses.weaknesses[0]}
-                </td>
-              ))}
-            </tr>
-
-            {/* Ação */}
-            <tr>
-              <td className="p-3.5 bg-slate-50/50 dark:bg-zinc-800/30" />
-              {forages.map(f => (
-                <td key={f.id} className="p-3.5">
-                  <button
-                    type="button"
-                    onClick={() => onSelectForage(f)}
-                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer"
-                  >
-                    <span>Ficha Completa</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </button>
-                </td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

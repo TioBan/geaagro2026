@@ -56,7 +56,7 @@ export function calculatePlantabilityMetrics(
       depthStdDevCm: 0,
       igpScore: 0,
       igpClassification: 'Aguardando Amostragem',
-      igpColorClass: 'text-stone-600 bg-stone-100 dark:bg-zinc-800 border-stone-300 dark:border-zinc-700'
+      igpColorClass: 'text-slate-600 dark:text-zinc-300 bg-slate-50 dark:bg-zinc-950/60 border-slate-200 dark:border-zinc-800'
     };
   }
 
@@ -136,23 +136,23 @@ export function calculatePlantabilityMetrics(
   const igpScore = Number(Math.max(0, Math.min(100, igpRaw)).toFixed(1));
 
   let igpClassification: 'Excelente' | 'Muito bom' | 'Bom' | 'Atenção' | 'Crítico' = 'Bom';
-  let igpColorClass = 'text-yellow-600 bg-yellow-50 border-yellow-200';
+  let igpColorClass = 'text-amber-700 dark:text-amber-400 bg-amber-50/70 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/60';
 
   if (igpScore >= 95) {
     igpClassification = 'Excelente';
-    igpColorClass = 'text-emerald-700 bg-emerald-50 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-400';
+    igpColorClass = 'text-emerald-700 dark:text-emerald-400 bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/60';
   } else if (igpScore >= 90) {
     igpClassification = 'Muito bom';
-    igpColorClass = 'text-blue-700 bg-blue-50 border-blue-300 dark:bg-blue-950/40 dark:text-blue-400';
+    igpColorClass = 'text-blue-700 dark:text-blue-400 bg-blue-50/70 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900/60';
   } else if (igpScore >= 80) {
     igpClassification = 'Bom';
-    igpColorClass = 'text-amber-700 bg-amber-50 border-amber-300 dark:bg-amber-950/40 dark:text-amber-400';
+    igpColorClass = 'text-amber-700 dark:text-amber-400 bg-amber-50/70 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/60';
   } else if (igpScore >= 70) {
     igpClassification = 'Atenção';
-    igpColorClass = 'text-orange-700 bg-orange-50 border-orange-300 dark:bg-orange-950/40 dark:text-orange-400';
+    igpColorClass = 'text-orange-700 dark:text-orange-400 bg-orange-50/70 dark:bg-orange-950/30 border-orange-200 dark:border-orange-900/60';
   } else {
     igpClassification = 'Crítico';
-    igpColorClass = 'text-rose-700 bg-rose-50 border-rose-300 dark:bg-rose-950/40 dark:text-rose-400';
+    igpColorClass = 'text-rose-700 dark:text-rose-400 bg-rose-50/70 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/60';
   }
 
   return {

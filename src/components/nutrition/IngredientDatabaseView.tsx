@@ -1,19 +1,14 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { FeedIngredient, IngredientCategory } from '../../types/animalNutrition';
+import { getIngredientCategoryLabel, INGREDIENT_CATEGORIES } from './nutritionConstants';
 import {
   Plus,
   Edit2,
   Trash2,
   Search,
-  Filter,
-  Package,
-  Layers,
   AlertTriangle,
   Info,
-  DollarSign,
-  Truck,
-  CheckCircle2,
-  Sparkles,
+  X,
 } from 'lucide-react';
 
 interface Props {
@@ -22,6 +17,51 @@ interface Props {
   onDeleteIngredient: (id: string) => void;
 }
 
+const createEmptyIngredient = (): FeedIngredient => ({
+  id: `ing_custom_${Date.now()}`,
+  name: '',
+  category: 'energeticos',
+  pricePerKg: 1.2,
+  freightPerTon: 35.0,
+  operationalCostPct: 2.0,
+  stockKg: 5000,
+  minStockAlertKg: 1500,
+  supplier: 'Fornecedor Local',
+  notes: '',
+  isCustom: true,
+  bromatology: {
+    dryMatterPct: 88.0,
+    crudeProteinPct: 12.0,
+    metabolizableEnergyMcal: 2.7,
+    netEnergyElm: 1.8,
+    netEnergyElg: 1.2,
+    netEnergyEll: 1.65,
+    ndfPct: 20.0,
+    adfPct: 8.0,
+    tdnPct: 75.0,
+    peNdfPct: 5.0,
+    starchPct: 45.0,
+    sugarsPct: 3.0,
+    etherExtractPct: 3.0,
+    calciumPct: 0.1,
+    phosphorusPct: 0.25,
+    potassiumPct: 0.5,
+    magnesiumPct: 0.2,
+    sodiumPct: 0.03,
+    sulfurPct: 0.15,
+    chlorinePct: 0.05,
+    zincPpm: 25.0,
+    copperPpm: 5.0,
+    manganesePpm: 20.0,
+    seleniumPpm: 0.08,
+    cobaltPpm: 0.04,
+    iodinePpm: 0.05,
+    dmdPct: 80.0,
+    minInclusionPct: 0.0,
+    maxInclusionPct: 50.0,
+  },
+});
+
 export const IngredientDatabaseView: React.FC<Props> = ({
   ingredients,
   onSaveIngredient,
@@ -29,101 +69,16 @@ export const IngredientDatabaseView: React.FC<Props> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<IngredientCategory | 'todas'>('todas');
+  const [onlyLowStock, setOnlyLowStock] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<FeedIngredient | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-
-  // Form State for editing or creating
-  const [formData, setFormData] = useState<FeedIngredient>({
-    id: '',
-    name: '',
-    category: 'energeticos',
-    pricePerKg: 1.0,
-    freightPerTon: 40.0,
-    operationalCostPct: 2.0,
-    stockKg: 10000,
-    minStockAlertKg: 2000,
-    supplier: '',
-    notes: '',
-    bromatology: {
-      dryMatterPct: 88.0,
-      crudeProteinPct: 10.0,
-      metabolizableEnergyMcal: 2.8,
-      netEnergyElm: 1.9,
-      netEnergyElg: 1.25,
-      netEnergyEll: 1.75,
-      ndfPct: 15.0,
-      adfPct: 6.0,
-      tdnPct: 80.0,
-      peNdfPct: 4.0,
-      starchPct: 60.0,
-      sugarsPct: 3.0,
-      etherExtractPct: 3.5,
-      calciumPct: 0.05,
-      phosphorusPct: 0.30,
-      potassiumPct: 0.40,
-      magnesiumPct: 0.15,
-      sodiumPct: 0.02,
-      sulfurPct: 0.12,
-      chlorinePct: 0.05,
-      zincPpm: 20.0,
-      copperPpm: 4.0,
-      manganesePpm: 15.0,
-      seleniumPpm: 0.05,
-      cobaltPpm: 0.03,
-      iodinePpm: 0.05,
-      dmdPct: 85.0,
-      minInclusionPct: 0.0,
-      maxInclusionPct: 60.0,
-    },
-  });
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [formData, setFormData] = useState<FeedIngredient>(createEmptyIngredient);
 
   const openNewIngredientModal = () => {
     setIsEditMode(false);
-    setFormData({
-      id: `ing_custom_${Date.now()}`,
-      name: '',
-      category: 'energeticos',
-      pricePerKg: 1.2,
-      freightPerTon: 35.0,
-      operationalCostPct: 2.0,
-      stockKg: 5000,
-      minStockAlertKg: 1500,
-      supplier: 'Fornecedor Local',
-      notes: '',
-      isCustom: true,
-      bromatology: {
-        dryMatterPct: 88.0,
-        crudeProteinPct: 12.0,
-        metabolizableEnergyMcal: 2.7,
-        netEnergyElm: 1.8,
-        netEnergyElg: 1.2,
-        netEnergyEll: 1.65,
-        ndfPct: 20.0,
-        adfPct: 8.0,
-        tdnPct: 75.0,
-        peNdfPct: 5.0,
-        starchPct: 45.0,
-        sugarsPct: 3.0,
-        etherExtractPct: 3.0,
-        calciumPct: 0.10,
-        phosphorusPct: 0.25,
-        potassiumPct: 0.50,
-        magnesiumPct: 0.20,
-        sodiumPct: 0.03,
-        sulfurPct: 0.15,
-        chlorinePct: 0.05,
-        zincPpm: 25.0,
-        copperPpm: 5.0,
-        manganesePpm: 20.0,
-        seleniumPpm: 0.08,
-        cobaltPpm: 0.04,
-        iodinePpm: 0.05,
-        dmdPct: 80.0,
-        minInclusionPct: 0.0,
-        maxInclusionPct: 50.0,
-      },
-    });
+    setFormData(createEmptyIngredient());
     setIsModalOpen(true);
   };
 
@@ -139,586 +94,540 @@ export const IngredientDatabaseView: React.FC<Props> = ({
     setIsModalOpen(false);
   };
 
-  const filtered = ingredients.filter((ing) => {
-    const matchSearch =
-      ing.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (ing.supplier && ing.supplier.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchCat = selectedCategory === 'todas' || ing.category === selectedCategory;
-    return matchSearch && matchCat;
-  });
+  const lowStockCount = useMemo(
+    () => ingredients.filter((i) => i.stockKg <= i.minStockAlertKg).length,
+    [ingredients]
+  );
 
-  const categories: Array<{ id: IngredientCategory | 'todas'; label: string; icon: string }> = [
-    { id: 'todas', label: 'Todos os Alimentos', icon: '🌽' },
-    { id: 'energeticos', label: 'Energéticos', icon: '⚡' },
-    { id: 'proteicos', label: 'Proteicos', icon: '🥩' },
-    { id: 'volumosos', label: 'Volumosos / Silagens', icon: '🌾' },
-    { id: 'minerais', label: 'Macro & Micro Minerais', icon: '🧂' },
-    { id: 'vitaminas', label: 'Vitaminas & Premixes', icon: '💊' },
-    { id: 'aditivos', label: 'Aditivos & Moduladores', icon: '🔬' },
-  ];
+  const filtered = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    return ingredients.filter((ing) => {
+      const matchSearch =
+        !q ||
+        ing.name.toLowerCase().includes(q) ||
+        (ing.supplier && ing.supplier.toLowerCase().includes(q)) ||
+        (ing.notes && ing.notes.toLowerCase().includes(q));
+      const matchCat = selectedCategory === 'todas' || ing.category === selectedCategory;
+      const matchStock = !onlyLowStock || ing.stockKg <= ing.minStockAlertKg;
+      return matchSearch && matchCat && matchStock;
+    });
+  }, [ingredients, searchTerm, selectedCategory, onlyLowStock]);
+
+  const inputCls =
+    'w-full h-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-2.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-emerald-500';
 
   return (
-    <div id="ingredient-database-view" className="space-y-6">
+    <div id="ingredient-database-view" className="space-y-4">
       {/* Search & Category Filter */}
-      <div className="bg-slate-900/70 border border-slate-800 p-4 rounded-xl space-y-3">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Buscar ingrediente por nome, nutriente ou fornecedor..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500"
-            />
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 space-y-2.5">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 flex-1">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Buscar ingrediente por nome, fornecedor ou observação..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full h-8 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md pl-8 pr-3 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            {lowStockCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setOnlyLowStock((prev) => !prev)}
+                className={`h-8 px-2.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 border whitespace-nowrap shrink-0 transition-colors ${
+                  onlyLowStock
+                    ? 'bg-rose-600 text-white border-rose-600'
+                    : 'border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30'
+                }`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Estoque Baixo ({lowStockCount})
+              </button>
+            )}
           </div>
 
           <button
+            type="button"
             onClick={openNewIngredientModal}
-            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20 whitespace-nowrap transition-all"
+            className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-md inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 transition-colors"
           >
-            <Plus className="w-4 h-4" />
-            Cadastrar Ingrediente Personalizado
+            <Plus className="w-3.5 h-3.5" />
+            Novo Ingrediente
           </button>
         </div>
 
-        {/* Category Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-          {categories.map((cat) => (
+        {/* Category Filter Tabs */}
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
             <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all ${
-                selectedCategory === cat.id
-                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+              type="button"
+              onClick={() => setSelectedCategory('todas')}
+              className={`h-7 px-2.5 rounded-md text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
+                selectedCategory === 'todas'
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
-              <span>{cat.icon}</span>
-              <span>{cat.label}</span>
+              Todos ({ingredients.length})
             </button>
-          ))}
+            {INGREDIENT_CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`h-7 px-2.5 rounded-md text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
+                  selectedCategory === cat.id
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums whitespace-nowrap shrink-0 hidden sm:inline">
+            {filtered.length} exibidos
+          </span>
         </div>
       </div>
 
       {/* Ingredients Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((ing) => {
-          const isLowStock = ing.stockKg <= ing.minStockAlertKg;
-          const costPerKgMs =
-            ing.bromatology.dryMatterPct > 0
-              ? (ing.pricePerKg / (ing.bromatology.dryMatterPct / 100)).toFixed(2)
-              : ing.pricePerKg.toFixed(2);
+      {filtered.length === 0 ? (
+        <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 rounded-lg py-10 px-4 text-center">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Nenhum ingrediente encontrado
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Ajuste os filtros ou cadastre um ingrediente personalizado com sua análise bromatológica.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          {filtered.map((ing) => {
+            const isLowStock = ing.stockKg <= ing.minStockAlertKg;
+            const costPerKgMs =
+              ing.bromatology.dryMatterPct > 0
+                ? (ing.pricePerKg / (ing.bromatology.dryMatterPct / 100)).toFixed(2)
+                : ing.pricePerKg.toFixed(2);
 
-          return (
-            <div
-              key={ing.id}
-              className={`bg-slate-900/80 border rounded-xl p-4 flex flex-col justify-between transition-all ${
-                isLowStock
-                  ? 'border-rose-900/50 hover:border-rose-700'
-                  : 'border-slate-800 hover:border-slate-700'
-              }`}
-            >
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-300">
-                    {ing.category}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    {ing.isCustom && (
-                      <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-blue-500/20 text-blue-300 rounded">
-                        Personalizado
-                      </span>
-                    )}
-                    {isLowStock && (
-                      <span className="px-1.5 py-0.5 text-[9px] font-bold bg-rose-500/20 text-rose-400 rounded flex items-center gap-0.5">
-                        <AlertTriangle className="w-2.5 h-2.5" />
-                        Estoque Baixo
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <h4 className="text-sm font-bold text-white mt-2">{ing.name}</h4>
-                <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
-                  {ing.notes || ing.supplier || 'Padrão Tabela Nacional de Bromatologia'}
-                </p>
-
-                {/* Key Bromatology Mini Metrics */}
-                <div className="grid grid-cols-4 gap-1.5 mt-3 pt-3 border-t border-slate-800/80 text-center">
-                  <div className="bg-slate-800/60 p-1.5 rounded">
-                    <span className="text-[9px] text-slate-400 block">% MS</span>
-                    <strong className="text-xs text-white">{ing.bromatology.dryMatterPct}%</strong>
-                  </div>
-                  <div className="bg-slate-800/60 p-1.5 rounded">
-                    <span className="text-[9px] text-slate-400 block">% PB</span>
-                    <strong className="text-xs text-emerald-400">{ing.bromatology.crudeProteinPct}%</strong>
-                  </div>
-                  <div className="bg-slate-800/60 p-1.5 rounded">
-                    <span className="text-[9px] text-slate-400 block">% NDT</span>
-                    <strong className="text-xs text-blue-400">{ing.bromatology.tdnPct}%</strong>
-                  </div>
-                  <div className="bg-slate-800/60 p-1.5 rounded">
-                    <span className="text-[9px] text-slate-400 block">% FDN</span>
-                    <strong className="text-xs text-amber-400">{ing.bromatology.ndfPct}%</strong>
-                  </div>
-                </div>
-
-                {/* Stock & Cost Metrics */}
-                <div className="mt-3 bg-slate-800/40 p-2 rounded-lg text-xs space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Preço MN:</span>
-                    <strong className="text-slate-200">R$ {ing.pricePerKg.toFixed(2)} / kg</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Custo base MS:</span>
-                    <strong className="text-emerald-400">R$ {costPerKgMs} / kg MS</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Estoque Disponível:</span>
-                    <span className={`font-semibold ${isLowStock ? 'text-rose-400' : 'text-slate-300'}`}>
-                      {(ing.stockKg / 1000).toFixed(1)} t
+            return (
+              <div
+                key={ing.id}
+                className={`bg-white dark:bg-slate-900 border rounded-lg p-4 flex flex-col justify-between transition-colors ${
+                  isLowStock
+                    ? 'border-rose-200 dark:border-rose-900/60'
+                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                    <span>
+                      {getIngredientCategoryLabel(ing.category)}
+                      {ing.isCustom ? ' · Personalizado' : ''}
                     </span>
+                    {isLowStock && (
+                      <span className="text-rose-700 dark:text-rose-400 font-semibold inline-flex items-center gap-1 shrink-0">
+                        <AlertTriangle className="w-3 h-3" />
+                        Estoque baixo
+                      </span>
+                    )}
+                  </div>
+
+                  <h4 className="text-sm font-semibold text-slate-900 dark:text-white mt-1.5">
+                    {ing.name}
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
+                    {ing.notes || ing.supplier || 'Tabela Nacional de Bromatologia'}
+                  </p>
+
+                  {/* Bromatology Metrics */}
+                  <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs tabular-nums">
+                    <div>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block">MS</span>
+                      <strong className="text-slate-900 dark:text-slate-100">{ing.bromatology.dryMatterPct}%</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block">PB</span>
+                      <strong className="text-emerald-700 dark:text-emerald-400">{ing.bromatology.crudeProteinPct}%</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block">NDT</span>
+                      <strong className="text-slate-900 dark:text-slate-100">{ing.bromatology.tdnPct}%</strong>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block">FDN</span>
+                      <strong className="text-slate-900 dark:text-slate-100">{ing.bromatology.ndfPct}%</strong>
+                    </div>
+                  </div>
+
+                  {/* Cost & Stock */}
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 text-xs space-y-1 tabular-nums">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Preço MN / Base MS</span>
+                      <span className="text-slate-800 dark:text-slate-200 font-medium">
+                        R$ {ing.pricePerKg.toFixed(2)} · <strong className="text-emerald-700 dark:text-emerald-400">R$ {costPerKgMs}/kg MS</strong>
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Estoque Disponível</span>
+                      <span className={`font-semibold ${isLowStock ? 'text-rose-700 dark:text-rose-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                        {(ing.stockKg / 1000).toFixed(1)} t
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Action Buttons */}
-              <div className="mt-3 pt-2.5 border-t border-slate-800 flex items-center justify-between">
-                <button
-                  onClick={() => setSelectedIngredient(ing)}
-                  className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1"
-                >
-                  <Info className="w-3.5 h-3.5" />
-                  Ver Ficha Completa
-                </button>
-
-                <div className="flex items-center gap-1">
+                <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
                   <button
-                    onClick={() => openEditModal(ing)}
-                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-all"
-                    title="Editar Preço e Estoque"
+                    type="button"
+                    onClick={() => setSelectedIngredient(ing)}
+                    className="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline inline-flex items-center gap-1"
                   >
-                    <Edit2 className="w-3.5 h-3.5" />
+                    <Info className="w-3.5 h-3.5" />
+                    Ficha Bromatológica
                   </button>
-                  {ing.isCustom && (
-                    <button
-                      onClick={() => onDeleteIngredient(ing.id)}
-                      className="p-1.5 bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-400 rounded transition-all"
-                      title="Excluir"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+
+                  {confirmDeleteId === ing.id ? (
+                    <div className="flex items-center gap-1 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onDeleteIngredient(ing.id);
+                          setConfirmDeleteId(null);
+                        }}
+                        className="h-7 px-2 bg-rose-600 hover:bg-rose-700 text-white rounded-md font-medium"
+                      >
+                        Excluir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="h-7 px-2 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-md"
+                      >
+                        Não
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(ing)}
+                        className="h-7 w-7 inline-flex items-center justify-center border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md transition-colors"
+                        title="Editar preço, estoque e bromatologia"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      {ing.isCustom && (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteId(ing.id)}
+                          className="h-7 w-7 inline-flex items-center justify-center border border-slate-200 dark:border-slate-700 hover:border-rose-300 dark:hover:border-rose-800 hover:text-rose-600 dark:hover:text-rose-400 text-slate-500 dark:text-slate-400 rounded-md transition-colors"
+                          title="Excluir ingrediente personalizado"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
-      {/* Ingredient Detailed Bromatology Modal */}
+      {/* Detailed Bromatology Modal */}
       {selectedIngredient && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-4 my-8">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl max-w-3xl w-full shadow-lg my-6 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
-                  Ficha Bromatológica Completa
-                </span>
-                <h3 className="text-base font-bold text-white mt-0.5">{selectedIngredient.name}</h3>
+                <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                  Ficha Bromatológica Completa · {getIngredientCategoryLabel(selectedIngredient.category)}
+                </p>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white mt-0.5">
+                  {selectedIngredient.name}
+                </h3>
               </div>
               <button
+                type="button"
                 onClick={() => setSelectedIngredient(null)}
-                className="text-slate-400 hover:text-white text-lg font-bold"
+                aria-label="Fechar ficha"
+                className="h-7 w-7 inline-flex items-center justify-center text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
               >
-                &times;
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-4 text-xs max-h-[70vh] overflow-y-auto pr-1">
-              {/* Energy & Macronutrients */}
+            <div className="p-5 space-y-4 text-xs max-h-[72vh] overflow-y-auto tabular-nums">
               <div>
-                <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wide mb-2">
-                  1. Energia & Frações Fibrosas (% na Matéria Seca)
+                <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-2">
+                  1. Energia & Frações Fibrosas (% na MS)
                 </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">Matéria Seca (% MS)</span>
-                    <strong className="text-white text-sm">{selectedIngredient.bromatology.dryMatterPct}%</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">Proteína Bruta (% PB)</span>
-                    <strong className="text-emerald-400 text-sm">{selectedIngredient.bromatology.crudeProteinPct}%</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">NDT (% MS)</span>
-                    <strong className="text-blue-400 text-sm">{selectedIngredient.bromatology.tdnPct}%</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">Energia Met. (Mcal/kg)</span>
-                    <strong className="text-amber-400 text-sm">{selectedIngredient.bromatology.metabolizableEnergyMcal}</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">FDN Total (% MS)</span>
-                    <strong className="text-white text-sm">{selectedIngredient.bromatology.ndfPct}%</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">FDN Efetivo (% FDNef)</span>
-                    <strong className="text-emerald-300 text-sm">{selectedIngredient.bromatology.peNdfPct}%</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">FDA (% MS)</span>
-                    <strong className="text-white text-sm">{selectedIngredient.bromatology.adfPct}%</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">Amido Total (% MS)</span>
-                    <strong className="text-white text-sm">{selectedIngredient.bromatology.starchPct}%</strong>
-                  </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 border border-slate-200 dark:border-slate-800 rounded-lg divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-slate-800">
+                  {[
+                    ['Matéria Seca', `${selectedIngredient.bromatology.dryMatterPct}%`],
+                    ['Proteína Bruta', `${selectedIngredient.bromatology.crudeProteinPct}%`],
+                    ['NDT', `${selectedIngredient.bromatology.tdnPct}%`],
+                    ['Energia Met.', `${selectedIngredient.bromatology.metabolizableEnergyMcal} Mcal/kg`],
+                  ].map(([label, val]) => (
+                    <div key={label} className="p-2.5">
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 block">{label}</span>
+                      <strong className="text-slate-900 dark:text-white text-sm">{val}</strong>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 border border-t-0 border-slate-200 dark:border-slate-800 rounded-b-lg -mt-1 pt-1 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-slate-800">
+                  {[
+                    ['FDN Total', `${selectedIngredient.bromatology.ndfPct}%`],
+                    ['peNDF (Efetivo)', `${selectedIngredient.bromatology.peNdfPct}%`],
+                    ['FDA', `${selectedIngredient.bromatology.adfPct}%`],
+                    ['Amido Total', `${selectedIngredient.bromatology.starchPct}%`],
+                  ].map(([label, val]) => (
+                    <div key={label} className="p-2.5">
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 block">{label}</span>
+                      <strong className="text-slate-900 dark:text-white">{val}</strong>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* Net Energies & Minerals */}
               <div>
-                <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wide mb-2">
+                <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-2">
                   2. Energias Líquidas & Macro Minerais
                 </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">ELm - Manutenção</span>
-                    <strong className="text-white text-xs">{selectedIngredient.bromatology.netEnergyElm} Mcal/kg</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">ELg - Ganho de Peso</span>
-                    <strong className="text-white text-xs">{selectedIngredient.bromatology.netEnergyElg} Mcal/kg</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">ELl - Lactação</span>
-                    <strong className="text-white text-xs">{selectedIngredient.bromatology.netEnergyEll} Mcal/kg</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">Extrato Etéreo (EE)</span>
-                    <strong className="text-white text-xs">{selectedIngredient.bromatology.etherExtractPct}%</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">Cálcio (Ca)</span>
-                    <strong className="text-white text-xs">{selectedIngredient.bromatology.calciumPct}%</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">Fósforo (P)</span>
-                    <strong className="text-white text-xs">{selectedIngredient.bromatology.phosphorusPct}%</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">Potássio (K)</span>
-                    <strong className="text-white text-xs">{selectedIngredient.bromatology.potassiumPct}%</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">Magnésio (Mg)</span>
-                    <strong className="text-white text-xs">{selectedIngredient.bromatology.magnesiumPct}%</strong>
-                  </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    ['ELm Manutenção', `${selectedIngredient.bromatology.netEnergyElm} Mcal/kg`],
+                    ['ELg Ganho', `${selectedIngredient.bromatology.netEnergyElg} Mcal/kg`],
+                    ['ELl Lactação', `${selectedIngredient.bromatology.netEnergyEll} Mcal/kg`],
+                    ['Extrato Etéreo', `${selectedIngredient.bromatology.etherExtractPct}%`],
+                    ['Cálcio (Ca)', `${selectedIngredient.bromatology.calciumPct}%`],
+                    ['Fósforo (P)', `${selectedIngredient.bromatology.phosphorusPct}%`],
+                    ['Potássio (K)', `${selectedIngredient.bromatology.potassiumPct}%`],
+                    ['Magnésio (Mg)', `${selectedIngredient.bromatology.magnesiumPct}%`],
+                  ].map(([label, val]) => (
+                    <div key={label} className="bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 p-2 rounded-md">
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 block">{label}</span>
+                      <strong className="text-slate-900 dark:text-slate-100">{val}</strong>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* Electrolytes and Trace Elements */}
               <div>
-                <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wide mb-2">
-                  3. Eletrólitos & Micro Minerais (DCAD & Quelatos)
+                <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100 mb-2">
+                  3. Eletrólitos & Micro Minerais
                 </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-center">
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">Sódio (Na)</span>
-                    <strong className="text-white text-xs">{selectedIngredient.bromatology.sodiumPct}%</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">Cloro (Cl)</span>
-                    <strong className="text-white text-xs">{selectedIngredient.bromatology.chlorinePct}%</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">Enxofre (S)</span>
-                    <strong className="text-white text-xs">{selectedIngredient.bromatology.sulfurPct}%</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">Zinco (Zn)</span>
-                    <strong className="text-white text-xs">{selectedIngredient.bromatology.zincPpm} ppm</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">Cobre (Cu)</span>
-                    <strong className="text-white text-xs">{selectedIngredient.bromatology.copperPpm} ppm</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg">
-                    <span className="text-slate-400 block text-[10px]">Selênio (Se)</span>
-                    <strong className="text-white text-xs">{selectedIngredient.bromatology.seleniumPpm} ppm</strong>
-                  </div>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                  {[
+                    ['Sódio (Na)', `${selectedIngredient.bromatology.sodiumPct}%`],
+                    ['Cloro (Cl)', `${selectedIngredient.bromatology.chlorinePct}%`],
+                    ['Enxofre (S)', `${selectedIngredient.bromatology.sulfurPct}%`],
+                    ['Zinco (Zn)', `${selectedIngredient.bromatology.zincPpm} ppm`],
+                    ['Cobre (Cu)', `${selectedIngredient.bromatology.copperPpm} ppm`],
+                    ['Selênio (Se)', `${selectedIngredient.bromatology.seleniumPpm} ppm`],
+                  ].map(([label, val]) => (
+                    <div key={label} className="bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 p-2 rounded-md">
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block">{label}</span>
+                      <strong className="text-slate-900 dark:text-slate-100">{val}</strong>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* Limits and Notes */}
-              <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Limites de Inclusão Sugeridos na Dieta:</span>
-                  <strong className="text-emerald-400">
-                    Min {selectedIngredient.bromatology.minInclusionPct}% — Máx {selectedIngredient.bromatology.maxInclusionPct}% da MS
+              <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-lg border border-slate-200 dark:border-slate-800 space-y-1.5">
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-500 dark:text-slate-400">Inclusão recomendada na MS</span>
+                  <strong className="text-emerald-700 dark:text-emerald-400">
+                    Mín {selectedIngredient.bromatology.minInclusionPct}% — Máx {selectedIngredient.bromatology.maxInclusionPct}%
                   </strong>
                 </div>
                 {selectedIngredient.bromatology.antiNutritionalFactors && (
-                  <div className="text-slate-300">
-                    <span className="text-amber-400 font-semibold block">Fatores Antinutricionais / Atenção:</span>
-                    <span>{selectedIngredient.bromatology.antiNutritionalFactors}</span>
-                  </div>
+                  <p className="text-slate-600 dark:text-slate-300">
+                    <strong className="text-amber-700 dark:text-amber-400">Fatores Antinutricionais:</strong>{' '}
+                    {selectedIngredient.bromatology.antiNutritionalFactors}
+                  </p>
                 )}
                 {selectedIngredient.bromatology.processingType && (
-                  <div className="text-slate-300">
-                    <span className="text-slate-400 font-semibold block">Processamento / Granulometria Recomendada:</span>
-                    <span>{selectedIngredient.bromatology.processingType}</span>
-                  </div>
+                  <p className="text-slate-600 dark:text-slate-300">
+                    <strong className="text-slate-800 dark:text-slate-200">Processamento:</strong>{' '}
+                    {selectedIngredient.bromatology.processingType}
+                  </p>
                 )}
               </div>
             </div>
 
-            <div className="flex justify-end pt-3 border-t border-slate-800">
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
               <button
-                onClick={() => setSelectedIngredient(null)}
-                className="px-4 py-2 bg-emerald-500 text-slate-950 font-bold rounded-lg"
+                type="button"
+                onClick={() => {
+                  const target = selectedIngredient;
+                  setSelectedIngredient(null);
+                  openEditModal(target);
+                }}
+                className="h-8 px-3 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-md text-xs font-medium transition-colors"
               >
-                Fechar Ficha
+                Editar Parâmetros
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedIngredient(null)}
+                className="h-8 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-medium transition-colors"
+              >
+                Fechar
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Edit / Create Ingredient Modal */}
+      {/* Edit / Create Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 my-8">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Package className="w-5 h-5 text-emerald-400" />
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl max-w-2xl w-full shadow-lg my-6 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
                 {isEditMode ? 'Editar Parâmetros & Estoque do Ingrediente' : 'Novo Ingrediente Personalizado'}
               </h3>
               <button
+                type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-white text-lg font-bold"
+                aria-label="Fechar modal"
+                className="h-7 w-7 inline-flex items-center justify-center text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
               >
-                &times;
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-4 text-xs max-h-[75vh] overflow-y-auto pr-1">
+            <form onSubmit={handleSave} className="p-5 space-y-4 text-xs max-h-[76vh] overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1">Nome do Ingrediente *</label>
+                  <label className="text-slate-600 dark:text-slate-400 font-medium block mb-1">Nome do Ingrediente *</label>
                   <input
                     type="text"
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                    className={inputCls}
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1">Categoria *</label>
+                  <label className="text-slate-600 dark:text-slate-400 font-medium block mb-1">Categoria *</label>
                   <select
                     value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value as IngredientCategory })}
+                    className={inputCls}
                   >
-                    <option value="energeticos">Energéticos</option>
-                    <option value="proteicos">Proteicos</option>
-                    <option value="volumosos">Volumosos / Silagens</option>
-                    <option value="minerais">Minerais</option>
-                    <option value="vitaminas">Vitaminas & Premixes</option>
-                    <option value="aditivos">Aditivos & Moduladores</option>
+                    {INGREDIENT_CATEGORIES.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
 
-              {/* Economic & Stock Fields */}
-              <div className="bg-slate-800/40 p-3 rounded-xl border border-slate-700/60 space-y-3">
-                <span className="text-emerald-400 font-bold block">Preços, Frete & Estoque</span>
+              <div className="bg-slate-50 dark:bg-slate-800/40 p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 space-y-3">
+                <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 block">
+                  Preços, Frete & Estoque
+                </span>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
-                    <label className="text-slate-400 block mb-1">Preço Base (R$/kg)</label>
+                    <label className="text-slate-600 dark:text-slate-400 font-medium block mb-1">Preço Base (R$/kg)</label>
                     <input
                       type="number"
                       step="0.01"
                       required
                       value={formData.pricePerKg}
                       onChange={(e) => setFormData({ ...formData, pricePerKg: Number(e.target.value) })}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                      className={`${inputCls} tabular-nums`}
                     />
                   </div>
                   <div>
-                    <label className="text-slate-400 block mb-1">Frete (R$/tonelada)</label>
+                    <label className="text-slate-600 dark:text-slate-400 font-medium block mb-1">Frete (R$/t)</label>
                     <input
                       type="number"
                       step="1"
                       value={formData.freightPerTon}
                       onChange={(e) => setFormData({ ...formData, freightPerTon: Number(e.target.value) })}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                      className={`${inputCls} tabular-nums`}
                     />
                   </div>
                   <div>
-                    <label className="text-slate-400 block mb-1">Estoque Atual (kg)</label>
+                    <label className="text-slate-600 dark:text-slate-400 font-medium block mb-1">Estoque Atual (kg)</label>
                     <input
                       type="number"
                       step="100"
                       value={formData.stockKg}
                       onChange={(e) => setFormData({ ...formData, stockKg: Number(e.target.value) })}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                      className={`${inputCls} tabular-nums`}
                     />
                   </div>
                   <div>
-                    <label className="text-slate-400 block mb-1">Alerta Mínimo (kg)</label>
+                    <label className="text-slate-600 dark:text-slate-400 font-medium block mb-1">Alerta Mínimo (kg)</label>
                     <input
                       type="number"
                       step="100"
                       value={formData.minStockAlertKg}
                       onChange={(e) => setFormData({ ...formData, minStockAlertKg: Number(e.target.value) })}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                      className={`${inputCls} tabular-nums`}
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Bromatological Values */}
-              <div className="bg-slate-800/40 p-3 rounded-xl border border-slate-700/60 space-y-3">
-                <span className="text-emerald-400 font-bold block">Composição Bromatológica (% na MS)</span>
+              <div className="bg-slate-50 dark:bg-slate-800/40 p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 space-y-3">
+                <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 block">
+                  Composição Bromatológica (% na MS)
+                </span>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div>
-                    <label className="text-slate-400 block mb-1">% Matéria Seca</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={formData.bromatology.dryMatterPct}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          bromatology: { ...formData.bromatology, dryMatterPct: Number(e.target.value) },
-                        })
-                      }
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-400 block mb-1">% Proteína Bruta</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={formData.bromatology.crudeProteinPct}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          bromatology: { ...formData.bromatology, crudeProteinPct: Number(e.target.value) },
-                        })
-                      }
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-400 block mb-1">% NDT</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={formData.bromatology.tdnPct}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          bromatology: { ...formData.bromatology, tdnPct: Number(e.target.value) },
-                        })
-                      }
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-400 block mb-1">% FDN Total</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={formData.bromatology.ndfPct}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          bromatology: { ...formData.bromatology, ndfPct: Number(e.target.value) },
-                        })
-                      }
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-400 block mb-1">% FDN Efetivo (peNDF)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={formData.bromatology.peNdfPct}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          bromatology: { ...formData.bromatology, peNdfPct: Number(e.target.value) },
-                        })
-                      }
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-400 block mb-1">% Amido</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={formData.bromatology.starchPct}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          bromatology: { ...formData.bromatology, starchPct: Number(e.target.value) },
-                        })
-                      }
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-400 block mb-1">% Cálcio (Ca)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.bromatology.calciumPct}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          bromatology: { ...formData.bromatology, calciumPct: Number(e.target.value) },
-                        })
-                      }
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-400 block mb-1">% Fósforo (P)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.bromatology.phosphorusPct}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          bromatology: { ...formData.bromatology, phosphorusPct: Number(e.target.value) },
-                        })
-                      }
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
-                    />
-                  </div>
+                  {(
+                    [
+                      ['% Matéria Seca', 'dryMatterPct', '0.1'],
+                      ['% Proteína Bruta', 'crudeProteinPct', '0.1'],
+                      ['% NDT', 'tdnPct', '0.1'],
+                      ['% FDN Total', 'ndfPct', '0.1'],
+                      ['% peNDF', 'peNdfPct', '0.1'],
+                      ['% Amido', 'starchPct', '0.1'],
+                      ['% Cálcio (Ca)', 'calciumPct', '0.01'],
+                      ['% Fósforo (P)', 'phosphorusPct', '0.01'],
+                    ] as const
+                  ).map(([label, field, step]) => (
+                    <div key={field}>
+                      <label className="text-slate-600 dark:text-slate-400 font-medium block mb-1">{label}</label>
+                      <input
+                        type="number"
+                        step={step}
+                        value={formData.bromatology[field]}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            bromatology: { ...formData.bromatology, [field]: Number(e.target.value) },
+                          })
+                        }
+                        className={`${inputCls} tabular-nums`}
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium"
+                  className="h-8 px-3 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-md font-medium transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-lg shadow-lg shadow-emerald-500/20"
+                  className="h-8 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-md transition-colors"
                 >
                   Salvar Ingrediente
                 </button>

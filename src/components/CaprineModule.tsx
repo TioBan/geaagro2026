@@ -1,10 +1,11 @@
-// @ts-nocheck
 import React, { useState, useEffect } from 'react';
 import {
   loadCaprineAnimals,
   saveCaprineAnimals,
   loadCaprineMilkLogs,
   saveCaprineMilkLogs,
+  loadCaprineMeatLogs,
+  saveCaprineMeatLogs,
   loadCaprineWeighings,
   saveCaprineWeighings,
   loadCaprineHealth,
@@ -26,8 +27,10 @@ import {
 } from '../utils/caprineStorage';
 
 import {
+  CaprineTab,
   CaprineAnimal,
   CaprineMilkRecord,
+  CaprineMeatRecord,
   CaprineWeighingRecord,
   CaprineHealthRecord,
   CaprineReproductionRecord,
@@ -55,7 +58,6 @@ import { CaprinePhotoDiaryView } from './caprinos/CaprinePhotoDiaryView';
 import { CaprineFacilitiesView } from './caprinos/CaprineFacilitiesView';
 import { CaprineReportsView } from './caprinos/CaprineReportsView';
 import { CaprineDiseaseLibraryView } from './caprinos/CaprineDiseaseLibraryView';
-import { CaprinoIcon } from './icons/CaprinoIcon';
 
 import {
   LayoutDashboard,
@@ -73,98 +75,122 @@ import {
   Camera,
   Home,
   FileText,
-  WifiOff,
   BookOpen
 } from 'lucide-react';
-
-type CaprineTab =
-  | 'dashboard'
-  | 'digital_twin'
-  | 'registry'
-  | 'genealogy'
-  | 'reproduction'
-  | 'kids'
-  | 'milk'
-  | 'meat'
-  | 'nutrition'
-  | 'pastures'
-  | 'health'
-  | 'pharmacy'
-  | 'photo_diary'
-  | 'facilities'
-  | 'disease_library'
-  | 'reports';
 
 interface CaprineModuleProps {
   activeSubTab?: string;
   setActiveSubTab?: (subTab: string) => void;
 }
 
+const VALID_TABS: CaprineTab[] = [
+  'dashboard',
+  'digital_twin',
+  'registry',
+  'genealogy',
+  'reproduction',
+  'kids',
+  'milk',
+  'meat',
+  'nutrition',
+  'pastures',
+  'health',
+  'pharmacy',
+  'disease_library',
+  'photo_diary',
+  'facilities',
+  'reports'
+];
+
+const SUB_NAV_TABS: { id: CaprineTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'dashboard', label: 'Painel', icon: LayoutDashboard },
+  { id: 'digital_twin', label: 'Gêmeo 360°', icon: Sparkles },
+  { id: 'registry', label: 'Cadastro RFID', icon: Users },
+  { id: 'genealogy', label: 'Genealogia', icon: Dna },
+  { id: 'reproduction', label: 'Reprodução', icon: Heart },
+  { id: 'kids', label: 'Cabritos', icon: Baby },
+  { id: 'milk', label: 'Leite', icon: Milk },
+  { id: 'meat', label: 'Carne & Peso', icon: Beef },
+  { id: 'nutrition', label: 'Nutrição NRC', icon: Wheat },
+  { id: 'pastures', label: 'Pastagens', icon: Sprout },
+  { id: 'health', label: 'Sanidade', icon: Syringe },
+  { id: 'pharmacy', label: 'Farmácia', icon: Package },
+  { id: 'disease_library', label: 'Patologias', icon: BookOpen },
+  { id: 'photo_diary', label: 'Diário Visual', icon: Camera },
+  { id: 'facilities', label: 'Apriscos', icon: Home },
+  { id: 'reports', label: 'Relatórios', icon: FileText }
+];
+
+function resolveTab(raw?: string): CaprineTab {
+  if (raw && VALID_TABS.includes(raw as CaprineTab)) {
+    return raw as CaprineTab;
+  }
+  return 'dashboard';
+}
+
 export const CaprineModule: React.FC<CaprineModuleProps> = ({
-  activeSubTab = 'dashboard',
+  activeSubTab,
   setActiveSubTab
 }) => {
-  const [internalTab, setInternalTab] = useState<CaprineTab>((activeSubTab as CaprineTab) || 'dashboard');
-  const [selectedAnimalId, setSelectedAnimalId] = useState<string>('');
+  const [internalTab, setInternalTab] = useState<CaprineTab>(() => resolveTab(activeSubTab));
+  const [animals, setAnimals] = useState<CaprineAnimal[]>(() => loadCaprineAnimals());
+  const [selectedAnimalId, setSelectedAnimalId] = useState<string>(() => loadCaprineAnimals()[0]?.id || '');
+
+  const [milkLogs, setMilkLogs] = useState<CaprineMilkRecord[]>(() => loadCaprineMilkLogs());
+  const [meatLogs, setMeatLogs] = useState<CaprineMeatRecord[]>(() => loadCaprineMeatLogs());
+  const [weighings, setWeighings] = useState<CaprineWeighingRecord[]>(() => loadCaprineWeighings());
+  const [healthRecords, setHealthRecords] = useState<CaprineHealthRecord[]>(() => loadCaprineHealth());
+  const [reproductionRecords, setReproductionRecords] = useState<CaprineReproductionRecord[]>(() => loadCaprineReproduction());
+  const [kidRecords, setKidRecords] = useState<CaprineKidRecord[]>(() => loadCaprineKids());
+  const [feeds, setFeeds] = useState<CaprineFeedItem[]>(() => loadCaprineFeeds());
+  const [paddocks, setPaddocks] = useState<CaprinePasturePaddock[]>(() => loadCaprinePaddocks());
+  const [pharmacy, setPharmacy] = useState<CaprinePharmacyItem[]>(() => loadCaprinePharmacy());
+  const [photos, setPhotos] = useState<CaprinePhotoEntry[]>(() => loadCaprinePhotos());
+  const [facilities, setFacilities] = useState<CaprineFacility[]>(() => loadCaprineFacilities());
 
   useEffect(() => {
-    if (activeSubTab && activeSubTab !== internalTab) {
-      setInternalTab(activeSubTab as CaprineTab);
+    if (activeSubTab) {
+      const next = resolveTab(activeSubTab);
+      if (next !== internalTab) {
+        setInternalTab(next);
+      }
     }
-  }, [activeSubTab]);
+  }, [activeSubTab, internalTab]);
 
-  const activeTab = (activeSubTab as CaprineTab) || internalTab;
+  const activeTab: CaprineTab = activeSubTab ? resolveTab(activeSubTab) : internalTab;
 
-  const handleTabChange = (tab: CaprineTab | string) => {
-    setInternalTab(tab as CaprineTab);
+  const handleTabChange = (tab: CaprineTab) => {
+    setInternalTab(tab);
     if (setActiveSubTab) {
       setActiveSubTab(tab);
     }
   };
 
-  // Local storage states
-  const [animals, setAnimals] = useState<CaprineAnimal[]>([]);
-  const [milkLogs, setMilkLogs] = useState<CaprineMilkRecord[]>([]);
-  const [weighings, setWeighings] = useState<CaprineWeighingRecord[]>([]);
-  const [healthRecords, setHealthRecords] = useState<CaprineHealthRecord[]>([]);
-  const [reproductionRecords, setReproductionRecords] = useState<CaprineReproductionRecord[]>([]);
-  const [kidRecords, setKidRecords] = useState<CaprineKidRecord[]>([]);
-  const [feeds, setFeeds] = useState<CaprineFeedItem[]>([]);
-  const [paddocks, setPaddocks] = useState<CaprinePasturePaddock[]>([]);
-  const [pharmacy, setPharmacy] = useState<CaprinePharmacyItem[]>([]);
-  const [photos, setPhotos] = useState<CaprinePhotoEntry[]>([]);
-  const [facilities, setFacilities] = useState<CaprineFacility[]>([]);
+  const handleSelectAnimalForTwin = (id: string) => {
+    setSelectedAnimalId(id);
+    handleTabChange('digital_twin');
+  };
 
-  // Load from local storage on mount
-  useEffect(() => {
-    const loadedAnimals = loadCaprineAnimals();
-    setAnimals(loadedAnimals);
-    if (loadedAnimals.length > 0 && loadedAnimals[0]?.id) setSelectedAnimalId(loadedAnimals[0].id);
-
-    setMilkLogs(loadCaprineMilkLogs());
-    setWeighings(loadCaprineWeighings());
-    setHealthRecords(loadCaprineHealth());
-    setReproductionRecords(loadCaprineReproduction());
-    setKidRecords(loadCaprineKids());
-    setFeeds(loadCaprineFeeds());
-    setPaddocks(loadCaprinePaddocks());
-    setPharmacy(loadCaprinePharmacy());
-    setPhotos(loadCaprinePhotos());
-    setFacilities(loadCaprineFacilities());
-  }, []);
-
-  // Handlers for updating local state and local storage
   const handleSaveAnimal = (animal: CaprineAnimal) => {
     const existingIndex = animals.findIndex(a => a.id === animal.id);
-    let updated: CaprineAnimal[];
-    if (existingIndex >= 0) {
-      updated = [...animals];
-      updated[existingIndex] = animal;
-    } else {
-      updated = [animal, ...animals];
-    }
+    const updated =
+      existingIndex >= 0
+        ? animals.map(a => (a.id === animal.id ? animal : a))
+        : [animal, ...animals];
     setAnimals(updated);
     saveCaprineAnimals(updated);
+    if (!selectedAnimalId) {
+      setSelectedAnimalId(animal.id);
+    }
+  };
+
+  const handleDeleteAnimal = (id: string) => {
+    const updated = animals.filter(a => a.id !== id);
+    setAnimals(updated);
+    saveCaprineAnimals(updated);
+    if (selectedAnimalId === id) {
+      setSelectedAnimalId(updated[0]?.id || '');
+    }
   };
 
   const handleSaveMilkLog = (log: CaprineMilkRecord) => {
@@ -173,16 +199,46 @@ export const CaprineModule: React.FC<CaprineModuleProps> = ({
     saveCaprineMilkLogs(updated);
   };
 
+  const handleSaveMeatRecord = (rec: CaprineMeatRecord) => {
+    const updated = [rec, ...meatLogs];
+    setMeatLogs(updated);
+    saveCaprineMeatLogs(updated);
+  };
+
   const handleSaveWeighing = (wei: CaprineWeighingRecord) => {
     const updated = [wei, ...weighings];
     setWeighings(updated);
     saveCaprineWeighings(updated);
+
+    // Sync latest weight/ECC/FAMACHA back to animal profile
+    if (wei.animalId) {
+      const updatedAnimals = animals.map(a =>
+        a.id === wei.animalId
+          ? {
+              ...a,
+              weightKg: wei.weightKg,
+              bodyConditionScore: wei.bodyConditionScore ?? a.bodyConditionScore,
+              famachaScore: wei.famachaScore ?? a.famachaScore
+            }
+          : a
+      );
+      setAnimals(updatedAnimals);
+      saveCaprineAnimals(updatedAnimals);
+    }
   };
 
   const handleSaveHealthRecord = (rec: CaprineHealthRecord) => {
     const updated = [rec, ...healthRecords];
     setHealthRecords(updated);
     saveCaprineHealth(updated);
+
+    if (rec.animalId && rec.famachaScore) {
+      const updatedAnimals = animals.map(a =>
+        a.id === rec.animalId ? { ...a, famachaScore: rec.famachaScore } : a
+      );
+      setAnimals(updatedAnimals);
+      saveCaprineAnimals(updatedAnimals);
+    }
   };
 
   const handleSaveReproductionRecord = (rec: CaprineReproductionRecord) => {
@@ -210,7 +266,11 @@ export const CaprineModule: React.FC<CaprineModuleProps> = ({
   };
 
   const handleSavePharmacyItem = (item: CaprinePharmacyItem) => {
-    const updated = [item, ...pharmacy];
+    const existingIndex = pharmacy.findIndex(p => p.id === item.id);
+    const updated =
+      existingIndex >= 0
+        ? pharmacy.map(p => (p.id === item.id ? item : p))
+        : [item, ...pharmacy];
     setPharmacy(updated);
     saveCaprinePharmacy(updated);
   };
@@ -227,30 +287,34 @@ export const CaprineModule: React.FC<CaprineModuleProps> = ({
     saveCaprineFacilities(updated);
   };
 
-  // Sub-Navigation Tabs Config
-  const subNavTabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'digital_twin', label: 'Gêmeo Digital 360°', icon: Sparkles },
-    { id: 'registry', label: 'Cadastro (RFID)', icon: Users },
-    { id: 'genealogy', label: 'Genealogia', icon: Dna },
-    { id: 'reproduction', label: 'Reprodução & IA', icon: Heart },
-    { id: 'kids', label: 'Criação Cabritos', icon: Baby },
-    { id: 'milk', label: 'Produção Leite', icon: Milk },
-    { id: 'meat', label: 'Produção Carne', icon: Beef },
-    { id: 'nutrition', label: 'Nutrição (NRC)', icon: Wheat },
-    { id: 'pastures', label: 'Pastagens/Caprineira', icon: Sprout },
-    { id: 'health', label: 'Sanidade & FAMACHA', icon: Syringe },
-    { id: 'pharmacy', label: 'Farmácia', icon: Package },
-    { id: 'disease_library', label: 'Biblioteca de Doenças', icon: BookOpen },
-    { id: 'photo_diary', label: 'Diário Fotográfico', icon: Camera },
-    { id: 'facilities', label: 'Apriscos', icon: Home },
-    { id: 'reports', label: 'Relatórios & Exportar', icon: FileText }
-  ];
-
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-zinc-950 text-stone-900 dark:text-stone-100 p-4 md:p-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 pt-3 pb-10 space-y-5 text-slate-900 dark:text-zinc-100">
+      {/* Compact Horizontal Sub-Navigation Strip */}
+      <div className="border-b border-slate-200 dark:border-zinc-800 print:hidden">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar -mb-px pb-0.5">
+          {SUB_NAV_TABS.map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabChange(tab.id)}
+                className={`h-8 px-2.5 inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap shrink-0 border-b-2 transition-colors cursor-pointer ${
+                  isActive
+                    ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400'
+                    : 'border-transparent text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-      {/* Main Tab Content View Switcher */}
+      {/* Active Sub-View */}
       {activeTab === 'dashboard' && (
         <CaprineDashboardView
           animals={animals}
@@ -259,6 +323,7 @@ export const CaprineModule: React.FC<CaprineModuleProps> = ({
           healthRecords={healthRecords}
           onNavigate={handleTabChange}
           onOpenAddAnimalModal={() => handleTabChange('registry')}
+          onSelectAnimalForTwin={handleSelectAnimalForTwin}
         />
       )}
 
@@ -279,6 +344,8 @@ export const CaprineModule: React.FC<CaprineModuleProps> = ({
         <CaprineIndividualRegistryView
           animals={animals}
           onSaveAnimal={handleSaveAnimal}
+          onDeleteAnimal={handleDeleteAnimal}
+          onSelectAnimalForTwin={handleSelectAnimalForTwin}
         />
       )}
 
@@ -313,9 +380,9 @@ export const CaprineModule: React.FC<CaprineModuleProps> = ({
       {activeTab === 'meat' && (
         <CaprineMeatProductionView
           animals={animals}
-          meatRecords={[]}
+          meatRecords={meatLogs}
           weighings={weighings}
-          onSaveMeatRecord={() => {}}
+          onSaveMeatRecord={handleSaveMeatRecord}
           onSaveWeighing={handleSaveWeighing}
         />
       )}

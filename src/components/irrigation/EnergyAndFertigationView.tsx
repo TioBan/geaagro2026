@@ -9,7 +9,14 @@ import {
   Trash2,
   Sliders,
   RotateCcw,
+  Check,
+  X,
 } from 'lucide-react';
+import {
+  formatBrDate,
+  IRRIGATION_INPUT_CLASS,
+  IRRIGATION_LABEL_CLASS,
+} from './irrigationUi';
 
 interface Props {
   systems: IrrigationSystemRecord[];
@@ -27,58 +34,64 @@ export const EnergyAndFertigationView: React.FC<Props> = ({
   onClearFertigation,
 }) => {
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
-  const activeSystem = (selectedSystemId ? systems.find(s => s.id === selectedSystemId) : null) || systems[0] || null;
+  const activeSystem =
+    (selectedSystemId ? systems.find((s) => s.id === selectedSystemId) : null) ||
+    systems[0] ||
+    null;
 
-  // Energy Tariff Parameters (Default clean/empty states - no pre-filled fake data)
+  // Tariff Config
   const [kwhRate, setKwhRate] = useState<number | ''>('');
   const [nightDiscountPct, setNightDiscountPct] = useState<number | ''>('');
   const [showTariffConfig, setShowTariffConfig] = useState(false);
 
-  // Fertigation Form State (Clean / empty states - no pre-filled fake data)
+  // Fertigation Form
   const [fertilizerName, setFertilizerName] = useState('');
   const [amount, setAmount] = useState<number | ''>('');
   const [unit, setUnit] = useState<'kg' | 'L'>('kg');
   const [targetNutrients, setTargetNutrients] = useState('');
   const [injectionHours, setInjectionHours] = useState<number | ''>('');
-  const [compatibility, setCompatibility] = useState<FertigationProgramItem['compatibilityCheck']>('Compatível');
+  const [compatibility, setCompatibility] =
+    useState<FertigationProgramItem['compatibilityCheck']>('Compatível');
   const [formError, setFormError] = useState('');
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
 
-  // Dynamic Energy Calculations based on real systems and configured parameters
-  const { totalPowerKw, totalPumpsCount, effectiveDiscountPct, calculatedCostPerMmHa } = useMemo(() => {
-    // 1. Potência Instalada
-    const totalPower = systems.reduce((acc, s) => acc + (Number(s.powerKw) || 0), 0);
-    const pumpsCount = systems.reduce((acc, s) => {
-      const explicitPumps = s.equipments?.filter(e => e.category === 'Bomba' || e.category === 'Motor').length || 0;
-      return acc + (explicitPumps > 0 ? explicitPumps : (Number(s.powerKw) > 0 ? 1 : 0));
-    }, 0);
+  const { totalPowerKw, totalPumpsCount, effectiveDiscountPct, calculatedCostPerMmHa } =
+    useMemo(() => {
+      const totalPower = systems.reduce((acc, s) => acc + (Number(s.powerKw) || 0), 0);
+      const pumpsCount = systems.reduce((acc, s) => {
+        const explicitPumps =
+          s.equipments?.filter((e) => e.category === 'Bomba' || e.category === 'Motor').length || 0;
+        return acc + (explicitPumps > 0 ? explicitPumps : Number(s.powerKw) > 0 ? 1 : 0);
+      }, 0);
 
-    // 2. Economia Tarifa Noturna
-    const discount = typeof nightDiscountPct === 'number' && nightDiscountPct > 0 ? nightDiscountPct : 0;
+      const discount =
+        typeof nightDiscountPct === 'number' && nightDiscountPct > 0 ? nightDiscountPct : 0;
 
-    // 3. Custo Médio por mm/ha
-    // 1 mm em 1 ha = 10 m³. Tempo para bombear 10 m³ = 10 / vazão (h). Energia = tempo * potência (kWh)
-    let cost = 0;
-    if (activeSystem && Number(activeSystem.nominalFlowM3h) > 0 && Number(activeSystem.powerKw) > 0 && typeof kwhRate === 'number' && kwhRate > 0) {
-      const hoursPerMmHa = 10 / Number(activeSystem.nominalFlowM3h);
-      const kwhPerMmHa = hoursPerMmHa * Number(activeSystem.powerKw);
-      const effectiveRate = kwhRate * (1 - discount / 100);
-      cost = kwhPerMmHa * effectiveRate;
-    } else if (totalPower > 0 && typeof kwhRate === 'number' && kwhRate > 0) {
-      // Estimativa média geral
-      const avgFlow = systems.reduce((acc, s) => acc + (Number(s.nominalFlowM3h) || 0), 0) || 100;
-      const hoursPerMmHa = 10 / avgFlow;
-      const kwhPerMmHa = hoursPerMmHa * totalPower;
-      const effectiveRate = kwhRate * (1 - discount / 100);
-      cost = kwhPerMmHa * effectiveRate;
-    }
+      let cost = 0;
+      if (
+        activeSystem &&
+        Number(activeSystem.nominalFlowM3h) > 0 &&
+        Number(activeSystem.powerKw) > 0 &&
+        typeof kwhRate === 'number' &&
+        kwhRate > 0
+      ) {
+        const hoursPerMmHa = 10 / Number(activeSystem.nominalFlowM3h);
+        const kwhPerMmHa = hoursPerMmHa * Number(activeSystem.powerKw);
+        cost = kwhPerMmHa * (kwhRate * (1 - discount / 100));
+      } else if (totalPower > 0 && typeof kwhRate === 'number' && kwhRate > 0) {
+        const avgFlow = systems.reduce((acc, s) => acc + (Number(s.nominalFlowM3h) || 0), 0) || 100;
+        const hoursPerMmHa = 10 / avgFlow;
+        const kwhPerMmHa = hoursPerMmHa * totalPower;
+        cost = kwhPerMmHa * (kwhRate * (1 - discount / 100));
+      }
 
-    return {
-      totalPowerKw: totalPower,
-      totalPumpsCount: pumpsCount,
-      effectiveDiscountPct: discount,
-      calculatedCostPerMmHa: cost,
-    };
-  }, [systems, activeSystem, nightDiscountPct, kwhRate]);
+      return {
+        totalPowerKw: totalPower,
+        totalPumpsCount: pumpsCount,
+        effectiveDiscountPct: discount,
+        calculatedCostPerMmHa: cost,
+      };
+    }, [systems, activeSystem, nightDiscountPct, kwhRate]);
 
   const handleCreateFertigation = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,25 +101,22 @@ export const EnergyAndFertigationView: React.FC<Props> = ({
       setFormError('Selecione ou cadastre um sistema de irrigação antes de agendar.');
       return;
     }
-
     if (!fertilizerName.trim()) {
       setFormError('Informe o nome do fertilizante ou calda.');
       return;
     }
-
     const numAmount = Number(amount);
-    if (!amount || isNaN(numAmount) || numAmount <= 0) {
+    if (!amount || Number.isNaN(numAmount) || numAmount <= 0) {
       setFormError('Informe uma quantidade válida maior que zero.');
       return;
     }
-
     const numHours = Number(injectionHours);
-    if (!injectionHours || isNaN(numHours) || numHours <= 0) {
+    if (!injectionHours || Number.isNaN(numHours) || numHours <= 0) {
       setFormError('Informe a duração da injeção em horas.');
       return;
     }
 
-    const newItem: FertigationProgramItem = {
+    onAddFertigation({
       id: `fert-${Date.now()}`,
       systemId: activeSystem.id,
       date: new Date().toISOString().split('T')[0],
@@ -117,85 +127,75 @@ export const EnergyAndFertigationView: React.FC<Props> = ({
       injectionDurationHours: numHours,
       compatibilityCheck: compatibility,
       status: 'Agendado',
-    };
+    });
 
-    onAddFertigation(newItem);
-
-    // Reset formulário para o estado limpo
     setFertilizerName('');
     setAmount('');
     setTargetNutrients('');
     setInjectionHours('');
     setCompatibility('Compatível');
-    setFormError('');
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="space-y-4">
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <div>
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Zap className="w-5 h-5 text-amber-500" />
-            Gestão Energética & Fertirrigação Integrada
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+            <Zap className="w-4 h-4 text-amber-500" />
+            Gestão Energética &amp; Fertirrigação Integrada
           </h3>
           <p className="text-xs text-slate-500 dark:text-zinc-400">
-            Controle de tarifação de energia (Verde/Azul/Noturna) e cronograma de injeção de fertilizantes solúveis
+            Controle de tarifação de energia e cronograma de injeção de fertilizantes solúveis.
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => setShowTariffConfig(prev => !prev)}
-          className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700/60 transition flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+          onClick={() => setShowTariffConfig((prev) => !prev)}
+          className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 hover:bg-slate-100 dark:hover:bg-zinc-800 text-xs font-medium text-slate-700 dark:text-zinc-200 inline-flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
         >
-          <Sliders className="w-3.5 h-3.5 text-amber-500" />
-          <span>{showTariffConfig ? 'Ocultar Parâmetros Tarifários' : 'Configurar Tarifação'}</span>
+          <Sliders className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+          {showTariffConfig ? 'Ocultar Tarifação' : 'Configurar Tarifação'}
         </button>
       </div>
 
-      {/* Painel Expansível de Configuração Tarifária */}
       {showTariffConfig && (
-        <div className="bg-amber-50/70 dark:bg-amber-950/20 p-4 rounded-2xl border border-amber-200/70 dark:border-amber-800/40 space-y-3 animate-in fade-in duration-200">
-          <div className="flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-300">
-            <Sliders className="w-4 h-4 text-amber-600" />
-            <span>Parâmetros de Tarifação da Concessionária de Energia</span>
+        <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-amber-200 dark:border-amber-900/50 space-y-3">
+          <div className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+            Parâmetros de Tarifação da Concessionária
           </div>
-          <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80">
-            Insira os valores da sua fatura para calcular a economia real com o horário reservado irrigante noturno (Resolução Normativa ANEEL) e o custo médio por milímetro de lâmina aplicada.
+          <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+            Informe a tarifa da fatura e o desconto do horário reservado irrigante noturno (ANEEL) para estimar o custo por mm/ha.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-slate-700 dark:text-zinc-300 font-semibold mb-1">
-                Tarifa de Energia (R$/kWh)
-              </label>
+              <label className={IRRIGATION_LABEL_CLASS}>Tarifa de Energia (R$/kWh)</label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 value={kwhRate}
-                onChange={e => setKwhRate(e.target.value === '' ? '' : Number(e.target.value))}
+                onChange={(e) => setKwhRate(e.target.value === '' ? '' : Number(e.target.value))}
                 placeholder="Ex: 0.45"
-                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-slate-900 dark:text-white"
+                className={IRRIGATION_INPUT_CLASS}
               />
             </div>
-
             <div>
-              <label className="block text-slate-700 dark:text-zinc-300 font-semibold mb-1">
-                Desconto Tarifa Noturna (%)
-              </label>
+              <label className={IRRIGATION_LABEL_CLASS}>Desconto Tarifa Noturna (%)</label>
               <input
                 type="number"
                 step="1"
                 min="0"
                 max="100"
                 value={nightDiscountPct}
-                onChange={e => setNightDiscountPct(e.target.value === '' ? '' : Number(e.target.value))}
+                onChange={(e) =>
+                  setNightDiscountPct(e.target.value === '' ? '' : Number(e.target.value))
+                }
                 placeholder="Ex: 60"
-                className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-slate-900 dark:text-white"
+                className={IRRIGATION_INPUT_CLASS}
               />
             </div>
-
             <div className="flex items-end">
               <button
                 type="button"
@@ -203,129 +203,99 @@ export const EnergyAndFertigationView: React.FC<Props> = ({
                   setKwhRate('');
                   setNightDiscountPct('');
                 }}
-                className="w-full py-1.5 px-3 rounded-xl border border-slate-300 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:bg-white dark:hover:bg-zinc-800 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition"
+                className="w-full h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 hover:bg-slate-100 dark:hover:bg-zinc-800 text-xs font-medium text-slate-600 dark:text-zinc-300 inline-flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>Limpar Tarifas</span>
+                Limpar Tarifas
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Grid Superior: Métricas Dinâmicas e Reais (Sem dados fictícios pré-preenchidos) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Card 1: Potência Instalada */}
-        <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs space-y-2">
-          <div className="flex justify-between items-center text-xs font-bold text-slate-500">
-            <span>Potência Instalada Motores</span>
-            <Zap className="w-4 h-4 text-amber-500" />
+      {/* 3-KPI Energy Strip */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-1">
+          <div className="flex justify-between items-center text-[11px] font-medium text-slate-500 dark:text-zinc-400">
+            <span>Potência Instalada</span>
+            <Zap className="w-3.5 h-3.5 text-amber-500" />
           </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white">
-            {totalPowerKw > 0 ? (
-              <>
-                {totalPowerKw} <span className="text-xs font-normal text-slate-500">kW</span>
-              </>
-            ) : (
-              <>
-                0 <span className="text-xs font-normal text-slate-500">kW</span>
-              </>
-            )}
+          <div className="text-xl font-bold tabular-nums text-slate-900 dark:text-zinc-100">
+            {totalPowerKw} <span className="text-xs font-normal text-slate-500">kW</span>
           </div>
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-slate-500 dark:text-zinc-400">
             {systems.length === 0
               ? 'Nenhum conjunto motobomba cadastrado'
               : totalPowerKw > 0
-              ? `${totalPumpsCount} ${totalPumpsCount === 1 ? 'Conjunto Motobomba Operacional' : 'Conjuntos Motobomba Operacionais'}`
-              : 'Nenhuma potência cadastrada nos sistemas'}
+              ? `${totalPumpsCount} ${totalPumpsCount === 1 ? 'conjunto motobomba' : 'conjuntos motobomba'}`
+              : 'Nenhuma potência informada'}
           </p>
         </div>
 
-        {/* Card 2: Economia Tarifa Noturna */}
-        <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs space-y-2">
-          <div className="flex justify-between items-center text-xs font-bold text-slate-500">
-            <span>Economia Tarifa Noturna</span>
-            <DollarSign className="w-4 h-4 text-emerald-500" />
+        <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-1">
+          <div className="flex justify-between items-center text-[11px] font-medium text-slate-500 dark:text-zinc-400">
+            <span>Desconto Tarifa Noturna</span>
+            <DollarSign className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-            {effectiveDiscountPct > 0 ? (
-              <>
-                {effectiveDiscountPct}% <span className="text-xs font-normal text-slate-500">desconto</span>
-              </>
-            ) : (
-              <>
-                0% <span className="text-xs font-normal text-slate-500">desconto</span>
-              </>
-            )}
+          <div className="text-xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
+            {effectiveDiscountPct}%
           </div>
-          <p className="text-[11px] text-emerald-600 font-semibold">
+          <p className="text-[11px] text-slate-500 dark:text-zinc-400">
             {effectiveDiscountPct > 0
-              ? 'Desconto Reservado Irrigante Noturno ANEEL'
-              : systems.length === 0
-              ? 'Nenhum sistema cadastrado'
-              : 'Clique em "Configurar Tarifação" para inserir'}
+              ? 'Horário reservado irrigante ANEEL'
+              : 'Configure a tarifa para calcular economia'}
           </p>
         </div>
 
-        {/* Card 3: Custo Médio da Irrigação */}
-        <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs space-y-2">
-          <div className="flex justify-between items-center text-xs font-bold text-slate-500">
-            <span>Custo Médio da Irrigação</span>
-            <DollarSign className="w-4 h-4 text-amber-500" />
+        <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-1">
+          <div className="flex justify-between items-center text-[11px] font-medium text-slate-500 dark:text-zinc-400">
+            <span>Custo Médio por Lâmina</span>
+            <DollarSign className="w-3.5 h-3.5 text-amber-500" />
           </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white">
-            {calculatedCostPerMmHa > 0 ? (
-              <>
-                R$ {calculatedCostPerMmHa.toFixed(2)}{' '}
-                <span className="text-xs font-normal text-slate-500">/ mm / ha</span>
-              </>
-            ) : (
-              <>
-                R$ 0,00 <span className="text-xs font-normal text-slate-500">/ mm / ha</span>
-              </>
-            )}
+          <div className="text-xl font-bold tabular-nums text-slate-900 dark:text-zinc-100">
+            R$ {calculatedCostPerMmHa.toFixed(2)}{' '}
+            <span className="text-xs font-normal text-slate-500">/ mm / ha</span>
           </div>
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-slate-500 dark:text-zinc-400">
             {calculatedCostPerMmHa > 0
-              ? 'Custo energético por lâmina aplicada'
-              : 'Sem parâmetros de consumo ou tarifa inseridos'}
+              ? 'Estimativa energética por milímetro'
+              : 'Informe tarifa e sistema para calcular'}
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Formulário de Programação de Fertirrigação (Campos sem dados pré-preenchidos) */}
-        <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-3">
-            <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-cyan-600" /> Programar Fertirrigação
+      {/* Fertigation Form + Schedule */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className="lg:col-span-4 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-3.5">
+          <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-zinc-800">
+            <h4 className="font-semibold text-xs text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              Programar Fertirrigação
             </h4>
-            <span className="text-[10px] text-emerald-600 font-bold uppercase">
-              {compatibility === 'Compatível' ? 'Compatibilidade OK' : compatibility}
+            <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400">
+              {compatibility}
             </span>
           </div>
 
           {formError && (
-            <div className="p-2.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-rose-700 dark:text-rose-300 text-xs font-medium">
+            <div className="p-2.5 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50/60 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 text-xs">
               {formError}
             </div>
           )}
 
-          <form onSubmit={handleCreateFertigation} className="space-y-3 text-xs">
+          <form onSubmit={handleCreateFertigation} className="space-y-3">
             <div>
-              <label className="block text-slate-600 dark:text-zinc-400 font-bold mb-1">
-                Sistema de Irrigação
-              </label>
+              <label className={IRRIGATION_LABEL_CLASS}>Sistema de Irrigação</label>
               <select
                 value={activeSystem?.id || ''}
-                onChange={e => setSelectedSystemId(e.target.value)}
+                onChange={(e) => setSelectedSystemId(e.target.value)}
                 disabled={systems.length === 0}
-                className="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white disabled:opacity-60"
+                className={IRRIGATION_INPUT_CLASS}
               >
                 {systems.length === 0 ? (
                   <option value="">Nenhum sistema cadastrado</option>
                 ) : (
-                  systems.map(s => (
+                  systems.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.systemName}
                     </option>
@@ -335,42 +305,35 @@ export const EnergyAndFertigationView: React.FC<Props> = ({
             </div>
 
             <div>
-              <label className="block text-slate-600 dark:text-zinc-400 font-bold mb-1">
-                Nome do Fertilizante / Calda
-              </label>
+              <label className={IRRIGATION_LABEL_CLASS}>Fertilizante / Calda</label>
               <input
                 type="text"
                 value={fertilizerName}
-                onChange={e => setFertilizerName(e.target.value)}
-                placeholder="Ex: Nitrato de Cálcio, Cloreto de Potássio (KCl), MAP..."
-                className="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white placeholder:text-slate-400"
+                onChange={(e) => setFertilizerName(e.target.value)}
+                placeholder="Ex: Nitrato de Cálcio, KCl, MAP..."
+                className={IRRIGATION_INPUT_CLASS}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label className="block text-slate-600 dark:text-zinc-400 font-bold mb-1">
-                  Quantidade
-                </label>
+                <label className={IRRIGATION_LABEL_CLASS}>Quantidade</label>
                 <input
                   type="number"
                   min="0"
                   step="any"
                   value={amount}
-                  onChange={e => setAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                  onChange={(e) => setAmount(e.target.value === '' ? '' : Number(e.target.value))}
                   placeholder="Ex: 100"
-                  className="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white placeholder:text-slate-400"
+                  className={IRRIGATION_INPUT_CLASS}
                 />
               </div>
-
               <div>
-                <label className="block text-slate-600 dark:text-zinc-400 font-bold mb-1">
-                  Unidade
-                </label>
+                <label className={IRRIGATION_LABEL_CLASS}>Unidade</label>
                 <select
                   value={unit}
-                  onChange={e => setUnit(e.target.value as 'kg' | 'L')}
-                  className="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white"
+                  onChange={(e) => setUnit(e.target.value as 'kg' | 'L')}
+                  className={IRRIGATION_INPUT_CLASS}
                 >
                   <option value="kg">kg</option>
                   <option value="L">Litros (L)</option>
@@ -379,42 +342,41 @@ export const EnergyAndFertigationView: React.FC<Props> = ({
             </div>
 
             <div>
-              <label className="block text-slate-600 dark:text-zinc-400 font-bold mb-1">
-                Aporte de Nutrientes Alvo
-              </label>
+              <label className={IRRIGATION_LABEL_CLASS}>Aporte de Nutrientes Alvo</label>
               <input
                 type="text"
                 value={targetNutrients}
-                onChange={e => setTargetNutrients(e.target.value)}
-                placeholder="Ex: N: 20 kg/ha, K₂O: 30 kg/ha..."
-                className="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white placeholder:text-slate-400"
+                onChange={(e) => setTargetNutrients(e.target.value)}
+                placeholder="Ex: N: 20 kg/ha, K₂O: 30 kg/ha"
+                className={IRRIGATION_INPUT_CLASS}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label className="block text-slate-600 dark:text-zinc-400 font-bold mb-1">
-                  Duração Injeção (Horas)
-                </label>
+                <label className={IRRIGATION_LABEL_CLASS}>Injeção (Horas)</label>
                 <input
                   type="number"
                   step="0.5"
                   min="0"
                   value={injectionHours}
-                  onChange={e => setInjectionHours(e.target.value === '' ? '' : Number(e.target.value))}
+                  onChange={(e) =>
+                    setInjectionHours(e.target.value === '' ? '' : Number(e.target.value))
+                  }
                   placeholder="Ex: 2.0"
-                  className="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white placeholder:text-slate-400"
+                  className={IRRIGATION_INPUT_CLASS}
                 />
               </div>
-
               <div>
-                <label className="block text-slate-600 dark:text-zinc-400 font-bold mb-1">
-                  Teste de Mistura
-                </label>
+                <label className={IRRIGATION_LABEL_CLASS}>Compatibilidade</label>
                 <select
                   value={compatibility}
-                  onChange={e => setCompatibility(e.target.value as FertigationProgramItem['compatibilityCheck'])}
-                  className="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white"
+                  onChange={(e) =>
+                    setCompatibility(
+                      e.target.value as FertigationProgramItem['compatibilityCheck']
+                    )
+                  }
+                  className={IRRIGATION_INPUT_CLASS}
                 >
                   <option value="Compatível">Compatível</option>
                   <option value="Requer Atenção">Requer Atenção</option>
@@ -426,80 +388,102 @@ export const EnergyAndFertigationView: React.FC<Props> = ({
             <button
               type="submit"
               disabled={systems.length === 0}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-xs inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
-              <Plus className="w-4 h-4" /> Agendar Fertirrigação
+              <Plus className="w-3.5 h-3.5" />
+              Agendar Fertirrigação
             </button>
           </form>
         </div>
 
-        {/* Lista de Fertirrigações Programadas e Histórico */}
-        <div className="lg:col-span-2 bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              Cronograma e Histórico de Fertirrigação ({fertigation.length})
+        <div className="lg:col-span-8 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="font-semibold text-xs text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              Cronograma de Fertirrigação ({fertigation.length})
             </h4>
 
             {fertigation.length > 0 && onClearFertigation && (
-              <button
-                type="button"
-                onClick={onClearFertigation}
-                className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <Trash2 className="w-3 h-3" />
-                <span>Limpar Histórico</span>
-              </button>
+              !confirmClearAll ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmClearAll(true)}
+                  className="text-[11px] font-medium text-rose-700 dark:text-rose-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Limpar Histórico
+                </button>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 text-[11px]">
+                  <span className="text-rose-700 dark:text-rose-400 font-medium">Limpar tudo?</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClearFertigation();
+                      setConfirmClearAll(false);
+                    }}
+                    className="h-6 px-2 rounded bg-rose-600 hover:bg-rose-700 text-white font-medium inline-flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <Check className="w-3 h-3" />
+                    Sim
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmClearAll(false)}
+                    className="h-6 px-2 rounded border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-300 font-medium inline-flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                    Não
+                  </button>
+                </div>
+              )
             )}
           </div>
 
           {fertigation.length === 0 ? (
-            <div className="text-center py-12 px-4 bg-slate-50/60 dark:bg-zinc-950/40 rounded-xl border-2 border-dashed border-slate-200 dark:border-zinc-800 space-y-2">
-              <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center mx-auto text-emerald-600 dark:text-emerald-400">
-                <Calendar className="w-6 h-6" />
-              </div>
-              <h5 className="font-bold text-sm text-slate-800 dark:text-zinc-200">
+            <div className="rounded-lg border border-dashed border-slate-200 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/60 p-8 text-center space-y-1">
+              <p className="text-xs font-semibold text-slate-800 dark:text-zinc-200">
                 Nenhuma fertirrigação programada
-              </h5>
+              </p>
               <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto">
-                Preencha o formulário ao lado para agendar uma nova aplicação de fertilizantes solúveis via sistema de irrigação.
+                Preencha o formulário ao lado para agendar uma aplicação de fertilizantes solúveis via irrigação.
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {fertigation.map(item => (
+            <div className="divide-y divide-slate-100 dark:divide-zinc-800 border border-slate-200 dark:border-zinc-800 rounded-lg overflow-hidden text-xs">
+              {fertigation.map((item) => (
                 <div
                   key={item.id}
-                  className="p-4 bg-slate-50 dark:bg-zinc-950/60 rounded-xl border border-slate-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                  className="p-3 bg-white dark:bg-zinc-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
                 >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 dark:text-white">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-slate-900 dark:text-zinc-100">
                         {item.fertilizerName}
                       </span>
                       <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        className={`text-[11px] font-medium ${
                           item.compatibilityCheck === 'Compatível'
-                            ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                            ? 'text-emerald-700 dark:text-emerald-400'
                             : item.compatibilityCheck === 'Requer Atenção'
-                            ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
-                            : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
+                            ? 'text-amber-700 dark:text-amber-400'
+                            : 'text-rose-700 dark:text-rose-400'
                         }`}
                       >
-                        {item.compatibilityCheck}
+                        · {item.compatibilityCheck}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      {new Date(item.date).toLocaleDateString('pt-BR')} • {item.targetNutrients} • Duração Injeção: {item.injectionDurationHours}h
+                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 tabular-nums">
+                      {formatBrDate(item.date)} · {item.targetNutrients} · Injeção: {item.injectionDurationHours}h
                     </p>
                   </div>
 
                   <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-                    <div className="text-right">
-                      <strong className="text-emerald-600 dark:text-emerald-400 text-sm block">
+                    <div className="text-right tabular-nums">
+                      <strong className="text-emerald-700 dark:text-emerald-400 block">
                         {item.amountKgOrL} {item.unit}
                       </strong>
-                      <span className="text-[10px] text-slate-400 uppercase font-bold">
+                      <span className="text-[11px] text-slate-500 dark:text-zinc-400">
                         {item.status}
                       </span>
                     </div>
@@ -508,8 +492,8 @@ export const EnergyAndFertigationView: React.FC<Props> = ({
                       <button
                         type="button"
                         onClick={() => onDeleteFertigation(item.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition cursor-pointer"
-                        title="Excluir este agendamento"
+                        aria-label={`Excluir agendamento ${item.fertilizerName}`}
+                        className="h-7 w-7 rounded-md border border-slate-200 dark:border-zinc-800 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 inline-flex items-center justify-center cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -524,3 +508,5 @@ export const EnergyAndFertigationView: React.FC<Props> = ({
     </div>
   );
 };
+
+export default EnergyAndFertigationView;

@@ -232,13 +232,24 @@ export interface EquineDentalRecord {
   animalId: string;
   date: string;
   veterinarian: string;
-  wearGrade: 'Normal / Fisiológico' | 'Pontas de Esmalte Leves' | 'Pontas de Esmalte Severas' | 'Onda / Degrau' | 'Boca em Tesoura' | 'Gancho Rostral/Caudal';
-  proceduresPerformed: string[]; // ex: ['Flutuação / Nivelamento Elétrico', 'Extração de Dente de Lobo (105/205)', 'Correção de Ganchos', 'Tratamento Periodontal']
+  wearGrade:
+    | 'Normal / Fisiológico'
+    | 'Pontas de Esmalte Leves'
+    | 'Pontas de Esmalte Severas'
+    | 'Onda / Degrau'
+    | 'Boca em Tesoura'
+    | 'Gancho Rostral/Caudal'
+    | 'Leve'
+    | 'Moderado'
+    | 'Severo';
+  proceduresPerformed: string[];
   malocclusionsFound?: string;
+  findings?: string;
   incisorAngle?: string;
   sedationUsed?: string;
   costBrl?: number;
-  nextReviewDate: string; // Geralmente a cada 6 ou 12 meses
+  nextReviewDate: string;
+  nextRevisionDate?: string;
   notes?: string;
 }
 
@@ -259,14 +270,17 @@ export interface EquineFarrieryRecord {
   animalId: string;
   date: string;
   farrierName: string;
-  horseshoeType: HorseshoeType;
-  material: 'Aço' | 'Alumínio' | 'Poliuretano' | 'Sem Ferradura (Apenas Casqueamento)';
-  frontHoofAngleDegrees?: number; // Ângulo normal ~48° a 55°
-  hindHoofAngleDegrees?: number;  // Ângulo normal ~52° a 58°
-  correctionsMade: string; // Ex: "Correção de desvio látero-medial em mão esquerda, recuo de pinça"
+  horseshoeType: HorseshoeType | string;
+  material?: 'Aço' | 'Alumínio' | 'Poliuretano' | 'Sem Ferradura (Apenas Casqueamento)';
+  frontHoofAngleDegrees?: number;
+  hindHoofAngleDegrees?: number;
+  intervalDays?: number;
+  correctiveShoeing?: boolean;
+  correctionsMade?: string;
   padsUsed?: string;
   nailType?: string;
-  nextShoeingDate: string; // Ciclo padrão: 30 a 45 dias
+  nextShoeingDate: string;
+  nextDueDate?: string;
   costBrl: number;
   hoofCondition: 'Excelente' | 'Bom' | 'Quebradiço' | 'Broca / Pododermatite' | 'Sensível / Laminite Prévia';
   photos?: string[];
@@ -274,35 +288,39 @@ export interface EquineFarrieryRecord {
 }
 
 export interface EquineVitals {
-  heartRateRestBpm: number; // Normal: 28 - 44 bpm
-  heartRatePeakBpm?: number; // Pico no treino: até 180-220 bpm
-  heartRateRec5MinBpm?: number; // Recuperação 5 min: ideal < 64 bpm
-  heartRateRec10MinBpm?: number; // Recuperação 10 min: ideal < 50 bpm
-  respRateMovMin: number; // Normal: 8 - 16 mov/min
-  rectalTempC: number; // Normal: 37.2°C - 38.3°C
-  mucousMembranes: 'Rosada e Brilhante (Normal)' | 'Pálida (Anemia/Choque)' | 'Hiperêmica / Congesta (Febre/Endotoxemia)' | 'Ictérica (Fígado/Hemólise)' | 'Cianótica (Hipóxia Severa)';
-  capillaryRefillTimeSec: number; // TPC normal: 1 a 2 segundos
-  hydrationScore: 'Hidratado (<2s prega)' | 'Desidratação Leve (2-3s)' | 'Desidratação Moderada (3-5s)' | 'Desidratação Grave (>5s)';
-  intestinalMotility: 'Normal nos 4 quadrantes (+/+)' | 'Hipomotilidade (+/-)' | 'Atonia / Silêncio Abdominal (-/-)' | 'Hipermotilidade (++ / Cólica espasmódica)';
+  heartRateRestBpm?: number;
+  restingHeartRateBpm?: number;
+  heartRatePeakBpm?: number;
+  peakHeartRateBpm?: number;
+  heartRateRec5MinBpm?: number;
+  heartRateRec10MinBpm?: number;
+  respRateMovMin?: number;
+  rectalTempC?: number;
+  temperatureCelsius?: number;
+  mucousMembranes?: 'Rosada e Brilhante (Normal)' | 'Pálida (Anemia/Choque)' | 'Hiperêmica / Congesta (Febre/Endotoxemia)' | 'Ictérica (Fígado/Hemólise)' | 'Cianótica (Hipóxia Severa)';
+  capillaryRefillTimeSec?: number;
+  hydrationScore?: 'Hidratado (<2s prega)' | 'Desidratação Leve (2-3s)' | 'Desidratação Moderada (3-5s)' | 'Desidratação Grave (>5s)';
+  intestinalMotility?: 'Normal nos 4 quadrantes (+/+)' | 'Hipomotilidade (+/-)' | 'Atonia / Silêncio Abdominal (-/-)' | 'Hipermotilidade (++ / Cólica espasmódica)';
 }
 
 export interface EquineTrainingRecord {
   id: string;
   animalId: string;
   date: string;
-  discipline: EquineDiscipline;
+  discipline: EquineDiscipline | string;
   riderName: string;
   trainerName?: string;
   durationMinutes: number;
   distanceKm?: number;
   avgSpeedKmh?: number;
   maxSpeedKmh?: number;
-  trackType: 'Pista de Areia' | 'Pista de Grama' | 'Redondel' | 'Pista Coberta' | 'Trilha / Campo' | 'Esteira Aquática';
-  effortLevel: 'Leve / Aquecimento' | 'Moderado' | 'Intenso' | 'Simulação de Prova / Máximo';
+  trackType?: 'Pista de Areia' | 'Pista de Grama' | 'Redondel' | 'Pista Coberta' | 'Trilha / Campo' | 'Esteira Aquática';
+  effortLevel: 'Leve / Aquecimento' | 'Leve' | 'Moderado' | 'Intenso' | 'Simulação de Prova / Máximo' | 'Máximo / Competição';
   vitals: EquineVitals;
-  recoveryEvaluation: 'Excelente (<10 min)' | 'Boa (10-15 min)' | 'Lenta (15-30 min)' | 'Fadiga / Alerta';
-  exercisesDone: string;
-  behaviorRating: 'Concentrado e Dócil' | 'Energético / Responsivo' | 'Resistente / Tenso' | 'Cansado';
+  performanceScore?: number;
+  recoveryEvaluation?: 'Excelente (<10 min)' | 'Boa (10-15 min)' | 'Lenta (15-30 min)' | 'Fadiga / Alerta';
+  exercisesDone?: string;
+  behaviorRating?: 'Concentrado e Dócil' | 'Energético / Responsivo' | 'Resistente / Tenso' | 'Cansado';
   notes?: string;
 }
 
@@ -313,38 +331,33 @@ export interface EquineCompetitionRecord {
   city: string;
   state: string;
   date: string;
-  discipline: EquineDiscipline;
+  discipline?: EquineDiscipline | string;
   category: string;
   riderOrHandler: string;
-  resultTime?: string; // Ex: "17.120s"
-  scoreOrFaults?: string; // Ex: "0 faltas / 74.5 pontos"
-  placement:
-    | '1º Lugar / Campeão'
-    | '2º Lugar / Reservado Campeão'
-    | '3º Lugar'
-    | '4º Lugar'
-    | '5º Lugar'
-    | 'Finalista / Top 10'
-    | 'Classificado'
-    | 'Desclassificado / Eliminado';
+  resultTime?: string;
+  scoreOrTime?: string;
+  scoreOrFaults?: string;
+  placement: string;
   prizeMoneyBrl: number;
   trophyOrRibbon?: string;
+  trophyOrMedal?: string;
   pointsAcquired?: number;
   photos?: string[];
   videoUrl?: string;
   observations?: string;
+  notes?: string;
 }
 
 export interface EquineNutritionFeed {
   id: string;
   name: string;
   category: 'Pastagem' | 'Feno' | 'Silagem' | 'Ração Concentrada' | 'Suplemento / Mineral' | 'Aditivo / Óleo';
-  dryMatterPct: number; // % MS
-  crudeProteinPct: number; // % PB
-  digestibleEnergyMcalKg: number; // ED Mcal/kg MS
-  neutralDetergentFiberPct: number; // % FDN
-  calciumPct: number; // % Ca
-  phosphorusPct: number; // % P
+  dryMatterPct: number;
+  crudeProteinPct: number;
+  digestibleEnergyMcalKg: number;
+  neutralDetergentFiberPct: number;
+  calciumPct: number;
+  phosphorusPct: number;
   costPerKgBrl: number;
 }
 
@@ -361,15 +374,13 @@ export interface EquineNutritionPlan {
   supplementsDaily: string;
   mineralSaltGrams: number;
   waterIntakeLitersEstimate: number;
-  // Calculados
-  totalDryMatterKg: number; // Geralmente 2.0% a 2.5% do peso vivo
+  totalDryMatterKg: number;
   dryMatterPctBodyWeight: number;
   totalCrudeProteinGrams: number;
   totalDigestibleEnergyMcal: number;
   totalCalciumGrams: number;
   totalPhosphorusGrams: number;
-  caPRatio: number; // Ideal entre 1.5:1 e 2.0:1
-  // Requisitos NRC Equinos
+  caPRatio: number;
   nrcCrudeProteinGrams: number;
   nrcDigestibleEnergyMcal: number;
   nrcCalciumGrams: number;
@@ -380,8 +391,11 @@ export interface EquineNutritionPlan {
 
 export type EquineFacilityType =
   | 'Baia Individual'
+  | 'Baia Maternidade'
   | 'Piquete com Pastagem'
+  | 'Piquete de Lazer / Pasto'
   | 'Pista de Treinamento'
+  | 'Pista de Prova'
   | 'Redondel'
   | 'Maternidade'
   | 'Centro de Reprodução'
@@ -393,45 +407,55 @@ export type EquineFacilityType =
 export interface EquineFacility {
   id: string;
   name: string;
-  type: EquineFacilityType;
-  dimensionsMeters?: string; // Ex: "4x4m" ou "2.5 hectares"
-  capacityAnimals: number;
-  currentOccupancy: number;
-  currentAnimalIds: string[];
-  pastureType?: string; // Ex: "Tifton 85", "Coastcross"
+  type: EquineFacilityType | string;
+  dimensionsMeters?: string;
+  capacityAnimals?: number;
+  currentOccupancy?: number;
+  currentAnimalIds?: string[];
+  currentOccupantAnimalId?: string;
+  pastureType?: string;
   waterSource?: 'Bebedouro Automático' | 'Bebedouro Alvenaria' | 'Açude / Cocho';
-  beddingType?: 'Maravalha de Pinus' | 'Casca de Arroz' | 'Piso Emborrachado' | 'Sem Cama / Pasto';
-  status: 'Disponível / Livre' | 'Ocupado' | 'Em Limpeza / Desinfecção' | 'Em Manutenção';
+  beddingType?: string;
+  status?: 'Disponível / Livre' | 'Ocupado' | 'Em Limpeza / Desinfecção' | 'Em Manutenção';
+  hygieneStatus?: 'Limpo / Desinfetado' | 'Necessita Troca de Cama' | 'Em Manutenção' | string;
   lastCleanedDate?: string;
   notes?: string;
 }
 
 export type EquineExpenseCategory =
   | 'Alimentação & Feno'
+  | 'Alimentação & Volumoso'
   | 'Veterinário & Clínico'
+  | 'Sanidade & Veterinário'
   | 'Medicamentos & Vacinas'
   | 'Ferrageamento & Casqueamento'
   | 'Odontologia'
   | 'Inscrições em Provas & Competições'
+  | 'Inscrições & Provas'
   | 'Treinamento & Doma'
+  | 'Treinador & Pista'
   | 'Transporte & Fretes'
   | 'Seguro Animal'
   | 'Reprodução & Sêmen'
+  | 'Genética & Reprodução'
   | 'Instalações & Manutenção'
+  | 'Instalações & Cama de Baia'
   | 'Arreios & Materiais'
   | 'Receitas de Premiações (Entrada)'
   | 'Venda de Coberturas (Entrada)'
-  | 'Venda de Animal (Entrada)';
+  | 'Venda de Animal (Entrada)'
+  | 'Outros';
 
 export interface EquineExpenseRecord {
   id: string;
-  animalId?: string; // Opcional (se for custo geral do haras ou de um cavalo específico)
+  animalId?: string;
   date: string;
-  category: EquineExpenseCategory;
-  type: 'Despesa' | 'Receita';
+  category: EquineExpenseCategory | string;
+  type?: 'Despesa' | 'Receita';
   description: string;
   amountBrl: number;
-  payeeOrRecipient: string;
+  payeeOrRecipient?: string;
+  costCenter?: string;
   invoiceNumber?: string;
   notes?: string;
 }
@@ -439,11 +463,13 @@ export interface EquineExpenseRecord {
 export interface EquineInventoryItem {
   id: string;
   name: string;
-  category: 'Medicamento' | 'Vacina / Soro' | 'Ração / Concentrado' | 'Feno / Volumoso' | 'Suplemento / Mineral' | 'Ferradura / Cravo' | 'Material de Enfermagem' | 'Arreio / Equipamento';
+  category: string;
   quantity: number;
-  unit: 'frasco' | 'ampola' | 'saco 40kg' | 'fardo 15kg' | 'kg' | 'dose' | 'jogo (4un)' | 'unidade' | 'litro';
-  minThreshold: number;
-  unitCostBrl: number;
+  unit: string;
+  minThreshold?: number;
+  minimumQuantity?: number;
+  unitCostBrl?: number;
+  costPerUnitBrl?: number;
   batchNumber?: string;
   expiryDate?: string;
   location: string;

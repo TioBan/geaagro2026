@@ -1,29 +1,23 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Sparkles,
+  Cpu,
   Heart,
   Scale,
-  Calendar,
   ShieldCheck,
-  TrendingUp,
   MapPin,
   Clock,
-  FileText,
-  Camera,
-  Activity,
-  Award,
-  ChevronRight,
-  Plus,
-  AlertCircle,
-  Baby,
-  Pill,
 } from 'lucide-react';
+import { SwineAnimal, SwineWeighingRecord } from '../../types/swine';
 import {
-  SwineAnimal,
-  SwineWeighingRecord,
-  SwineHealthRecord,
-  SwineReproductionRecord,
-} from '../../types/swine';
+  SWINE_CARD_CLASS,
+  SWINE_INPUT_CLASS,
+  SWINE_LABEL_CLASS,
+  SWINE_PRIMARY_BTN_CLASS,
+  SWINE_SUBCARD_CLASS,
+  formatBrDate,
+  getSwineStatusBadgeClass,
+  getTodayIsoDate,
+} from './swineUi';
 
 interface SwineDigitalTwinViewProps {
   animals: SwineAnimal[];
@@ -31,6 +25,8 @@ interface SwineDigitalTwinViewProps {
   onSelectAnimal: (animal: SwineAnimal) => void;
   onUpdateAnimal: (animal: SwineAnimal) => void;
 }
+
+type TwinSubTab = 'timeline' | 'weighing' | 'reproduction' | 'health' | 'movements';
 
 export const SwineDigitalTwinView: React.FC<SwineDigitalTwinViewProps> = ({
   animals,
@@ -40,372 +36,442 @@ export const SwineDigitalTwinView: React.FC<SwineDigitalTwinViewProps> = ({
 }) => {
   const currentAnimal = selectedAnimal || animals[0];
 
-  const [activeTab, setActiveTab] = useState<'timeline' | 'weighing' | 'reproduction' | 'health' | 'movements' | 'photos'>('timeline');
-
-  // New weigh-in modal or inline state
-  const [newWeight, setNewWeight] = useState(currentAnimal?.currentWeightKg || 220);
+  const [activeTab, setActiveTab] = useState<TwinSubTab>('timeline');
+  const [newWeight, setNewWeight] = useState(currentAnimal?.currentWeightKg || 200);
   const [newEcc, setNewEcc] = useState(currentAnimal?.bodyConditionScore || 3.0);
-  const [newBackfat, setNewBackfat] = useState(16);
+  const [newBackfat, setNewBackfat] = useState(14);
+
+  useEffect(() => {
+    if (currentAnimal) {
+      setNewWeight(currentAnimal.currentWeightKg);
+      setNewEcc(currentAnimal.bodyConditionScore);
+    }
+  }, [currentAnimal?.id, currentAnimal?.currentWeightKg, currentAnimal?.bodyConditionScore]);
 
   if (!currentAnimal) {
     return (
-      <div className="bg-white p-12 rounded-2xl border border-gray-200 text-center space-y-3">
-        <Sparkles className="w-10 h-10 text-pink-600 mx-auto" />
-        <h4 className="text-base font-bold text-gray-900">Nenhum animal selecionado</h4>
-        <p className="text-xs text-gray-500">Cadastre um suíno para visualizar seu Gêmeo Digital.</p>
+      <div className={`${SWINE_CARD_CLASS} p-10 text-center space-y-2`}>
+        <Cpu className="w-8 h-8 text-rose-600 dark:text-rose-400 mx-auto" />
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+          Nenhum animal selecionado
+        </h3>
+        <p className="text-xs text-slate-500 dark:text-zinc-400">
+          Cadastre um suíno no Plantel Individual para visualizar seu Gêmeo Digital 360°.
+        </p>
       </div>
     );
   }
 
-  // Calculate Withdrawal Period (Carência) Status
   const activeWithdrawals = (currentAnimal.healthHistory || []).filter(h => {
-    if (h.withdrawalDays === 0) return false;
+    if (!h.withdrawalDays || h.withdrawalDays <= 0) return false;
     const treatDate = new Date(h.date).getTime();
     const endDate = treatDate + h.withdrawalDays * 86400000;
-    return Date.now() < endDate;
+    return Number.isFinite(endDate) && Date.now() < endDate;
   });
 
-  const isWithdrawalActive = (activeWithdrawals || []).length > 0;
+  const isWithdrawalActive = activeWithdrawals.length > 0;
 
-  // Add Weighing
-  const handleAddWeighing = () => {
-    const prevWeight = currentAnimal.currentWeightKg;
+  const handleAddWeighing = (e: React.FormEvent) => {
+    e.preventDefault();
     const weighingHist = currentAnimal.weighingHistory || [];
-    const lastWeighing = weighingHist[(weighingHist || []).length - 1];
+    const lastWeighing = weighingHist[weighingHist.length - 1];
     let dailyGain = 0;
     if (lastWeighing) {
-      const daysDiff = Math.max(1, (Date.now() - new Date(lastWeighing.date).getTime()) / 86400000);
+      const daysDiff = Math.max(
+        1,
+        (Date.now() - new Date(lastWeighing.date).getTime()) / 86400000
+      );
       dailyGain = Number(((newWeight - lastWeighing.weightKg) / daysDiff).toFixed(2));
     }
 
     const updatedWeighing: SwineWeighingRecord = {
       id: `w_${Date.now()}`,
-      date: new Date().toISOString().split('T')[0],
+      date: getTodayIsoDate(),
       weightKg: Number(newWeight),
       dailyGainKg: dailyGain,
       bodyConditionScore: Number(newEcc),
-      backfatMm: Number(newBackfat),
+      backfatMm: Number(newBackfat) || undefined,
     };
 
     const updatedAnimal: SwineAnimal = {
       ...currentAnimal,
       currentWeightKg: Number(newWeight),
       bodyConditionScore: Number(newEcc),
-      weighingHistory: [...(currentAnimal.weighingHistory || []), updatedWeighing],
+      weighingHistory: [...weighingHist, updatedWeighing],
     };
 
     onUpdateAnimal(updatedAnimal);
   };
 
   return (
-    <div className="space-y-6">
-      {/* Top Animal Selector Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-600 to-rose-700 text-white flex items-center justify-center font-bold">
-            <Sparkles className="w-5 h-5" />
+    <div className="space-y-4">
+      {/* Animal Selector Bar */}
+      <div className={`${SWINE_CARD_CLASS} p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+            <Cpu className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-sm font-black text-gray-900">
-              Gêmeo Digital do Animal • 360° Passport
-            </h3>
-            <p className="text-xs text-gray-500">
-              Passaporte biológico, histórico produtivo, curva de peso e rastreabilidade viva.
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+              Gêmeo Digital 360° — Passaporte Biológico
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Histórico produtivo, biometria, reprodução, sanidade e rastreabilidade individual.
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <label className="text-xs font-bold text-gray-600 shrink-0">Selecionar Suíno:</label>
+          <label className="text-xs font-medium text-slate-600 dark:text-zinc-400 shrink-0">
+            Suíno:
+          </label>
           <select
-            value={currentAnimal?.id || ''}
+            value={currentAnimal.id}
             onChange={e => {
-              const found = (animals || []).find(a => a?.id === e.target.value);
+              const found = animals.find(a => a.id === e.target.value);
               if (found) onSelectAnimal(found);
             }}
-            className="w-full sm:w-64 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-pink-500"
+            className={`${SWINE_INPUT_CLASS} sm:w-64`}
           >
-            {(animals || []).filter(a => a && a.id).map(a => (
+            {animals.map(a => (
               <option key={a.id} value={a.id}>
-                {a.code} - {a.breed} ({a.category})
+                {a.code} — {a.breed} ({a.category})
               </option>
             ))}
           </select>
         </div>
       </div>
 
-      {/* Hero Bio Card of Selected Swine */}
-      <div className="bg-white rounded-3xl border border-gray-200 shadow-xs overflow-hidden">
-        <div className="p-6 bg-gradient-to-r from-pink-50/60 via-white to-rose-50/40 border-b border-gray-100 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-pink-600 to-rose-800 text-white flex items-center justify-center text-xl font-black shadow-lg shadow-pink-600/20 shrink-0">
-              {currentAnimal.code.substring(0, 3)}
+      {/* Main Passport Card */}
+      <div className={`${SWINE_CARD_CLASS} overflow-hidden`}>
+        <div className="p-4 border-b border-slate-100 dark:border-zinc-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-rose-600 text-white flex items-center justify-center text-sm font-bold shrink-0">
+              {currentAnimal.code.slice(0, 3)}
             </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h2 className="text-2xl font-black text-gray-900">{currentAnimal.code}</h2>
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base font-bold text-slate-900 dark:text-zinc-100">
+                  {currentAnimal.code}
+                </h3>
                 {currentAnimal.name && (
-                  <span className="text-sm font-semibold text-gray-600">
-                    "{currentAnimal.name}"
+                  <span className="text-xs text-slate-500 dark:text-zinc-400">
+                    “{currentAnimal.name}”
                   </span>
                 )}
                 <span
-                  className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                    currentAnimal.status === 'Em Lactação'
-                      ? 'bg-amber-100 text-amber-800'
-                      : currentAnimal.status === 'Gestante'
-                      ? 'bg-purple-100 text-purple-800'
-                      : 'bg-emerald-100 text-emerald-800'
-                  }`}
+                  className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${getSwineStatusBadgeClass(currentAnimal.status)}`}
                 >
                   {currentAnimal.status}
                 </span>
               </div>
-
-              <p className="text-xs text-gray-600">
-                <span className="font-bold text-gray-900">{currentAnimal.breed}</span> • {currentAnimal.sex} • Categoria: {currentAnimal.category}
+              <p className="text-xs text-slate-600 dark:text-zinc-400">
+                <span className="font-medium text-slate-800 dark:text-zinc-200">
+                  {currentAnimal.breed}
+                </span>{' '}
+                · {currentAnimal.sex} · {currentAnimal.category}
               </p>
-
-              <div className="flex items-center gap-3 text-[11px] text-gray-500">
-                <span>Nascimento: {currentAnimal.birthDate}</span>
-                <span>•</span>
-                <span>Local: {currentAnimal.currentPenNumber || 'Galpão 01'}</span>
-                <span>•</span>
-                <span className="font-mono">{currentAnimal.rfidOrQrCode}</span>
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-zinc-400">
+                <span>Nasc.: {formatBrDate(currentAnimal.birthDate)}</span>
+                <span>·</span>
+                <span>Local: {currentAnimal.currentPenNumber || 'Não informado'}</span>
+                {currentAnimal.rfidOrQrCode && (
+                  <>
+                    <span>·</span>
+                    <span className="font-mono">{currentAnimal.rfidOrQrCode}</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Key Vitals */}
-          <div className="grid grid-cols-3 gap-3 w-full lg:w-auto">
-            <div className="p-3 bg-white rounded-2xl border border-gray-200/80 text-center">
-              <span className="text-[10px] font-bold text-gray-500 uppercase">Peso Atual</span>
-              <div className="text-xl font-black text-gray-900 mt-0.5">
+          <div className="grid grid-cols-3 gap-2.5 w-full lg:w-auto">
+            <div className={`${SWINE_SUBCARD_CLASS} px-3 py-2 text-center`}>
+              <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Peso Atual</span>
+              <div className="text-sm font-bold text-slate-900 dark:text-zinc-100 tabular-nums">
                 {currentAnimal.currentWeightKg} kg
               </div>
             </div>
-            <div className="p-3 bg-white rounded-2xl border border-gray-200/80 text-center">
-              <span className="text-[10px] font-bold text-gray-500 uppercase">ECC Corporal</span>
-              <div className="text-xl font-black text-pink-600 mt-0.5">
+            <div className={`${SWINE_SUBCARD_CLASS} px-3 py-2 text-center`}>
+              <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">ECC</span>
+              <div className="text-sm font-bold text-rose-600 dark:text-rose-400 tabular-nums">
                 {currentAnimal.bodyConditionScore} / 5
               </div>
             </div>
-            <div className="p-3 bg-white rounded-2xl border border-gray-200/80 text-center">
-              <span className="text-[10px] font-bold text-gray-500 uppercase">Carência Carne</span>
-              <div className={`text-xs font-bold mt-1.5 ${isWithdrawalActive ? 'text-red-600' : 'text-emerald-600'}`}>
-                {isWithdrawalActive ? 'Em Carência' : 'Liberado (Zero)'}
+            <div className={`${SWINE_SUBCARD_CLASS} px-3 py-2 text-center`}>
+              <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Carência</span>
+              <div
+                className={`text-xs font-semibold mt-0.5 ${
+                  isWithdrawalActive
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-emerald-600 dark:text-emerald-400'
+                }`}
+              >
+                {isWithdrawalActive ? 'Em Carência' : 'Liberado'}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Digital Twin Sub-Tabs */}
-        <div className="p-2 bg-gray-50 border-b border-gray-100 flex items-center gap-1.5 overflow-x-auto">
-          {[
-            { id: 'timeline', label: 'Linha do Tempo 360°', icon: Clock },
-            { id: 'weighing', label: 'Curva de Peso & GMD', icon: Scale },
-            { id: 'reproduction', label: 'Histórico Reprodutivo', icon: Heart },
-            { id: 'health', label: 'Sanidade & Medicamentos', icon: ShieldCheck },
-            { id: 'movements', label: 'Movimentações de Baia', icon: MapPin },
-          ].map(tab => {
+        {/* Sub-Tabs */}
+        <div className="px-3 py-2 bg-slate-50 dark:bg-zinc-950 border-b border-slate-100 dark:border-zinc-800 flex items-center gap-1 overflow-x-auto">
+          {(
+            [
+              { id: 'timeline', label: 'Linha do Tempo', icon: Clock },
+              { id: 'weighing', label: 'Peso & GMD', icon: Scale },
+              { id: 'reproduction', label: 'Reprodução', icon: Heart },
+              { id: 'health', label: 'Sanidade', icon: ShieldCheck },
+              { id: 'movements', label: 'Movimentações', icon: MapPin },
+            ] as const
+          ).map(tab => {
             const Icon = tab.icon;
             const isTabActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
                   isTabActive
-                    ? 'bg-pink-600 text-white shadow-xs'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                    ? 'bg-rose-600 text-white'
+                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-200/60 dark:hover:bg-zinc-800'
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-3.5 h-3.5" />
                 <span>{tab.label}</span>
               </button>
             );
           })}
         </div>
 
-        {/* Sub-Tab Contents */}
-        <div className="p-6">
-          {/* 1. Life Timeline */}
+        <div className="p-4">
           {activeTab === 'timeline' && (
-            <div className="space-y-4">
-              <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                Linha do Tempo da Vida Produtiva
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold text-slate-700 dark:text-zinc-300 uppercase tracking-wider">
+                Cronologia do Animal
               </h4>
 
-              <div className="relative border-l-2 border-pink-200 pl-6 ml-3 space-y-6">
-                {/* Entry event */}
+              <div className="space-y-2.5 border-l border-slate-200 dark:border-zinc-800 pl-4 ml-2">
                 <div className="relative">
-                  <div className="absolute -left-[31px] top-0 w-4 h-4 rounded-full bg-pink-600 border-2 border-white shadow-xs" />
-                  <span className="text-[11px] font-bold text-pink-600">{currentAnimal.entryDate}</span>
-                  <h5 className="text-xs font-bold text-gray-900">Entrada no Plantel</h5>
-                  <p className="text-xs text-gray-500">Origem: {currentAnimal.origin} • Peso Inicial: {currentAnimal.initialWeightKg} kg</p>
+                  <span className="text-[11px] font-medium text-rose-600 dark:text-rose-400">
+                    {formatBrDate(currentAnimal.entryDate)}
+                  </span>
+                  <h5 className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                    Entrada no Plantel
+                  </h5>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400">
+                    Origem: {currentAnimal.origin} · Peso inicial: {currentAnimal.initialWeightKg} kg
+                  </p>
                 </div>
 
-                {/* Reproduction Events */}
                 {currentAnimal.reproductionHistory.map(rep => (
                   <div key={rep.id} className="relative">
-                    <div className="absolute -left-[31px] top-0 w-4 h-4 rounded-full bg-rose-500 border-2 border-white shadow-xs" />
-                    <span className="text-[11px] font-bold text-rose-600">{rep.date}</span>
-                    <h5 className="text-xs font-bold text-gray-900">{rep.eventType}</h5>
-                    <p className="text-xs text-gray-600">
+                    <span className="text-[11px] font-medium text-rose-600 dark:text-rose-400">
+                      {formatBrDate(rep.date)}
+                    </span>
+                    <h5 className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                      {rep.eventType}
+                    </h5>
+                    <p className="text-xs text-slate-500 dark:text-zinc-400">
                       {rep.eventType === 'Parto'
-                        ? `Leitões nascidos: ${rep.totalBorn} (${rep.bornAlive} vivos, ${rep.stillborn || 0} natimortos). Peso médio: ${rep.avgPigletBirthWeightKg} kg.`
+                        ? `Nascidos: ${rep.totalBorn ?? 0} (${rep.bornAlive ?? 0} vivos, ${rep.stillborn ?? 0} natimortos).`
                         : rep.eventType === 'Inseminação Artificial (IA)'
-                        ? `IA com sêmen ${rep.boarOrSemenId} (${rep.boarBreed}). Previsão parto: ${rep.expectedFarrowingDate}.`
-                        : rep.notes || 'Evento reprodutivo registrado.'}
+                          ? `Sêmen: ${rep.boarOrSemenId ?? '—'} (${rep.boarBreed ?? '—'}) · Prev. parto: ${formatBrDate(rep.expectedFarrowingDate)}`
+                          : rep.notes || 'Evento reprodutivo registrado.'}
                     </p>
                   </div>
                 ))}
 
-                {/* Health Events */}
                 {currentAnimal.healthHistory.map(h => (
                   <div key={h.id} className="relative">
-                    <div className="absolute -left-[31px] top-0 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-xs" />
-                    <span className="text-[11px] font-bold text-emerald-600">{h.date}</span>
-                    <h5 className="text-xs font-bold text-gray-900">{h.type}: {h.productName}</h5>
-                    <p className="text-xs text-gray-600">Dose: {h.dosage} • Via: {h.route} • Aplicador: {h.veterinarianOrOperator}</p>
+                    <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                      {formatBrDate(h.date)}
+                    </span>
+                    <h5 className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                      {h.type}: {h.productName}
+                    </h5>
+                    <p className="text-xs text-slate-500 dark:text-zinc-400">
+                      Dose: {h.dosage} · Via: {h.route} · Resp.: {h.veterinarianOrOperator}
+                    </p>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* 2. Weight & BCS Growth */}
           {activeTab === 'weighing' && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                  Histórico de Pesagens & Escore Corporal
-                </h4>
-
-                {/* Inline Add Weighing */}
-                <div className="flex items-center gap-2">
+            <div className="space-y-4">
+              <form
+                onSubmit={handleAddWeighing}
+                className={`${SWINE_SUBCARD_CLASS} p-3 grid grid-cols-2 sm:grid-cols-4 gap-2.5 items-end`}
+              >
+                <div>
+                  <label className={SWINE_LABEL_CLASS}>Peso (kg)</label>
                   <input
                     type="number"
-                    placeholder="Novo Peso (kg)"
+                    step="0.5"
+                    min="0"
                     value={newWeight}
                     onChange={e => setNewWeight(Number(e.target.value))}
-                    className="w-28 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold"
+                    className={SWINE_INPUT_CLASS}
                   />
+                </div>
+                <div>
+                  <label className={SWINE_LABEL_CLASS}>ECC (1–5)</label>
                   <input
                     type="number"
                     step="0.1"
                     min="1"
                     max="5"
-                    placeholder="ECC"
                     value={newEcc}
                     onChange={e => setNewEcc(Number(e.target.value))}
-                    className="w-20 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold"
+                    className={SWINE_INPUT_CLASS}
                   />
-                  <button
-                    onClick={handleAddWeighing}
-                    className="px-3 py-1.5 bg-pink-600 text-white rounded-xl text-xs font-bold"
-                  >
-                    Registrar Peso
-                  </button>
                 </div>
-              </div>
+                <div>
+                  <label className={SWINE_LABEL_CLASS}>Toucinho P2 (mm)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    value={newBackfat}
+                    onChange={e => setNewBackfat(Number(e.target.value))}
+                    className={SWINE_INPUT_CLASS}
+                  />
+                </div>
+                <button type="submit" className={`${SWINE_PRIMARY_BTN_CLASS} h-9 w-full`}>
+                  Registrar Pesagem
+                </button>
+              </form>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {currentAnimal.weighingHistory.map((w, idx) => (
-                  <div key={w.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-1">
-                    <span className="text-[11px] font-bold text-gray-500">{w.date} (Pesagem #{idx + 1})</span>
-                    <div className="text-xl font-black text-gray-900">{w.weightKg} kg</div>
-                    <div className="text-xs text-gray-600 flex justify-between">
-                      <span>ECC: {w.bodyConditionScore} / 5</span>
-                      {w.backfatMm && <span>P2: {w.backfatMm} mm</span>}
+              {currentAnimal.weighingHistory.length === 0 ? (
+                <p className="text-xs text-slate-500 dark:text-zinc-400 text-center py-6">
+                  Nenhuma pesagem registrada para este animal.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {currentAnimal.weighingHistory.map((w, idx) => (
+                    <div key={w.id} className={`${SWINE_SUBCARD_CLASS} p-3 space-y-1`}>
+                      <span className="text-[11px] text-slate-500 dark:text-zinc-400">
+                        {formatBrDate(w.date)} · Pesagem #{idx + 1}
+                      </span>
+                      <div className="text-lg font-bold text-slate-900 dark:text-zinc-100 tabular-nums">
+                        {w.weightKg} kg
+                      </div>
+                      <div className="text-xs text-slate-600 dark:text-zinc-400 flex justify-between tabular-nums">
+                        <span>ECC: {w.bodyConditionScore ?? '—'} / 5</span>
+                        {w.backfatMm !== undefined && <span>P2: {w.backfatMm} mm</span>}
+                      </div>
+                      {w.dailyGainKg !== undefined && w.dailyGainKg !== 0 && (
+                        <div className="text-[11px] text-emerald-600 dark:text-emerald-400 tabular-nums">
+                          GMD: {w.dailyGainKg} kg/dia
+                        </div>
+                      )}
                     </div>
-                    {w.notes && <p className="text-[11px] text-gray-500 italic mt-1">{w.notes}</p>}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
-          {/* 3. Reproduction */}
           {activeTab === 'reproduction' && (
-            <div className="space-y-4">
-              <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                Eventos Reprodutivos & Partos Registrados
-              </h4>
-
-              <div className="space-y-3">
-                {currentAnimal.reproductionHistory.map(rep => (
-                  <div key={rep.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-2.5">
+              {currentAnimal.reproductionHistory.length === 0 ? (
+                <p className="text-xs text-slate-500 dark:text-zinc-400 text-center py-6">
+                  Nenhum evento reprodutivo registrado.
+                </p>
+              ) : (
+                currentAnimal.reproductionHistory.map(rep => (
+                  <div
+                    key={rep.id}
+                    className={`${SWINE_SUBCARD_CLASS} p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2`}
+                  >
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-gray-900">{rep.eventType}</span>
-                        <span className="text-[11px] text-gray-500">({rep.date})</span>
+                        <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                          {rep.eventType}
+                        </span>
+                        <span className="text-[11px] text-slate-500 dark:text-zinc-400">
+                          {formatBrDate(rep.date)}
+                        </span>
                       </div>
-                      <p className="text-xs text-gray-600 mt-0.5">
+                      <p className="text-xs text-slate-600 dark:text-zinc-400 mt-0.5">
                         {rep.eventType === 'Parto'
-                          ? `Total: ${rep.totalBorn} | Vivos: ${rep.bornAlive} | Natimortos: ${rep.stillborn || 0} | Peso Leitegada: ${rep.litterBirthWeightKg || 0} kg`
+                          ? `Total: ${rep.totalBorn ?? 0} · Vivos: ${rep.bornAlive ?? 0} · Natimortos: ${rep.stillborn ?? 0}`
                           : rep.eventType === 'Inseminação Artificial (IA)'
-                          ? `Sêmen: ${rep.boarOrSemenId} (${rep.boarBreed}) • Prev. Parto: ${rep.expectedFarrowingDate}`
-                          : rep.notes || 'Registro concluído'}
+                            ? `Sêmen: ${rep.boarOrSemenId ?? '—'} (${rep.boarBreed ?? '—'}) · Prev. parto: ${formatBrDate(rep.expectedFarrowingDate)}`
+                            : rep.notes || 'Registro concluído'}
                       </p>
                     </div>
-
-                    <span className="text-[11px] font-bold px-3 py-1 bg-pink-100 text-pink-800 rounded-full shrink-0">
-                      Auditado
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 shrink-0">
+                      Registrado
                     </span>
                   </div>
-                ))}
-              </div>
+                ))
+              )}
             </div>
           )}
 
-          {/* 4. Health & Withdrawal */}
           {activeTab === 'health' && (
-            <div className="space-y-4">
-              <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                Manejos Sanitários, Vacinas & Carência
-              </h4>
-
-              <div className="space-y-3">
-                {currentAnimal.healthHistory.map(h => (
-                  <div key={h.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-2.5">
+              {currentAnimal.healthHistory.length === 0 ? (
+                <p className="text-xs text-slate-500 dark:text-zinc-400 text-center py-6">
+                  Nenhum manejo sanitário registrado para este animal.
+                </p>
+              ) : (
+                currentAnimal.healthHistory.map(h => (
+                  <div
+                    key={h.id}
+                    className={`${SWINE_SUBCARD_CLASS} p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2`}
+                  >
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-gray-900">{h.productName}</span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">
+                        <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                          {h.productName}
+                        </span>
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                           {h.type}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-600 mt-0.5">
-                        Dose: {h.dosage} ({h.route}) • Carência: {h.withdrawalDays} dias • Resp: {h.veterinarianOrOperator}
+                      <p className="text-xs text-slate-600 dark:text-zinc-400 mt-0.5">
+                        Dose: {h.dosage} ({h.route}) · Carência: {h.withdrawalDays} dias · Resp.: {h.veterinarianOrOperator}
                       </p>
                     </div>
-                    <span className="text-xs font-bold text-gray-500">{h.date}</span>
+                    <span className="text-xs text-slate-500 dark:text-zinc-400 shrink-0 tabular-nums">
+                      {formatBrDate(h.date)}
+                    </span>
                   </div>
-                ))}
-              </div>
+                ))
+              )}
             </div>
           )}
 
-          {/* 5. Movements */}
           {activeTab === 'movements' && (
-            <div className="space-y-4">
-              <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                Histórico de Transferências de Baia & Galpão
-              </h4>
-
-              <div className="space-y-2">
-                {currentAnimal.movements.map(m => (
-                  <div key={m.id} className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between text-xs">
+            <div className="space-y-2">
+              {currentAnimal.movements.length === 0 ? (
+                <p className="text-xs text-slate-500 dark:text-zinc-400 text-center py-6">
+                  Nenhuma movimentação registrada.
+                </p>
+              ) : (
+                currentAnimal.movements.map(m => (
+                  <div
+                    key={m.id}
+                    className={`${SWINE_SUBCARD_CLASS} p-3 flex items-center justify-between gap-2 text-xs`}
+                  >
                     <div>
-                      <span className="font-bold text-gray-900">{m.fromLocation} → {m.toLocation}</span>
-                      <span className="text-gray-500 block text-[11px]">Motivo: {m.reason} • Resp: {m.operator}</span>
+                      <span className="font-semibold text-slate-900 dark:text-zinc-100">
+                        {m.fromLocation} → {m.toLocation}
+                      </span>
+                      <span className="text-slate-500 dark:text-zinc-400 block text-[11px]">
+                        Motivo: {m.reason} · Resp.: {m.operator}
+                      </span>
                     </div>
-                    <span className="text-gray-500 font-medium">{m.date}</span>
+                    <span className="text-slate-500 dark:text-zinc-400 shrink-0 tabular-nums">
+                      {formatBrDate(m.date)}
+                    </span>
                   </div>
-                ))}
-              </div>
+                ))
+              )}
             </div>
           )}
         </div>

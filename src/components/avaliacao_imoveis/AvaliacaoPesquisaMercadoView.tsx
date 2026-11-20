@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ImovelComparativoMercado } from '../../types/avaliacaoImoveis';
 import {
   calcularFatorOferta,
@@ -50,6 +50,10 @@ const criarAmostraVazia = (): ImovelComparativoMercado => ({
   fotos: []
 });
 
+const inputCls =
+  'w-full h-9 px-3 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500';
+const labelCls = 'block text-xs font-medium text-slate-600 dark:text-zinc-400 mb-1';
+
 export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
   comparativos,
   areaAvaliandoHa,
@@ -61,10 +65,23 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
   const [sucesso, setSucesso] = useState(false);
   const [comparativoEditando, setComparativoEditando] = useState<ImovelComparativoMercado | null>(null);
   const [isNovo, setIsNovo] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setLista([...comparativos]);
   }, [comparativos]);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const dispararSucesso = () => {
+    setSucesso(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setSucesso(false), 3000);
+  };
 
   const recalcularFatores = (comp: ImovelComparativoMercado): ImovelComparativoMercado => {
     const fOferta = calcularFatorOferta(comp.tipoValor);
@@ -97,8 +114,7 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
     const recalcs = lista.map(recalcularFatores);
     setLista(recalcs);
     onSalvarComparativos(recalcs);
-    setSucesso(true);
-    setTimeout(() => setSucesso(false), 3000);
+    dispararSucesso();
   };
 
   const handleAbrirNovaAmostra = () => {
@@ -152,8 +168,7 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
     onSalvarComparativos(novaLista);
     setComparativoEditando(null);
     setIsNovo(false);
-    setSucesso(true);
-    setTimeout(() => setSucesso(false), 3000);
+    dispararSucesso();
   };
 
   const handleToggleStatus = (id: string) => {
@@ -163,7 +178,8 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
         return {
           ...c,
           statusInclusao: novoStatus as ImovelComparativoMercado['statusInclusao'],
-          justificativaStatus: novoStatus === 'descartado_outlier' ? 'Descartado manualmente pelo avaliador' : undefined
+          justificativaStatus:
+            novoStatus === 'descartado_outlier' ? 'Descartado manualmente pelo avaliador' : undefined
         };
       }
       return c;
@@ -190,38 +206,38 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
   });
 
   return (
-    <div className="space-y-6">
-      {/* Top Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+    <div className="space-y-5">
+      {/* Barra Superior */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-slate-200/80 dark:border-zinc-800">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+          <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             Banco de Dados de Imóveis Comparativos de Mercado
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Amostras de mercado, saneamento de dados, homogeneização por fatores (NBR 14653-3)
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+            Amostras de mercado, saneamento de dados e homogeneização por fatores (NBR 14653-3)
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           {sucesso && (
-            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mr-2">
-              <CheckCircle2 className="w-4 h-4" /> Salvo e Homogeneizado!
+            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mr-1">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Homogeneizado
             </span>
           )}
           <button
             type="button"
             onClick={handleAbrirNovaAmostra}
-            className="px-3 py-2 text-xs bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg flex items-center gap-1.5 font-medium transition-colors"
+            className="h-8 px-2.5 text-xs bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100/80 dark:hover:bg-emerald-950/70 rounded-lg flex items-center gap-1 font-medium transition-colors"
           >
             <Plus className="w-3.5 h-3.5" /> Nova Amostra
           </button>
           <button
             type="button"
             onClick={handleSalvarTudo}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-colors"
+            className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg text-xs flex items-center gap-1.5 transition-colors"
           >
-            <Save className="w-4 h-4" /> Homogeneizar & Salvar
+            <Save className="w-3.5 h-3.5" /> Homogeneizar & Salvar
           </button>
         </div>
       </div>
@@ -230,32 +246,32 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
       {comparativoEditando && (
         <form
           onSubmit={handleSalvarModal}
-          className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-xl border border-emerald-500/50 shadow-md space-y-5"
+          className="bg-white dark:bg-zinc-900 p-5 rounded-xl border border-emerald-500/50 space-y-4"
         >
-          <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-3">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-3">
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                {isNovo ? 'Cadastrar Nova Amostra Comparativa' : `Editar Amostra (${comparativoEditando.codigo || comparativoEditando.identificacao})`}
+              <h3 className="text-xs font-semibold text-slate-900 dark:text-zinc-100 uppercase tracking-wider">
+                {isNovo
+                  ? 'Cadastrar Nova Amostra Comparativa'
+                  : `Editar Amostra (${comparativoEditando.codigo || comparativoEditando.identificacao})`}
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Preencha os dados do imóvel pesquisado no mercado para cálculo automático dos fatores NBR 14653-3
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                Preencha os dados do imóvel pesquisado para cálculo automático dos fatores NBR 14653-3
               </p>
             </div>
             <button
               type="button"
               onClick={handleFecharModal}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
               title="Cancelar"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Código da Amostra
-              </label>
+              <label className={labelCls}>Código da Amostra</label>
               <input
                 type="text"
                 placeholder="Ex: AMOSTRA-01"
@@ -263,14 +279,12 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
                 onChange={(e) =>
                   setComparativoEditando({ ...comparativoEditando, codigo: e.target.value })
                 }
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className={`${inputCls} font-mono`}
               />
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Identificação / Nome do Imóvel *
-              </label>
+              <label className={labelCls}>Identificação / Nome do Imóvel *</label>
               <input
                 type="text"
                 required
@@ -279,28 +293,24 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
                 onChange={(e) =>
                   setComparativoEditando({ ...comparativoEditando, identificacao: e.target.value })
                 }
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className={inputCls}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Data da Informação
-              </label>
+              <label className={labelCls}>Data da Informação</label>
               <input
                 type="date"
                 value={comparativoEditando.dataInformacao}
                 onChange={(e) =>
                   setComparativoEditando({ ...comparativoEditando, dataInformacao: e.target.value })
                 }
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className={`${inputCls} tabular-nums`}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Município *
-              </label>
+              <label className={labelCls}>Município *</label>
               <input
                 type="text"
                 required
@@ -309,14 +319,12 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
                 onChange={(e) =>
                   setComparativoEditando({ ...comparativoEditando, municipio: e.target.value })
                 }
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className={inputCls}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                UF *
-              </label>
+              <label className={labelCls}>UF *</label>
               <input
                 type="text"
                 required
@@ -324,16 +332,17 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
                 placeholder="Ex: GO"
                 value={comparativoEditando.estado}
                 onChange={(e) =>
-                  setComparativoEditando({ ...comparativoEditando, estado: e.target.value.toUpperCase() })
+                  setComparativoEditando({
+                    ...comparativoEditando,
+                    estado: e.target.value.toUpperCase()
+                  })
                 }
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white uppercase"
+                className={`${inputCls} uppercase`}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Área Total (ha) *
-              </label>
+              <label className={labelCls}>Área Total (ha) *</label>
               <input
                 type="number"
                 required
@@ -351,14 +360,12 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
                     precoPorHectareR$: area > 0 && valor > 0 ? Math.round(valor / area) : precoHa
                   });
                 }}
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
+                className={`${inputCls} font-mono tabular-nums`}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Tipo de Valor (Oferta / Negociado)
-              </label>
+              <label className={labelCls}>Tipo de Valor (Oferta / Negociado)</label>
               <select
                 value={comparativoEditando.tipoValor}
                 onChange={(e) =>
@@ -367,7 +374,7 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
                     tipoValor: e.target.value as 'anunciado' | 'negociado_efetivo'
                   })
                 }
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className={inputCls}
               >
                 <option value="anunciado">Anunciado / Oferta (Fator 0,90)</option>
                 <option value="negociado_efetivo">Negociado Efetivo (Fator 1,00)</option>
@@ -375,9 +382,7 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Valor Total Informado (R$)
-              </label>
+              <label className={labelCls}>Valor Total Informado (R$)</label>
               <input
                 type="number"
                 min="0"
@@ -390,17 +395,16 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
                   setComparativoEditando({
                     ...comparativoEditando,
                     valorInformadoR$: valor,
-                    precoPorHectareR$: area > 0 ? Math.round(valor / area) : comparativoEditando.precoPorHectareR$
+                    precoPorHectareR$:
+                      area > 0 ? Math.round(valor / area) : comparativoEditando.precoPorHectareR$
                   });
                 }}
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
+                className={`${inputCls} font-mono tabular-nums`}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Valor Unitário (R$/ha) *
-              </label>
+              <label className={labelCls}>Valor Unitário (R$/ha) *</label>
               <input
                 type="number"
                 required
@@ -414,23 +418,22 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
                   setComparativoEditando({
                     ...comparativoEditando,
                     precoPorHectareR$: precoHa,
-                    valorInformadoR$: area > 0 ? Math.round(precoHa * area) : comparativoEditando.valorInformadoR$
+                    valorInformadoR$:
+                      area > 0 ? Math.round(precoHa * area) : comparativoEditando.valorInformadoR$
                   });
                 }}
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 font-bold font-mono"
+                className={`${inputCls} font-mono tabular-nums font-semibold text-emerald-700 dark:text-emerald-400`}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Topografia / Relevo
-              </label>
+              <label className={labelCls}>Topografia / Relevo</label>
               <select
                 value={comparativoEditando.topografia}
                 onChange={(e) =>
                   setComparativoEditando({ ...comparativoEditando, topografia: e.target.value })
                 }
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className={inputCls}
               >
                 <option value="Plano (0-3%)">Plano (0-3%)</option>
                 <option value="Suave Ondulado (3-8%)">Suave Ondulado (3-8%)</option>
@@ -441,15 +444,13 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Aptidão Agrícola
-              </label>
+              <label className={labelCls}>Aptidão Agrícola</label>
               <select
                 value={comparativoEditando.aptidaoAgricola}
                 onChange={(e) =>
                   setComparativoEditando({ ...comparativoEditando, aptidaoAgricola: e.target.value })
                 }
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className={inputCls}
               >
                 <option value="1 - Boa para Lavouras">1 - Boa para Lavouras</option>
                 <option value="2 - Regular para Lavouras">2 - Regular para Lavouras</option>
@@ -461,15 +462,16 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Disponibilidade Hídrica
-              </label>
+              <label className={labelCls}>Disponibilidade Hídrica</label>
               <select
                 value={comparativoEditando.disponibilidadeHidrica}
                 onChange={(e) =>
-                  setComparativoEditando({ ...comparativoEditando, disponibilidadeHidrica: e.target.value })
+                  setComparativoEditando({
+                    ...comparativoEditando,
+                    disponibilidadeHidrica: e.target.value
+                  })
                 }
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className={inputCls}
               >
                 <option value="Excelente">Excelente</option>
                 <option value="Boa">Boa</option>
@@ -479,9 +481,7 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Distância do Asfalto (km)
-              </label>
+              <label className={labelCls}>Distância do Asfalto (km)</label>
               <input
                 type="number"
                 min="0"
@@ -494,14 +494,12 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
                     distanciaAsfaltoKm: parseFloat(e.target.value) || 0
                   })
                 }
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
+                className={`${inputCls} font-mono tabular-nums`}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Tipo de Exploração
-              </label>
+              <label className={labelCls}>Tipo de Exploração</label>
               <input
                 type="text"
                 placeholder="Ex: Lavoura de soja/milho, pecuária..."
@@ -509,44 +507,44 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
                 onChange={(e) =>
                   setComparativoEditando({ ...comparativoEditando, tipoExploracao: e.target.value })
                 }
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className={inputCls}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Fonte da Informação
-              </label>
+              <label className={labelCls}>Fonte da Informação</label>
               <input
                 type="text"
                 placeholder="Ex: Imobiliária, corretor, cartório..."
                 value={comparativoEditando.fonteInformacao}
                 onChange={(e) =>
-                  setComparativoEditando({ ...comparativoEditando, fonteInformacao: e.target.value })
+                  setComparativoEditando({
+                    ...comparativoEditando,
+                    fonteInformacao: e.target.value
+                  })
                 }
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className={inputCls}
               />
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Benfeitorias Existentes na Amostra
-              </label>
+              <label className={labelCls}>Benfeitorias Existentes na Amostra</label>
               <input
                 type="text"
                 placeholder="Ex: Terra nua, sede, curral, barracão..."
                 value={comparativoEditando.benfeitoriasDescricao}
                 onChange={(e) =>
-                  setComparativoEditando({ ...comparativoEditando, benfeitoriasDescricao: e.target.value })
+                  setComparativoEditando({
+                    ...comparativoEditando,
+                    benfeitoriasDescricao: e.target.value
+                  })
                 }
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className={inputCls}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Acessibilidade
-              </label>
+              <label className={labelCls}>Acessibilidade</label>
               <input
                 type="text"
                 placeholder="Ex: Asfalto, vicinal cascalhada..."
@@ -554,14 +552,12 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
                 onChange={(e) =>
                   setComparativoEditando({ ...comparativoEditando, acessibilidade: e.target.value })
                 }
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className={inputCls}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Confiabilidade
-              </label>
+              <label className={labelCls}>Confiabilidade</label>
               <select
                 value={comparativoEditando.confiabilidade}
                 onChange={(e) =>
@@ -570,7 +566,7 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
                     confiabilidade: e.target.value as 'Alta' | 'Média' | 'Baixa'
                   })
                 }
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className={inputCls}
               >
                 <option value="Alta">Alta</option>
                 <option value="Média">Média</option>
@@ -579,17 +575,17 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-zinc-800">
             <button
               type="button"
               onClick={handleFecharModal}
-              className="px-4 py-2 text-xs font-medium rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="h-8 px-3 text-xs font-medium rounded-lg border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-sm transition-colors"
+              className="h-8 px-3.5 text-xs font-medium rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 transition-colors"
             >
               <Save className="w-3.5 h-3.5" />
               {isNovo ? 'Adicionar Amostra' : 'Salvar Alterações'}
@@ -599,24 +595,24 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
       )}
 
       {/* Filtros e Busca */}
-      <div className="flex flex-col sm:flex-row items-center gap-3 bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+      <div className="flex flex-col sm:flex-row items-center gap-2.5 bg-white dark:bg-zinc-900 p-3 rounded-xl border border-slate-200/80 dark:border-zinc-800">
         <div className="relative flex-1 w-full">
-          <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             placeholder="Buscar por nome da fazenda, código ou município..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+            className="w-full h-8 pl-8 pr-3 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
           />
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Filter className="w-4 h-4 text-slate-400 shrink-0" />
+          <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           <select
             value={filtroStatus}
             onChange={(e) => setFiltroStatus(e.target.value)}
-            className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white w-full sm:w-44"
+            className="h-8 px-2.5 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 w-full sm:w-48 focus:outline-none focus:border-emerald-500"
           >
             <option value="todos">Todos os Status</option>
             <option value="incluido">Somente Válidos / Incluídos</option>
@@ -627,8 +623,8 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
 
       {/* Grid de Cards dos Comparativos */}
       {filtrados.length === 0 ? (
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-8 text-center text-xs text-slate-500 dark:text-slate-400">
-          Nenhuma amostra comparativa encontrada. Clique em <strong>"+ Nova Amostra"</strong> para cadastrar imóveis comparativos de mercado.
+        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-slate-200/80 dark:border-zinc-800 p-8 text-center text-xs text-slate-500 dark:text-zinc-400">
+          Nenhuma amostra comparativa encontrada. Clique em <strong>Nova Amostra</strong> para cadastrar imóveis de mercado.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -639,109 +635,112 @@ export const AvaliacaoPesquisaMercadoView: React.FC<Props> = ({
             return (
               <div
                 key={comp.id}
-                className={`p-5 rounded-xl border transition-all ${
+                className={`p-4 rounded-xl border transition-colors ${
                   isAtivo
-                    ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-sm'
-                    : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700/60 opacity-70'
+                    ? 'bg-white dark:bg-zinc-900 border-slate-200/80 dark:border-zinc-800'
+                    : 'bg-slate-50/70 dark:bg-zinc-950/60 border-slate-200/60 dark:border-zinc-800/60 opacity-75'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300">
                         {comp.codigo}
                       </span>
                       <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded uppercase ${
+                        className={`text-[10px] font-medium px-1.5 py-0.5 rounded uppercase ${
                           isAtivo
-                            ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
-                            : 'bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300'
+                            ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
+                            : 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400'
                         }`}
                       >
-                        {comp.statusInclusao}
+                        {isAtivo ? 'Incluído' : 'Descartado'}
                       </span>
-                      <span className="text-xs text-slate-400">
+                      <span className="text-[11px] text-slate-400 dark:text-zinc-500">
                         {comp.tipoValor === 'negociado_efetivo' ? 'Negociado Real' : 'Anunciado'}
                       </span>
                     </div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-1">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 mt-1 truncate">
                       {comp.identificacao}
                     </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {comp.municipio}{comp.estado ? ` - ${comp.estado}` : ''} • {comp.areaTotalHa.toLocaleString('pt-BR')} ha • {comp.dataInformacao}
+                    <p className="text-xs text-slate-500 dark:text-zinc-400 tabular-nums">
+                      {comp.municipio}
+                      {comp.estado ? ` - ${comp.estado}` : ''} ·{' '}
+                      {comp.areaTotalHa.toLocaleString('pt-BR')} ha · {comp.dataInformacao}
                     </p>
                   </div>
 
                   <div className="text-right shrink-0">
-                    <span className="block text-[10px] uppercase text-slate-400 font-medium">Informado</span>
-                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                    <span className="block text-[10px] uppercase text-slate-400 dark:text-zinc-500 font-medium">
+                      Informado
+                    </span>
+                    <span className="text-sm font-semibold tabular-nums text-slate-800 dark:text-zinc-200">
                       R$ {comp.precoPorHectareR$.toLocaleString('pt-BR')}/ha
                     </span>
                   </div>
                 </div>
 
-                {/* Box de Homogeneização */}
-                <div className="mt-4 p-3 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 flex items-center justify-between text-xs">
+                {/* Bloco de Homogeneização */}
+                <div className="mt-3 p-3 rounded-lg bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-200/70 dark:border-emerald-800/40 flex items-center justify-between gap-2 text-xs">
                   <div>
-                    <span className="block text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400">
-                      Fator Total de Homogeneização
+                    <span className="block text-[10px] uppercase font-semibold text-emerald-700 dark:text-emerald-400">
+                      Fator Total
                     </span>
-                    <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
+                    <span className="font-mono tabular-nums font-semibold text-slate-800 dark:text-zinc-200">
                       {comp.fatores?.fatorTotal ? comp.fatores.fatorTotal.toFixed(3) : '1.000'}
                     </span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
-                      (Oferta: {comp.fatores?.fatorOferta || 1} • Dimensão: {comp.fatores?.fatorDimensao || 1} • Acesso: {comp.fatores?.fatorAcesso || 1})
+                    <span className="text-[10px] text-slate-500 dark:text-zinc-400 block tabular-nums">
+                      Oferta {comp.fatores?.fatorOferta || 1} · Dim {comp.fatores?.fatorDimensao || 1} · Acesso {comp.fatores?.fatorAcesso || 1}
                     </span>
                   </div>
 
                   <div className="text-right">
-                    <span className="block text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400">
-                      Valor Homogeneizado
+                    <span className="block text-[10px] uppercase font-semibold text-emerald-700 dark:text-emerald-400">
+                      Homogeneizado
                     </span>
-                    <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
+                    <span className="text-sm font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
                       R$ {vHomog.toLocaleString('pt-BR')}/ha
                     </span>
                   </div>
                 </div>
 
                 {comp.justificativaStatus && (
-                  <p className="text-[11px] text-red-600 dark:text-red-400 mt-2 bg-red-50 dark:bg-red-950/30 p-2 rounded border border-red-200 dark:border-red-800/30">
-                    <strong>Justificativa do Descarte:</strong> {comp.justificativaStatus}
+                  <p className="text-[11px] text-rose-700 dark:text-rose-400 mt-2 bg-rose-50/70 dark:bg-rose-950/30 p-2 rounded-md border border-rose-200/70 dark:border-rose-800/40">
+                    <strong>Descarte:</strong> {comp.justificativaStatus}
                   </p>
                 )}
 
-                {/* Ações do Card */}
-                <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100 dark:border-slate-700 text-xs">
-                  <span className="text-slate-400 text-[11px] truncate max-w-[180px]">
+                <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-zinc-800 text-xs">
+                  <span className="text-slate-400 dark:text-zinc-500 text-[11px] truncate">
                     Fonte: {comp.fonteInformacao || 'Não informada'}
                   </span>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
                       onClick={() => handleAbrirEdicao(comp)}
-                      className="px-2.5 py-1 rounded text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center gap-1"
+                      className="h-7 px-2 rounded-md text-xs font-medium bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-200/80 dark:hover:bg-zinc-700 transition-colors flex items-center gap-1"
                     >
                       <Pencil className="w-3 h-3" /> Editar
                     </button>
                     <button
                       type="button"
                       onClick={() => handleToggleStatus(comp.id)}
-                      className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                      className={`h-7 px-2 rounded-md text-xs font-medium transition-colors ${
                         isAtivo
-                          ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-950/60 dark:text-amber-300'
-                          : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300'
+                          ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-300'
+                          : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300'
                       }`}
                     >
-                      {isAtivo ? 'Descartar da Amostra' : 'Reintegrar Amostra'}
+                      {isAtivo ? 'Descartar' : 'Reintegrar'}
                     </button>
                     <button
                       type="button"
                       onClick={() => handleRemover(comp.id)}
-                      className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                      className="h-7 w-7 flex items-center justify-center rounded-md text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
                       title="Remover amostra"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>

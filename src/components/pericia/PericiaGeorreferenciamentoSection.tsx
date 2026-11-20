@@ -88,6 +88,7 @@ export const PericiaGeorreferenciamentoSection: React.FC<
 
   // Advanced KML/KMZ importer modal state
   const [isKmlImporterOpen, setIsKmlImporterOpen] = useState(false);
+  const [confirmClearPoints, setConfirmClearPoints] = useState(false);
 
   // Fallback initial georeferencing if not present
   const defaultGeoData: PericiaGeorreferenciamento = useMemo(() => {
@@ -433,17 +434,22 @@ export const PericiaGeorreferenciamentoSection: React.FC<
 
   // Clear all points
   const handleClearAllPoints = () => {
-    if (confirm('Deseja realmente limpar todos os pontos e vértices cadastrados?')) {
-      updateGeoData({
-        ...geoData,
-        pontos: [],
-        areaCalculadaHa: 0,
-        perimetroCalculadoMeters: 0,
-        arquivoImportadoNome: undefined,
-        arquivoImportadoTipo: undefined,
-      });
-      showToast('Todos os pontos foram removidos.');
+    if (!confirmClearPoints) {
+      setConfirmClearPoints(true);
+      showToast('Clique novamente em limpar para confirmar a remoção de todos os pontos.');
+      setTimeout(() => setConfirmClearPoints(false), 4000);
+      return;
     }
+    updateGeoData({
+      ...geoData,
+      pontos: [],
+      areaCalculadaHa: 0,
+      perimetroCalculadoMeters: 0,
+      arquivoImportadoNome: undefined,
+      arquivoImportadoTipo: undefined,
+    });
+    setConfirmClearPoints(false);
+    showToast('Todos os pontos foram removidos.');
   };
 
   // File Upload Handler (KML, KMZ, GeoJSON, GPX, CSV, TXT)
@@ -755,8 +761,8 @@ export const PericiaGeorreferenciamentoSection: React.FC<
             <span>{isCapturingGps ? 'Buscando Satélites...' : 'Capturar GPS Atual'}</span>
           </button>
 
-          <span className="text-xs text-emerald-600 dark:text-emerald-400 font-mono font-bold bg-emerald-50 dark:bg-emerald-950/80 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/80 flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-xs text-emerald-700 dark:text-emerald-400 font-mono font-medium bg-emerald-50/70 dark:bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-200/80 dark:border-emerald-800/60 flex items-center gap-1.5 tabular-nums">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             GPS Ativo: ±{gpsAccuracy ? `${gpsAccuracy}m` : '2.1m'}
           </span>
         </div>
@@ -769,15 +775,14 @@ export const PericiaGeorreferenciamentoSection: React.FC<
             <button
               type="button"
               onClick={() => setMapViewMode('osm')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              className={`h-8 px-3 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
                 mapViewMode === 'osm'
-                  ? 'bg-emerald-600 text-white shadow-xs'
+                  ? 'bg-emerald-600 text-white'
                   : 'bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300'
               }`}
             >
               <Navigation className="w-3.5 h-3.5" />
               <span>OpenStreetMap Interativo</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
             </button>
             <button
               type="button"
@@ -1408,25 +1413,25 @@ export const PericiaGeorreferenciamentoSection: React.FC<
       {subTab === 'importar' && (
         <div className="space-y-4 text-xs">
           {/* Advanced Processor Banner */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="p-4 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/25 border border-emerald-200/80 dark:border-emerald-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/20 text-white flex items-center gap-1 w-fit">
-                <Sparkles className="w-3 h-3 text-amber-300" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                <Sparkles className="w-3 h-3" />
                 Processador Geográfico Oficial
               </span>
-              <h4 className="text-sm font-black">
-                Assistente Visual de Importação de KML / KMZ (CAR & SIGEF)
+              <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
+                Assistente Visual de Importação KML / KMZ (CAR & SIGEF)
               </h4>
-              <p className="text-xs text-white/80 max-w-xl">
-                Importe perímetros completos com cálculo automático de área em hectares, perímetro, fuso UTM, centróide e seleção de camadas de talhões.
+              <p className="text-xs text-slate-600 dark:text-zinc-400 max-w-xl">
+                Importe perímetros completos com cálculo automático de área em hectares, perímetro, fuso UTM, centróide e seleção de camadas.
               </p>
             </div>
             <button
               type="button"
               onClick={() => setIsKmlImporterOpen(true)}
-              className="px-4 py-2.5 bg-white text-emerald-800 hover:bg-emerald-50 rounded-xl font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
+              className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
             >
-              <FileCode className="w-4 h-4 text-emerald-600" />
+              <FileCode className="w-3.5 h-3.5" />
               <span>Abrir Importador KML/KMZ</span>
             </button>
           </div>

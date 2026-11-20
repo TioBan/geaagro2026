@@ -144,119 +144,97 @@ const DEFAULT_OPERATIONS: AgriculturalOperationCost[] = [];
 const DEFAULT_SALES: CommercializationRecord[] = [];
 const DEFAULT_DIARY: FinancialDiaryEntry[] = [];
 
-// Loaders and Savers with safe parsing
-export const loadSeasons = (): PropertyCropSeason[] => {
+// Shared safe array parser for localStorage resilience
+function safeReadArray<T>(key: string, fallback: T[]): T[] {
   try {
-    const data = localStorage.getItem(STORAGE_KEYS.SEASONS);
-    return data ? JSON.parse(data) : DEFAULT_SEASONS;
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : fallback;
   } catch {
-    return DEFAULT_SEASONS;
+    return fallback;
   }
+}
+
+export const isFertilizerInput = (item: InputItem): boolean => {
+  if (item.category === 'Fertilizantes') return true;
+  const nameLower = (item.name || '').toLowerCase();
+  return (
+    nameLower.includes('npk') ||
+    nameLower.includes('ureia') ||
+    nameLower.includes('potássio') ||
+    nameLower.includes('cloreto') ||
+    nameLower.includes('fósforo') ||
+    nameLower.includes('adubo') ||
+    nameLower.includes('map ') ||
+    nameLower.includes('dap ') ||
+    nameLower.includes('sulfato de amônio') ||
+    nameLower.includes('superfosfato')
+  );
 };
+
+export const formatCostDate = (dateStr?: string): string => {
+  if (!dateStr) return '—';
+  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+  if (isoMatch) {
+    return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+  }
+  const parsed = new Date(dateStr);
+  return Number.isNaN(parsed.getTime()) ? '—' : parsed.toLocaleDateString('pt-BR');
+};
+
+// Loaders and Savers with safe parsing
+export const loadSeasons = (): PropertyCropSeason[] => safeReadArray(STORAGE_KEYS.SEASONS, DEFAULT_SEASONS);
 
 export const saveSeasons = (items: PropertyCropSeason[]) => {
   localStorage.setItem(STORAGE_KEYS.SEASONS, JSON.stringify(items));
 };
 
-export const loadInputs = (): InputItem[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.INPUTS);
-    return data ? JSON.parse(data) : DEFAULT_INPUTS;
-  } catch {
-    return DEFAULT_INPUTS;
-  }
-};
+export const loadInputs = (): InputItem[] => safeReadArray(STORAGE_KEYS.INPUTS, DEFAULT_INPUTS);
 
 export const saveInputs = (items: InputItem[]) => {
   localStorage.setItem(STORAGE_KEYS.INPUTS, JSON.stringify(items));
 };
 
-export const loadMachines = (): MachineEquipment[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.MACHINES);
-    return data ? JSON.parse(data) : DEFAULT_MACHINES;
-  } catch {
-    return DEFAULT_MACHINES;
-  }
-};
+export const loadMachines = (): MachineEquipment[] => safeReadArray(STORAGE_KEYS.MACHINES, DEFAULT_MACHINES);
 
 export const saveMachines = (items: MachineEquipment[]) => {
   localStorage.setItem(STORAGE_KEYS.MACHINES, JSON.stringify(items));
 };
 
-export const loadImplementations = (): ImplementationCostItem[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.IMPLEMENTATION);
-    return data ? JSON.parse(data) : DEFAULT_IMPLEMENTATIONS;
-  } catch {
-    return DEFAULT_IMPLEMENTATIONS;
-  }
-};
+export const loadImplementations = (): ImplementationCostItem[] =>
+  safeReadArray(STORAGE_KEYS.IMPLEMENTATION, DEFAULT_IMPLEMENTATIONS);
 
 export const saveImplementations = (items: ImplementationCostItem[]) => {
   localStorage.setItem(STORAGE_KEYS.IMPLEMENTATION, JSON.stringify(items));
 };
 
-export const loadOperations = (): AgriculturalOperationCost[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.OPERATIONS);
-    return data ? JSON.parse(data) : DEFAULT_OPERATIONS;
-  } catch {
-    return DEFAULT_OPERATIONS;
-  }
-};
+export const loadOperations = (): AgriculturalOperationCost[] =>
+  safeReadArray(STORAGE_KEYS.OPERATIONS, DEFAULT_OPERATIONS);
 
 export const saveOperations = (items: AgriculturalOperationCost[]) => {
   localStorage.setItem(STORAGE_KEYS.OPERATIONS, JSON.stringify(items));
 };
 
-export const loadSales = (): CommercializationRecord[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.SALES);
-    return data ? JSON.parse(data) : DEFAULT_SALES;
-  } catch {
-    return DEFAULT_SALES;
-  }
-};
+export const loadSales = (): CommercializationRecord[] => safeReadArray(STORAGE_KEYS.SALES, DEFAULT_SALES);
 
 export const saveSales = (items: CommercializationRecord[]) => {
   localStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(items));
 };
 
-export const loadDiary = (): FinancialDiaryEntry[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.DIARY);
-    return data ? JSON.parse(data) : DEFAULT_DIARY;
-  } catch {
-    return DEFAULT_DIARY;
-  }
-};
+export const loadDiary = (): FinancialDiaryEntry[] => safeReadArray(STORAGE_KEYS.DIARY, DEFAULT_DIARY);
 
 export const saveDiary = (items: FinancialDiaryEntry[]) => {
   localStorage.setItem(STORAGE_KEYS.DIARY, JSON.stringify(items));
 };
 
-export const loadIrrigation = (): IrrigationCostRecord[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.IRRIGATION);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
-};
+export const loadIrrigation = (): IrrigationCostRecord[] => safeReadArray(STORAGE_KEYS.IRRIGATION, []);
 
 export const saveIrrigation = (items: IrrigationCostRecord[]) => {
   localStorage.setItem(STORAGE_KEYS.IRRIGATION, JSON.stringify(items));
 };
 
-export const loadLabor = (): LaborCostRecord[] => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.LABOR);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
-};
+export const loadLabor = (): LaborCostRecord[] => safeReadArray(STORAGE_KEYS.LABOR, []);
 
 export const saveLabor = (items: LaborCostRecord[]) => {
   localStorage.setItem(STORAGE_KEYS.LABOR, JSON.stringify(items));
@@ -310,45 +288,39 @@ export const calculateEconomicKPIs = (
   arg6: IrrigationCostRecord[] = [],
   arg7: LaborCostRecord[] = []
 ): EconomicKPIs => {
-  // Disambiguate arguments to support different calling conventions
   let implementations: ImplementationCostItem[] = [];
   let operations: AgriculturalOperationCost[] = [];
   let sales: CommercializationRecord[] = [];
   let machines: MachineEquipment[] = [];
-  let irrigation: IrrigationCostRecord[] = arg6;
-  let labor: LaborCostRecord[] = arg7;
+  const irrigation: IrrigationCostRecord[] = arg6;
+  const labor: LaborCostRecord[] = arg7;
 
-  if (Array.isArray(arg2)) {
-    if (arg2.length === 0 || 'category' in arg2[0]) {
-      implementations = arg2 as ImplementationCostItem[];
-    } else if ('operationType' in arg2[0]) {
+  if (Array.isArray(arg2) && arg2.length > 0) {
+    if ('operationType' in arg2[0]) {
       operations = arg2 as AgriculturalOperationCost[];
+    } else if ('category' in arg2[0]) {
+      implementations = arg2 as ImplementationCostItem[];
     }
   }
 
-  if (Array.isArray(arg3)) {
-    if (arg3.length > 0 && 'operationType' in arg3[0]) {
+  if (Array.isArray(arg3) && arg3.length > 0) {
+    if ('operationType' in arg3[0]) {
       operations = arg3 as AgriculturalOperationCost[];
-    } else if (arg3.length === 0 || 'customerName' in arg3[0]) {
+    } else if ('customerName' in arg3[0]) {
       sales = arg3 as CommercializationRecord[];
     }
   }
 
-  if (Array.isArray(arg4)) {
-    if (arg4.length > 0 && 'customerName' in arg4[0]) {
+  if (Array.isArray(arg4) && arg4.length > 0) {
+    if ('customerName' in arg4[0]) {
       sales = arg4 as CommercializationRecord[];
-    } else if (arg4.length > 0 && 'brandModel' in arg4[0]) {
+    } else if ('brandModel' in arg4[0] || 'hourlyRate' in arg4[0]) {
       machines = arg4 as MachineEquipment[];
     }
   }
 
-  if (Array.isArray(arg5)) {
+  if (Array.isArray(arg5) && arg5.length > 0) {
     machines = arg5;
-  }
-
-  // Fallback defaults if arrays are empty or unassigned
-  if (operations.length === 0 && Array.isArray(arg2) && arg2.length > 0 && 'operationType' in arg2[0]) {
-    operations = arg2 as AgriculturalOperationCost[];
   }
   const areaHa = season?.plantedAreaHa > 0 ? season.plantedAreaHa : 1;
 

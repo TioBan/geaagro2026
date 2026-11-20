@@ -30,6 +30,7 @@ export const AvaliacaoDireitosTab: React.FC<AvaliacaoDireitosTabProps> = ({
   const items: PericiaAvaliacaoDireito[] = avaliacao.direitos || [];
 
   const [showForm, setShowForm] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<PericiaAvaliacaoDireito>>({
     tipoDireito: 'servidao_passagem',
     denominacao: '',
@@ -68,7 +69,7 @@ export const AvaliacaoDireitosTab: React.FC<AvaliacaoDireitosTabProps> = ({
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.denominacao?.trim() || !formData.titularOuConcessionaria?.trim()) {
-      alert('Informe a denominação do direito e o titular/concessionária.');
+      onShowNotification('Informe a denominação do direito e o titular/concessionária.');
       return;
     }
 
@@ -104,14 +105,19 @@ export const AvaliacaoDireitosTab: React.FC<AvaliacaoDireitosTabProps> = ({
   };
 
   const handleDeleteItem = (id: string) => {
-    if (confirm('Deseja excluir este direito/gravame da avaliação?')) {
-      const updated = items.filter(item => item.id !== id);
-      onUpdateAvaliacao({
-        ...avaliacao,
-        direitos: updated,
-      });
-      onShowNotification('Direito/gravame removido.');
+    if (pendingDeleteId !== id) {
+      setPendingDeleteId(id);
+      onShowNotification('Clique novamente em excluir para confirmar a remoção do direito/gravame.');
+      setTimeout(() => setPendingDeleteId((prev) => (prev === id ? null : prev)), 4000);
+      return;
     }
+    const updated = items.filter(item => item.id !== id);
+    onUpdateAvaliacao({
+      ...avaliacao,
+      direitos: updated,
+    });
+    setPendingDeleteId(null);
+    onShowNotification('Direito/gravame removido.');
   };
 
   const handleExportCSV = () => {

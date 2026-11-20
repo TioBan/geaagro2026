@@ -1,21 +1,17 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { Baby, Plus, CheckCircle2, X } from 'lucide-react';
+import { FarrowingLitter, SwineAnimal } from '../../types/swine';
 import {
-  Baby,
-  Heart,
-  Scale,
-  Plus,
-  CheckCircle2,
-  AlertCircle,
-  Clock,
-  Sparkles,
-  Users,
-  ShieldAlert,
-  ArrowRight,
-} from 'lucide-react';
-import {
-  FarrowingLitter,
-  SwineAnimal,
-} from '../../types/swine';
+  SWINE_CARD_CLASS,
+  SWINE_INPUT_CLASS,
+  SWINE_LABEL_CLASS,
+  SWINE_PRIMARY_BTN_CLASS,
+  SWINE_SECONDARY_BTN_CLASS,
+  SWINE_SUBCARD_CLASS,
+  formatBrDate,
+  getTodayIsoDate,
+  useEscapeClose,
+} from './swineUi';
 
 interface SwineFarrowingMaternityViewProps {
   litters: FarrowingLitter[];
@@ -32,39 +28,57 @@ export const SwineFarrowingMaternityView: React.FC<SwineFarrowingMaternityViewPr
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Form State
-  const [sowCode, setSowCode] = useState('MTZ-1042');
-  const [farrowingDate, setFarrowingDate] = useState(new Date().toISOString().split('T')[0]);
-  const [penNumber, setPenNumber] = useState('Maternidade 05');
-  const [bornAlive, setBornAlive] = useState(15);
-  const [stillborn, setStillborn] = useState(1);
-  const [mummified, setMummified] = useState(0);
-  const [avgBirthWeight, setAvgBirthWeight] = useState(1.45);
-  const [uniformityCv, setUniformityCv] = useState(8.5);
-  const [colostrumChecked, setColostrumChecked] = useState(true);
-  const [splitNursing, setSplitNursing] = useState(true);
-
-  const totalPigletsInMaternity = litters.reduce(
-    (acc, l) => acc + (l.status === 'Em Lactação' ? l.currentPigletsCount : 0),
-    0
+  const registeredSows = useMemo(
+    () => animals.filter(a => a.category.includes('Matriz') || a.category.includes('Marrã')),
+    [animals]
   );
 
-  const totalBornAlive = (litters || []).reduce((acc, l) => acc + (l?.bornAlive || 0), 0);
-  const totalStillborn = (litters || []).reduce((acc, l) => acc + (l?.stillborn || 0), 0);
-  const avgBirthWeightGlobal =
-    (litters || []).length > 0
-      ? ((litters || []).reduce((acc, l) => acc + (l?.avgBirthWeightKg || 0), 0) / (litters || []).length).toFixed(2)
-      : '1.45';
+  // Form State
+  const [sowCode, setSowCode] = useState(registeredSows[0]?.code || '');
+  const [farrowingDate, setFarrowingDate] = useState(getTodayIsoDate());
+  const [penNumber, setPenNumber] = useState('Maternidade 01');
+  const [bornAlive, setBornAlive] = useState(14);
+  const [stillborn, setStillborn] = useState(0);
+  const [mummified, setMummified] = useState(0);
+  const [avgBirthWeight, setAvgBirthWeight] = useState(1.45);
+  const [uniformityCv, setUniformityCv] = useState(9.0);
+  const [colostrumChecked, setColostrumChecked] = useState(true);
+  const [splitNursing, setSplitNursing] = useState(false);
+
+  useEscapeClose(isModalOpen, () => setIsModalOpen(false));
+
+  const metrics = useMemo(() => {
+    const pigletsInMaternity = litters.reduce(
+      (acc, l) => acc + (l.status === 'Em Lactação' ? l.currentPigletsCount : 0),
+      0
+    );
+    const totalBornAlive = litters.reduce((acc, l) => acc + l.bornAlive, 0);
+    const totalStillborn = litters.reduce((acc, l) => acc + l.stillborn, 0);
+    const avgWeight =
+      litters.length > 0
+        ? `${(litters.reduce((acc, l) => acc + l.avgBirthWeightKg, 0) / litters.length).toFixed(2)} kg`
+        : '—';
+    const avgCv =
+      litters.length > 0
+        ? `CV ${(litters.reduce((acc, l) => acc + l.litterUniformityCvPct, 0) / litters.length).toFixed(1)}%`
+        : '—';
+
+    return { pigletsInMaternity, totalBornAlive, totalStillborn, avgWeight, avgCv };
+  }, [litters]);
 
   const handleSaveLitter = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!sowCode.trim()) return;
+    const matchedSow = registeredSows.find(
+      s => s.code.toLowerCase() === sowCode.trim().toLowerCase()
+    );
     const total = Number(bornAlive) + Number(stillborn) + Number(mummified);
     const newLitter: FarrowingLitter = {
       id: `lit_${Date.now()}`,
-      sowId: `sow_${Date.now()}`,
-      sowCode: sowCode.trim(),
+      sowId: matchedSow?.id ?? `sow_${Date.now()}`,
+      sowCode: sowCode.trim().toUpperCase(),
       farrowingDate,
-      penNumber,
+      penNumber: penNumber.trim() || 'Maternidade 01',
       totalBorn: total,
       bornAlive: Number(bornAlive),
       stillborn: Number(stillborn),
@@ -85,270 +99,383 @@ export const SwineFarrowingMaternityView: React.FC<SwineFarrowingMaternityViewPr
   };
 
   const handleApplyCrossFostering = (litterId: string, direction: 'in' | 'out') => {
-    const target = (litters || []).find(l => l?.id === litterId);
-    if (!target) return;
+    const target = litters.find(l => l.id === litterId);
+    if (!target || target.status !== 'Em Lactação') return;
 
-    const updated: FarrowingLitter = {
+    onUpdateLitter({
       ...target,
       crossFosteredIn: direction === 'in' ? target.crossFosteredIn + 1 : target.crossFosteredIn,
       crossFosteredOut: direction === 'out' ? target.crossFosteredOut + 1 : target.crossFosteredOut,
       currentPigletsCount:
-        direction === 'in' ? target.currentPigletsCount + 1 : Math.max(0, target.currentPigletsCount - 1),
-    };
-    onUpdateLitter(updated);
+        direction === 'in'
+          ? target.currentPigletsCount + 1
+          : Math.max(0, target.currentPigletsCount - 1),
+    });
+  };
+
+  const handleWeanLitter = (litter: FarrowingLitter) => {
+    const today = getTodayIsoDate();
+    onUpdateLitter({
+      ...litter,
+      status: 'Desmamada',
+      weaningDate: today,
+      pigletsWeaned: litter.currentPigletsCount,
+    });
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-4">
+      {/* Header */}
+      <div className={`${SWINE_CARD_CLASS} p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
         <div>
-          <h2 className="text-xl font-black text-gray-900 flex items-center gap-2">
-            <Baby className="w-5 h-5 text-amber-600" />
-            <span>Setor de Maternidade & Manejo de Leitegadas</span>
+          <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+            <Baby className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span>Maternidade & Manejo de Leitegadas</span>
           </h2>
-          <p className="text-xs text-gray-500">
-            Controle de partos, peso ao nascer, uniformidade (CV%), ingestão de colostro, adoções cruzadas e desmame.
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Controle de partos, peso ao nascer, uniformidade (CV%), colostro, adoções cruzadas e desmame.
           </p>
         </div>
 
         <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
+          type="button"
+          onClick={() => {
+            if (!sowCode && registeredSows[0]) setSowCode(registeredSows[0].code);
+            setIsModalOpen(true);
+          }}
+          className={`${SWINE_PRIMARY_BTN_CLASS} shrink-0`}
         >
-          <Plus className="w-4 h-4" />
-          <span>Registrar Parto na Maternidade</span>
+          <Plus className="w-3.5 h-3.5" />
+          <span>Registrar Parto</span>
         </button>
       </div>
 
-      {/* Maternity KPI Cards */}
+      {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-4 bg-white rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs text-gray-500 font-semibold block">Leitões Lactantes</span>
-          <div className="text-2xl font-black text-amber-600 mt-1">{totalPigletsInMaternity}</div>
-          <span className="text-[11px] text-gray-500 font-medium">nas baias de maternidade</span>
-        </div>
-        <div className="p-4 bg-white rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs text-gray-500 font-semibold block">Nascidos Vivos (Total)</span>
-          <div className="text-2xl font-black text-emerald-600 mt-1">{totalBornAlive}</div>
-          <span className="text-[11px] text-gray-500 font-medium">{totalStillborn} natimortos</span>
-        </div>
-        <div className="p-4 bg-white rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs text-gray-500 font-semibold block">Peso Médio ao Nascer</span>
-          <div className="text-2xl font-black text-gray-900 mt-1">{avgBirthWeightGlobal} kg</div>
-          <span className="text-[11px] text-emerald-600 font-medium">Meta &gt; 1.35 kg</span>
-        </div>
-        <div className="p-4 bg-white rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs text-gray-500 font-semibold block">Uniformidade Média</span>
-          <div className="text-2xl font-black text-indigo-600 mt-1">CV 9.8%</div>
-          <span className="text-[11px] text-emerald-600 font-medium">Lotes uniformes (&lt; 12%)</span>
-        </div>
-      </div>
-
-      {/* Litters in Lactation Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {litters.map(litter => (
-          <div
-            key={litter.id}
-            className="bg-white rounded-2xl border border-gray-200 shadow-xs p-5 space-y-4 hover:border-amber-300 transition-all"
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-black text-gray-900">{litter.sowCode}</h3>
-                  <span className="text-xs font-bold text-gray-500">({litter.penNumber})</span>
-                </div>
-                <span className="text-xs text-gray-500 block">
-                  Parto: {litter.farrowingDate}
-                </span>
-              </div>
-              <span className="text-[10px] font-bold px-2.5 py-0.5 bg-amber-100 text-amber-800 rounded-full">
-                {litter.status}
-              </span>
-            </div>
-
-            {/* Metrics */}
-            <div className="grid grid-cols-4 gap-2 text-center text-xs">
-              <div className="p-2 bg-gray-50 rounded-xl border border-gray-100">
-                <span className="text-[10px] text-gray-500 block">Vivos</span>
-                <span className="font-bold text-emerald-700">{litter.bornAlive}</span>
-              </div>
-              <div className="p-2 bg-gray-50 rounded-xl border border-gray-100">
-                <span className="text-[10px] text-gray-500 block">Natimortos</span>
-                <span className="font-bold text-gray-700">{litter.stillborn}</span>
-              </div>
-              <div className="p-2 bg-gray-50 rounded-xl border border-gray-100">
-                <span className="text-[10px] text-gray-500 block">Peso Méd.</span>
-                <span className="font-bold text-gray-900">{litter.avgBirthWeightKg} kg</span>
-              </div>
-              <div className="p-2 bg-gray-50 rounded-xl border border-gray-100">
-                <span className="text-[10px] text-gray-500 block">Atual</span>
-                <span className="font-black text-amber-600">{litter.currentPigletsCount}</span>
-              </div>
-            </div>
-
-            {/* Checklist items */}
-            <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-100 text-xs space-y-1 text-gray-700">
-              <div className="flex items-center justify-between">
-                <span>Ingestão de Colostro Monitorada:</span>
-                <span className="font-bold text-emerald-700">
-                  {litter.colostrumIntakeChecked ? ' Sim (100%)' : ' Pendente'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Manejo de Mamada Intermitente (Split Nursing):</span>
-                <span className="font-bold text-gray-900">
-                  {litter.splitNursingApplied ? ' Aplicado' : ' Não necessário'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Adoções / Transferências:</span>
-                <span className="font-bold text-gray-900">
-                  +{litter.crossFosteredIn} / -{litter.crossFosteredOut}
-                </span>
-              </div>
-            </div>
-
-            {/* Cross Fostering Buttons */}
-            <div className="flex items-center justify-between pt-2 border-t border-gray-100 text-xs">
-              <span className="text-gray-500 font-medium">Manejo de Adoção:</span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleApplyCrossFostering(litter.id, 'in')}
-                  className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-lg transition-colors"
-                >
-                  + Adotar Leitão
-                </button>
-                <button
-                  onClick={() => handleApplyCrossFostering(litter.id, 'out')}
-                  className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg transition-colors"
-                >
-                  - Doar Leitão
-                </button>
-              </div>
-            </div>
+        <div className={`${SWINE_CARD_CLASS} p-3.5`}>
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+            Leitões Lactantes
+          </span>
+          <div className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-0.5 tabular-nums">
+            {metrics.pigletsInMaternity}
           </div>
-        ))}
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400">nas baias ativas</span>
+        </div>
+
+        <div className={`${SWINE_CARD_CLASS} p-3.5`}>
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+            Nascidos Vivos
+          </span>
+          <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 tabular-nums">
+            {metrics.totalBornAlive}
+          </div>
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+            {metrics.totalStillborn} natimortos
+          </span>
+        </div>
+
+        <div className={`${SWINE_CARD_CLASS} p-3.5`}>
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+            Peso Médio ao Nascer
+          </span>
+          <div className="text-xl font-bold text-slate-900 dark:text-zinc-100 mt-0.5 tabular-nums">
+            {metrics.avgWeight}
+          </div>
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400">Meta &gt; 1,35 kg</span>
+        </div>
+
+        <div className={`${SWINE_CARD_CLASS} p-3.5`}>
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+            Uniformidade Média
+          </span>
+          <div className="text-xl font-bold text-slate-900 dark:text-zinc-100 mt-0.5 tabular-nums">
+            {metrics.avgCv}
+          </div>
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400">Meta &lt; 12%</span>
+        </div>
       </div>
+
+      {/* Litters Grid */}
+      {litters.length === 0 ? (
+        <div className={`${SWINE_CARD_CLASS} p-10 text-center space-y-2`}>
+          <Baby className="w-8 h-8 text-slate-400 dark:text-zinc-500 mx-auto" />
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-zinc-200">
+            Nenhuma leitegada registrada
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Registre o primeiro parto para acompanhar colostro, adoções cruzadas e desmame.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {litters.map(litter => {
+            const isLactating = litter.status === 'Em Lactação';
+            return (
+              <div key={litter.id} className={`${SWINE_CARD_CLASS} p-4 space-y-3`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                        {litter.sowCode}
+                      </h3>
+                      <span className="text-xs text-slate-500 dark:text-zinc-400">
+                        ({litter.penNumber})
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-slate-500 dark:text-zinc-400">
+                      Parto: {formatBrDate(litter.farrowingDate)}
+                      {litter.weaningDate ? ` · Desmame: ${formatBrDate(litter.weaningDate)}` : ''}
+                    </span>
+                  </div>
+                  <span
+                    className={`text-[10px] font-medium px-2 py-0.5 rounded-md border shrink-0 ${
+                      isLactating
+                        ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                        : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                    }`}
+                  >
+                    {litter.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  <div className={`${SWINE_SUBCARD_CLASS} p-2`}>
+                    <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Vivos</span>
+                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                      {litter.bornAlive}
+                    </span>
+                  </div>
+                  <div className={`${SWINE_SUBCARD_CLASS} p-2`}>
+                    <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Natim.</span>
+                    <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300 tabular-nums">
+                      {litter.stillborn}
+                    </span>
+                  </div>
+                  <div className={`${SWINE_SUBCARD_CLASS} p-2`}>
+                    <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Peso Méd.</span>
+                    <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100 tabular-nums">
+                      {litter.avgBirthWeightKg} kg
+                    </span>
+                  </div>
+                  <div className={`${SWINE_SUBCARD_CLASS} p-2`}>
+                    <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Atual</span>
+                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400 tabular-nums">
+                      {litter.currentPigletsCount}
+                    </span>
+                  </div>
+                </div>
+
+                <div className={`${SWINE_SUBCARD_CLASS} p-2.5 text-xs space-y-1 text-slate-600 dark:text-zinc-400`}>
+                  <div className="flex justify-between">
+                    <span>Colostro monitorado</span>
+                    <span className="font-medium text-slate-900 dark:text-zinc-100">
+                      {litter.colostrumIntakeChecked ? 'Sim' : 'Pendente'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Split Nursing</span>
+                    <span className="font-medium text-slate-900 dark:text-zinc-100">
+                      {litter.splitNursingApplied ? 'Aplicado' : 'Não aplicado'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Adoções / Uniformidade</span>
+                    <span className="font-medium text-slate-900 dark:text-zinc-100 tabular-nums">
+                      +{litter.crossFosteredIn} / -{litter.crossFosteredOut} · CV {litter.litterUniformityCvPct}%
+                    </span>
+                  </div>
+                </div>
+
+                {isLactating && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-slate-100 dark:border-zinc-800">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleApplyCrossFostering(litter.id, 'in')}
+                        className="h-7 px-2.5 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[11px] font-medium hover:bg-emerald-100 dark:hover:bg-emerald-950/70 transition-colors cursor-pointer"
+                      >
+                        + Adotar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyCrossFostering(litter.id, 'out')}
+                        className="h-7 px-2.5 rounded-lg border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-[11px] font-medium hover:bg-rose-100 dark:hover:bg-rose-950/70 transition-colors cursor-pointer"
+                      >
+                        - Doar
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleWeanLitter(litter)}
+                      className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-[11px] font-medium transition-colors cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                      <span>Registrar Desmame</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="text-base font-black text-gray-900">Novo Parto na Maternidade</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400">✕</button>
+        <div
+          className="fixed inset-0 bg-zinc-950/60 z-50 flex items-center justify-center p-4"
+          onClick={() => setIsModalOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl max-w-lg w-full p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-3">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Novo Parto na Maternidade
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
             <form onSubmit={handleSaveLitter} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">Brinco da Matriz *</label>
+                  <label className={SWINE_LABEL_CLASS}>Brinco da Matriz *</label>
                   <input
                     type="text"
                     required
+                    list="registered-sows-list"
+                    placeholder="Ex: MTZ-1042"
                     value={sowCode}
                     onChange={e => setSowCode(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs"
+                    className={SWINE_INPUT_CLASS}
+                  />
+                  {registeredSows.length > 0 && (
+                    <datalist id="registered-sows-list">
+                      {registeredSows.map(s => (
+                        <option key={s.id} value={s.code} />
+                      ))}
+                    </datalist>
+                  )}
+                </div>
+
+                <div>
+                  <label className={SWINE_LABEL_CLASS}>Data do Parto *</label>
+                  <input
+                    type="date"
+                    required
+                    value={farrowingDate}
+                    onChange={e => setFarrowingDate(e.target.value)}
+                    className={SWINE_INPUT_CLASS}
                   />
                 </div>
+
                 <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">Baia da Maternidade</label>
+                  <label className={SWINE_LABEL_CLASS}>Baia / Cela</label>
                   <input
                     type="text"
                     value={penNumber}
                     onChange={e => setPenNumber(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs"
+                    className={SWINE_INPUT_CLASS}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-2.5">
                 <div>
-                  <label className="text-[11px] font-bold text-gray-700 block mb-1">Nascidos Vivos *</label>
+                  <label className={SWINE_LABEL_CLASS}>Nascidos Vivos *</label>
                   <input
                     type="number"
+                    min="0"
                     value={bornAlive}
                     onChange={e => setBornAlive(Number(e.target.value))}
-                    className="w-full px-2 py-1.5 bg-gray-50 border rounded-xl text-xs"
+                    className={SWINE_INPUT_CLASS}
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-gray-700 block mb-1">Natimortos</label>
+                  <label className={SWINE_LABEL_CLASS}>Natimortos</label>
                   <input
                     type="number"
+                    min="0"
                     value={stillborn}
                     onChange={e => setStillborn(Number(e.target.value))}
-                    className="w-full px-2 py-1.5 bg-gray-50 border rounded-xl text-xs"
+                    className={SWINE_INPUT_CLASS}
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-gray-700 block mb-1">Mumificados</label>
+                  <label className={SWINE_LABEL_CLASS}>Mumificados</label>
                   <input
                     type="number"
+                    min="0"
                     value={mummified}
                     onChange={e => setMummified(Number(e.target.value))}
-                    className="w-full px-2 py-1.5 bg-gray-50 border rounded-xl text-xs"
+                    className={SWINE_INPUT_CLASS}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">Peso Médio ao Nascer (kg)</label>
+                  <label className={SWINE_LABEL_CLASS}>Peso Médio ao Nascer (kg)</label>
                   <input
                     type="number"
                     step="0.05"
+                    min="0"
                     value={avgBirthWeight}
                     onChange={e => setAvgBirthWeight(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs"
+                    className={SWINE_INPUT_CLASS}
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">Uniformidade (CV %)</label>
+                  <label className={SWINE_LABEL_CLASS}>Uniformidade (CV %)</label>
                   <input
                     type="number"
                     step="0.1"
+                    min="0"
                     value={uniformityCv}
                     onChange={e => setUniformityCv(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs"
+                    className={SWINE_INPUT_CLASS}
                   />
                 </div>
               </div>
 
-              <div className="space-y-2 pt-2">
-                <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+              <div className="space-y-2 pt-1">
+                <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-zinc-300 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={colostrumChecked}
                     onChange={e => setColostrumChecked(e.target.checked)}
-                    className="rounded text-pink-600 focus:ring-pink-500"
+                    className="rounded border-slate-300 text-rose-600 focus:ring-rose-500"
                   />
-                  <span>Ingestão de Colostro garantida nas primeiras 2 horas</span>
+                  <span>Ingestão de colostro garantida nas primeiras 2 horas</span>
                 </label>
-                <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-zinc-300 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={splitNursing}
                     onChange={e => setSplitNursing(e.target.checked)}
-                    className="rounded text-pink-600 focus:ring-pink-500"
+                    className="rounded border-slate-300 text-rose-600 focus:ring-rose-500"
                   />
-                  <span>Aplicar mamada dividida (Split Nursing) para leitões mais leves</span>
+                  <span>Mamada dividida (Split Nursing) aplicada</span>
                 </label>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-gray-100 text-xs font-bold rounded-xl"
+                  className={SWINE_SECONDARY_BTN_CLASS}
                 >
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-pink-600 text-white text-xs font-bold rounded-xl shadow-xs"
-                >
+                <button type="submit" className={SWINE_PRIMARY_BTN_CLASS}>
                   Salvar Parto
                 </button>
               </div>

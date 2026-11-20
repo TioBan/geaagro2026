@@ -1,10 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  LayoutDashboard,
+  Building2,
+  CalendarRange,
   Tractor,
-  RefreshCw,
-  MapPin,
-  Trash2,
+  Wallet,
+  Package,
+  ShoppingBag,
+  Wrench,
+  CloudRain,
+  FileText,
   Sliders,
+  RefreshCw,
+  Trash2,
   Check,
   X,
 } from 'lucide-react';
@@ -12,7 +20,6 @@ import {
   loadGestaoRuralStorage,
   saveGestaoRuralStorage,
   clearGestaoRuralStorage,
-  getCropEmoji,
 } from '../utils/gestaoRuralStorage';
 import {
   PropriedadeRural,
@@ -66,8 +73,21 @@ const GestaoCulturaSelectorModal = lazyWithRetry(() =>
   import('./gestao_rural/GestaoCulturaSelectorModal').then(m => ({ default: m.GestaoCulturaSelectorModal }))
 );
 
+const SUB_TABS = [
+  { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
+  { id: 'administracao', label: 'Fazenda & Talhões', icon: Building2 },
+  { id: 'planejamento', label: 'Safras', icon: CalendarRange },
+  { id: 'operacoes', label: 'Operações', icon: Tractor },
+  { id: 'financeiro', label: 'Financeiro', icon: Wallet },
+  { id: 'estoque', label: 'Estoque', icon: Package },
+  { id: 'comercializacao', label: 'Comercialização', icon: ShoppingBag },
+  { id: 'maquinas_rh', label: 'Máquinas & RH', icon: Wrench },
+  { id: 'irrigacao_clima_bi', label: 'Irrigação & BI', icon: CloudRain },
+  { id: 'relatorios_ia', label: 'Relatórios', icon: FileText },
+] as const;
+
 const SubViewFallback: React.FC = () => (
-  <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-8 text-center text-xs text-slate-500 dark:text-zinc-400">
+  <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl p-6 text-center text-xs text-slate-500 dark:text-zinc-400">
     Carregando módulo de gestão rural...
   </div>
 );
@@ -111,7 +131,6 @@ export const GestaoRuralModule: React.FC<GestaoRuralModuleProps> = ({
     }));
   };
 
-  // Sync to LocalStorage only after user/state updates (skip redundant initial mount write)
   useEffect(() => {
     if (isFirstRenderRef.current) {
       isFirstRenderRef.current = false;
@@ -202,101 +221,126 @@ export const GestaoRuralModule: React.FC<GestaoRuralModuleProps> = ({
 
   const activeCulturaConfig = data.configCultura || DEFAULT_CONFIG_CULTURA;
 
+  const locationText = data.propriedade.municipio
+    ? `${data.propriedade.municipio}${data.propriedade.estado ? ` - ${data.propriedade.estado}` : ''}`
+    : null;
+
   return (
-    <div className="w-full space-y-6 animate-fade-in">
-      {/* UNIFIED SINGLE HERO BANNER */}
-      <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 rounded-3xl p-6 text-white shadow-xl border border-emerald-700/50 flex flex-col gap-5">
-        <div className="space-y-2">
-          <div className="space-y-0.5">
-            <div className="text-xs font-extrabold uppercase tracking-widest text-emerald-300/90">
-              Administração & Gestão Rural
-            </div>
-            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white">
-              {data.propriedade.nome || 'Minha Propriedade'}
-            </h1>
-          </div>
-
-          <p className="text-xs md:text-sm text-emerald-100/80 max-w-3xl leading-relaxed">
-            {data.propriedade.municipio ? `${data.propriedade.municipio}${data.propriedade.estado ? ` - ${data.propriedade.estado}` : ''} • ` : ''}Área Agricolável:{' '}
-            <strong className="text-white">{data.propriedade.areaAgricolaHa || 0} ha</strong> | Irrigada:{' '}
-            <strong className="text-emerald-300">{data.propriedade.areaIrrigadaHa || 0} ha</strong>
-            {data.propriedade.responsavelTecnico ? ` | RT: ${data.propriedade.responsavelTecnico}` : ''}
-          </p>
-        </div>
-
-        {/* ACTION BUTTONS AT THE BOTTOM */}
-        <div className="pt-4 border-t border-emerald-700/40 flex flex-wrap items-center gap-3 w-full">
-          <button
-            onClick={() => setShowCulturaModal(true)}
-            className="px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-2 group"
-            title="Escolher cultura integrada e ajustar unidades de comercialização (ex: Banana -> cx, sc, kg, ton)"
-          >
-            <span className="text-base group-hover:scale-110 transition-transform">
-              {getCropEmoji(activeCulturaConfig.cultura)}
-            </span>
-            <div className="text-left leading-tight">
-              <span className="text-[9px] uppercase tracking-wider font-extrabold text-amber-950 block">Cultura Integrada</span>
-              <span className="font-black text-xs">
-                {activeCulturaConfig.cultura} • <span className="underline decoration-amber-900/40 font-mono text-[11px]">{activeCulturaConfig.unidadeComercializacaoPrincipal}</span>
+    <div className="w-full space-y-5 animate-fade-in">
+      {/* COMPACT HEADER & HORIZONTAL SUB-NAVIGATION */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="min-w-0 space-y-0.5">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+              <span>Administração &amp; Gestão Rural</span>
+              <span className="text-slate-300 dark:text-zinc-700">•</span>
+              <span className="text-slate-500 dark:text-zinc-400 font-medium normal-case tracking-normal">
+                {activeCulturaConfig.cultura} ({activeCulturaConfig.unidadeComercializacaoPrincipal})
               </span>
             </div>
-            <span className="px-2 py-0.5 rounded-md bg-amber-950/20 text-amber-950 text-[10px] font-extrabold ml-1">
-              {activeCulturaConfig.unidadesHabilitadas?.join(', ') || 'cx, sc, kg, ton'}
-            </span>
-            <Sliders className="w-3.5 h-3.5 text-amber-950" />
-          </button>
+            <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-slate-900 dark:text-zinc-50 truncate">
+              {data.propriedade.nome || 'Minha Propriedade'}
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 flex flex-wrap items-center gap-x-2 gap-y-0.5 tabular-nums">
+              {locationText && <span>{locationText}</span>}
+              {locationText && <span className="text-slate-300 dark:text-zinc-700">·</span>}
+              <span>
+                Agrícola <strong className="font-semibold text-slate-700 dark:text-zinc-200">{data.propriedade.areaAgricolaHa || 0} ha</strong>
+              </span>
+              <span className="text-slate-300 dark:text-zinc-700">·</span>
+              <span>
+                Irrigada <strong className="font-semibold text-slate-700 dark:text-zinc-200">{data.propriedade.areaIrrigadaHa || 0} ha</strong>
+              </span>
+              {data.propriedade.responsavelTecnico && (
+                <>
+                  <span className="text-slate-300 dark:text-zinc-700">·</span>
+                  <span>RT: {data.propriedade.responsavelTecnico}</span>
+                </>
+              )}
+            </p>
+          </div>
 
-          <button
-            onClick={() => handleSwitchTab('administracao')}
-            className="px-4 py-2.5 bg-white text-emerald-900 font-extrabold text-xs rounded-xl hover:bg-emerald-50 transition-all shadow-md cursor-pointer flex items-center gap-2"
-          >
-            <MapPin className="w-4 h-4 text-emerald-700" />
-            <span>Ver Talhões</span>
-          </button>
-          <button
-            onClick={() => handleSwitchTab('operacoes')}
-            className="px-4 py-2.5 bg-emerald-700/80 hover:bg-emerald-600 text-white font-extrabold text-xs rounded-xl border border-emerald-500/50 transition-all cursor-pointer flex items-center gap-2"
-          >
-            <Tractor className="w-4 h-4 text-emerald-300" />
-            <span>Lançar Operação</span>
-          </button>
-          <button
-            onClick={() => setData(loadGestaoRuralStorage())}
-            className="px-3.5 py-2.5 bg-emerald-950/60 hover:bg-emerald-950/80 text-emerald-100 font-extrabold text-xs rounded-xl border border-emerald-600/40 transition-all cursor-pointer flex items-center gap-1.5"
-            title="Atualizar Dados Locais"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Recarregar</span>
-          </button>
-
-          {!confirmReset ? (
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
-              onClick={() => setConfirmReset(true)}
-              className="px-3.5 py-2.5 bg-red-950/40 hover:bg-red-900/60 text-red-200 font-extrabold text-xs rounded-xl border border-red-800/40 transition-all cursor-pointer flex items-center gap-1.5 ml-auto"
-              title="Limpar todos os dados deste módulo"
+              type="button"
+              onClick={() => setShowCulturaModal(true)}
+              className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50 hover:bg-slate-100 dark:bg-zinc-800/70 dark:hover:bg-zinc-800 text-slate-800 dark:text-zinc-100 text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Configurar cultura integrada e unidades de comercialização"
             >
-              <Trash2 className="w-3.5 h-3.5 text-red-400" />
-              <span>Limpar Dados</span>
+              <Sliders className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Cultura &amp; Unidades</span>
             </button>
-          ) : (
-            <div className="flex items-center gap-1.5 ml-auto bg-red-950/80 border border-red-700/60 rounded-xl px-3 py-1.5 text-xs">
-              <span className="text-red-100 font-bold">Zerar lançamentos?</span>
+
+            <button
+              type="button"
+              onClick={() => setData(loadGestaoRuralStorage())}
+              className="h-8 px-2.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white hover:bg-slate-50 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Recarregar dados locais"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Recarregar</span>
+            </button>
+
+            {!confirmReset ? (
               <button
-                onClick={handleConfirmResetData}
-                className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg cursor-pointer flex items-center gap-1"
+                type="button"
+                onClick={() => setConfirmReset(true)}
+                className="h-8 px-2.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white hover:border-red-300 hover:text-red-600 dark:bg-zinc-900 dark:hover:border-red-800 dark:hover:text-red-400 text-slate-500 dark:text-zinc-400 text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Zerar lançamentos deste módulo"
               >
-                <Check className="w-3 h-3" />
-                Confirmar
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Limpar</span>
               </button>
-              <button
-                onClick={() => setConfirmReset(false)}
-                className="px-2 py-1 bg-white/10 hover:bg-white/20 text-white font-bold rounded-lg cursor-pointer flex items-center gap-1"
-              >
-                <X className="w-3 h-3" />
-                Cancelar
-              </button>
-            </div>
-          )}
+            ) : (
+              <div className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50/70 dark:bg-red-950/30 text-xs">
+                <span className="text-red-700 dark:text-red-300 font-medium">Zerar tudo?</span>
+                <button
+                  type="button"
+                  onClick={handleConfirmResetData}
+                  className="h-6 px-2 rounded-md bg-red-600 hover:bg-red-700 text-white font-medium inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <Check className="w-3 h-3" />
+                  Sim
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmReset(false)}
+                  className="h-6 px-2 rounded-md bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 font-medium inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                  Não
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* HAIRLINE SUB-TAB NAVIGATION */}
+        <div className="border-t border-slate-200/80 dark:border-zinc-800 px-3 sm:px-5 overflow-x-auto no-scrollbar">
+          <nav className="flex items-center gap-1 min-w-max" aria-label="Seções de Gestão Rural">
+            {SUB_TABS.map(tab => {
+              const Icon = tab.icon;
+              const isActive = currentSubTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => handleSwitchTab(tab.id)}
+                  className={`relative h-10 px-2.5 text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+                    isActive
+                      ? 'text-emerald-700 dark:text-emerald-400 font-semibold'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5 shrink-0" />
+                  <span>{tab.label}</span>
+                  {isActive && (
+                    <span className="absolute inset-x-1 bottom-0 h-0.5 bg-emerald-600 dark:bg-emerald-400 rounded-full" />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
         </div>
       </div>
 
@@ -413,7 +457,7 @@ export const GestaoRuralModule: React.FC<GestaoRuralModuleProps> = ({
         )}
       </React.Suspense>
 
-      {/* LAZY-LOADED CULTURA SELECTOR MODAL (mounted only when open) */}
+      {/* LAZY-LOADED CULTURA SELECTOR MODAL */}
       <React.Suspense fallback={null}>
         {showCulturaModal && (
           <GestaoCulturaSelectorModal

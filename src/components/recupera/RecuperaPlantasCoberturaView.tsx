@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { PlantaCoberturaInfo, AreaDegradadaItem } from '../../types/recupera';
-import {
-  Sprout,
-  Calculator,
-  Search,
-  CheckCircle2
-} from 'lucide-react';
+import { Sprout, Calculator, Search, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   areaAtiva?: AreaDegradadaItem;
 }
+
+const INPUT_CLASS =
+  'w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition';
 
 const PLANTAS_COBERTURA_CATALOGO: PlantaCoberturaInfo[] = [
   {
@@ -484,10 +482,9 @@ export const RecuperaPlantasCoberturaView: React.FC<Props> = ({ areaAtiva }) => 
   const [filtroFamilia, setFiltroFamilia] = useState<string>('todas');
   const [plantaSelecionada, setPlantaSelecionada] = useState<PlantaCoberturaInfo>(PLANTAS_COBERTURA_CATALOGO[0]);
 
-  // Simulador de Consórcio
   const [especie1, setEspecie1] = useState<string>('crotalaria_ochroleuca');
   const [especie2, setEspecie2] = useState<string>('milheto_grao');
-  const [proporcaoEspecie1, setProporcaoEspecie1] = useState<number>(50); // %
+  const [proporcaoEspecie1, setProporcaoEspecie1] = useState<number>(50);
   const [areaSimuladaHa, setAreaSimuladaHa] = useState<string>(areaAtiva?.areaHa ? String(areaAtiva.areaHa) : '');
 
   useEffect(() => {
@@ -501,8 +498,8 @@ export const RecuperaPlantasCoberturaView: React.FC<Props> = ({ areaAtiva }) => 
   const taxaP1 = (p1.taxaSemeaduraKgHa * (proporcaoEspecie1 / 100)).toFixed(1);
   const taxaP2 = (p2.taxaSemeaduraKgHa * ((100 - proporcaoEspecie1) / 100)).toFixed(1);
   const biomassaMediaEstimada = (
-    ((p1.producaoBiomassaSecaTHaMin + p1.producaoBiomassaSecaTHaMax) / 2 * (proporcaoEspecie1 / 100)) +
-    ((p2.producaoBiomassaSecaTHaMin + p2.producaoBiomassaSecaTHaMax) / 2 * ((100 - proporcaoEspecie1) / 100))
+    ((p1.producaoBiomassaSecaTHaMin + p1.producaoBiomassaSecaTHaMax) / 2) * (proporcaoEspecie1 / 100) +
+    ((p2.producaoBiomassaSecaTHaMin + p2.producaoBiomassaSecaTHaMax) / 2) * ((100 - proporcaoEspecie1) / 100)
   ).toFixed(1);
 
   const leguminosas = useMemo(
@@ -532,18 +529,19 @@ export const RecuperaPlantasCoberturaView: React.FC<Props> = ({ areaAtiva }) => 
   }, [busca, filtroFamilia]);
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-5">
+      <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 sm:p-5 border border-slate-200/80 dark:border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+          <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider tabular-nums">
             Fase 4 • Plantas de Cobertura & Adubação Verde ({PLANTAS_COBERTURA_CATALOGO.length} espécies)
           </span>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Sprout className="w-5 h-5 text-emerald-600" />
+          <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-2 mt-0.5">
+            <Sprout className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             <span>Biblioteca Técnica & Simulador de Consórcios</span>
           </h2>
-          <p className="text-xs text-slate-500">
-            Biomassa seca, relação C/N, sistema radicular descompactador e cálculo de taxas{areaAtiva?.nomeTalhao ? ` para ${areaAtiva.nomeTalhao}` : ''}
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+            Biomassa seca, relação C/N, sistema radicular descompactador e cálculo de taxas
+            {areaAtiva?.nomeTalhao ? ` para ${areaAtiva.nomeTalhao}` : ''}
           </p>
         </div>
 
@@ -551,7 +549,7 @@ export const RecuperaPlantasCoberturaView: React.FC<Props> = ({ areaAtiva }) => 
           <select
             value={filtroFamilia}
             onChange={e => setFiltroFamilia(e.target.value)}
-            className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-900 dark:text-white"
+            className="h-9 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 text-xs font-medium text-slate-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
           >
             <option value="todas">Todas as famílias ({PLANTAS_COBERTURA_CATALOGO.length})</option>
             <option value="leguminosa">Leguminosas (Fabaceae)</option>
@@ -559,91 +557,119 @@ export const RecuperaPlantasCoberturaView: React.FC<Props> = ({ areaAtiva }) => 
             <option value="outras">Crucíferas / Poligonáceas / Asteráceas</option>
           </select>
 
-          <div className="relative w-full md:w-64">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+          <div className="relative w-full md:w-60">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400 dark:text-zinc-500" />
             <input
               type="text"
               value={busca}
               onChange={e => setBusca(e.target.value)}
-              placeholder="Buscar por espécie ou benefício..."
-              className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-900 dark:text-white"
+              placeholder="Buscar espécie ou benefício..."
+              className="w-full h-9 pl-8 pr-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/70 dark:bg-zinc-950/60 text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
             />
           </div>
         </div>
       </div>
 
-      {/* Grid: Lista de Espécies (Esquerda) e Ficha Técnica Detalhada (Direita) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Lista de Espécies */}
-        <div className="lg:col-span-5 space-y-2 max-h-[640px] overflow-y-auto pr-1 scrollbar-thin">
-          {filtradas.map(p => (
-            <div
-              key={p.id}
-              onClick={() => setPlantaSelecionada(p)}
-              className={`p-3.5 rounded-xl border transition cursor-pointer text-xs ${
-                plantaSelecionada.id === p.id
-                  ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 ring-2 ring-emerald-500/20'
-                  : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-emerald-300'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-2 mb-1">
-                <h4 className="font-bold text-slate-900 dark:text-white">{p.nomePopular}</h4>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                  {p.familia.split(' ')[0]}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 italic mb-1.5">{p.nomeCientifico}</p>
-              <div className="flex items-center gap-3 text-[10px] text-slate-600 dark:text-slate-400">
-                <span>Biomassa: <strong>{p.producaoBiomassaSecaTHaMin}-{p.producaoBiomassaSecaTHaMax} t/ha</strong></span>
-                <span>Taxa: <strong>{p.taxaSemeaduraKgHa} kg/ha</strong></span>
-              </div>
+      {/* Lista de Espécies + Ficha Técnica */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="lg:col-span-5 space-y-2 max-h-[560px] overflow-y-auto pr-1">
+          {filtradas.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 rounded-xl border border-dashed border-slate-200 dark:border-zinc-800">
+              Nenhuma espécie encontrada com os filtros atuais.
             </div>
-          ))}
+          ) : (
+            filtradas.map(p => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setPlantaSelecionada(p)}
+                className={`w-full p-3.5 rounded-xl border transition text-left text-xs ${
+                  plantaSelecionada.id === p.id
+                    ? 'border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/20'
+                    : 'border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300 dark:hover:border-zinc-700'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2 mb-0.5">
+                  <h4 className="font-semibold text-slate-900 dark:text-zinc-100">{p.nomePopular}</h4>
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 shrink-0">
+                    {p.familia.split(' ')[0]}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400 italic mb-1.5">{p.nomeCientifico}</p>
+                <div className="flex items-center gap-3 text-[11px] text-slate-600 dark:text-zinc-400 tabular-nums">
+                  <span>
+                    Biomassa:{' '}
+                    <strong className="text-slate-800 dark:text-zinc-200">
+                      {p.producaoBiomassaSecaTHaMin}-{p.producaoBiomassaSecaTHaMax} t/ha
+                    </strong>
+                  </span>
+                  <span>
+                    Taxa: <strong className="text-slate-800 dark:text-zinc-200">{p.taxaSemeaduraKgHa} kg/ha</strong>
+                  </span>
+                </div>
+              </button>
+            ))
+          )}
         </div>
 
         {/* Ficha Técnica da Espécie Selecionada */}
-        <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4 text-xs">
-          <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
-            <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">
+        <div className="lg:col-span-7 bg-white dark:bg-zinc-900 rounded-xl p-4 sm:p-5 border border-slate-200/80 dark:border-zinc-800 space-y-4 text-xs">
+          <div className="border-b border-slate-100 dark:border-zinc-800 pb-3">
+            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
               {plantaSelecionada.familia} • {plantaSelecionada.ciclo}
             </span>
-            <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-              {plantaSelecionada.nomePopular} <span className="text-xs font-normal text-slate-400 italic">({plantaSelecionada.nomeCientifico})</span>
+            <h3 className="text-base font-bold text-slate-900 dark:text-zinc-100 mt-0.5">
+              {plantaSelecionada.nomePopular}{' '}
+              <span className="text-xs font-normal text-slate-400 dark:text-zinc-500 italic">
+                ({plantaSelecionada.nomeCientifico})
+              </span>
             </h3>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
-              <span className="text-[10px] text-slate-500 block">Sistema Radicular</span>
-              <strong className="text-slate-800 dark:text-slate-200">{plantaSelecionada.sistemaRadicular}</strong>
+          <div className="grid grid-cols-1 sm:grid-cols-3 border border-slate-200/80 dark:border-zinc-800 rounded-lg divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80 dark:divide-zinc-800">
+            <div className="p-3">
+              <span className="text-[10px] text-slate-500 dark:text-zinc-400 block mb-0.5">Sistema Radicular</span>
+              <strong className="font-semibold text-slate-800 dark:text-zinc-200">
+                {plantaSelecionada.sistemaRadicular}
+              </strong>
             </div>
-            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
-              <span className="text-[10px] text-slate-500 block">Biomassa Seca</span>
-              <strong className="text-emerald-600">{plantaSelecionada.producaoBiomassaSecaTHaMin} a {plantaSelecionada.producaoBiomassaSecaTHaMax} t/ha</strong>
+            <div className="p-3">
+              <span className="text-[10px] text-slate-500 dark:text-zinc-400 block mb-0.5">Biomassa Seca</span>
+              <strong className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                {plantaSelecionada.producaoBiomassaSecaTHaMin} a {plantaSelecionada.producaoBiomassaSecaTHaMax} t/ha
+              </strong>
             </div>
-            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
-              <span className="text-[10px] text-slate-500 block">Relação C/N</span>
-              <strong className="text-slate-800 dark:text-slate-200">{plantaSelecionada.relacaoCN}</strong>
+            <div className="p-3">
+              <span className="text-[10px] text-slate-500 dark:text-zinc-400 block mb-0.5">Relação C/N</span>
+              <strong className="font-semibold text-slate-800 dark:text-zinc-200 tabular-nums">
+                {plantaSelecionada.relacaoCN}
+              </strong>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <span className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Época de Semeadura</span>
-              <p className="text-slate-500">{plantaSelecionada.epocaSemeadura}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="p-3 bg-slate-50/70 dark:bg-zinc-950/60 rounded-lg border border-slate-200/70 dark:border-zinc-800">
+              <span className="font-semibold text-slate-700 dark:text-zinc-300 block mb-0.5">Época de Semeadura</span>
+              <p className="text-slate-600 dark:text-zinc-400">{plantaSelecionada.epocaSemeadura}</p>
             </div>
-            <div>
-              <span className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Profundidade & Taxa Pura</span>
-              <p className="text-slate-500">{plantaSelecionada.profundidadeSemeaduraCm} • {plantaSelecionada.taxaSemeaduraKgHa} kg/ha</p>
+            <div className="p-3 bg-slate-50/70 dark:bg-zinc-950/60 rounded-lg border border-slate-200/70 dark:border-zinc-800">
+              <span className="font-semibold text-slate-700 dark:text-zinc-300 block mb-0.5">
+                Profundidade & Taxa Pura
+              </span>
+              <p className="text-slate-600 dark:text-zinc-400 tabular-nums">
+                {plantaSelecionada.profundidadeSemeaduraCm} • {plantaSelecionada.taxaSemeaduraKgHa} kg/ha
+              </p>
             </div>
           </div>
 
           <div>
-            <span className="font-bold text-slate-900 dark:text-white block mb-2">Principais Benefícios para Recuperação do Solo:</span>
-            <ul className="space-y-1 text-slate-600 dark:text-slate-400">
+            <span className="font-semibold text-slate-900 dark:text-zinc-100 block mb-2">
+              Principais Benefícios para Recuperação do Solo:
+            </span>
+            <ul className="space-y-1.5 text-slate-600 dark:text-zinc-400">
               {plantaSelecionada.beneficiosSolo.map((b, i) => (
                 <li key={i} className="flex items-start gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                   <span>{b}</span>
                 </li>
               ))}
@@ -652,45 +678,47 @@ export const RecuperaPlantasCoberturaView: React.FC<Props> = ({ areaAtiva }) => 
         </div>
       </div>
 
-      {/* Simulador Interativo de Consórcios de Plantas de Cobertura */}
-      <div className="bg-gradient-to-r from-emerald-900 to-teal-950 rounded-2xl p-6 text-white shadow-lg space-y-4 text-xs">
-        <div className="flex items-center gap-2">
-          <Calculator className="w-5 h-5 text-emerald-400" />
-          <h3 className="text-sm font-bold">Simulador de Consórcios & Taxa de Sementes Ponderada</h3>
+      {/* Simulador Interativo de Consórcios */}
+      <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 sm:p-5 border border-slate-200/80 dark:border-zinc-800 space-y-4 text-xs">
+        <div className="border-b border-slate-100 dark:border-zinc-800 pb-3">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+            <Calculator className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span>Simulador de Consórcios & Taxa de Sementes Ponderada</span>
+          </h3>
+          <p className="text-slate-500 dark:text-zinc-400 mt-0.5">
+            O consórcio entre uma Gramínea (alta palhada e C/N elevado) e uma Leguminosa (fixação de N e C/N baixo) equilibra a decomposição da matéria orgânica.
+          </p>
         </div>
-        <p className="text-emerald-100/70 text-xs">
-          O consórcio entre uma Gramínea (alta palhada e C/N elevado) e uma Leguminosa (fixação de N e C/N baixo) equilibra a taxa de decomposição da matéria orgânica.
-        </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3.5">
           <div>
-            <label className="block text-emerald-200 mb-1 font-semibold">Leguminosa (Fixadora de N)</label>
-            <select
-              value={especie1}
-              onChange={e => setEspecie1(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-900/80 border border-emerald-500/40 text-white font-bold"
-            >
+            <label className="block text-slate-600 dark:text-zinc-400 mb-1 font-medium">
+              Leguminosa (Fixadora de N)
+            </label>
+            <select value={especie1} onChange={e => setEspecie1(e.target.value)} className={INPUT_CLASS}>
               {leguminosas.map(p => (
-                <option key={p.id} value={p.id}>{p.nomePopular}</option>
+                <option key={p.id} value={p.id}>
+                  {p.nomePopular}
+                </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-emerald-200 mb-1 font-semibold">Gramínea / Outra Família (Palhada / P)</label>
-            <select
-              value={especie2}
-              onChange={e => setEspecie2(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-900/80 border border-emerald-500/40 text-white font-bold"
-            >
+            <label className="block text-slate-600 dark:text-zinc-400 mb-1 font-medium">
+              Gramínea / Outra Família (Palhada)
+            </label>
+            <select value={especie2} onChange={e => setEspecie2(e.target.value)} className={INPUT_CLASS}>
               {naoLeguminosas.map(p => (
-                <option key={p.id} value={p.id}>{p.nomePopular}</option>
+                <option key={p.id} value={p.id}>
+                  {p.nomePopular}
+                </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-emerald-200 mb-1 font-semibold">
+            <label className="block text-slate-600 dark:text-zinc-400 mb-1 font-medium tabular-nums">
               Proporção: {proporcaoEspecie1}% / {100 - proporcaoEspecie1}%
             </label>
             <input
@@ -699,13 +727,15 @@ export const RecuperaPlantasCoberturaView: React.FC<Props> = ({ areaAtiva }) => 
               max="80"
               step="5"
               value={proporcaoEspecie1}
-              onChange={e => setProporcaoEspecie1(parseInt(e.target.value))}
-              className="w-full accent-emerald-400 mt-2"
+              onChange={e => setProporcaoEspecie1(parseInt(e.target.value, 10))}
+              className="w-full accent-emerald-600 mt-2.5"
             />
           </div>
 
           <div>
-            <label className="block text-emerald-200 mb-1 font-semibold">Área para Cálculo Total (ha)</label>
+            <label className="block text-slate-600 dark:text-zinc-400 mb-1 font-medium">
+              Área para Cálculo Total (ha)
+            </label>
             <input
               type="number"
               min="0"
@@ -713,31 +743,51 @@ export const RecuperaPlantasCoberturaView: React.FC<Props> = ({ areaAtiva }) => 
               value={areaSimuladaHa}
               onChange={e => setAreaSimuladaHa(e.target.value)}
               placeholder="Ex: 15"
-              className="w-full px-3 py-2 rounded-xl bg-slate-900/80 border border-emerald-500/40 text-white font-bold placeholder:text-emerald-200/40"
+              className={`${INPUT_CLASS} font-semibold tabular-nums`}
             />
           </div>
         </div>
 
         {/* Resultado Consolidado do Consórcio */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-white/10 rounded-xl border border-white/15">
-          <div>
-            <span className="text-[10px] text-emerald-200 block">Dose de {p1.nomePopular.split(' ')[0]}</span>
-            <p className="text-lg font-bold text-white">{taxaP1} kg/ha</p>
-            <span className="text-[10px] text-emerald-300">
-              {areaHaNum > 0 ? `Total (${areaHaNum} ha): ${(parseFloat(taxaP1) * areaHaNum).toFixed(1)} kg` : 'Informe a área em ha para calcular total'}
+        <div className="grid grid-cols-1 sm:grid-cols-3 border border-slate-200/80 dark:border-zinc-800 rounded-lg divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80 dark:divide-zinc-800 overflow-hidden bg-slate-50/70 dark:bg-zinc-950/60">
+          <div className="p-3.5">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">
+              Dose de {p1.nomePopular.split(' ')[0]}
+            </span>
+            <p className="text-lg font-bold text-slate-900 dark:text-zinc-100 tabular-nums mt-0.5">
+              {taxaP1} kg/ha
+            </p>
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+              {areaHaNum > 0
+                ? `Total (${areaHaNum} ha): ${(parseFloat(taxaP1) * areaHaNum).toFixed(1)} kg`
+                : 'Informe a área em ha para calcular total'}
             </span>
           </div>
-          <div>
-            <span className="text-[10px] text-emerald-200 block">Dose de {p2.nomePopular.split(' ')[0]}</span>
-            <p className="text-lg font-bold text-white">{taxaP2} kg/ha</p>
-            <span className="text-[10px] text-emerald-300">
-              {areaHaNum > 0 ? `Total (${areaHaNum} ha): ${(parseFloat(taxaP2) * areaHaNum).toFixed(1)} kg` : 'Informe a área em ha para calcular total'}
+
+          <div className="p-3.5">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">
+              Dose de {p2.nomePopular.split(' ')[0]}
+            </span>
+            <p className="text-lg font-bold text-slate-900 dark:text-zinc-100 tabular-nums mt-0.5">
+              {taxaP2} kg/ha
+            </p>
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+              {areaHaNum > 0
+                ? `Total (${areaHaNum} ha): ${(parseFloat(taxaP2) * areaHaNum).toFixed(1)} kg`
+                : 'Informe a área em ha para calcular total'}
             </span>
           </div>
-          <div>
-            <span className="text-[10px] text-emerald-200 block">Biomassa Seca Combinada</span>
-            <p className="text-lg font-bold text-emerald-300">~{biomassaMediaEstimada} t/ha</p>
-            <span className="text-[10px] text-emerald-200">Equilíbrio C/N ideal para o solo</span>
+
+          <div className="p-3.5 bg-emerald-50/40 dark:bg-emerald-950/20">
+            <span className="text-[11px] text-emerald-700 dark:text-emerald-400 block">
+              Biomassa Seca Combinada
+            </span>
+            <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300 tabular-nums mt-0.5">
+              ~{biomassaMediaEstimada} t/ha
+            </p>
+            <span className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80">
+              Equilíbrio C/N ideal para o solo
+            </span>
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   X,
   Upload,
@@ -8,12 +8,8 @@ import {
   Compass,
   CheckCircle2,
   AlertCircle,
-  FileText,
   Sparkles,
-  Maximize2,
-  Minimize2,
   Info,
-  ChevronRight,
   ExternalLink,
   Ruler,
   Landmark,
@@ -372,26 +368,40 @@ export const PericiaKmlImporterModal: React.FC<PericiaKmlImporterModalProps> = (
     };
   }, [activePoints, metrics.centroide]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/70 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh] my-auto animate-in fade-in zoom-in-95 duration-200">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto"
+    >
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl w-full max-w-4xl shadow-xl overflow-hidden flex flex-col max-h-[90vh] my-auto">
         
         {/* Header */}
-        <div className="px-5 py-4 sm:px-6 sm:py-5 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between bg-gradient-to-r from-emerald-50/70 via-slate-50 to-white dark:from-emerald-950/30 dark:via-zinc-900 dark:to-zinc-900">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md">
-              <FileCode className="w-5 h-5" />
+        <div className="px-5 py-3.5 border-b border-slate-200/80 dark:border-zinc-800 flex items-center justify-between bg-slate-50/70 dark:bg-zinc-950/40 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/70 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <FileCode className="w-4 h-4" />
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <span>Importação & Processamento de KML / KMZ</span>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
+                <span>Importação & Processamento KML / KMZ</span>
+                <span className="text-[10px] uppercase font-medium tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/50">
                   Google Earth • CAR • SIGEF
                 </span>
               </h2>
-              <p className="text-xs text-slate-500 dark:text-zinc-400">
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400 truncate">
                 Imóvel:{' '}
-                <span className="font-semibold text-slate-700 dark:text-zinc-300">
+                <span className="font-medium text-slate-700 dark:text-zinc-300">
                   {pericia.imovelNome || 'Imóvel Periciado'}
                 </span>{' '}
                 • Código:{' '}
@@ -403,10 +413,12 @@ export const PericiaKmlImporterModal: React.FC<PericiaKmlImporterModalProps> = (
           </div>
 
           <button
+            type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-xl hover:bg-slate-200 dark:hover:bg-zinc-800 flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+            aria-label="Fechar"
+            className="w-8 h-8 rounded-lg hover:bg-slate-200/70 dark:hover:bg-zinc-800 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer shrink-0"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 

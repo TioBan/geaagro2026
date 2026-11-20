@@ -9,19 +9,20 @@ import {
   calcularMetodoCapitalizacaoRenda,
   calcularMetodoEvolutivo
 } from '../../utils/avaliacaoImoveisCalculos';
-import {
-  Scale,
-  DollarSign,
-  Building,
-  CheckCircle2,
-  Save
-} from 'lucide-react';
+import { Scale, DollarSign, Building, CheckCircle2, Save } from 'lucide-react';
 
 interface Props {
   avaliacao: AvaliacaoCompletaImovel;
   onAtualizarMetodoPrincipal: (metodo: MetodoAvaliacaoPrincipal) => void;
-  onSalvarConfiguracoes: (capRenda?: MetodoCapitalizacaoRendaConfig, evolutivo?: MetodoEvolutivoConfig) => void;
+  onSalvarConfiguracoes: (
+    capRenda?: MetodoCapitalizacaoRendaConfig,
+    evolutivo?: MetodoEvolutivoConfig
+  ) => void;
 }
+
+const inputCls =
+  'w-full h-9 px-3 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500';
+const labelCls = 'block text-xs font-medium text-slate-600 dark:text-zinc-400 mb-1';
 
 export const AvaliacaoMetodosView: React.FC<Props> = ({
   avaliacao,
@@ -32,7 +33,6 @@ export const AvaliacaoMetodosView: React.FC<Props> = ({
     avaliacao.metodoPrincipal || 'comparativo_direto'
   );
 
-  // Estado do Método da Capitalização da Renda (sem dados pré-preenchidos)
   const [fluxoLiquidoAnual, setFluxoLiquidoAnual] = useState<number>(
     avaliacao.capitalizacaoRenda?.fluxoCaixaLiquidoAnualR$ ?? 0
   );
@@ -46,7 +46,6 @@ export const AvaliacaoMetodosView: React.FC<Props> = ({
     avaliacao.capitalizacaoRenda?.valorResidualFinalR$ ?? 0
   );
 
-  // Estado do Método Evolutivo (sem dados pré-preenchidos)
   const [fatorComercializacaoFc, setFatorComercializacaoFc] = useState<number>(
     avaliacao.metodoEvolutivo?.fatorComercializacaoFc ?? 0
   );
@@ -73,7 +72,6 @@ export const AvaliacaoMetodosView: React.FC<Props> = ({
     };
   }, []);
 
-  // Cálculos reativos memoizados
   const resultadoRenda = useMemo(
     () =>
       calcularMetodoCapitalizacaoRenda(
@@ -119,7 +117,8 @@ export const AvaliacaoMetodosView: React.FC<Props> = ({
     const configEvolutivo: MetodoEvolutivoConfig = {
       valorTerraNuaR$: avaliacao.valorTotalHomogeneizadoR$,
       valorBenfeitoriasR$: avaliacao.valorTotalBenfeitoriasR$,
-      valorInstalacoesEquipamentosR$: avaliacao.metodoEvolutivo?.valorInstalacoesEquipamentosR$ ?? 0,
+      valorInstalacoesEquipamentosR$:
+        avaliacao.metodoEvolutivo?.valorInstalacoesEquipamentosR$ ?? 0,
       fatorComercializacaoFc,
       valorTotalEvolutivoR$: resultadoEvolutivo.valorFinal,
       justificativaFc: justificativaFc.trim()
@@ -132,48 +131,48 @@ export const AvaliacaoMetodosView: React.FC<Props> = ({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+    <div className="space-y-5">
+      {/* Barra Superior */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-slate-200/80 dark:border-zinc-800">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Scale className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+          <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+            <Scale className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             Métodos de Avaliação de Imóveis Rurais (ABNT NBR 14653-3)
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Simulação e conciliação entre o Método Comparativo Direto, Capitalização da Renda e Método Evolutivo
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+            Conciliação entre Comparativo Direto, Capitalização da Renda e Método Evolutivo
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 shrink-0">
           {sucesso && (
-            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-              <CheckCircle2 className="w-4 h-4" /> Configurações salvas!
+            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Salvo
             </span>
           )}
           <button
             type="button"
             onClick={handleSalvar}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg text-sm flex items-center gap-2 shadow-sm transition-colors"
+            className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg text-xs flex items-center gap-1.5 transition-colors"
           >
-            <Save className="w-4 h-4" /> Definir Método & Salvar
+            <Save className="w-3.5 h-3.5" /> Definir Método & Salvar
           </button>
         </div>
       </div>
 
       {/* Seleção do Método Principal */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Card Método 1: Comparativo Direto */}
-        <div
+        <button
+          type="button"
           onClick={() => setMetodoAtivo('comparativo_direto')}
-          className={`p-5 rounded-xl border cursor-pointer transition-all ${
+          className={`p-4 text-left rounded-xl border transition-colors ${
             metodoAtivo === 'comparativo_direto'
-              ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20 ring-2 ring-emerald-500'
-              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
+              ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/25'
+              : 'border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300 dark:hover:border-zinc-700'
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
+            <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400">
               Método Preferencial
             </span>
             <input
@@ -181,34 +180,36 @@ export const AvaliacaoMetodosView: React.FC<Props> = ({
               name="metodo"
               checked={metodoAtivo === 'comparativo_direto'}
               onChange={() => setMetodoAtivo('comparativo_direto')}
-              className="text-emerald-600 focus:ring-emerald-500"
+              className="accent-emerald-600"
             />
           </div>
-          <h3 className="text-base font-bold text-slate-900 dark:text-white mt-3">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 mt-3">
             Comparativo Direto de Mercado
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 leading-relaxed">
             Identifica o valor pelo tratamento estatístico e homogeneização de dados de mercado assemelhados.
           </p>
-          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700">
-            <span className="text-[10px] text-slate-400 uppercase font-bold">Valor Concluído</span>
-            <p className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400">
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-zinc-800">
+            <span className="text-[10px] text-slate-400 dark:text-zinc-500 uppercase font-medium">
+              Valor Concluído
+            </span>
+            <p className="text-lg font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
               R$ {avaliacao.valorFinalImovelR$.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
           </div>
-        </div>
+        </button>
 
-        {/* Card Método 2: Capitalização da Renda */}
-        <div
+        <button
+          type="button"
           onClick={() => setMetodoAtivo('capitalizacao_renda')}
-          className={`p-5 rounded-xl border cursor-pointer transition-all ${
+          className={`p-4 text-left rounded-xl border transition-colors ${
             metodoAtivo === 'capitalizacao_renda'
-              ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20 ring-2 ring-emerald-500'
-              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
+              ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/25'
+              : 'border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300 dark:hover:border-zinc-700'
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300">
+            <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-400">
               Fluxo Descontado
             </span>
             <input
@@ -216,34 +217,36 @@ export const AvaliacaoMetodosView: React.FC<Props> = ({
               name="metodo"
               checked={metodoAtivo === 'capitalizacao_renda'}
               onChange={() => setMetodoAtivo('capitalizacao_renda')}
-              className="text-emerald-600 focus:ring-emerald-500"
+              className="accent-emerald-600"
             />
           </div>
-          <h3 className="text-base font-bold text-slate-900 dark:text-white mt-3">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 mt-3">
             Capitalização da Renda Líquida
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-            Calcula o valor presente líquido das receitas operacionais agrícolas futuras descontadas por taxa de atratividade.
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 leading-relaxed">
+            Calcula o valor presente líquido das receitas operacionais futuras descontadas por taxa de atratividade.
           </p>
-          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700">
-            <span className="text-[10px] text-slate-400 uppercase font-bold">VPL da Propriedade</span>
-            <p className="text-lg font-extrabold text-blue-600 dark:text-blue-400">
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-zinc-800">
+            <span className="text-[10px] text-slate-400 dark:text-zinc-500 uppercase font-medium">
+              VPL da Propriedade
+            </span>
+            <p className="text-lg font-bold tabular-nums text-sky-600 dark:text-sky-400">
               R$ {resultadoRenda.valorPresenteLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
           </div>
-        </div>
+        </button>
 
-        {/* Card Método 3: Método Evolutivo */}
-        <div
+        <button
+          type="button"
           onClick={() => setMetodoAtivo('evolutivo')}
-          className={`p-5 rounded-xl border cursor-pointer transition-all ${
+          className={`p-4 text-left rounded-xl border transition-colors ${
             metodoAtivo === 'evolutivo'
-              ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20 ring-2 ring-emerald-500'
-              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
+              ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/25'
+              : 'border-slate-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300 dark:hover:border-zinc-700'
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300">
+            <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-violet-50 dark:bg-violet-950/60 text-violet-700 dark:text-violet-400">
               Soma com Fator Fc
             </span>
             <input
@@ -251,50 +254,48 @@ export const AvaliacaoMetodosView: React.FC<Props> = ({
               name="metodo"
               checked={metodoAtivo === 'evolutivo'}
               onChange={() => setMetodoAtivo('evolutivo')}
-              className="text-emerald-600 focus:ring-emerald-500"
+              className="accent-emerald-600"
             />
           </div>
-          <h3 className="text-base font-bold text-slate-900 dark:text-white mt-3">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 mt-3">
             Método Evolutivo
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 leading-relaxed">
             Combina o valor da terra nua (VTN) com as benfeitorias depreciadas, ajustadas por fator de comercialização.
           </p>
-          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700">
-            <span className="text-[10px] text-slate-400 uppercase font-bold">Valor Evolutivo</span>
-            <p className="text-lg font-extrabold text-purple-600 dark:text-purple-400">
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-zinc-800">
+            <span className="text-[10px] text-slate-400 dark:text-zinc-500 uppercase font-medium">
+              Valor Evolutivo
+            </span>
+            <p className="text-lg font-bold tabular-nums text-violet-600 dark:text-violet-400">
               R$ {resultadoEvolutivo.valorFinal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Painel de Configuração do Método da Renda */}
-      <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 dark:border-slate-700 pb-2">
-          <DollarSign className="w-4 h-4 text-emerald-500" />
+      <div className="bg-white dark:bg-zinc-900 p-5 rounded-xl border border-slate-200/80 dark:border-zinc-800 space-y-4">
+        <h3 className="text-xs font-semibold text-slate-900 dark:text-zinc-100 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 dark:border-zinc-800 pb-2.5">
+          <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           Parâmetros do Método da Capitalização da Renda
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Fluxo de Caixa Líquido Anual (R$)
-            </label>
+            <label className={labelCls}>Fluxo de Caixa Líquido Anual (R$)</label>
             <input
               type="number"
               min="0"
               value={fluxoLiquidoAnual || ''}
               onChange={(e) => setFluxoLiquidoAnual(parseFloat(e.target.value) || 0)}
               placeholder="0,00"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className={`${inputCls} font-semibold tabular-nums`}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Taxa de Desconto Anual (%)
-            </label>
+            <label className={labelCls}>Taxa de Desconto Anual (%)</label>
             <input
               type="number"
               min="0"
@@ -302,50 +303,53 @@ export const AvaliacaoMetodosView: React.FC<Props> = ({
               value={taxaDesconto || ''}
               onChange={(e) => setTaxaDesconto(parseFloat(e.target.value) || 0)}
               placeholder="0,0"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className={`${inputCls} tabular-nums`}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Horizonte de Projeção (Anos)
-            </label>
+            <label className={labelCls}>Horizonte de Projeção (Anos)</label>
             <input
               type="number"
               min="0"
               value={horizonteAnos || ''}
               onChange={(e) => setHorizonteAnos(parseInt(e.target.value, 10) || 0)}
               placeholder="0"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className={`${inputCls} tabular-nums`}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Valor Residual de Saída (R$)
-            </label>
+            <label className={labelCls}>Valor Residual de Saída (R$)</label>
             <input
               type="number"
               min="0"
               value={valorResidual || ''}
               onChange={(e) => setValorResidual(parseFloat(e.target.value) || 0)}
               placeholder="0,00"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className={`${inputCls} tabular-nums`}
             />
           </div>
         </div>
 
-        {/* Tabela de Sensibilidade da Renda */}
         <div className="pt-2">
-          <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
-            Matriz de Análise de Sensibilidade (Variação de Receitas vs VPL)
+          <h4 className="text-xs font-medium text-slate-600 dark:text-zinc-400 mb-2">
+            Matriz de Sensibilidade (Variação de Receitas vs VPL)
           </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             {resultadoRenda.sensibilidade.map((s, idx) => (
-              <div key={idx} className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 text-xs">
-                <span className="font-bold text-slate-800 dark:text-slate-200 block">{s.cenario}</span>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">Taxa: {s.taxaDescontoPct}% • Variação: {s.variacaoReceitaPct > 0 ? `+${s.variacaoReceitaPct}` : s.variacaoReceitaPct}%</span>
-                <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 block mt-1">
+              <div
+                key={idx}
+                className="p-3 rounded-lg bg-slate-50/70 dark:bg-zinc-950/60 border border-slate-200/80 dark:border-zinc-800 text-xs"
+              >
+                <span className="font-semibold text-slate-900 dark:text-zinc-100 block">
+                  {s.cenario}
+                </span>
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+                  Taxa: {s.taxaDescontoPct}% · Variação:{' '}
+                  {s.variacaoReceitaPct > 0 ? `+${s.variacaoReceitaPct}` : s.variacaoReceitaPct}%
+                </span>
+                <span className="text-sm font-bold tabular-nums text-emerald-700 dark:text-emerald-400 block mt-1">
                   R$ {s.vplR$.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
                 </span>
               </div>
@@ -355,17 +359,15 @@ export const AvaliacaoMetodosView: React.FC<Props> = ({
       </div>
 
       {/* Painel de Configuração do Método Evolutivo */}
-      <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 dark:border-slate-700 pb-2">
-          <Building className="w-4 h-4 text-emerald-500" />
+      <div className="bg-white dark:bg-zinc-900 p-5 rounded-xl border border-slate-200/80 dark:border-zinc-800 space-y-4">
+        <h3 className="text-xs font-semibold text-slate-900 dark:text-zinc-100 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 dark:border-zinc-800 pb-2.5">
+          <Building className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           Parâmetros do Método Evolutivo [ Vi = (VTN + Benfeitorias) × Fc ]
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Fator de Comercialização (Fc)
-            </label>
+            <label className={labelCls}>Fator de Comercialização (Fc)</label>
             <input
               type="number"
               min="0"
@@ -373,21 +375,21 @@ export const AvaliacaoMetodosView: React.FC<Props> = ({
               value={fatorComercializacaoFc || ''}
               onChange={(e) => setFatorComercializacaoFc(parseFloat(e.target.value) || 0)}
               placeholder="Ex: 1.00"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 font-bold text-purple-600 dark:text-purple-400 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className={`${inputCls} font-semibold tabular-nums text-violet-600 dark:text-violet-400`}
             />
-            <span className="text-[10px] text-slate-400 mt-1 block">Típico entre 0.90 e 1.10</span>
+            <span className="text-[11px] text-slate-400 dark:text-zinc-500 mt-1 block">
+              Faixa típica entre 0,90 e 1,10
+            </span>
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Justificativa Técnica do Fator de Comercialização
-            </label>
+            <label className={labelCls}>Justificativa Técnica do Fator de Comercialização</label>
             <input
               type="text"
               value={justificativaFc}
               onChange={(e) => setJustificativaFc(e.target.value)}
               placeholder="Informe a justificativa técnica para o fator de comercialização..."
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className={inputCls}
             />
           </div>
         </div>

@@ -1,99 +1,152 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { Camera, Plus, Trash2, Upload, X } from 'lucide-react';
+import { SwineAnimal, SwinePhotoRecord } from '../../types/swine';
+import { loadSwinePhotos, saveSwinePhotos } from '../../utils/swineStorage';
 import {
-  Camera,
-  Plus,
-  Tag,
-  Calendar,
-  Sparkles,
-  Search,
-  Filter,
-  Eye,
-  Trash2,
-} from 'lucide-react';
-import {
-  SwinePhotoRecord,
-  SwineAnimal,
-} from '../../types/swine';
-import { DEFAULT_SWINE_PHOTOS } from '../../data/swineDefaultData';
+  SWINE_CARD_CLASS,
+  SWINE_INPUT_CLASS,
+  SWINE_LABEL_CLASS,
+  SWINE_PRIMARY_BTN_CLASS,
+  SWINE_SECONDARY_BTN_CLASS,
+  SWINE_TEXTAREA_CLASS,
+  formatBrDate,
+  getTodayIsoDate,
+  useEscapeClose,
+} from './swineUi';
 
 interface SwinePhotoDiaryViewProps {
   animals: SwineAnimal[];
+  photos?: SwinePhotoRecord[];
+  onAddPhoto?: (photo: SwinePhotoRecord) => void;
+  onDeletePhoto?: (id: string) => void;
 }
+
+const PHOTO_CATEGORIES: { id: string; label: string }[] = [
+  { id: 'all', label: 'Todas' },
+  { id: 'Leitegada', label: 'Leitegada' },
+  { id: 'Animal', label: 'Animal / ECC' },
+  { id: 'Baia', label: 'Baia / Galpão' },
+  { id: 'Lesão/Necropsia', label: 'Lesão / Necropsia' },
+  { id: 'Instalação', label: 'Instalação' },
+  { id: 'Manejo', label: 'Manejo' },
+];
 
 export const SwinePhotoDiaryView: React.FC<SwinePhotoDiaryViewProps> = ({
   animals,
+  photos: externalPhotos,
+  onAddPhoto,
+  onDeletePhoto,
 }) => {
-  const [entries, setEntries] = useState<SwinePhotoRecord[]>(DEFAULT_SWINE_PHOTOS);
+  const [localEntries, setLocalEntries] = useState<SwinePhotoRecord[]>(loadSwinePhotos);
   const [selectedTag, setSelectedTag] = useState<string>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Form state
-  const [swineId, setSwineId] = useState('sow_01');
+  const [swineId, setSwineId] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<SwinePhotoRecord['category']>('Leitegada');
-  const [photoUrl, setPhotoUrl] = useState('https://images.unsplash.com/photo-1516467508483-a7212febe31a?w=800&auto=format&fit=crop&q=80');
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [shedId, setShedId] = useState('');
 
-  const filteredEntries = entries.filter(e => {
-    return selectedTag === 'all' || e.category === selectedTag;
-  });
+  useEscapeClose(isModalOpen, () => setIsModalOpen(false));
+
+  const entries = externalPhotos ?? localEntries;
+
+  const filteredEntries = useMemo(
+    () => entries.filter(e => selectedTag === 'all' || e.category === selectedTag),
+    [entries, selectedTag]
+  );
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setPhotoUrl(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!title.trim() || !photoUrl.trim()) return;
+
     const newEntry: SwinePhotoRecord = {
       id: `photo_${Date.now()}`,
-      date: new Date().toISOString().split('T')[0],
-      swineId,
+      date: getTodayIsoDate(),
+      swineId: swineId || undefined,
+      shedId: shedId.trim() || undefined,
       title: title.trim(),
-      description: description.trim(),
-      imageUrl: photoUrl,
+      description: description.trim() || undefined,
+      imageUrl: photoUrl.trim(),
       category,
     };
 
-    setEntries([newEntry, ...entries]);
+    if (onAddPhoto) {
+      onAddPhoto(newEntry);
+    } else {
+      const updated = [newEntry, ...localEntries];
+      setLocalEntries(updated);
+      saveSwinePhotos(updated);
+    }
+
+    setTitle('');
+    setDescription('');
+    setPhotoUrl('');
+    setShedId('');
     setIsModalOpen(false);
   };
 
+  const handleDelete = (id: string) => {
+    if (onDeletePhoto) {
+      onDeletePhoto(id);
+    } else {
+      const updated = localEntries.filter(p => p.id !== id);
+      setLocalEntries(updated);
+      saveSwinePhotos(updated);
+    }
+    setConfirmDeleteId(null);
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className={`${SWINE_CARD_CLASS} p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
         <div>
-          <h2 className="text-xl font-black text-gray-900 flex items-center gap-2">
-            <Camera className="w-5 h-5 text-pink-600" />
+          <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+            <Camera className="w-4 h-4 text-rose-600 dark:text-rose-400" />
             <span>Diário Fotográfico & Evidências a Campo</span>
           </h2>
-          <p className="text-xs text-gray-500">
-            Registro visual auditável de partos, escore corporal, lesões clínicas, ultrassonografias e inspeções de galpão.
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Registro visual persistente de partos, escore corporal, lesões clínicas e inspeções de galpão.
           </p>
         </div>
 
         <button
+          type="button"
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
+          className={`${SWINE_PRIMARY_BTN_CLASS} shrink-0`}
         >
-          <Plus className="w-4 h-4" />
-          <span>Nova Foto / Evidência</span>
+          <Plus className="w-3.5 h-3.5" />
+          <span>Nova Evidência</span>
         </button>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-xs flex items-center gap-2 overflow-x-auto">
-        {[
-          { id: 'all', label: 'Todas as Fotos' },
-          { id: 'Leitegada', label: 'Leitegada & Maternidade' },
-          { id: 'Animal', label: 'Animal / Escore Corporal' },
-          { id: 'Baia', label: 'Baias & Galpão' },
-          { id: 'Lesão/Necropsia', label: 'Lesões / Necrópsia' },
-          { id: 'Manejo', label: 'Manejo Operacional' },
-        ].map(t => (
+      {/* Category Filter */}
+      <div className={`${SWINE_CARD_CLASS} p-2 flex items-center gap-1 overflow-x-auto`}>
+        {PHOTO_CATEGORIES.map(t => (
           <button
             key={t.id}
+            type="button"
             onClick={() => setSelectedTag(t.id)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+            className={`h-8 px-3 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
               selectedTag === t.id
-                ? 'bg-pink-600 text-white shadow-xs'
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                ? 'bg-rose-600 text-white'
+                : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800'
             }`}
           >
             {t.label}
@@ -101,82 +154,139 @@ export const SwinePhotoDiaryView: React.FC<SwinePhotoDiaryViewProps> = ({
         ))}
       </div>
 
-      {/* Photo Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {(filteredEntries || []).filter(p => p && p.id).map(photo => {
-          const matchedAnimal = (animals || []).find(a => a?.id === photo.swineId);
-          return (
-            <div
-              key={photo.id}
-              className="bg-white rounded-3xl border border-gray-200 shadow-xs overflow-hidden hover:border-pink-300 transition-all flex flex-col"
-            >
-              <div className="h-48 bg-gray-100 relative overflow-hidden">
-                <img
-                  src={photo.imageUrl}
-                  alt={photo.title}
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover"
-                />
-                <span className="absolute top-3 left-3 px-2.5 py-1 bg-black/60 backdrop-blur-xs text-white text-[10px] font-bold rounded-full">
-                  {photo.category}
-                </span>
-                {matchedAnimal && (
-                  <span className="absolute top-3 right-3 px-2.5 py-1 bg-pink-600 text-white text-[10px] font-black rounded-full shadow-xs">
-                    {matchedAnimal.code}
+      {/* Grid */}
+      {filteredEntries.length === 0 ? (
+        <div className={`${SWINE_CARD_CLASS} p-10 text-center space-y-2`}>
+          <Camera className="w-8 h-8 text-slate-400 dark:text-zinc-500 mx-auto" />
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-zinc-200">
+            Nenhuma evidência fotográfica registrada
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Envie uma foto do dispositivo ou informe uma URL para compor o diário da granja.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredEntries.map(photo => {
+            const matchedAnimal = animals.find(a => a.id === photo.swineId);
+            return (
+              <div key={photo.id} className={`${SWINE_CARD_CLASS} overflow-hidden flex flex-col`}>
+                <div className="h-44 bg-slate-100 dark:bg-zinc-950 relative overflow-hidden">
+                  <img
+                    src={photo.imageUrl}
+                    alt={photo.title}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover"
+                  />
+                  <span className="absolute top-2.5 left-2.5 px-2 py-0.5 bg-zinc-950/75 text-white text-[10px] font-medium rounded-md">
+                    {photo.category}
                   </span>
-                )}
-              </div>
-
-              <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
-                <div>
-                  <div className="flex items-center justify-between text-[11px] text-gray-400 mb-1">
-                    <span>{photo.date}</span>
-                    <span>{photo.shedId || 'Galpão Geral'}</span>
-                  </div>
-                  <h3 className="text-sm font-black text-gray-900">{photo.title}</h3>
-                  {photo.description && (
-                    <p className="text-xs text-gray-600 mt-1 leading-relaxed">{photo.description}</p>
+                  {matchedAnimal && (
+                    <span className="absolute top-2.5 right-2.5 px-2 py-0.5 bg-rose-600 text-white text-[10px] font-semibold rounded-md">
+                      {matchedAnimal.code}
+                    </span>
                   )}
                 </div>
 
-                <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-xs">
-                  <span className="text-pink-600 font-bold">✓ Auditado no Gêmeo Digital</span>
+                <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
+                  <div>
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-zinc-400 mb-1 tabular-nums">
+                      <span>{formatBrDate(photo.date)}</span>
+                      <span>{photo.shedId || 'Granja'}</span>
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                      {photo.title}
+                    </h3>
+                    {photo.description && (
+                      <p className="text-xs text-slate-600 dark:text-zinc-400 mt-1 leading-relaxed">
+                        {photo.description}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between">
+                    <span className="text-[11px] text-slate-500 dark:text-zinc-400">
+                      Registro salvo localmente
+                    </span>
+
+                    {confirmDeleteId === photo.id ? (
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(photo.id)}
+                          className="h-7 px-2 rounded-md bg-red-600 hover:bg-red-700 text-white text-[11px] font-medium cursor-pointer"
+                        >
+                          Excluir
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="h-7 px-2 rounded-md border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 text-[11px] cursor-pointer"
+                        >
+                          Não
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(photo.id)}
+                        className="h-7 w-7 rounded-md border border-slate-200 dark:border-zinc-700 text-slate-400 hover:text-red-600 dark:hover:text-red-400 flex items-center justify-center cursor-pointer"
+                        title="Excluir evidência"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="text-base font-black text-gray-900">Registrar Foto / Evidência</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400">✕</button>
+        <div
+          className="fixed inset-0 bg-zinc-950/60 z-50 flex items-center justify-center p-4"
+          onClick={() => setIsModalOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl max-w-lg w-full p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-3">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Registrar Foto / Evidência
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
             <form onSubmit={handleSave} className="space-y-3">
               <div>
-                <label className="text-xs font-bold text-gray-700 block mb-1">Título da Evidência *</label>
+                <label className={SWINE_LABEL_CLASS}>Título da Evidência *</label>
                 <input
                   type="text"
                   required
                   placeholder="Ex: Parto da Matriz MTZ-1042"
                   value={title}
                   onChange={e => setTitle(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs"
+                  className={SWINE_INPUT_CLASS}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">Animal Relacionado</label>
+                  <label className={SWINE_LABEL_CLASS}>Animal Relacionado</label>
                   <select
                     value={swineId}
                     onChange={e => setSwineId(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs font-bold"
+                    className={SWINE_INPUT_CLASS}
                   >
                     <option value="">Nenhum (Instalação / Galpão)</option>
                     {animals.map(a => (
@@ -187,14 +297,14 @@ export const SwinePhotoDiaryView: React.FC<SwinePhotoDiaryViewProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">Categoria / Tag</label>
+                  <label className={SWINE_LABEL_CLASS}>Categoria</label>
                   <select
                     value={category}
-                    onChange={e => setCategory(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs font-bold"
+                    onChange={e => setCategory(e.target.value as SwinePhotoRecord['category'])}
+                    className={SWINE_INPUT_CLASS}
                   >
                     <option value="Leitegada">Leitegada</option>
-                    <option value="Animal">Animal / Escore</option>
+                    <option value="Animal">Animal / ECC</option>
                     <option value="Baia">Baia / Gaiola</option>
                     <option value="Lesão/Necropsia">Lesão / Necropsia</option>
                     <option value="Instalação">Instalação</option>
@@ -204,38 +314,61 @@ export const SwinePhotoDiaryView: React.FC<SwinePhotoDiaryViewProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-bold text-gray-700 block mb-1">URL da Imagem</label>
+                <label className={SWINE_LABEL_CLASS}>Galpão / Local</label>
                 <input
                   type="text"
-                  value={photoUrl}
-                  onChange={e => setPhotoUrl(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs"
+                  placeholder="Ex: Maternidade 01"
+                  value={shedId}
+                  onChange={e => setShedId(e.target.value)}
+                  className={SWINE_INPUT_CLASS}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label className={SWINE_LABEL_CLASS}>Imagem (Enviar arquivo ou colar URL) *</label>
+                <div className="flex items-center gap-2">
+                  <label className={`${SWINE_SECONDARY_BTN_CLASS} shrink-0`}>
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Carregar Foto</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ou cole a URL da imagem..."
+                    value={photoUrl}
+                    onChange={e => setPhotoUrl(e.target.value)}
+                    className={SWINE_INPUT_CLASS}
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-gray-700 block mb-1">Descrição Técnica</label>
+                <label className={SWINE_LABEL_CLASS}>Descrição Técnica</label>
                 <textarea
                   rows={2}
+                  placeholder="Observações da inspeção visual..."
                   value={description}
                   onChange={e => setDescription(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs"
+                  className={SWINE_TEXTAREA_CLASS}
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-gray-100 text-xs font-bold rounded-xl"
+                  className={SWINE_SECONDARY_BTN_CLASS}
                 >
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-pink-600 text-white text-xs font-bold rounded-xl shadow-xs"
-                >
-                  Salvar Foto
+                <button type="submit" className={SWINE_PRIMARY_BTN_CLASS}>
+                  Salvar Evidência
                 </button>
               </div>
             </form>

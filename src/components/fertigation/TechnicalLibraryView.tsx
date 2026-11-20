@@ -1,20 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import {
-  BookOpen,
   Search,
-  CheckCircle2,
   AlertTriangle,
   FlaskConical,
   Sprout,
   ShieldAlert,
   Droplets,
-  Layers,
-  Sparkles,
-  Info,
   ChevronRight,
-  Zap,
+  Leaf,
 } from 'lucide-react';
-import { FertilizerItem, FertilizerGroup } from '../../types/fertigation';
+import { FertilizerItem } from '../../types/fertigation';
 import { FERTILIZERS_DATABASE } from '../../data/fertigationData';
 
 interface TechnicalLibraryViewProps {
@@ -22,8 +17,20 @@ interface TechnicalLibraryViewProps {
   onSendToTank: (fertId: string) => void;
 }
 
+const GROUP_OPTIONS = [
+  { id: 'todos', label: 'Todos os grupos' },
+  { id: 'nitrogenados', label: 'Nitrogenados' },
+  { id: 'fosfatados', label: 'Fosfatados' },
+  { id: 'potassicos', label: 'Potássicos' },
+  { id: 'calcio', label: 'Cálcio' },
+  { id: 'magnesio', label: 'Magnésio' },
+  { id: 'enxofre', label: 'Enxofre' },
+  { id: 'micronutrientes_quelatos', label: 'Micronutrientes (Quelatos)' },
+  { id: 'micronutrientes_sais', label: 'Micronutrientes (Sais)' },
+  { id: 'acidos', label: 'Ácidos e corretivos' },
+];
+
 export const TechnicalLibraryView: React.FC<TechnicalLibraryViewProps> = ({
-  onSelectFertilizerForDetail,
   onSendToTank,
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -31,12 +38,13 @@ export const TechnicalLibraryView: React.FC<TechnicalLibraryViewProps> = ({
   const [selectedFertId, setSelectedFertId] = useState<string>(FERTILIZERS_DATABASE[0]?.id || '');
 
   const filteredFertilizers = useMemo(() => {
+    const q = searchQuery.toLowerCase();
     return FERTILIZERS_DATABASE.filter(f => {
       const matchesSearch =
-        f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        f.commercialName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        f.formula.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        f.plantFunction.toLowerCase().includes(searchQuery.toLowerCase());
+        f.name.toLowerCase().includes(q) ||
+        f.commercialName.toLowerCase().includes(q) ||
+        f.formula.toLowerCase().includes(q) ||
+        f.plantFunction.toLowerCase().includes(q);
       const matchesGroup = selectedGroup === 'todos' || f.group === selectedGroup;
       return matchesSearch && matchesGroup;
     });
@@ -46,259 +54,285 @@ export const TechnicalLibraryView: React.FC<TechnicalLibraryViewProps> = ({
     return FERTILIZERS_DATABASE.find(f => f?.id === selectedFertId) || FERTILIZERS_DATABASE[0];
   }, [selectedFertId]);
 
-  // Mobility deduction
-  let mobility = 'Moderadamente Móvel';
-  if (activeFert?.group === 'calcio' || activeFert?.id?.includes('boro') || activeFert?.id?.includes('borico')) {
-    mobility = 'Imóvel no Floema (Exige fluxo transpiratório contínuo)';
-  } else if (activeFert?.id?.includes('potassio') || activeFert?.id?.includes('ureia') || activeFert?.id?.includes('nitrato_amonio') || activeFert?.group === 'magnesio') {
-    mobility = 'Altamente Móvel no Floema (Sintomas em folhas velhas)';
-  } else if (activeFert?.group === 'micronutrientes_quelatos' || activeFert?.group === 'micronutrientes_sais') {
-    mobility = 'Baixa a Pouca Mobilidade (Sintomas em folhas novas/ápices)';
+  let mobility = 'Moderadamente móvel';
+  if (
+    activeFert?.group === 'calcio' ||
+    activeFert?.id?.includes('boro') ||
+    activeFert?.id?.includes('borico')
+  ) {
+    mobility = 'Imóvel no floema (exige fluxo transpiratório contínuo)';
+  } else if (
+    activeFert?.id?.includes('potassio') ||
+    activeFert?.id?.includes('ureia') ||
+    activeFert?.id?.includes('nitrato_amonio') ||
+    activeFert?.group === 'magnesio'
+  ) {
+    mobility = 'Altamente móvel no floema (sintomas em folhas velhas)';
+  } else if (
+    activeFert?.group === 'micronutrientes_quelatos' ||
+    activeFert?.group === 'micronutrientes_sais'
+  ) {
+    mobility = 'Baixa mobilidade (sintomas em folhas novas e ápices)';
   }
 
   return (
-    <div className="space-y-6 animate-fade-in" id="technical-library">
-      {/* Header Banner */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-2xl p-5 shadow-2xs space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h3 className="font-black text-lg text-slate-900 dark:text-white flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-emerald-600" />
-              Biblioteca Técnica & Enciclopédia Agronômica de Fertilizantes
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-zinc-400">
-              Guia completo de fisiologia vegetal, sintomas de deficiência/excesso, mobilidade e boas práticas agronômicas
-            </p>
-          </div>
-
-          <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-xs font-black px-3 py-1 rounded-full w-fit">
-            {FERTILIZERS_DATABASE.length} Insumos Catalogados
-          </span>
-        </div>
-
-        {/* Filter and Search Controls */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
-          <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-            <input
-              type="text"
-              placeholder="Buscar por nome, fórmula, sintoma..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-medium text-slate-900 dark:text-white"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto overflow-x-auto text-xs">
-            {[
-              { id: 'todos', label: 'Todos' },
-              { id: 'nitrogenados', label: 'Nitrogenados' },
-              { id: 'fosfatados', label: 'Fosfatados' },
-              { id: 'potassicos', label: 'Potássicos' },
-              { id: 'calcio', label: 'Cálcio' },
-              { id: 'magnesio', label: 'Magnésio' },
-              { id: 'enxofre', label: 'Enxofre' },
-              { id: 'micronutrientes_quelatos', label: 'Micronutrientes (Quelatos)' },
-              { id: 'micronutrientes_sais', label: 'Micronutrientes (Sais)' },
-              { id: 'acidos', label: 'Ácidos & Corretivos' },
-            ].map(grp => (
-              <button
-                key={grp.id}
-                onClick={() => setSelectedGroup(grp.id)}
-                className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer text-[11px] ${
-                  selectedGroup === grp.id
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200'
-                }`}
-              >
-                {grp.label}
-              </button>
-            ))}
-          </div>
-        </div>
+    <div className="space-y-5" id="technical-library">
+      {/* Cabeçalho */}
+      <div>
+        <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100">
+          Biblioteca Técnica de Fertilizantes
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5 tabular-nums">
+          {FERTILIZERS_DATABASE.length} insumos catalogados · Fisiologia, sintomas de deficiência/excesso e segurança FISPQ
+        </p>
       </div>
 
-      {/* Main 2-Column Layout: Fertilizer Selector list (4 cols) & Full Technical Sheet (8 cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left List of Fertilizers */}
-        <div className="lg:col-span-4 bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-2xl p-4 shadow-2xs space-y-2 max-h-[700px] overflow-y-auto">
-          <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-            Selecione o Insumo ({filteredFertilizers.length}):
-          </span>
-
-          {filteredFertilizers.map(f => (
-            <div
-              key={f.id}
-              onClick={() => setSelectedFertId(f.id)}
-              className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between text-xs ${
-                selectedFertId === f.id
-                  ? 'bg-emerald-50/80 dark:bg-zinc-800 border-emerald-500 text-emerald-950 dark:text-white shadow-xs'
-                  : 'bg-slate-50/60 dark:bg-zinc-900/60 border-slate-200/70 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800/80'
-              }`}
-            >
-              <div className="min-w-0 flex-1">
-                <strong className="block font-bold truncate">{f.name}</strong>
-                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono mt-0.5">
-                  <span>{f.formula}</span>
-                  <span>•</span>
-                  <span className="uppercase text-emerald-600 dark:text-emerald-400 font-bold">{f.defaultTank}</span>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-slate-400 shrink-0 ml-1" />
+      {/* Layout Mestre-Detalhe */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Lista Esquerda */}
+        <div className="lg:col-span-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden flex flex-col">
+          <div className="p-3 border-b border-slate-100 dark:border-zinc-800 space-y-2.5">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Buscar nome, fórmula ou sintoma..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full h-8 pl-8 pr-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
+              />
             </div>
-          ))}
+
+            <select
+              value={selectedGroup}
+              onChange={e => setSelectedGroup(e.target.value)}
+              aria-label="Filtrar grupo químico"
+              className="w-full h-8 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg px-2.5 text-xs font-medium text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-emerald-500"
+            >
+              {GROUP_OPTIONS.map(grp => (
+                <option key={grp.id} value={grp.id}>
+                  {grp.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="px-3.5 py-2 border-b border-slate-100 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-950/40 text-[11px] font-medium text-slate-500 dark:text-zinc-400 tabular-nums">
+            {filteredFertilizers.length} {filteredFertilizers.length === 1 ? 'insumo' : 'insumos'}
+          </div>
+
+          <div className="divide-y divide-slate-100 dark:divide-zinc-800 max-h-[600px] overflow-y-auto">
+            {filteredFertilizers.length === 0 ? (
+              <div className="p-6 text-center text-xs text-slate-500 dark:text-zinc-400">
+                Nenhum fertilizante encontrado.
+              </div>
+            ) : (
+              filteredFertilizers.map(f => {
+                const isSelected = selectedFertId === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setSelectedFertId(f.id)}
+                    className={`w-full px-3.5 py-2.5 text-left transition-colors flex items-center justify-between gap-2 cursor-pointer ${
+                      isSelected
+                        ? 'bg-emerald-50/70 dark:bg-emerald-950/35'
+                        : 'hover:bg-slate-50 dark:hover:bg-zinc-800/50'
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div
+                        className={`text-xs font-semibold truncate ${
+                          isSelected
+                            ? 'text-emerald-800 dark:text-emerald-300'
+                            : 'text-slate-900 dark:text-zinc-100'
+                        }`}
+                      >
+                        {f.name}
+                      </div>
+                      <div className="text-[11px] text-slate-500 dark:text-zinc-400 font-mono truncate mt-0.5">
+                        {f.formula} · {f.defaultTank}
+                      </div>
+                    </div>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 shrink-0" />
+                  </button>
+                );
+              })
+            )}
+          </div>
         </div>
 
-        {/* Right Encyclopedic Sheet */}
-        <div className="lg:col-span-8 bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-2xl p-6 shadow-2xs space-y-6">
-          {/* Header of Active Fertilizer */}
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-slate-100 dark:border-zinc-800 pb-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] font-black uppercase tracking-wider">
-                  {activeFert.group}
-                </span>
-                <span className="px-2.5 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 text-[10px] font-black uppercase tracking-wider">
+        {/* Ficha Técnica Completa */}
+        <div className="lg:col-span-8 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+          {/* Cabeçalho da Ficha */}
+          <div className="p-5 border-b border-slate-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500 dark:text-zinc-400 capitalize">
+                <span>{activeFert.group.replace(/_/g, ' ')}</span>
+                <span aria-hidden="true">·</span>
+                <span className="font-medium text-emerald-700 dark:text-emerald-400">
                   {activeFert.defaultTank}
                 </span>
               </div>
-              <h3 className="font-black text-xl text-slate-900 dark:text-white mt-1.5">
+              <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">
                 {activeFert.name}
               </h3>
-              <span className="font-mono text-xs text-emerald-600 dark:text-emerald-400 font-bold">
+              <div className="font-mono text-xs text-slate-600 dark:text-zinc-400">
                 {activeFert.chemicalName} ({activeFert.formula})
-              </span>
+              </div>
             </div>
 
             <button
+              type="button"
               onClick={() => onSendToTank(activeFert.id)}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-all shrink-0"
+              className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer self-start"
             >
-              <FlaskConical className="w-4 h-4" />
-              Simular no Tanque
+              <FlaskConical className="w-3.5 h-3.5 shrink-0" />
+              <span>Simular no Tanque</span>
             </button>
           </div>
 
-          {/* Quick Technical Fact Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-            <div className="p-3 bg-slate-50 dark:bg-zinc-800/80 rounded-xl border border-slate-200/70 dark:border-zinc-700/60">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block">Solubilidade a 20°C:</span>
-              <strong className="text-sm font-black text-slate-900 dark:text-white">{activeFert.solubilityAt20C_gL} g/L</strong>
+          {/* Faixa de Parâmetros Físico-Químicos */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 divide-x divide-slate-100 dark:divide-zinc-800 border-b border-slate-100 dark:border-zinc-800 text-xs">
+            <div className="p-3.5">
+              <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">
+                Solubilidade (20 °C)
+              </span>
+              <span className="text-sm font-semibold tabular-nums text-slate-900 dark:text-zinc-100 mt-0.5 block">
+                {activeFert.solubilityAt20C_gL} g/L
+              </span>
             </div>
 
-            <div className="p-3 bg-slate-50 dark:bg-zinc-800/80 rounded-xl border border-slate-200/70 dark:border-zinc-700/60">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block">Índice Salino:</span>
-              <strong className="text-sm font-black text-slate-900 dark:text-white">{activeFert.saltIndex}</strong>
+            <div className="p-3.5">
+              <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">
+                Índice salino
+              </span>
+              <span className="text-sm font-semibold tabular-nums text-slate-900 dark:text-zinc-100 mt-0.5 block">
+                {activeFert.saltIndex}
+              </span>
             </div>
 
-            <div className="p-3 bg-slate-50 dark:bg-zinc-800/80 rounded-xl border border-slate-200/70 dark:border-zinc-700/60">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block">pH Solução 10%:</span>
-              <strong className="text-sm font-black text-slate-900 dark:text-white">{activeFert.solutionPh10Percent}</strong>
+            <div className="p-3.5">
+              <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">
+                pH solução 10%
+              </span>
+              <span className="text-sm font-semibold tabular-nums text-slate-900 dark:text-zinc-100 mt-0.5 block">
+                {activeFert.solutionPh10Percent}
+              </span>
             </div>
 
-            <div className="p-3 bg-slate-50 dark:bg-zinc-800/80 rounded-xl border border-slate-200/70 dark:border-zinc-700/60">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block">CE a 1 g/L:</span>
-              <strong className="text-sm font-black text-slate-900 dark:text-white">{activeFert.estimatedCeMsPerCmAt1gL} mS/cm</strong>
+            <div className="p-3.5">
+              <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">
+                CE a 1 g/L
+              </span>
+              <span className="text-sm font-semibold tabular-nums text-slate-900 dark:text-zinc-100 mt-0.5 block">
+                {activeFert.estimatedCeMsPerCmAt1gL} mS/cm
+              </span>
             </div>
           </div>
 
-          {/* Guaranteed Nutrients Breakdown */}
-          <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/80 rounded-xl border border-slate-200/70 dark:border-zinc-700/60 space-y-2 text-xs">
-            <strong className="font-bold text-slate-900 dark:text-white block">
-              Garantias Nutricionais Declaradas (%):
-            </strong>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(activeFert.guaranteedNutrients).map(([elem, pct]) => (
-                <div key={elem} className="px-3 py-1 bg-white dark:bg-zinc-900 border rounded-lg flex items-center gap-1.5 font-bold">
-                  <span className="text-emerald-600 dark:text-emerald-400">{elem}:</span>
-                  <span className="text-slate-900 dark:text-white">{pct}%</span>
-                </div>
-              ))}
+          {/* Garantias Nutricionais */}
+          <div className="px-5 py-3.5 border-b border-slate-100 dark:border-zinc-800 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs">
+            <span className="font-semibold text-slate-700 dark:text-zinc-300">
+              Garantias (%):
+            </span>
+            {Object.entries(activeFert.guaranteedNutrients).map(([elem, pct]) => (
+              <span key={elem} className="tabular-nums">
+                <strong className="font-semibold text-emerald-700 dark:text-emerald-400">{elem}</strong>{' '}
+                <span className="text-slate-900 dark:text-zinc-100 font-medium">{pct}%</span>
+              </span>
+            ))}
+          </div>
+
+          {/* Função Fisiológica e Mobilidade */}
+          <div className="p-5 border-b border-slate-100 dark:border-zinc-800 space-y-2 text-xs">
+            <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-zinc-100">
+              <Sprout className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span>Função na fisiologia vegetal</span>
+            </div>
+            <p className="text-slate-600 dark:text-zinc-400 leading-relaxed">
+              {activeFert.plantFunction}
+            </p>
+            <div className="text-[11px] text-slate-500 dark:text-zinc-400 pt-0.5">
+              <strong className="text-slate-700 dark:text-zinc-300">Mobilidade:</strong> {mobility}
             </div>
           </div>
 
-          {/* Deep Agronomic Sections */}
-          <div className="space-y-4 text-xs">
-            {/* 1. Função na Planta & Mobilidade */}
-            <div className="p-4 bg-emerald-50/60 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-900/60 space-y-2">
-              <strong className="text-emerald-950 dark:text-emerald-200 font-bold text-sm flex items-center gap-1.5">
-                <Sprout className="w-4 h-4 text-emerald-600" />
-                Função Bioquímica na Fisiologia Vegetal:
-              </strong>
-              <p className="text-[11px] text-emerald-900 dark:text-emerald-300 leading-relaxed font-medium">
-                {activeFert.plantFunction}
+          {/* Deficiência vs Excesso */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-zinc-800 border-b border-slate-100 dark:border-zinc-800 text-xs">
+            <div className="p-4 space-y-1.5">
+              <div className="flex items-center gap-1.5 font-semibold text-amber-700 dark:text-amber-400">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <span>Sintomas de deficiência</span>
+              </div>
+              <p className="text-slate-600 dark:text-zinc-400 leading-relaxed">
+                {activeFert.deficiencySymptoms}
               </p>
-              <div className="pt-1 text-[11px] text-slate-600 dark:text-zinc-400">
-                <strong>Mobilidade no Tecido Vegetal: </strong> {mobility}
-              </div>
             </div>
 
-            {/* 2. Sintomas de Deficiência vs Sintomas de Excesso */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div className="p-3.5 bg-amber-50/70 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-900/60 space-y-1.5">
-                <strong className="text-amber-950 dark:text-amber-200 font-bold flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4 text-amber-600" />
-                  Sintomas Visuais de Deficiência:
-                </strong>
-                <p className="text-[11px] text-amber-900 dark:text-amber-300 leading-relaxed">
-                  {activeFert.deficiencySymptoms}
-                </p>
+            <div className="p-4 space-y-1.5">
+              <div className="flex items-center gap-1.5 font-semibold text-rose-700 dark:text-rose-400">
+                <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                <span>Sintomas de excesso / fitotoxicidade</span>
               </div>
+              <p className="text-slate-600 dark:text-zinc-400 leading-relaxed">
+                {activeFert.excessSymptoms}
+              </p>
+            </div>
+          </div>
 
-              <div className="p-3.5 bg-rose-50/70 dark:bg-rose-950/30 rounded-xl border border-rose-200 dark:border-rose-900/60 space-y-1.5">
-                <strong className="text-rose-950 dark:text-rose-200 font-bold flex items-center gap-1.5">
-                  <ShieldAlert className="w-4 h-4 text-rose-600" />
-                  Sintomas de Fitotoxicidade / Excesso:
-                </strong>
-                <p className="text-[11px] text-rose-900 dark:text-rose-300 leading-relaxed">
-                  {activeFert.excessSymptoms}
-                </p>
+          {/* Diretrizes de Aplicação */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-zinc-800 border-b border-slate-100 dark:border-zinc-800 text-xs">
+            <div className="p-4 space-y-1">
+              <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-zinc-200">
+                <Droplets className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>Fertirrigação</span>
               </div>
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
+                Dosar via {activeFert.defaultTank}. Concentração de injeção segura de 50 a 150 g/L.
+              </p>
             </div>
 
-            {/* 3. Recomendações Práticas de Aplicação */}
-            <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/80 rounded-xl border border-slate-200/70 dark:border-zinc-700/60 space-y-2">
-              <strong className="text-slate-900 dark:text-white font-bold block">
-                Diretrizes de Aplicação Agronômica:
-              </strong>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[11px]">
-                <div className="p-2 bg-white dark:bg-zinc-900 rounded-lg border space-y-1">
-                  <span className="font-bold text-teal-600 dark:text-teal-400 block">💧 Fertirrigação:</span>
-                  <span className="text-slate-600 dark:text-zinc-400">
-                    Dosar via {activeFert.defaultTank}. Concentração de injeção segura de 50 a 150 g/L de água.
-                  </span>
-                </div>
-                <div className="p-2 bg-white dark:bg-zinc-900 rounded-lg border space-y-1">
-                  <span className="font-bold text-indigo-600 dark:text-indigo-400 block">🌱 Hidroponia (NFT/Substrato):</span>
-                  <span className="text-slate-600 dark:text-zinc-400">
-                    Ajustar condutividade elétrica conforme a fase fenológica da cultura sem ultrapassar 2.2 mS/cm.
-                  </span>
-                </div>
-                <div className="p-2 bg-white dark:bg-zinc-900 rounded-lg border space-y-1">
-                  <span className="font-bold text-emerald-600 dark:text-emerald-400 block">🍃 Aplicação Foliar:</span>
-                  <span className="text-slate-600 dark:text-zinc-400">
-                    Dose de 0.1% a 0.5% com adjuvante espalhante adesivo nas horas mais frescas do dia.
-                  </span>
-                </div>
+            <div className="p-4 space-y-1">
+              <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-zinc-200">
+                <Sprout className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+                <span>Hidroponia</span>
               </div>
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
+                Ajustar CE conforme fase fenológica mantendo a solução abaixo de 2,2 mS/cm.
+              </p>
             </div>
 
-            {/* 4. Incompatibilidades & Segurança FISPQ */}
+            <div className="p-4 space-y-1">
+              <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-zinc-200">
+                <Leaf className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>Aplicação foliar</span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
+                Concentração de 0,1% a 0,5% com adjuvante nas horas mais amenas do dia.
+              </p>
+            </div>
+          </div>
+
+          {/* Incompatibilidades e FISPQ */}
+          <div className="p-4 space-y-3 text-xs">
             {activeFert.prohibitedMixNotes && (
-              <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-900 rounded-xl space-y-1 text-rose-950 dark:text-rose-200">
-                <strong className="block font-bold flex items-center gap-1.5 text-rose-700 dark:text-rose-400">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  Incompatibilidades Químicas Proibidas:
-                </strong>
-                <p className="text-[11px] leading-relaxed">{activeFert.prohibitedMixNotes}</p>
+              <div className="p-3 rounded-lg border border-rose-200 dark:border-rose-800/70 bg-rose-50/70 dark:bg-rose-950/30 space-y-1">
+                <div className="flex items-center gap-1.5 font-semibold text-rose-800 dark:text-rose-300">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>Incompatibilidades químicas proibidas</span>
+                </div>
+                <p className="text-[11px] text-rose-950 dark:text-rose-200/90 leading-relaxed">
+                  {activeFert.prohibitedMixNotes}
+                </p>
               </div>
             )}
 
-            <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/80 rounded-xl border border-slate-200/70 dark:border-zinc-700/60 space-y-1 text-slate-700 dark:text-zinc-300">
-              <strong className="text-slate-900 dark:text-white font-bold block">
-                Armazenamento, Manuseio & Segurança (FISPQ):
+            <div className="text-[11px] text-slate-600 dark:text-zinc-400 leading-relaxed">
+              <strong className="text-slate-800 dark:text-zinc-200">
+                Armazenamento e segurança (FISPQ):{' '}
               </strong>
-              <p className="text-[11px] leading-relaxed">{activeFert.storageAndSafety}</p>
+              {activeFert.storageAndSafety}
             </div>
           </div>
         </div>

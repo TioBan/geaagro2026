@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BuffaloAnimal } from '../../types/buffalo';
-import { Dna, Award, Search, ArrowRight, UserCheck, Shield } from 'lucide-react';
+import { Dna, ArrowUpRight } from 'lucide-react';
 
 interface BuffaloGenealogyViewProps {
   animals: BuffaloAnimal[];
@@ -15,159 +15,158 @@ export const BuffaloGenealogyView: React.FC<BuffaloGenealogyViewProps> = ({
   const selectedAnimal = animals.find(a => a.id === selectedId) || animals[0];
 
   return (
-    <div className="space-y-6">
-      {/* Top Selector */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      {/* Seletor */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <span className="text-[10px] font-black uppercase tracking-wider text-teal-600 block">
-            Genética &amp; Linhagens Bubalinas
-          </span>
-          <h2 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-            <Dna className="w-5 h-5 text-teal-600" />
-            <span>Árvore Genealógica de 3 Gerações</span>
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+            <Dna className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+            <span>Árvore Genealógica &amp; Registro ABCB</span>
           </h2>
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Pedigree ascendente de 3 gerações e linhagens bubalinas
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-bold text-slate-500">Selecionar Búfalo:</label>
-          <select
-            value={selectedId}
-            onChange={(e) => setSelectedId(e.target.value)}
-            className="px-3 py-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-slate-800 dark:text-zinc-200"
-          >
-            {animals.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.identificationNumber} - {a.name} ({a.breed} • {a.bloodDegree})
-              </option>
-            ))}
-          </select>
-        </div>
+        {animals.length > 0 && (
+          <div className="flex items-center gap-2 shrink-0">
+            <label className="text-xs text-slate-500 dark:text-zinc-400 whitespace-nowrap">Animal:</label>
+            <select
+              value={selectedAnimal?.id || ''}
+              onChange={(e) => setSelectedId(e.target.value)}
+              className="h-8 px-2.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-700 rounded-lg text-xs font-medium text-slate-900 dark:text-zinc-100 cursor-pointer"
+            >
+              {animals.map(a => (
+                <option key={a.id} value={a.id}>
+                  {a.identificationNumber} - {a.name} ({a.breed})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {selectedAnimal ? (
-        <div className="space-y-6">
-          {/* Card Central do Animal Selecionado */}
-          <div className="bg-gradient-to-r from-teal-900 via-slate-900 to-slate-950 border border-teal-500/30 rounded-3xl p-6 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 bg-teal-500/30 text-teal-300 rounded-full font-bold text-xs">
-                  {selectedAnimal.breed}
-                </span>
-                <span className="px-2.5 py-0.5 bg-slate-800 text-slate-300 rounded-md font-bold text-xs">
-                  {selectedAnimal.bloodDegree}
-                </span>
+        <div className="space-y-4">
+          {/* Resumo do Animal Selecionado */}
+          <section className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400">
+                <span className="font-medium text-teal-600 dark:text-teal-400">{selectedAnimal.breed}</span>
+                <span aria-hidden="true">·</span>
+                <span>{selectedAnimal.bloodDegree}</span>
+                <span aria-hidden="true">·</span>
+                <span className="tabular-nums">ABCB: {selectedAnimal.registrationCodeABCB || 'Não informado'}</span>
               </div>
-              <h3 className="text-2xl font-black">{selectedAnimal.name}</h3>
-              <p className="text-xs text-slate-300">
-                Brinco: <strong>{selectedAnimal.identificationNumber}</strong> • Reg. ABCB: <strong>{selectedAnimal.registrationCodeABCB || 'N/D'}</strong>
-              </p>
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+                {selectedAnimal.identificationNumber} · {selectedAnimal.name}
+              </h3>
               {selectedAnimal.geneticLineage && (
-                <p className="text-xs text-teal-300 font-semibold pt-1">
+                <p className="text-xs text-slate-600 dark:text-zinc-300">
                   Linhagem: {selectedAnimal.geneticLineage}
                 </p>
               )}
             </div>
 
             <button
+              type="button"
               onClick={() => onSelectAnimalForTwin(selectedAnimal.id)}
-              className="px-5 py-2.5 bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all cursor-pointer"
+              className="h-8 px-3 bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5 cursor-pointer self-start sm:self-auto shrink-0 transition-colors"
             >
-              Ver Gêmeo Digital Completo
+              <span>Abrir Gêmeo 360°</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
-          </div>
+          </section>
 
-          {/* Estrutura da Árvore Genealógica (Nós de 3 Gerações) */}
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
-            <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-              <Award className="w-4 h-4 text-teal-600" />
-              <span>Pedigree Ascendente (Pais e Avós)</span>
+          {/* Pedigree Ascendente */}
+          <section className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-4">
+            <h4 className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+              Pedigree Ascendente (Pais e Avós)
             </h4>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Ramo Paterno */}
-              <div className="p-5 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 rounded-2xl space-y-4">
-                <div className="flex items-center justify-between border-b border-blue-200 dark:border-blue-900/50 pb-2">
-                  <span className="text-xs font-black uppercase text-blue-700 dark:text-blue-400">Linha Paterna (Sire)</span>
-                  <span className="text-[10px] font-bold text-slate-500">50% da Carga Genética</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Linha Paterna */}
+              <div className="p-3.5 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/40 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-zinc-800 text-xs">
+                  <span className="font-semibold text-sky-700 dark:text-sky-400">Linha Paterna (Sire)</span>
+                  <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">50% genética</span>
                 </div>
 
-                <div className="p-3.5 bg-white dark:bg-zinc-900 rounded-xl border border-blue-100 dark:border-blue-950 shadow-xs space-y-1">
-                  <span className="text-[10px] font-bold uppercase text-slate-400">Pai (1ª Geração)</span>
-                  <div className="font-extrabold text-sm text-slate-900 dark:text-white">
-                    {selectedAnimal.sireName || 'Imperador de Marajó'}
+                <div>
+                  <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Pai (1ª Geração)</span>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                    {selectedAnimal.sireName || 'Não informado'}
                   </div>
-                  <span className="text-[11px] text-teal-600 font-semibold block">
-                    Reg: {selectedAnimal.sireRegistration || 'ABCB-MR-60112'}
-                  </span>
+                  {selectedAnimal.sireRegistration && (
+                    <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+                      Reg.: {selectedAnimal.sireRegistration}
+                    </span>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 pt-2">
-                  <div className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-blue-50 dark:border-blue-950 shadow-2xs">
-                    <span className="text-[9px] font-bold uppercase text-slate-400 block">Avô Paterno</span>
-                    <span className="font-bold text-xs text-slate-800 dark:text-zinc-200">
-                      {selectedAnimal.paternalGrandsire || 'Sultan da Índia 102'}
+                <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-slate-200/80 dark:border-zinc-800 text-xs">
+                  <div>
+                    <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Avô Paterno</span>
+                    <span className="font-medium text-slate-800 dark:text-zinc-200">
+                      {selectedAnimal.paternalGrandsire || 'Não informado'}
                     </span>
                   </div>
-                  <div className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-blue-50 dark:border-blue-950 shadow-2xs">
-                    <span className="text-[9px] font-bold uppercase text-slate-400 block">Avó Paterna</span>
-                    <span className="font-bold text-xs text-slate-800 dark:text-zinc-200">
-                      {selectedAnimal.paternalGranddam || 'Rainha do Nilo'}
+                  <div>
+                    <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Avó Paterna</span>
+                    <span className="font-medium text-slate-800 dark:text-zinc-200">
+                      {selectedAnimal.paternalGranddam || 'Não informado'}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Ramo Materno */}
-              <div className="p-5 bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/50 rounded-2xl space-y-4">
-                <div className="flex items-center justify-between border-b border-rose-200 dark:border-rose-900/50 pb-2">
-                  <span className="text-xs font-black uppercase text-rose-700 dark:text-rose-400">Linha Materna (Dam)</span>
-                  <span className="text-[10px] font-bold text-slate-500">50% da Carga Genética</span>
+              {/* Linha Materna */}
+              <div className="p-3.5 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-950/40 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-zinc-800 text-xs">
+                  <span className="font-semibold text-rose-700 dark:text-rose-400">Linha Materna (Dam)</span>
+                  <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">50% genética</span>
                 </div>
 
-                <div className="p-3.5 bg-white dark:bg-zinc-900 rounded-xl border border-rose-100 dark:border-rose-950 shadow-xs space-y-1">
-                  <span className="text-[10px] font-bold uppercase text-slate-400">Mãe (1ª Geração)</span>
-                  <div className="font-extrabold text-sm text-slate-900 dark:text-white">
-                    {selectedAnimal.damName || 'Estrela Negra do Vale'}
+                <div>
+                  <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Mãe (1ª Geração)</span>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                    {selectedAnimal.damName || 'Não informado'}
                   </div>
-                  <span className="text-[11px] text-teal-600 font-semibold block">
-                    Reg: {selectedAnimal.damRegistration || 'ABCB-MR-71044'}
-                  </span>
+                  {selectedAnimal.damRegistration && (
+                    <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+                      Reg.: {selectedAnimal.damRegistration}
+                    </span>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 pt-2">
-                  <div className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-rose-50 dark:border-rose-950 shadow-2xs">
-                    <span className="text-[9px] font-bold uppercase text-slate-400 block">Avô Materno</span>
-                    <span className="font-bold text-xs text-slate-800 dark:text-zinc-200">
-                      {selectedAnimal.maternalGrandsire || 'Gran Murrah Nacional'}
+                <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-slate-200/80 dark:border-zinc-800 text-xs">
+                  <div>
+                    <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Avô Materno</span>
+                    <span className="font-medium text-slate-800 dark:text-zinc-200">
+                      {selectedAnimal.maternalGrandsire || 'Não informado'}
                     </span>
                   </div>
-                  <div className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-rose-50 dark:border-rose-950 shadow-2xs">
-                    <span className="text-[9px] font-bold uppercase text-slate-400 block">Avó Materna</span>
-                    <span className="font-bold text-xs text-slate-800 dark:text-zinc-200">
-                      {selectedAnimal.maternalGranddam || 'Pretinha do Pantanal'}
+                  <div>
+                    <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Avó Materna</span>
+                    <span className="font-medium text-slate-800 dark:text-zinc-200">
+                      {selectedAnimal.maternalGranddam || 'Não informado'}
                     </span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Diferenciais Genéticos da Raça */}
-            <div className="p-4 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200 dark:border-zinc-700 text-xs text-slate-700 dark:text-zinc-300 space-y-2">
-              <span className="font-bold text-slate-900 dark:text-white block">
-                Padrão Racial &amp; Características Hereditárias:
-              </span>
-              <p>
-                Os búfalos da raça <strong>{selectedAnimal.breed}</strong> possuem alta herdabilidade para teor de sólidos totais (gordura e caseínas), com conformação de úbere adaptada e docilidade para ordenha com ou sem bezerro ao pé.
-              </p>
-            </div>
-          </div>
+            <p className="text-xs text-slate-600 dark:text-zinc-400 pt-2 border-t border-slate-100 dark:border-zinc-800 leading-relaxed">
+              <strong className="text-slate-800 dark:text-zinc-200">Padrão racial ({selectedAnimal.breed}):</strong>{' '}
+              elevada herdabilidade para teor de sólidos totais (gordura e caseína), longevidade produtiva e adaptação a áreas tropicais úmidas.
+            </p>
+          </section>
         </div>
       ) : (
-        <div className="bg-white dark:bg-zinc-900 border border-dashed border-slate-300 dark:border-zinc-700 rounded-3xl p-12 text-center space-y-3">
-          <Dna className="w-12 h-12 text-slate-300 dark:text-zinc-600 mx-auto" />
-          <h3 className="text-base font-black text-slate-800 dark:text-zinc-200">Nenhum animal cadastrado no rebanho</h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            Cadastre animais na aba <strong>Registro Individual</strong> para visualizar a árvore genealógica e linhagens de 3 gerações.
+        <div className="bg-white dark:bg-zinc-900 border border-dashed border-slate-300 dark:border-zinc-700 rounded-xl p-10 text-center space-y-2">
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-zinc-200">Nenhum búfalo cadastrado</h3>
+          <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-sm mx-auto">
+            Cadastre animais na aba Cadastro para consultar a árvore genealógica e o registro ABCB.
           </p>
         </div>
       )}

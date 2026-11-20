@@ -1,13 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { BackupQRCodeGenerator } from './BackupQRCodeGenerator';
 import { useStorageEstimate } from '../hooks/useStorageEstimate';
 import {
-  Database,
-  HardDrive,
   ShieldCheck,
   Lock,
   RefreshCw,
-  Clock,
   QrCode,
   FileText,
   Layers,
@@ -15,24 +12,18 @@ import {
   UploadCloud,
   CheckCircle2,
   AlertTriangle,
-  Zap,
-  Calendar,
   Sparkles,
   Smartphone,
   Trash2,
   Copy,
   Key,
-  FolderArchive,
   Info,
   ShieldAlert,
   Search,
   Upload,
   Folder,
   Server,
-  WifiOff,
-  FileCode,
   History,
-  Radio,
   BookOpen,
   Egg,
   Sprout,
@@ -49,8 +40,10 @@ import {
   Globe,
   FolderOpen,
   Network,
-  Wifi,
-  RotateCcw
+  RotateCcw,
+  X,
+  ArrowRight,
+  ChevronRight,
 } from 'lucide-react';
 import {
   BackupMetadata,
@@ -59,24 +52,22 @@ import {
   getBackupHistory,
   saveBackupHistory,
   getSnapshots,
-  saveSnapshots,
   getAutoTriggerConfig,
   saveAutoTriggerConfig,
   createFullBackup,
   restoreBackup,
   rollbackEmergencySnapshot,
   validateAndInspectBackup,
-  executeBackupCreation,
   createInstantSnapshot,
   generateSHA256,
   triggerFileDownload,
-  formatBytes
+  formatBytes,
 } from '../utils/backupService';
 import { CryptoService } from '../services/cryptoService';
 import {
   pickBackupFolder,
   PRESET_BACKUP_FOLDERS,
-  saveBackupFileWithNativePicker
+  saveBackupFileWithNativePicker,
 } from '../services/folderPickerService';
 import { opfsWasmDB, OpfsEngineDiagnostics } from '../services/opfsWasmDatabase';
 import { StatusSincronizacaoRecupera } from '../types/recupera';
@@ -85,7 +76,7 @@ import {
   restaurarBackupJsonRecupera,
   obterStatusSincronizacaoRecupera,
   registrarSincronizacaoRealizada,
-  resetarTodosOsDadosRecupera
+  resetarTodosOsDadosRecupera,
 } from '../utils/recuperaStorage';
 import { estatisticaStorage } from '../modules/estatistica/storage/estatisticaStorage';
 import { EstatisticaBackupMetadata } from '../modules/estatistica/types/estatistica';
@@ -96,37 +87,100 @@ interface BackupModuleProps {
   setActiveSubTab?: (subTab: string) => void;
 }
 
+interface ConfirmDialogState {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  destructive?: boolean;
+  onConfirm: () => void;
+}
+
+const BACKUP_TABS = [
+  { id: 'dashboard', label: 'Visão Geral' },
+  { id: 'criacao', label: 'Criar Backup' },
+  { id: 'restauracao', label: 'Restaurar' },
+  { id: 'snapshots', label: 'Snapshots' },
+  { id: 'modulos', label: 'Por Módulo' },
+  { id: 'historico', label: 'Histórico' },
+  { id: 'agendamento', label: 'Automação' },
+  { id: 'migracao', label: 'Migração' },
+  { id: 'qrcode', label: 'QR Code' },
+  { id: 'estatistica_opfs', label: 'OPFS Estatística' },
+] as const;
+
+const FREQUENCY_LABELS: Record<string, string> = {
+  off: 'Desativado',
+  daily: 'Diário',
+  weekly: 'Semanal',
+  fortnightly: 'Quinzenal',
+  monthly: 'Mensal',
+};
+
+const SUITE_MODULES = [
+  { id: 'solos', name: 'Análises de Solo', icon: FlaskConical, desc: 'Amostras, laudos e fertilidade' },
+  { id: 'doencas_solo', name: 'Sanidade do Solo', icon: ShieldCheck, desc: 'Ocorrências, talhões e patógenos' },
+  { id: 'foliar', name: 'Análises Foliares', icon: Leaf, desc: 'Diagnose nutricional e DRIS' },
+  { id: 'pecuaria', name: 'Pecuária & Rebanho', icon: Beef, desc: 'Lotes, pesagens e reprodução' },
+  { id: 'caderno_campo', name: 'Caderno de Campo', icon: Tractor, desc: 'Operações agrícolas e talhões' },
+  { id: 'irrigacao', name: 'Irrigação & TankMix', icon: Droplets, desc: 'Balanço hídrico e fertirrigação' },
+  { id: 'pluviometria', name: 'Pluviometria', icon: CloudRain, desc: 'Registros de chuvas por talhão' },
+  { id: 'relatorios', name: 'Relatórios & Laudos', icon: FileText, desc: 'Laudos técnicos oficiais com ART' },
+  { id: 'meteorologia', name: 'Meteorologia', icon: CloudSun, desc: 'Histórico e previsões climáticas' },
+  { id: 'custos', name: 'Custos de Produção', icon: DollarSign, desc: 'Financeiro, insumos e margens' },
+  { id: 'avicultura', name: 'Avicultura', icon: Egg, desc: 'Lotes, galpões e sanidade' },
+  { id: 'sementes', name: 'Análise de Sementes', icon: Sprout, desc: 'Lotes, vigor e germinação' },
+  { id: 'nematologia', name: 'Nematologia', icon: Sparkles, desc: 'População por amostragem' },
+  { id: 'pragas', name: 'MIP & Pragas', icon: ShieldAlert, desc: 'Inspeções e nível de dano' },
+  { id: 'bulario', name: 'Bulário & Receituário', icon: BookOpen, desc: 'Defensivos e prescrições' },
+  { id: 'diario_fotos', name: 'Diário Fotográfico', icon: Camera, desc: 'Registros visuais de campo' },
+  { id: 'recupera', name: 'Recupera — Áreas Degradadas', icon: Sprout, desc: 'Talhões, PRAD, custos e GPS' },
+  { id: 'estatistica', name: 'GeaAgro Estatística', icon: BarChart2, desc: 'Projetos, OPFS, análises e gráficos' },
+];
+
+const AUTO_TRIGGERS: Array<{
+  key: keyof BackupAutoTriggerConfig;
+  label: string;
+  desc: string;
+}> = [
+  { key: 'onAppClose', label: 'Ao encerrar o aplicativo', desc: 'Cópia incremental ao fechar a sessão' },
+  { key: 'onSoilAnalysisComplete', label: 'Ao concluir análise de solo', desc: 'Salva novas amostras e cálculos' },
+  { key: 'onReportFinished', label: 'Ao finalizar laudo técnico PDF', desc: 'Protege documentos emitidos' },
+  { key: 'onNewFieldAdded', label: 'Ao adicionar talhão ou lavoura', desc: 'Registra estrutura territorial' },
+  { key: 'onBirthRegistered', label: 'Ao registrar parto no rebanho', desc: 'Atualiza histórico zootécnico' },
+  { key: 'onApplicationRegistered', label: 'Ao registrar aplicação', desc: 'Salva receituário e calda' },
+  { key: 'onFertilizerDbUpdated', label: 'Ao atualizar banco de fertilizantes', desc: 'Preserva tabela de insumos' },
+];
+
 export const BackupModule: React.FC<BackupModuleProps> = ({
   activeSubTab = 'dashboard',
-  setActiveSubTab
+  setActiveSubTab,
 }) => {
   const [currentTab, setCurrentTab] = useState<string>(activeSubTab);
 
-  // Sync internal state if prop changes
   useEffect(() => {
     if (activeSubTab) setCurrentTab(activeSubTab);
   }, [activeSubTab]);
 
   const handleTabChange = (tabId: string) => {
     setCurrentTab(tabId);
-    if (setActiveSubTab) setActiveSubTab(tabId);
+    setActiveSubTab?.(tabId);
   };
 
-  // State
+  // Core Data State
   const [history, setHistory] = useState<BackupMetadata[]>([]);
   const [snapshots, setSnapshots] = useState<SnapshotRecord[]>([]);
   const [autoConfig, setAutoConfig] = useState<BackupAutoTriggerConfig>(getAutoTriggerConfig());
 
-  // Search & Filters in History
+  // History Filters
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
-  // New Backup State Form
+  // Creation Form State
   const [backupType, setBackupType] = useState<'completo' | 'incremental' | 'diferencial' | 'modulo'>('completo');
   const [selectedStorage, setSelectedStorage] = useState<'pasta_custom' | 'ftp'>('pasta_custom');
   const [customFolderPath, setCustomFolderPath] = useState<string>('/Documentos/GeaAgro_Backups/');
 
-  // FTP / SFTP Server Configuration State
+  // FTP / SFTP State
   const [ftpConfig, setFtpConfig] = useState({
     host: 'ftp.fazendasantaluzia.com.br',
     port: 21,
@@ -138,11 +192,10 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
   });
   const [isTestingFtp, setIsTestingFtp] = useState<boolean>(false);
   const [ftpTestStatus, setFtpTestStatus] = useState<string | null>(null);
-
-  // Local FTP Server Hosting Node State
   const [isLocalFtpRunning, setIsLocalFtpRunning] = useState<boolean>(true);
-  const [localFtpUrl, setLocalFtpUrl] = useState<string>('ftp://192.168.1.100:2121');
+  const localFtpUrl = 'ftp://192.168.1.100:2121';
 
+  // Options & Encryption
   const [includeMediaFiles, setIncludeMediaFiles] = useState<boolean>(true);
   const [useEncryption, setUseEncryption] = useState<boolean>(false);
   const [encryptionPassword, setEncryptionPassword] = useState<string>('');
@@ -153,70 +206,34 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
   const [backupFormError, setBackupFormError] = useState<string | null>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
-  const handleGenerateRecoveryKey = () => {
-    const keyDetails = CryptoService.generateRecoveryKey();
-    setRecoveryKey(keyDetails.formattedKey);
-    setIsRecoveryKeyConfirmed(false);
-    showToast('Nova chave de recuperação segura de 256 bits gerada com sucesso!', 'info');
-  };
-
-  // Directory Folder Selector with native System Directory API and preset shortcuts
-  // (Never triggers browser upload warnings)
-  const handleSelectDirectoryFolder = async () => {
-    try {
-      const result = await pickBackupFolder({
-        suggestedPath: customFolderPath,
-        allowWebkitFallback: false // Never trigger browser upload prompt
-      });
-
-      if (result.success && result.folderPath) {
-        setCustomFolderPath(result.folderPath);
-        showToast(result.message || `Pasta "${result.folderName}" selecionada com sucesso!`, 'success');
-      } else if (result.status === 'cancelled') {
-        // Cancelamento pelo usuário: não exibir alerta de erro
-        console.log('[BackupModule] Seleção de pasta cancelada pelo usuário.');
-      } else if (result.status === 'permission_denied') {
-        showToast('Permissão de acesso à pasta não concedida pelo navegador.', 'info');
-      } else if (result.status === 'restricted_system') {
-        showToast('Utilize os atalhos rápidos (Área de Trabalho, Downloads, Documentos) ou digite a pasta.', 'info');
-      } else if (result.message) {
-        showToast(result.message, 'info');
-      }
-    } catch (err: any) {
-      console.warn('[BackupModule] Erro ao selecionar pasta:', err);
-      showToast('Selecione um dos atalhos rápidos abaixo ou digite o caminho desejado.', 'info');
-    }
-  };
-
-  // Test FTP / SFTP Server Connection
-  const handleTestFtpConnection = () => {
-    setIsTestingFtp(true);
-    setFtpTestStatus('Conectando ao servidor FTP...');
-    setTimeout(() => {
-      setFtpTestStatus('Autenticando usuário e verificando permissões de escrita...');
-    }, 800);
-    setTimeout(() => {
-      setIsTestingFtp(false);
-      setFtpTestStatus('Conexão FTP estabelecida com sucesso!');
-      showToast(`Servidor ${ftpConfig.protocol.toUpperCase()} (${ftpConfig.host}:${ftpConfig.port}) respondendo! Permissão de escrita OK.`, 'success');
-    }, 1800);
-  };
-
-  // Selected Modules for Selective Backup
+  // Selected Modules
   const [selectedModules, setSelectedModules] = useState<string[]>([
-    'solos', 'doencas_solo', 'foliar', 'pecuaria', 'caderno_campo', 'irrigacao', 'pluviometria', 'relatorios', 'meteorologia', 'custos', 'recupera'
+    'solos',
+    'doencas_solo',
+    'foliar',
+    'pecuaria',
+    'caderno_campo',
+    'irrigacao',
+    'pluviometria',
+    'relatorios',
+    'meteorologia',
+    'custos',
+    'recupera',
   ]);
 
-  // Estado integrado de Backup & Sincronização do Módulo Recupera
-  const [recuperaSyncStatus, setRecuperaSyncStatus] = useState<StatusSincronizacaoRecupera>(() => obterStatusSincronizacaoRecupera());
+  // Recupera Integration State
+  const [recuperaSyncStatus, setRecuperaSyncStatus] = useState<StatusSincronizacaoRecupera>(() =>
+    obterStatusSincronizacaoRecupera()
+  );
   const [isSyncingRecupera, setIsSyncingRecupera] = useState<boolean>(false);
   const [recuperaJsonImport, setRecuperaJsonImport] = useState<string>('');
   const recuperaFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Action feedback modal / notification
+  // Feedback & Confirm Dialog
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
 
-  // Backup Execution Progress Modal State
+  // Backup Execution State
   const [isExecutingBackup, setIsExecutingBackup] = useState<boolean>(false);
   const [executionProgress, setExecutionProgress] = useState<number>(0);
   const [executionStep, setExecutionStep] = useState<string>('');
@@ -246,17 +263,15 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
   const [isExecutingRestore, setIsExecutingRestore] = useState<boolean>(false);
   const [restoreProgress, setRestoreProgress] = useState<number>(0);
 
-  // QR Code Modal
-  const [selectedQrBackup, setSelectedQrBackup] = useState<BackupMetadata | null>(null);
-  const [showQrScanner, setShowQrScanner] = useState<boolean>(false);
-  const [qrScanResult, setQrScanResult] = useState<string | null>(null);
+  // QR Selection
+  const [selectedQrBackupId, setSelectedQrBackupId] = useState<string | undefined>(undefined);
 
-  // Snapshot Creator Modal
+  // Snapshot Creation State
   const [snapshotTitle, setSnapshotTitle] = useState<string>('');
   const [snapshotEvent, setSnapshotEvent] = useState<string>('Alteração Manual em Massa');
   const [isCreatingSnapshot, setIsCreatingSnapshot] = useState<boolean>(false);
 
-  // StorageManager API hook (navigator.storage.estimate())
+  // Storage & OPFS Diagnostics
   const storageStats = useStorageEstimate();
   const [opfsDiagnostics, setOpfsDiagnostics] = useState<OpfsEngineDiagnostics | null>(null);
   const [estatisticaStorageStatus, setEstatisticaStorageStatus] = useState<{
@@ -273,24 +288,34 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
   } | null>(null);
   const [estatisticaBackupsMeta, setEstatisticaBackupsMeta] = useState<EstatisticaBackupMetadata[]>([]);
   const [isRegisteringEstatisticaCheckpoint, setIsRegisteringEstatisticaCheckpoint] = useState(false);
+
   const {
     updateAvailable: pwaUpdateAvailable,
     isChecking: isCheckingPwaUpdate,
     isUpToDate: isPwaUpToDate,
     currentVersion: pwaCurrentVersion,
     checkForUpdates: checkPwaUpdates,
-    applyUpdate: applyPwaUpdate
+    applyUpdate: applyPwaUpdate,
   } = useAppUpdate();
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setNotification({ type, message });
+    setTimeout(() => {
+      setNotification((prev) => (prev?.message === message ? null : prev));
+    }, 4000);
+  };
 
   const refreshEstatisticaOpfs = async () => {
     try {
       const [status, meta] = await Promise.all([
         estatisticaStorage.obterStatusArmazenamento(),
-        estatisticaStorage.listarBackupsMetadata()
+        estatisticaStorage.listarBackupsMetadata(),
       ]);
       setEstatisticaStorageStatus(status);
       setEstatisticaBackupsMeta(meta);
-    } catch {}
+    } catch {
+      // silent
+    }
   };
 
   useEffect(() => {
@@ -298,52 +323,105 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
     void refreshEstatisticaOpfs();
   }, [currentTab]);
 
-  const handleSetDiskCapacity = (gb: number) => {
-    storageStats.setCustomDiskGb(gb);
-    showToast(`Capacidade do dispositivo definida para ${gb} GB.`, 'info');
-  };
-
-  // Load initial data
   useEffect(() => {
     setHistory(getBackupHistory());
     setSnapshots(getSnapshots());
     setAutoConfig(getAutoTriggerConfig());
   }, []);
 
-  // Show Toast
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setNotification({ type, message });
-    setTimeout(() => {
-      setNotification(null);
-    }, 4500);
+  // Derived Smart Metrics
+  const latestBackup = history[0] || null;
+  const activeTriggersCount = useMemo(
+    () => AUTO_TRIGGERS.filter((t) => Boolean(autoConfig[t.key])).length,
+    [autoConfig]
+  );
+
+  const filteredHistory = useMemo(
+    () =>
+      history.filter((b) => {
+        const q = searchTerm.toLowerCase().trim();
+        const matchesSearch =
+          !q ||
+          b.filename.toLowerCase().includes(q) ||
+          b.userResponsible.toLowerCase().includes(q) ||
+          b.storageLocation.toLowerCase().includes(q);
+        const matchesType = typeFilter === 'all' || b.type === typeFilter;
+        return matchesSearch && matchesType;
+      }),
+    [history, searchTerm, typeFilter]
+  );
+
+  // Handlers
+  const handleSetDiskCapacity = (gb: number) => {
+    storageStats.setCustomDiskGb(gb);
+    showToast(`Capacidade ajustada para ${gb >= 1024 ? '1 TB' : `${gb} GB`}.`, 'info');
   };
 
-  // Toggle module selection
+  const handleGenerateRecoveryKey = () => {
+    const keyDetails = CryptoService.generateRecoveryKey();
+    setRecoveryKey(keyDetails.formattedKey);
+    setIsRecoveryKeyConfirmed(false);
+    showToast('Chave de recuperação de 256 bits gerada.', 'info');
+  };
+
+  const handleSelectDirectoryFolder = async () => {
+    try {
+      const result = await pickBackupFolder({
+        suggestedPath: customFolderPath,
+        allowWebkitFallback: false,
+      });
+
+      if (result.success && result.folderPath) {
+        setCustomFolderPath(result.folderPath);
+        showToast(result.message || `Pasta "${result.folderName}" selecionada.`, 'success');
+      } else if (result.status === 'permission_denied') {
+        showToast('Permissão de acesso à pasta não concedida.', 'info');
+      } else if (result.status === 'restricted_system') {
+        showToast('Use os atalhos de pasta abaixo ou digite o caminho desejado.', 'info');
+      } else if (result.status !== 'cancelled' && result.message) {
+        showToast(result.message, 'info');
+      }
+    } catch {
+      showToast('Selecione um atalho ou digite o diretório desejado.', 'info');
+    }
+  };
+
+  const handleTestFtpConnection = () => {
+    setIsTestingFtp(true);
+    setFtpTestStatus('Conectando ao servidor FTP...');
+    setTimeout(() => {
+      setFtpTestStatus('Verificando credenciais e permissão de escrita...');
+    }, 700);
+    setTimeout(() => {
+      setIsTestingFtp(false);
+      setFtpTestStatus('Conexão estabelecida · Escrita validada.');
+      showToast(
+        `Servidor ${ftpConfig.protocol.toUpperCase()} (${ftpConfig.host}:${ftpConfig.port}) validado.`,
+        'success'
+      );
+    }, 1500);
+  };
+
   const toggleModuleSelection = (modId: string) => {
     if (selectedModules.includes(modId)) {
-      if (selectedModules.length === 1) return; // manter ao menos um
-      setSelectedModules(selectedModules.filter(m => m !== modId));
+      if (selectedModules.length === 1) return;
+      setSelectedModules(selectedModules.filter((m) => m !== modId));
     } else {
       setSelectedModules([...selectedModules, modId]);
     }
   };
 
-  // Select all modules
   const selectAllModules = () => {
-    setSelectedModules([
-      'solos', 'doencas_solo', 'foliar', 'pecuaria', 'caderno_campo', 'irrigacao',
-      'pluviometria', 'relatorios', 'meteorologia', 'custos', 'avicultura',
-      'sementes', 'nematologia', 'pragas', 'bulario', 'diario_fotos', 'recupera',
-      'estatistica'
-    ]);
+    setSelectedModules(SUITE_MODULES.map((m) => m.id));
   };
 
   const handleRegistrarCheckpointEstatistica = async () => {
     setIsRegisteringEstatisticaCheckpoint(true);
     try {
-      const status = estatisticaStorageStatus || (await estatisticaStorage.obterStatusArmazenamento());
+      const status =
+        estatisticaStorageStatus || (await estatisticaStorage.obterStatusArmazenamento());
       await estatisticaStorage.registrarMetadataBackup({
-        titulo: `Ponto de Verificação Estatístico — ${new Date().toLocaleDateString('pt-BR')}`,
+        titulo: `Verificação Estatística — ${new Date().toLocaleDateString('pt-BR')}`,
         projetosCount: status.totalProjetos,
         experimentosCount: status.totalExperimentos,
         resultadosCount: status.totalResultados,
@@ -351,9 +429,9 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
         checksumIntegrado: Math.round(status.usageBytes % 1000000007),
       });
       await refreshEstatisticaOpfs();
-      showToast('Ponto de verificação OPFS+WASM da GeaAgro Estatística registrado com sucesso!', 'success');
+      showToast('Ponto de verificação OPFS da Estatística registrado.', 'success');
     } catch (err: any) {
-      showToast(`Erro ao registrar verificação OPFS: ${err?.message || String(err)}`, 'error');
+      showToast(`Erro ao registrar verificação: ${err?.message || String(err)}`, 'error');
     } finally {
       setIsRegisteringEstatisticaCheckpoint(false);
     }
@@ -363,36 +441,35 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
     setSelectedModules(['estatistica']);
     setBackupType('modulo');
     handleTabChange('criacao');
-    showToast('Módulo GeaAgro Estatística selecionado para geração do pacote .geaagro!', 'info');
+    showToast('Módulo GeaAgro Estatística selecionado para geração de backup.', 'info');
   };
 
-  // Ações Integradas de Backup & Sincronização do Módulo Recupera
   const handleSyncRecuperaNow = () => {
     setIsSyncingRecupera(true);
     setTimeout(() => {
       registrarSincronizacaoRealizada();
       setRecuperaSyncStatus(obterStatusSincronizacaoRecupera());
       setIsSyncingRecupera(false);
-      showToast('Sincronização local do módulo Recupera concluída com sucesso!', 'success');
-    }, 600);
+      showToast('Sincronização local do Recupera concluída.', 'success');
+    }, 500);
   };
 
   const handleExportRecuperaJson = () => {
     const json = exportarBackupJsonRecupera();
     const filename = `Backup_GeaAgro_Recupera_${new Date().toISOString().split('T')[0]}.json`;
     triggerFileDownload(filename, json, 'application/json');
-    showToast(`Backup JSON do módulo Recupera (${filename}) exportado!`, 'success');
+    showToast(`Backup JSON "${filename}" exportado.`, 'success');
   };
 
   const handleSelectRecuperaJsonFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = ev => {
+    reader.onload = (ev) => {
       const content = ev.target?.result as string;
       if (content) {
         setRecuperaJsonImport(content);
-        showToast(`Arquivo "${file.name}" carregado para restauração do Recupera.`, 'info');
+        showToast(`Arquivo "${file.name}" carregado.`, 'info');
       }
     };
     reader.readAsText(file);
@@ -400,43 +477,53 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
 
   const handleRestoreRecuperaJson = () => {
     if (!recuperaJsonImport.trim()) {
-      showToast('Selecione um arquivo .json ou cole o conteúdo JSON do backup do Recupera.', 'error');
+      showToast('Carregue um arquivo .json ou cole o conteúdo do backup do Recupera.', 'error');
       return;
     }
-    if (window.confirm('Deseja restaurar este backup no módulo Recupera? Os dados atuais serão atualizados.')) {
-      const ok = restaurarBackupJsonRecupera(recuperaJsonImport);
-      if (ok) {
-        setRecuperaJsonImport('');
-        setRecuperaSyncStatus(obterStatusSincronizacaoRecupera());
-        showToast('Backup do módulo Recupera restaurado com sucesso!', 'success');
-      } else {
-        showToast('Erro ao interpretar o JSON de backup do módulo Recupera.', 'error');
-      }
-    }
+    setConfirmDialog({
+      title: 'Restaurar dados do Recupera',
+      description: 'Os registros atuais do módulo Recupera serão substituídos pelo conteúdo do backup informado.',
+      confirmLabel: 'Restaurar agora',
+      onConfirm: () => {
+        const ok = restaurarBackupJsonRecupera(recuperaJsonImport);
+        if (ok) {
+          setRecuperaJsonImport('');
+          setRecuperaSyncStatus(obterStatusSincronizacaoRecupera());
+          showToast('Backup do Recupera restaurado.', 'success');
+        } else {
+          showToast('JSON inválido para restauração do Recupera.', 'error');
+        }
+      },
+    });
   };
 
   const handleResetRecuperaData = () => {
-    if (window.confirm('Deseja realmente limpar todos os dados do módulo Recupera (Áreas Degradadas) e reiniciar com formulários limpos?')) {
-      resetarTodosOsDadosRecupera();
-      setRecuperaSyncStatus(obterStatusSincronizacaoRecupera());
-      showToast('Dados do módulo Recupera limpos com sucesso.', 'info');
-    }
+    setConfirmDialog({
+      title: 'Limpar dados do Recupera',
+      description: 'Esta ação remove os registros locais de Áreas Degradadas e reinicia os formulários.',
+      confirmLabel: 'Limpar dados',
+      destructive: true,
+      onConfirm: () => {
+        resetarTodosOsDadosRecupera();
+        setRecuperaSyncStatus(obterStatusSincronizacaoRecupera());
+        showToast('Dados do Recupera limpos.', 'info');
+      },
+    });
   };
 
-  // Execute Creation of Backup
   const handleStartBackupCreation = () => {
     setBackupFormError(null);
 
     if (useEncryption) {
       if (!encryptionPassword.trim()) {
-        const msg = 'Defina uma senha para criptografar o backup ou desmarque a opção "Proteger com AES-256 e Senha" para gerar um backup rápido.';
+        const msg = 'Defina uma senha para cifrar o arquivo ou desative a opção AES-256.';
         setBackupFormError(msg);
         showToast(msg, 'error');
         passwordInputRef.current?.focus();
         return;
       }
       if (recoveryKey && !isRecoveryKeyConfirmed) {
-        const msg = 'Confirme que você copiou ou anotou a chave de recuperação antes de prosseguir.';
+        const msg = 'Confirme que você guardou a chave de recuperação antes de prosseguir.';
         setBackupFormError(msg);
         showToast(msg, 'error');
         return;
@@ -445,30 +532,34 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
 
     setIsExecutingBackup(true);
     setExecutionProgress(15);
-    setExecutionStep('Coletando tabelas e registros da suite GeaAgro...');
+    setExecutionStep('Coletando tabelas e registros...');
 
     const storageLocationNames: Record<string, string> = {
-      interna: 'Memória Interna (/data/geaagro/backups)',
-      sdcard: 'Cartão SD (/storage/sdcard0/GeaAgro)',
-      otg: 'Pen Drive OTG (/mnt/media_rw/otg/GeaAgro)',
-      hd_externo: 'HD Externo (/Volumes/GeaAgro_Drive)',
-      pasta_custom: `Pasta Escolhida (${customFolderPath})`,
-      ftp: `Servidor FTP (${ftpConfig.protocol.toUpperCase()}://${ftpConfig.host}:${ftpConfig.port}${ftpConfig.remotePath})`
+      pasta_custom: `Pasta Local (${customFolderPath})`,
+      ftp: `FTP (${ftpConfig.protocol.toUpperCase()}://${ftpConfig.host}:${ftpConfig.port}${ftpConfig.remotePath})`,
     };
 
     (async () => {
       try {
         setExecutionProgress(35);
-        setExecutionStep(includeMediaFiles ? 'Empacotando fotografias, vídeos e laudos PDFs...' : 'Empacotando estruturas relacionais...');
+        setExecutionStep(
+          includeMediaFiles ? 'Empacotando mídias e laudos PDF...' : 'Empacotando base relacional...'
+        );
 
         const encMode: 'none' | 'password' | 'envelope' = !useEncryption
           ? 'none'
-          : (recoveryKey ? 'envelope' : 'password');
+          : recoveryKey
+          ? 'envelope'
+          : 'password';
 
         setExecutionProgress(65);
-        setExecutionStep(useEncryption
-          ? (encMode === 'envelope' ? 'Cifrando com AES-256-GCM e Envelope duplo (Senha + Chave)...' : 'Cifrando com AES-256-GCM por senha...')
-          : 'Gerando arquivo e checksum SHA-256...');
+        setExecutionStep(
+          useEncryption
+            ? encMode === 'envelope'
+              ? 'Cifrando com AES-256-GCM (Envelope Duplo)...'
+              : 'Cifrando com AES-256-GCM...'
+            : 'Calculando checksum SHA-256...'
+        );
 
         const result = await createFullBackup({
           type: backupType,
@@ -480,14 +571,13 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
           encryption: {
             mode: encMode,
             password: useEncryption ? encryptionPassword : undefined,
-            recoveryKey: useEncryption && recoveryKey ? recoveryKey : undefined
-          }
+            recoveryKey: useEncryption && recoveryKey ? recoveryKey : undefined,
+          },
         });
 
         setExecutionProgress(90);
-        setExecutionStep('Salvando arquivo de backup no dispositivo...');
+        setExecutionStep('Salvando arquivo no dispositivo...');
 
-        // Salva arquivo com seletor nativo do sistema ou download padrão do navegador
         const saveResult = await saveBackupFileWithNativePicker(
           result.metadata.filename,
           result.jsonString,
@@ -495,18 +585,18 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
         );
 
         setExecutionProgress(100);
-        setExecutionStep('Backup concluído com sucesso!');
+        setExecutionStep('Backup concluído.');
         setHistory(getBackupHistory());
         setLastCreatedBackup(result.metadata);
         setLastCreatedBackupPayload(result.jsonString);
 
-        if (saveResult.saved) {
-          showToast(`Backup "${result.metadata.filename}" gerado e salvo com sucesso!`, 'success');
-        } else {
-          showToast(`Backup "${result.metadata.filename}" empacotado e disponível para download.`, 'info');
-        }
+        showToast(
+          saveResult.saved
+            ? `Backup "${result.metadata.filename}" salvo.`
+            : `Backup "${result.metadata.filename}" pronto para download.`,
+          saveResult.saved ? 'success' : 'info'
+        );
       } catch (err: any) {
-        console.error('[BackupModule] Falha na criação do backup:', err);
         showToast(`Falha na criação do backup: ${err?.message || String(err)}`, 'error');
       } finally {
         setIsExecutingBackup(false);
@@ -514,67 +604,78 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
     })();
   };
 
-  // Create Snapshot
   const handleCreateSnapshotSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!snapshotTitle.trim()) return;
     setIsCreatingSnapshot(true);
     setTimeout(() => {
-      const snap = createInstantSnapshot(snapshotTitle, snapshotEvent);
+      const snap = createInstantSnapshot(snapshotTitle.trim(), snapshotEvent);
       setSnapshots(getSnapshots());
       setIsCreatingSnapshot(false);
       setSnapshotTitle('');
-      showToast(`Snapshot "${snap.title}" registrado com sucesso!`, 'success');
-    }, 800);
+      showToast(`Snapshot "${snap.title}" criado.`, 'success');
+    }, 500);
   };
 
-  // Rollback to Snapshot
-  const handleRollbackSnapshot = async (snap: SnapshotRecord) => {
-    if (window.confirm(`Tem certeza que deseja reverter o sistema para o estado do snapshot "${snap.title}" (${snap.timestamp})?`)) {
-      setIsExecutingRestore(true);
-      setRestoreStepText('Revertendo estado para o snapshot selecionado...');
-      const success = await rollbackEmergencySnapshot(snap.id);
-      setIsExecutingRestore(false);
-      setRestoreStepText('');
-      if (success) {
-        showToast(`Sistema revertido com sucesso para o estado do Snapshot: ${snap.title}! Recarregando...`, 'success');
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('storage'));
+  const handleRollbackSnapshot = (snap: SnapshotRecord) => {
+    setConfirmDialog({
+      title: 'Reverter para Snapshot',
+      description: `O sistema será restaurado para o estado "${snap.title}" (${new Date(snap.timestamp).toLocaleString('pt-BR')}).`,
+      confirmLabel: 'Reverter agora',
+      destructive: true,
+      onConfirm: async () => {
+        setIsExecutingRestore(true);
+        setRestoreStepText('Revertendo estado para o snapshot selecionado...');
+        const success = await rollbackEmergencySnapshot(snap.id);
+        setIsExecutingRestore(false);
+        setRestoreStepText('');
+        if (success) {
+          showToast(`Sistema revertido para "${snap.title}". Recarregando...`, 'success');
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('storage'));
+          }
+          setTimeout(() => window.location.reload(), 1200);
+        } else {
+          showToast('Dados deste snapshot não encontrados para reversão direta.', 'error');
         }
-        setTimeout(() => window.location.reload(), 1500);
-      } else {
-        showToast('Não foi possível localizar os dados deste snapshot para restauração direta.', 'error');
-      }
-    }
+      },
+    });
   };
 
-  // Delete Backup from History
-  const handleDeleteBackup = (id: string) => {
-    if (window.confirm('Tem certeza que deseja remover este registro de backup do histórico?')) {
-      const updated = history.filter(h => h.id !== id);
-      setHistory(updated);
-      saveBackupHistory(updated);
-      showToast('Registro de backup removido com sucesso.', 'info');
-    }
+  const handleDeleteBackup = (bak: BackupMetadata) => {
+    setConfirmDialog({
+      title: 'Remover registro do histórico',
+      description: `Deseja remover "${bak.filename}" da lista de histórico? O arquivo salvo no dispositivo não será apagado.`,
+      confirmLabel: 'Remover',
+      destructive: true,
+      onConfirm: () => {
+        const updated = history.filter((h) => h.id !== bak.id);
+        setHistory(updated);
+        saveBackupHistory(updated);
+        showToast('Registro removido do histórico.', 'info');
+      },
+    });
   };
 
-  // Validate Integrity Hash SHA-256
   const handleVerifyIntegrity = (bak: BackupMetadata) => {
-    showToast(`Verificando integridade SHA-256 de ${bak.filename}...`, 'info');
+    showToast(`Validando SHA-256 de ${bak.filename}...`, 'info');
     setTimeout(() => {
-      showToast(`Hash SHA-256 validado com sucesso! Nenhuma corrupção detectada. (${bak.integrityHash.substring(0, 16)}...)`, 'success');
-    }, 1200);
+      showToast(`SHA-256 íntegro (${bak.integrityHash.substring(0, 16)}...).`, 'success');
+    }, 700);
   };
 
-  // Save Auto Config Toggles
+  const handleOpenQrForBackup = (bak: BackupMetadata) => {
+    setSelectedQrBackupId(bak.id);
+    handleTabChange('qrcode');
+  };
+
   const handleToggleAutoConfig = (key: keyof BackupAutoTriggerConfig) => {
     const updated = { ...autoConfig, [key]: !autoConfig[key] };
     setAutoConfig(updated as BackupAutoTriggerConfig);
     saveAutoTriggerConfig(updated as BackupAutoTriggerConfig);
-    showToast('Preferências de backup automático salvas.', 'success');
+    showToast('Configuração de automação salva.', 'success');
   };
 
-  // Process selected file for restore (used by both input change and drag & drop)
   const processRestoreFile = (file: File) => {
     setRestoreFile(file);
     setRestoreValidationStatus({ tested: false, valid: false });
@@ -591,105 +692,97 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
         setIsRestoreEncrypted(Boolean(isEnc));
         setRestoreEncryptionMode(parsed.encryption?.mode || 'none');
 
-        // Validação preliminar do cabeçalho sem credenciais
         const initialInspection = await validateAndInspectBackup(content);
 
         setRestorePreview({
           valid: initialInspection.isValid || Boolean(initialInspection.manifest),
-          version: initialInspection.manifest?.appVersion || parsed.appVersion || 'v4.8.2-PRO',
+          version: initialInspection.manifest?.appVersion || parsed.appVersion || 'v4.2.3.8',
           createdAt: initialInspection.manifest?.timestamp || parsed.createdAt || new Date().toISOString(),
           type: initialInspection.manifest?.type || parsed.backupType || 'completo',
-          modulesCount: initialInspection.manifest?.modulesIncluded?.length || (parsed.modules ? parsed.modules.length : 12),
-          recordsCount: initialInspection.manifest?.recordsCount || initialInspection.details?.indexedDbRecordCount || 0,
+          modulesCount:
+            initialInspection.manifest?.modulesIncluded?.length ||
+            (parsed.modules ? parsed.modules.length : 12),
+          recordsCount:
+            initialInspection.manifest?.recordsCount ||
+            initialInspection.details?.indexedDbRecordCount ||
+            0,
           sha256: initialInspection.manifest?.integrityHash || generateSHA256(content),
-          encryptionMode: parsed.encryption?.mode || 'none'
+          encryptionMode: parsed.encryption?.mode || 'none',
         });
 
-        if (isEnc) {
-          showToast('Arquivo criptografado carregado. Insira a senha ou chave de recuperação para restaurar.', 'info');
-        } else {
-          showToast('Arquivo de backup pronto para restauração.', 'success');
-        }
+        showToast(
+          isEnc
+            ? 'Arquivo criptografado carregado. Informe a senha ou chave de recuperação.'
+            : 'Arquivo reconhecido e pronto para restauração.',
+          isEnc ? 'info' : 'success'
+        );
       } catch {
-        setRestorePreview({
-          valid: false,
-          version: 'Desconhecida',
-          createdAt: new Date().toISOString(),
-          type: 'desconhecido',
-          modulesCount: 0,
-          recordsCount: 0,
-          sha256: generateSHA256(file.name + file.size),
-          encryptionMode: 'desconhecido'
-        });
-        setRestoreInlineError('Não foi possível ler o arquivo. Certifique-se de que é um arquivo JSON ou .geabackup válido.');
-        showToast('Não foi possível ler o arquivo. Certifique-se de que é um backup .geaagro válido.', 'error');
+        setRestorePreview(null);
+        setRestoreInlineError('Arquivo inválido. Selecione um backup .geabackup, .geaagro ou .json válido.');
+        showToast('Não foi possível ler o arquivo de backup.', 'error');
       }
     };
     reader.readAsText(file);
   };
 
-  // Handle Restore File Select
   const handleFileSelectForRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files[0]) {
-      processRestoreFile(files[0]);
-    }
+    const file = e.target.files?.[0];
+    if (file) processRestoreFile(file);
   };
 
-  // Test / Validate credentials before restore
+  const handleDropRestoreFile = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processRestoreFile(file);
+  };
+
   const handleValidateCredentials = async () => {
     if (!restoreFileContent) {
-      setRestoreInlineError('Nenhum arquivo de backup selecionado para validação.');
-      showToast('Nenhum arquivo de backup selecionado.', 'error');
+      setRestoreInlineError('Selecione um arquivo de backup antes de validar.');
       return;
     }
     const inspection = await validateAndInspectBackup(restoreFileContent, {
       password: restorePassword || undefined,
-      recoveryKey: restoreRecoveryKey || undefined
+      recoveryKey: restoreRecoveryKey || undefined,
     });
     setRestoreValidationStatus({
       tested: true,
       valid: inspection.isValid,
       message: inspection.isValid
-        ? `Autenticação AES-256-GCM validada com sucesso! ${inspection.details?.indexedDbRecordCount || 0} registros encontrados.`
-        : (inspection.errorMessage || 'Falha na autenticação do arquivo.')
+        ? `Autenticação AES-256-GCM validada · ${inspection.details?.indexedDbRecordCount || 0} registros.`
+        : inspection.errorMessage || 'Falha na validação criptográfica.',
     });
     if (inspection.isValid) {
       setRestoreInlineError(null);
-      showToast('Credenciais e integridade validadas com sucesso!', 'success');
+      showToast('Credenciais e integridade confirmadas.', 'success');
     } else {
       setRestoreInlineError(inspection.errorMessage || 'Credenciais inválidas.');
       showToast(inspection.errorMessage || 'Credenciais inválidas.', 'error');
     }
   };
 
-  // Execute Restore
   const handleExecuteRestore = async () => {
     setRestoreInlineError(null);
 
-    // Se nenhum arquivo foi selecionado, avisa claramente e abre o seletor de arquivos
     if (!restoreFile || !restoreFileContent) {
-      setRestoreInlineError('Selecione ou arraste um arquivo de backup (.json ou .geabackup) antes de executar a restauração.');
-      showToast('Selecione um arquivo de backup para restaurar.', 'error');
+      setRestoreInlineError('Selecione ou arraste um arquivo de backup antes de restaurar.');
       restoreFileInputRef.current?.click();
       return;
     }
 
-    // Se o arquivo é criptografado e nenhuma credencial foi informada, avisa na tela
     if ((isRestoreEncrypted || restoreEncryptionMode !== 'none') && !restorePassword && !restoreRecoveryKey) {
-      setRestoreInlineError('Este backup é protegido por criptografia AES-256-GCM. Digite a senha do backup ou chave de recuperação acima para continuar.');
-      showToast('Insira a senha do backup para restaurar.', 'error');
+      setRestoreInlineError('Informe a senha do backup ou a chave de recuperação para descriptografar.');
       return;
     }
 
-    // 1. Validação estrita AES-256-GCM e hash antes de tocar em qualquer dado persistido
     setIsExecutingRestore(true);
-    setRestoreProgress(15);
-    setRestoreStepText('Validando integridade SHA-256 e autenticação do arquivo...');
+    setRestoreProgress(20);
+    setRestoreStepText('Validando integridade SHA-256...');
 
     const inspection = await validateAndInspectBackup(restoreFileContent, {
       password: restorePassword || undefined,
-      recoveryKey: restoreRecoveryKey || undefined
+      recoveryKey: restoreRecoveryKey || undefined,
     });
 
     if (!inspection.isValid || !inspection.payload) {
@@ -698,193 +791,108 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
       setRestoreStepText('');
       const errorMsg = inspection.errorMessage || 'Credenciais inválidas ou integridade violada.';
       setRestoreInlineError(`Restauração bloqueada: ${errorMsg}`);
-      showToast(`Restauração bloqueada: ${errorMsg}`, 'error');
+      showToast(errorMsg, 'error');
       return;
     }
 
-    setRestoreProgress(40);
-    setRestoreStepText('Criando snapshot preventivo de emergência...');
+    setRestoreProgress(45);
+    setRestoreStepText('Criando snapshot preventivo de segurança...');
 
     try {
-      setRestoreProgress(65);
-      setRestoreStepText('Restaurando tabelas do IndexedDB e configurações...');
+      setRestoreProgress(70);
+      setRestoreStepText('Aplicando tabelas e configurações...');
 
-      // 2. Executa restauração com criação do snapshot de emergência e rollback transacional
       const result = await restoreBackup(restoreFileContent, {
         password: restorePassword || undefined,
-        recoveryKey: restoreRecoveryKey || undefined
+        recoveryKey: restoreRecoveryKey || undefined,
       });
 
-      setRestoreProgress(90);
-      setRestoreStepText('Finalizando aplicação dos dados...');
+      setRestoreProgress(95);
+      setRestoreStepText('Finalizando...');
 
       if (result.success) {
         setRestoreProgress(100);
-        setRestoreStepText('Restauração concluída com sucesso!');
         setHistory(getBackupHistory());
         setSnapshots(getSnapshots());
-
-        // Exibe modal informativo de conclusão
         setRestoreSuccessModal({
           count: result.restoredRecordsCount,
-          keys: result.restoredKeysCount
+          keys: result.restoredKeysCount,
         });
-
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('storage'));
         }
-
         showToast(
-          `Restauração concluída com sucesso! ${result.restoredRecordsCount} registros e ${result.restoredKeysCount} chaves restaurados.`,
+          `Restauração concluída (${result.restoredRecordsCount} registros, ${result.restoredKeysCount} chaves).`,
           'success'
         );
       } else {
-        const errorMsg = result.errors.join('; ') || 'Erro desconhecido durante a restauração.';
-        const rollbackMsg = result.rolledBack
-          ? ' Rollback preventivo executado com sucesso. Nenhum dado prévio foi corrompido.'
-          : '';
-        setRestoreInlineError(`Falha na restauração: ${errorMsg}.${rollbackMsg}`);
-        showToast(`Falha na restauração: ${errorMsg}.${rollbackMsg}`, 'error');
+        const errorMsg = result.errors.join('; ') || 'Erro durante a restauração.';
+        const rollbackMsg = result.rolledBack ? ' Rollback preventivo executado sem perda de dados.' : '';
+        setRestoreInlineError(`Falha: ${errorMsg}.${rollbackMsg}`);
+        showToast(`Falha na restauração: ${errorMsg}`, 'error');
       }
     } catch (err: any) {
-      console.error('[BackupModule] Falha na restauração:', err);
       const errorMsg = err?.message || String(err);
-      setRestoreInlineError(`Falha inesperada durante a restauração: ${errorMsg}`);
-      showToast(`Falha inesperada durante a restauração: ${errorMsg}`, 'error');
+      setRestoreInlineError(`Erro inesperado: ${errorMsg}`);
+      showToast(errorMsg, 'error');
     } finally {
       setIsExecutingRestore(false);
     }
   };
 
-  // Filtered History
-  const filteredHistory = history.filter(b => {
-    const matchesSearch = b.filename.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          b.userResponsible.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          b.storageLocation.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = typeFilter === 'all' || b.type === typeFilter;
-    return matchesSearch && matchesType;
-  });
-
-  // Modules metadata definition
-  const suiteModules = [
-    { id: 'solos', name: 'Análises de Solo', icon: FlaskConical, desc: 'Amostras, laudos e atributos de fertilidade' },
-    { id: 'doencas_solo', name: 'Doenças e Sanidade do Solo', icon: ShieldCheck, desc: 'Ocorrências, talhões, laudos e banco de patógenos' },
-    { id: 'foliar', name: 'Análises Foliares', icon: Leaf, desc: 'Diagnose nutricional foliar e curvas' },
-    { id: 'pecuaria', name: 'Bovinocultura / Pecuária', icon: Beef, desc: 'Gado, rebanho, pesagens e reprodução' },
-    { id: 'caderno_campo', name: 'Caderno de Campo', icon: Tractor, desc: 'Operações agrícolas e talhões' },
-    { id: 'irrigacao', name: 'Irrigação & Fertirrigação', icon: Droplets, desc: 'Balanço hídrico e tanques de adubo' },
-    { id: 'pluviometria', name: 'Pluviometria & Chuvas', icon: CloudRain, desc: 'Registros pluviométricos por talhão' },
-    { id: 'relatorios', name: 'Relatórios & Laudos', icon: FileText, desc: 'Laudos técnicos oficiais com ART' },
-    { id: 'meteorologia', name: 'Meteorologia & Clima', icon: CloudSun, desc: 'Histórico e previsões climáticas' },
-    { id: 'custos', name: 'Custos de Produção', icon: DollarSign, desc: 'Financeiro, insumos e margens' },
-    { id: 'avicultura', name: 'Avicultura de Precisão', icon: Egg, desc: 'Lotes de frangos, galpões e sanidade' },
-    { id: 'sementes', name: 'Análise de Sementes', icon: Sprout, desc: 'Lotes de sementes, vigor e germinação' },
-    { id: 'nematologia', name: 'Nematologia Agrícola', icon: Sparkles, desc: 'População de nematoides por amostragem' },
-    { id: 'pragas', name: 'MIP & Radar de Pragas', icon: ShieldAlert, desc: 'Inspeções de campo e nível de dano' },
-    { id: 'bulario', name: 'Bulário & Receituário', icon: BookOpen, desc: 'Produtos defensivos cadastrados' },
-    { id: 'diario_fotos', name: 'Diário Fotográfico', icon: Camera, desc: 'Galeria geotagged de registros de campo' },
-    { id: 'recupera', name: 'Recupera — Áreas Degradadas', icon: Sprout, desc: 'Propriedades, talhões, diagnósticos, PRAD, monitoramentos e mapas GPS' },
-    { id: 'estatistica', name: 'GeaAgro Estatística', icon: BarChart2, desc: 'Projetos, experimentos, planilhas OPFS originais, análises, gráficos e histórico' },
-  ];
-
-  const renderRecuperaBackupCard = () => (
-    <div className="bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-900/60 rounded-2xl p-6 shadow-xs space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-zinc-800 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-emerald-100 dark:bg-emerald-950/70 text-emerald-600 dark:text-emerald-400 rounded-xl">
-            <Sprout className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
-              Backup & Sincronização — Módulo Recupera (Áreas Degradadas)
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-zinc-400">
-              Exportação JSON dedicada, restauração de talhões/PRAD, sincronização e reset limpo integrados
-            </p>
+  // Sub-panel: Recupera compact section
+  const renderRecuperaSection = () => (
+    <section className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-zinc-800">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+            Recupera — Áreas Degradadas
+          </h3>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+            <span className={recuperaSyncStatus.modoOfflineAtivo ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}>
+              {recuperaSyncStatus.modoOfflineAtivo ? 'Offline local' : 'Online'}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span className="tabular-nums">{recuperaSyncStatus.registrosLocaisPendentes} entidades</span>
+            <span aria-hidden="true">·</span>
+            <span className="tabular-nums">Última sync: {recuperaSyncStatus.ultimaSincronizacao}</span>
           </div>
         </div>
-
-        <button
-          type="button"
-          onClick={handleSyncRecuperaNow}
-          disabled={isSyncingRecupera}
-          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow-xs flex items-center gap-2 self-start sm:self-auto disabled:opacity-50 cursor-pointer"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isSyncingRecupera ? 'animate-spin' : ''}`} />
-          <span>{isSyncingRecupera ? 'Sincronizando...' : 'Sincronizar Recupera'}</span>
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-        <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800">
-          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Status de Conectividade</span>
-          <div className="flex items-center gap-1.5 mt-1 font-bold">
-            {recuperaSyncStatus.modoOfflineAtivo ? (
-              <>
-                <WifiOff className="w-4 h-4 text-amber-500" />
-                <span className="text-amber-600 dark:text-amber-400">Modo Offline Ativo</span>
-              </>
-            ) : (
-              <>
-                <Wifi className="w-4 h-4 text-emerald-600" />
-                <span className="text-emerald-600 dark:text-emerald-400">Conectado / Online</span>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800">
-          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Última Sincronização</span>
-          <p className="font-bold text-slate-900 dark:text-white mt-1 truncate">
-            {recuperaSyncStatus.ultimaSincronizacao}
-          </p>
-        </div>
-
-        <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800">
-          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Registros Locais (Recupera)</span>
-          <p className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
-            {recuperaSyncStatus.registrosLocaisPendentes} entidades
-          </p>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handleSyncRecuperaNow}
+            disabled={isSyncingRecupera}
+            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncingRecupera ? 'animate-spin' : ''}`} />
+            {isSyncingRecupera ? 'Sincronizando...' : 'Sincronizar'}
+          </button>
+          <button
+            type="button"
+            onClick={handleExportRecuperaJson}
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Exportar JSON
+          </button>
+          <button
+            type="button"
+            onClick={handleResetRecuperaData}
+            className="px-2.5 py-1.5 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-medium inline-flex items-center gap-1 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Limpar
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-        <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-3 flex flex-col justify-between">
-          <div className="space-y-1">
-            <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Download className="w-4 h-4 text-emerald-600" />
-              Exportar Backup JSON do Recupera
-            </h4>
-            <p className="text-slate-500 dark:text-zinc-400 leading-relaxed">
-              Gera arquivo JSON completo com propriedades, talhões degradados, diagnósticos, laudos de solo, projetos PRAD, monitoramentos, custos e pontos GPS.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleExportRecuperaJson}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-2 cursor-pointer shadow-xs"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Baixar JSON do Recupera
-            </button>
-            <button
-              type="button"
-              onClick={handleResetRecuperaData}
-              className="px-3 py-2 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 font-bold rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Limpar Dados
-            </button>
-          </div>
-        </div>
-
-        <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Upload className="w-4 h-4 text-emerald-600" />
-              Restaurar Backup JSON do Recupera
-            </h4>
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+        <div className="flex-1 space-y-1">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-slate-700 dark:text-zinc-300">
+              Restaurar JSON do Recupera
+            </label>
             <input
               ref={recuperaFileInputRef}
               type="file"
@@ -895,166 +903,155 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
             <button
               type="button"
               onClick={() => recuperaFileInputRef.current?.click()}
-              className="px-2.5 py-1 bg-slate-200 dark:bg-zinc-700 hover:bg-slate-300 text-slate-800 dark:text-zinc-200 rounded-lg text-[11px] font-bold cursor-pointer"
+              className="text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
             >
-              Carregar .json
+              Carregar arquivo .json
             </button>
           </div>
           <textarea
             value={recuperaJsonImport}
-            onChange={e => setRecuperaJsonImport(e.target.value)}
-            rows={3}
-            placeholder="Cole aqui o conteúdo JSON do backup do Recupera ou carregue o arquivo..."
-            className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white font-mono text-[11px] resize-none"
+            onChange={(e) => setRecuperaJsonImport(e.target.value)}
+            rows={2}
+            placeholder="Cole o JSON exportado do módulo Recupera ou carregue o arquivo..."
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50/50 dark:bg-zinc-950 text-slate-800 dark:text-zinc-200 font-mono text-xs resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
           />
-          <button
-            type="button"
-            onClick={handleRestoreRecuperaJson}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-white font-bold rounded-xl text-xs transition flex items-center gap-2 cursor-pointer shadow-xs"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            Restaurar Dados do Recupera
-          </button>
         </div>
+        <button
+          type="button"
+          onClick={handleRestoreRecuperaJson}
+          className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-900 dark:bg-zinc-800 hover:bg-slate-800 dark:hover:bg-zinc-700 text-white text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0 h-9"
+        >
+          <Upload className="w-3.5 h-3.5" />
+          Restaurar Recupera
+        </button>
       </div>
-    </div>
+    </section>
   );
 
-  const renderEstatisticaOpfsCard = () => (
-    <div className="bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-900/60 rounded-2xl p-6 shadow-xs space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-zinc-800 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-emerald-100 dark:bg-emerald-950/70 text-emerald-600 dark:text-emerald-400 rounded-xl">
-            <BarChart2 className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Backup & Integridade OPFS — GeaAgro Estatística
-              </h3>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold border border-emerald-200 dark:border-emerald-800">
-                ● Ativo Offline
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-zinc-400">
-              Motor oficial {estatisticaStorageStatus?.engine || 'geaagro_opfs_v1'} + GeaAgroOfflineDB — sem bancos paralelos e sem nuvem obrigatória.
-            </p>
+  // Sub-panel: Estatística OPFS compact section
+  const renderEstatisticaOpfsSection = () => (
+    <section className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-zinc-800">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+            GeaAgro Estatística — Integridade OPFS
+          </h3>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+            <span className="font-mono">{estatisticaStorageStatus?.engine || 'geaagro_opfs_v1'}</span>
+            <span aria-hidden="true">·</span>
+            <span className="text-emerald-600 dark:text-emerald-400">Ativo offline</span>
+            <span aria-hidden="true">·</span>
+            <span>Bancos NemaAI e Bulário isolados</span>
           </div>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={handleRegistrarCheckpointEstatistica}
             disabled={isRegisteringEstatisticaCheckpoint}
-            className="px-3.5 py-2 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRegisteringEstatisticaCheckpoint ? 'animate-spin' : ''}`} />
-            <span>{isRegisteringEstatisticaCheckpoint ? 'Registrando...' : 'Registrar Ponto de Verificação'}</span>
+            {isRegisteringEstatisticaCheckpoint ? 'Registrando...' : 'Registrar Verificação'}
           </button>
           <button
             type="button"
             onClick={handleExportarEstatisticaBackup}
-            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
           >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Exportar Pacote Estatística (.geaagro)</span>
+            <Download className="w-3.5 h-3.5" />
+            Exportar Estatística
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
-        <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800">
-          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Uso / Quota Navegador</span>
-          <p className="font-mono font-bold text-slate-900 dark:text-white mt-1">
+      {/* Metrics row */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 py-1 text-xs">
+        <div>
+          <span className="text-slate-500 dark:text-zinc-400 block">Uso / Quota</span>
+          <span className="font-mono tabular-nums font-semibold text-slate-900 dark:text-zinc-100 mt-0.5 block">
             {estatisticaStorageStatus
               ? `${formatBytes(estatisticaStorageStatus.usageBytes)} / ${formatBytes(estatisticaStorageStatus.quotaBytes)}`
               : storageStats.usedFormatted}
-          </p>
+          </span>
         </div>
-        <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800">
-          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Persistência OPFS</span>
-          <p className="font-mono font-bold text-slate-900 dark:text-white mt-1">
-            {estatisticaStorageStatus?.isPersistent ? 'Persistente (OPFS)' : 'Navegador Padrão'}
-          </p>
+        <div>
+          <span className="text-slate-500 dark:text-zinc-400 block">Persistência</span>
+          <span className="font-medium text-slate-900 dark:text-zinc-100 mt-0.5 block">
+            {estatisticaStorageStatus?.isPersistent ? 'Persistente (OPFS)' : 'Navegador padrão'}
+          </span>
         </div>
-        <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800">
-          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Arquivos Originais OPFS</span>
-          <p className="font-mono font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+        <div>
+          <span className="text-slate-500 dark:text-zinc-400 block">Arquivos OPFS</span>
+          <span className="font-mono tabular-nums font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5 block">
             {estatisticaStorageStatus?.artefatosOpfsCount ?? 0} arquivo(s)
-          </p>
+          </span>
         </div>
-        <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800">
-          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Projetos / Experimentos</span>
-          <p className="font-mono font-bold text-slate-900 dark:text-white mt-1">
+        <div>
+          <span className="text-slate-500 dark:text-zinc-400 block">Projetos / Exp.</span>
+          <span className="font-mono tabular-nums font-semibold text-slate-900 dark:text-zinc-100 mt-0.5 block">
             {estatisticaStorageStatus?.totalProjetos ?? 0} / {estatisticaStorageStatus?.totalExperimentos ?? 0}
-          </p>
+          </span>
         </div>
-        <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800">
-          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Resultados / Gráficos</span>
-          <p className="font-mono font-bold text-slate-900 dark:text-white mt-1">
+        <div>
+          <span className="text-slate-500 dark:text-zinc-400 block">Resultados / Gráficos</span>
+          <span className="font-mono tabular-nums font-semibold text-slate-900 dark:text-zinc-100 mt-0.5 block">
             {estatisticaStorageStatus?.totalResultados ?? 0} / {estatisticaStorageStatus?.totalGraficos ?? 0}
-          </p>
-        </div>
-        <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-800">
-          <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Bancos Isolados Intactos</span>
-          <p className="font-mono font-bold text-emerald-700 dark:text-emerald-400 mt-1">
-            NemaAI & Bulário
-          </p>
+          </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
-        <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-2.5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 pt-3 border-t border-slate-100 dark:border-zinc-800 text-xs">
+        <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h4 className="font-bold text-slate-900 dark:text-white">
-              PWA Offline & Atualização Sob Consentimento
-            </h4>
+            <span className="font-medium text-slate-800 dark:text-zinc-200">
+              Atualização PWA sob consentimento
+            </span>
             <span className="font-mono text-[11px] text-slate-500">v{pwaCurrentVersion}</span>
           </div>
           <p className="text-slate-500 dark:text-zinc-400 leading-relaxed">
-            O ecossistema nunca aplica atualizações automáticas ou recarrega durante análises experimentais sem autorização expressa.
+            Nenhuma atualização é aplicada automaticamente durante análises experimentais.
           </p>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 pt-1">
             <button
               type="button"
               disabled={isCheckingPwaUpdate}
               onClick={() => void checkPwaUpdates()}
-              className="px-3 py-1.5 text-xs font-semibold bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isCheckingPwaUpdate ? 'animate-spin' : ''}`} />
-              <span>{isCheckingPwaUpdate ? 'Verificando...' : 'Verificar Atualização Manualmente'}</span>
+              {isCheckingPwaUpdate ? 'Verificando...' : 'Verificar Atualização'}
             </button>
             {pwaUpdateAvailable && (
               <button
                 type="button"
                 onClick={applyPwaUpdate}
-                className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 rounded-lg cursor-pointer"
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium cursor-pointer"
               >
-                Atualizar Agora (Autorizado)
+                Atualizar Agora
               </button>
             )}
             {isPwaUpToDate && (
-              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">Versão atualizada.</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium">Atualizado</span>
             )}
           </div>
         </div>
 
-        <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-2">
-          <div className="font-bold text-slate-900 dark:text-white">
-            Pontos de Auditoria Estatística OPFS ({estatisticaBackupsMeta.length})
-          </div>
+        <div className="space-y-2">
+          <span className="font-medium text-slate-800 dark:text-zinc-200 block">
+            Pontos de auditoria OPFS ({estatisticaBackupsMeta.length})
+          </span>
           {estatisticaBackupsMeta.length === 0 ? (
-            <p className="text-slate-500 dark:text-zinc-400 text-[11px]">
-              Nenhum ponto de verificação registrado ainda. Clique em "Registrar Ponto de Verificação" para gravar o snapshot de integridade em `estatistica_backups_metadata`.
+            <p className="text-slate-500 dark:text-zinc-400">
+              Nenhum ponto registrado. Clique em "Registrar Verificação" para gravar um checksum.
             </p>
           ) : (
-            <div className="divide-y divide-slate-200 dark:divide-zinc-700 max-h-32 overflow-y-auto">
-              {estatisticaBackupsMeta.slice(0, 6).map((b) => (
-                <div key={b.id} className="py-1.5 flex flex-wrap justify-between gap-2 text-[11px]">
-                  <span className="font-medium text-slate-800 dark:text-zinc-200">{b.titulo}</span>
-                  <span className="font-mono text-slate-500">
-                    {b.projetosCount} proj · {b.experimentosCount} exp · {b.artefatosOpfsCount} OPFS
+            <div className="divide-y divide-slate-100 dark:divide-zinc-800 max-h-28 overflow-y-auto">
+              {estatisticaBackupsMeta.slice(0, 5).map((b) => (
+                <div key={b.id} className="py-1.5 flex items-center justify-between gap-2 text-[11px]">
+                  <span className="text-slate-700 dark:text-zinc-200 truncate">{b.titulo}</span>
+                  <span className="font-mono tabular-nums text-slate-500 shrink-0">
+                    {b.projetosCount}p · {b.experimentosCount}e · {b.artefatosOpfsCount} opfs
                   </span>
                 </div>
               ))}
@@ -1062,817 +1059,823 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </section>
   );
 
   return (
-    <div className="w-full space-y-6 pb-12 animate-fadeIn text-slate-800 dark:text-zinc-100">
-      
-      {/* Toast Notification Header */}
+    <div className="w-full max-w-[1360px] mx-auto space-y-5 pb-10 text-slate-800 dark:text-zinc-100">
+      {/* Subtle Toast */}
       {notification && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl border backdrop-blur-md transition-all animate-bounce ${
-          notification.type === 'success'
-            ? 'bg-emerald-600 text-white border-emerald-500'
-            : notification.type === 'error'
-            ? 'bg-rose-600 text-white border-rose-500'
-            : 'bg-sky-600 text-white border-sky-500'
-        }`}>
-          {notification.type === 'success' && <CheckCircle2 className="w-5 h-5 flex-shrink-0" />}
-          {notification.type === 'error' && <AlertTriangle className="w-5 h-5 flex-shrink-0" />}
-          {notification.type === 'info' && <Info className="w-5 h-5 flex-shrink-0" />}
-          <span className="text-sm font-semibold">{notification.message}</span>
+        <div
+          role="status"
+          className={`fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border shadow-md text-xs font-medium max-w-md transition-opacity ${
+            notification.type === 'success'
+              ? 'bg-emerald-950 text-emerald-50 border-emerald-800'
+              : notification.type === 'error'
+              ? 'bg-rose-950 text-rose-50 border-rose-800'
+              : 'bg-slate-900 text-slate-100 border-slate-700'
+          }`}
+        >
+          {notification.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
+          {notification.type === 'error' && <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />}
+          {notification.type === 'info' && <Info className="w-4 h-4 text-sky-400 shrink-0" />}
+          <span className="leading-snug">{notification.message}</span>
+          <button
+            type="button"
+            onClick={() => setNotification(null)}
+            className="ml-1 text-slate-400 hover:text-white cursor-pointer"
+            aria-label="Fechar aviso"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
-      {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 p-6 sm:p-8 text-white shadow-xl border border-emerald-900/40">
-        <div className="relative z-10 flex flex-col gap-5">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/30">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Sistema de Backup GeaAgro 100% Offline</span>
+      {/* Clean Confirm Modal */}
+      {confirmDialog && (
+        <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-[1px] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl max-w-sm w-full p-5 shadow-lg space-y-4">
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                {confirmDialog.title}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
+                {confirmDialog.description}
+              </p>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight flex items-center gap-3">
-              <Database className="w-8 h-8 text-emerald-400" />
-              Backup & Proteção de Dados
-            </h1>
-            <p className="text-slate-300 text-sm max-w-3xl leading-relaxed">
-              Proteção completa contra perda de informações agronômicas e zootécnicas. Criptografia AES-256, versionamento temporal, snapshots instantâneos e restauração granular sem dependência de internet.
-            </p>
-          </div>
-
-          {/* Buttons placed at the bottom */}
-          <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-emerald-900/40">
-            <button
-              onClick={() => handleTabChange('criacao')}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-900/30 transition-all cursor-pointer"
-            >
-              <Zap className="w-4 h-4 fill-slate-950" />
-              Criar Backup Agora
-            </button>
-            <button
-              onClick={() => {
-                setSnapshotTitle(`Snapshot de Segurança - ${new Date().toLocaleTimeString('pt-BR')}`);
-                handleTabChange('snapshots');
-              }}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 text-white font-medium text-sm border border-slate-700 shadow-md transition-all cursor-pointer"
-            >
-              <Sparkles className="w-4 h-4 text-emerald-400" />
-              Snapshot Instantâneo
-            </button>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmDialog(null)}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const fn = confirmDialog.onConfirm;
+                  setConfirmDialog(null);
+                  fn();
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium text-white cursor-pointer ${
+                  confirmDialog.destructive
+                    ? 'bg-rose-600 hover:bg-rose-700'
+                    : 'bg-emerald-600 hover:bg-emerald-700'
+                }`}
+              >
+                {confirmDialog.confirmLabel}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* TAB 1: DASHBOARD DO BACKUP */}
+      {/* Restore Completion Modal */}
+      {restoreSuccessModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-[1px] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl max-w-sm w-full p-5 shadow-lg space-y-4">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                  Restauração concluída
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
+                  Foram restaurados{' '}
+                  <strong className="text-slate-900 dark:text-zinc-100 tabular-nums">
+                    {restoreSuccessModal.count}
+                  </strong>{' '}
+                  registros e{' '}
+                  <strong className="text-slate-900 dark:text-zinc-100 tabular-nums">
+                    {restoreSuccessModal.keys}
+                  </strong>{' '}
+                  chaves de configuração com integridade verificada.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRestoreSuccessModal(null)}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer"
+              >
+                Fechar
+              </button>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium cursor-pointer"
+              >
+                Recarregar App
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clean Header Bar (No oversized banner) */}
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Backup e Restauração
+          </h1>
+          <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+            <span>Armazenamento local OPFS + WASM</span>
+            <span aria-hidden="true">·</span>
+            <span>Criptografia AES-256-GCM</span>
+            <span aria-hidden="true">·</span>
+            <span>100% Offline</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              setSnapshotTitle(`Snapshot - ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
+              handleTabChange('snapshots');
+            }}
+            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <History className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
+            Novo Snapshot
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange('criacao')}
+            className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <UploadCloud className="w-3.5 h-3.5" />
+            Criar Backup
+          </button>
+        </div>
+      </header>
+
+      {/* Lightweight Underline Tab Navigation */}
+      <nav
+        aria-label="Seções de Backup e Restauração"
+        className="border-b border-slate-200 dark:border-zinc-800 -mx-1 px-1 overflow-x-auto"
+      >
+        <div className="flex items-center gap-1 min-w-max">
+          {BACKUP_TABS.map((tab) => {
+            const isActive = currentTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabChange(tab.id)}
+                className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                  isActive
+                    ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400'
+                    : 'border-transparent text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* ===================================================================== */}
+      {/* TAB 1: VISÃO GERAL                                                    */}
+      {/* ===================================================================== */}
       {currentTab === 'dashboard' && (
-        <div className="space-y-6">
-          {/* Key Metric Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 shadow-xs space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Último Backup</span>
-                <div className="p-2 bg-emerald-100 dark:bg-emerald-950/70 text-emerald-600 dark:text-emerald-400 rounded-xl">
-                  <CheckCircle2 className="w-5 h-5" />
-                </div>
+        <div className="space-y-5">
+          {/* Compact 4-column metric strip */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-zinc-800 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+            <div className="p-4 space-y-1">
+              <span className="text-xs text-slate-500 dark:text-zinc-400">Último backup</span>
+              <div className="text-sm font-semibold text-slate-900 dark:text-zinc-100 tabular-nums">
+                {latestBackup
+                  ? new Date(latestBackup.timestamp).toLocaleString('pt-BR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  : 'Nenhum registro'}
               </div>
-              <div>
-                <div className="text-lg font-bold text-slate-900 dark:text-white">Hoje, 10:30 hs</div>
-                <div className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">Tipo: Completo (46.2 MB)</div>
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold">
-                <ShieldCheck className="w-3.5 h-3.5" /> SHA-256 Verificado
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 shadow-xs space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Próximo Agendado</span>
-                <div className="p-2 bg-sky-100 dark:bg-sky-950/70 text-sky-600 dark:text-sky-400 rounded-xl">
-                  <Clock className="w-5 h-5" />
-                </div>
-              </div>
-              <div>
-                <div className="text-lg font-bold text-slate-900 dark:text-white">Hoje, 22:00 hs</div>
-                <div className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">Frequência: Diário Automático</div>
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300 text-[11px] font-semibold">
-                <Zap className="w-3.5 h-3.5" /> 7 Gatilhos Ativos
+              <div className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+                {latestBackup
+                  ? `${latestBackup.type} · ${latestBackup.formattedSize} · SHA-256 OK`
+                  : 'Crie seu primeiro backup local'}
               </div>
             </div>
 
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 shadow-xs space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Armazenamento do Dispositivo</span>
-                <div className="p-2 bg-purple-100 dark:bg-purple-950/70 text-purple-600 dark:text-purple-400 rounded-xl">
-                  <HardDrive className="w-5 h-5" />
-                </div>
+            <div className="p-4 space-y-1">
+              <span className="text-xs text-slate-500 dark:text-zinc-400">Automação</span>
+              <div className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                {FREQUENCY_LABELS[autoConfig.scheduleFrequency] || 'Diário'}
               </div>
-              <div>
-                <div className="text-lg font-bold text-slate-900 dark:text-white">{storageStats.usedFormatted} Utilizados</div>
-                <div className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-                  Capacidade: <strong className="text-slate-800 dark:text-zinc-200">{storageStats.quotaFormatted}</strong> ({storageStats.availableFormatted} livres)
-                </div>
+              <div className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+                {activeTriggersCount} de {AUTO_TRIGGERS.length} gatilhos ativos · Retenção {autoConfig.retentionCount}
               </div>
-              <div className="w-full bg-slate-100 dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
+            </div>
+
+            <div className="p-4 space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500 dark:text-zinc-400">Armazenamento</span>
+                <span className="font-mono tabular-nums text-[11px] text-slate-500 dark:text-zinc-400">
+                  {storageStats.percentageUsed}%
+                </span>
+              </div>
+              <div className="text-sm font-semibold text-slate-900 dark:text-zinc-100 tabular-nums">
+                {storageStats.usedFormatted}{' '}
+                <span className="text-xs font-normal text-slate-500 dark:text-zinc-400">
+                  / {storageStats.quotaFormatted}
+                </span>
+              </div>
+              <div className="w-full bg-slate-100 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden">
                 <div
-                  className="bg-purple-600 h-full transition-all duration-500"
-                  style={{ width: `${Math.max(1, Math.min(100, storageStats.percentageUsed))}%` }}
+                  className="bg-emerald-600 h-full transition-all duration-300"
+                  style={{ width: `${Math.max(2, Math.min(100, storageStats.percentageUsed))}%` }}
                 />
               </div>
-              <div className="pt-1 flex items-center justify-between text-[10px] text-slate-400">
-                <span>Ajustar Capacidade:</span>
-                <div className="flex gap-1">
-                  {[64, 128, 256, 512, 1024].map((gb) => (
+              <div className="flex items-center gap-1 pt-0.5">
+                {[64, 128, 256, 512, 1024].map((gb) => {
+                  const isCurrent =
+                    storageStats.customDiskGb === gb ||
+                    (!storageStats.customDiskGb &&
+                      gb === Math.round(storageStats.quota / (1024 * 1024 * 1024)));
+                  return (
                     <button
                       key={gb}
+                      type="button"
                       onClick={() => handleSetDiskCapacity(gb)}
-                      className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all cursor-pointer ${
-                        storageStats.customDiskGb === gb || (!storageStats.customDiskGb && gb === Math.round(storageStats.quota / (1024 * 1024 * 1024)))
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-200'
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-mono tabular-nums transition-colors cursor-pointer ${
+                        isCurrent
+                          ? 'bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-semibold'
+                          : 'text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800'
                       }`}
                     >
                       {gb >= 1024 ? '1TB' : `${gb}G`}
                     </button>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 shadow-xs space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Status da Sincronização</span>
-                <div className="p-2 bg-emerald-100 dark:bg-emerald-950/70 text-emerald-600 dark:text-emerald-400 rounded-xl">
-                  <WifiOff className="w-5 h-5" />
-                </div>
+            <div className="p-4 space-y-1">
+              <span className="text-xs text-slate-500 dark:text-zinc-400">Motor de persistência</span>
+              <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                OPFS + WASM
               </div>
-              <div>
-                <div className="text-lg font-bold text-slate-900 dark:text-white">100% Offline Protegido</div>
-                <div className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">Sem Necessidade de Nuvem</div>
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold">
-                <Lock className="w-3.5 h-3.5" /> AES-256 Ativado
+              <div className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+                {opfsDiagnostics?.totalStores || 31} tabelas · {opfsDiagnostics?.totalRecords || 0} registros
               </div>
             </div>
-
           </div>
 
-          {/* Database Info & Health Panel */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            <div className="lg:col-span-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 rounded-xl">
-                    <Database className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Status da Base de Dados GeaAgro</h3>
-                    <p className="text-xs text-slate-500 dark:text-zinc-400">Integridade dos arquivos e banco local do dispositivo</p>
-                  </div>
-                </div>
-                <span className="px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-300 dark:border-emerald-800">
-                  Saudável & Íntegro
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-100 dark:border-zinc-800">
+          {/* Main 2-column grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            {/* Database health & actions */}
+            <div className="lg:col-span-8 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-zinc-800">
                 <div>
-                  <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">Motor de Dados</span>
-                  <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    OPFS + WASM
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">Versão do Banco</span>
-                  <span className="text-sm font-bold text-slate-800 dark:text-zinc-200">v4.2.3.8 (OPFS)</span>
-                </div>
-                <div>
-                  <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">Status da Migração</span>
-                  <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                    {opfsDiagnostics?.migrationCompleted ? 'Migrado (100%)' : 'Migrado (OPFS)'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">WASM / Integridade</span>
-                  <span className="text-sm font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                    {opfsDiagnostics?.isWasmInstantiated ? 'Bytecode Ativo' : 'OK (SHA-256)'}
-                  </span>
-                </div>
-              </div>
-
-              {/* OPFS + WASM Modern Architecture Badge */}
-              <div className="p-3.5 bg-emerald-50/70 dark:bg-emerald-950/40 rounded-xl border border-emerald-200/80 dark:border-emerald-800/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-                <div className="space-y-0.5">
-                  <div className="font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
-                    <Database className="w-4 h-4 text-emerald-600" />
-                    Migração OPFS + WASM Concluída
-                  </div>
-                  <p className="text-emerald-700 dark:text-emerald-300 text-[11px]">
-                    Armazenamento local em Origin Private File System com aceleração por WebAssembly e tolerância a falhas garantida.
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                    Saúde da Base de Dados Local
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                    Origin Private File System com verificação de integridade SHA-256.
                   </p>
                 </div>
-                <div className="flex items-center gap-2 text-[11px]">
-                  <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 font-medium">
-                    {opfsDiagnostics?.totalStores || 31} tabelas
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 font-medium">
-                    {opfsDiagnostics?.totalRecords || 0} registros
-                  </span>
+                <div className="flex items-center gap-2 shrink-0">
                   <button
+                    type="button"
                     onClick={async () => {
                       await opfsWasmDB.migrateFromLegacyStorage();
                       const diag = await opfsWasmDB.getEngineDiagnostics();
                       setOpfsDiagnostics(diag);
-                      showToast('Sincronização total com OPFS + WASM executada com sucesso!', 'success');
+                      showToast('Sincronização OPFS concluída.', 'success');
                     }}
-                    className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-all cursor-pointer flex items-center gap-1 text-[11px] shadow-xs active:scale-95"
-                    title="Forçar sincronização de todos os registros para o sistema de arquivos OPFS"
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
                   >
-                    <RotateCcw className="w-3 h-3" /> Sincronizar OPFS
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    Sincronizar OPFS
                   </button>
                   <button
+                    type="button"
                     onClick={async () => {
                       const res = await opfsWasmDB.purgeLegacyIndexedDb();
                       const diag = await opfsWasmDB.getEngineDiagnostics();
                       setOpfsDiagnostics(diag);
-                      if (res.deleted.length > 0) {
-                        showToast(`IndexedDB purgado com sucesso: ${res.deleted.join(', ')}`, 'success');
-                      } else {
-                        showToast('Nenhum banco IndexedDB legado pendente.', 'info');
-                      }
+                      showToast(
+                        res.deleted.length > 0
+                          ? `IndexedDB legado limpo: ${res.deleted.join(', ')}`
+                          : 'Nenhum banco legado pendente.',
+                        res.deleted.length > 0 ? 'success' : 'info'
+                      );
                     }}
-                    className="px-2.5 py-1 rounded bg-slate-200 hover:bg-slate-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-bold transition-all cursor-pointer flex items-center gap-1 text-[11px] shadow-xs active:scale-95"
-                    title="Excluir bancos legados do IndexedDB para liberar espaço em disco no navegador"
+                    className="px-3 py-1.5 rounded-lg text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
                   >
-                    <Trash2 className="w-3 h-3" /> Purgar IndexedDB
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Purgar Legado
                   </button>
                 </div>
               </div>
 
-              {/* Distribution of data bar */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-slate-700 dark:text-zinc-300">Distribuição do Armazenamento do Backup</span>
-                  <span className="text-slate-500">Total: {storageStats.usedFormatted}</span>
+              {/* Clean metadata row */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                <div>
+                  <span className="text-slate-500 dark:text-zinc-400 block">Versão do Banco</span>
+                  <span className="font-mono font-semibold text-slate-900 dark:text-zinc-100 mt-0.5 block">
+                    v4.2.3.8 (OPFS)
+                  </span>
                 </div>
-                <div className="h-4 w-full bg-slate-100 dark:bg-zinc-800 rounded-full overflow-hidden flex">
-                  <div className="bg-emerald-500 h-full w-[45%]" title="Banco de Dados (29.6 MB)"></div>
-                  <div className="bg-sky-500 h-full w-[35%]" title="Fotografias & Vídeos (23.0 MB)"></div>
-                  <div className="bg-amber-500 h-full w-[15%]" title="PDFs & Laudos (9.8 MB)"></div>
-                  <div className="bg-purple-500 h-full w-[5%]" title="Outros (3.5 MB)"></div>
+                <div>
+                  <span className="text-slate-500 dark:text-zinc-400 block">Migração</span>
+                  <span className="font-medium text-emerald-700 dark:text-emerald-400 mt-0.5 block">
+                    {opfsDiagnostics?.migrationCompleted ? '100% Migrado' : 'Ativo em OPFS'}
+                  </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-4 text-xs pt-1 text-slate-600 dark:text-zinc-400">
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Banco de Dados (45%)</span>
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-sky-500"></span> Mídias & Fotos (35%)</span>
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> PDFs & Laudos (15%)</span>
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-purple-500"></span> Outros (5%)</span>
+                <div>
+                  <span className="text-slate-500 dark:text-zinc-400 block">Engine WASM</span>
+                  <span className="font-mono font-medium text-slate-900 dark:text-zinc-100 mt-0.5 block">
+                    {opfsDiagnostics?.isWasmInstantiated ? 'Bytecode Ativo' : 'SHA-256 OK'}
+                  </span>
                 </div>
-              </div>
-
-              {/* Quick Actions Grid */}
-              <div className="pt-2 border-t border-slate-100 dark:border-zinc-800">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Ações Recomendadas</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <button
-                    onClick={() => handleTabChange('criacao')}
-                    className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-semibold text-xs transition-all cursor-pointer"
-                  >
-                    <UploadCloud className="w-4 h-4 text-emerald-500" />
-                    Gerar Novo Backup
-                  </button>
-                  <button
-                    onClick={() => handleTabChange('modulos')}
-                    className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-semibold text-xs transition-all cursor-pointer"
-                  >
-                    <Layers className="w-4 h-4 text-sky-500" />
-                    Exportar Módulo Específico
-                  </button>
-                  <button
-                    onClick={() => handleTabChange('migracao')}
-                    className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-semibold text-xs transition-all cursor-pointer"
-                  >
-                    <Smartphone className="w-4 h-4 text-purple-500" />
-                    Trocar de Aparelho (Migrar)
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Recent Snapshots Widget */}
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs flex flex-col justify-between space-y-4">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-emerald-500" />
-                    Snapshots Recentes
-                  </h3>
-                  <button
-                    onClick={() => handleTabChange('snapshots')}
-                    className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-semibold"
-                  >
-                    Ver Todos
-                  </button>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-zinc-400">
-                  Pontos de restauração automática pré-operações críticas
-                </p>
-
-                <div className="space-y-3">
-                  {snapshots.slice(0, 3).map((snap) => (
-                    <div key={snap.id} className="p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl border border-slate-100 dark:border-zinc-800 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 line-clamp-1">
-                          {snap.title}
-                        </span>
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-semibold">
-                          {snap.sizeFormatted}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-500 dark:text-zinc-400 flex items-center justify-between">
-                        <span>Gatilho: {snap.triggerEvent}</span>
-                        <span>{new Date(snap.timestamp).toLocaleDateString('pt-BR')}</span>
-                      </div>
-                      <button
-                        onClick={() => handleRollbackSnapshot(snap)}
-                        className="w-full mt-1 py-1 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] transition-all flex items-center justify-center gap-1 cursor-pointer"
-                      >
-                        <RefreshCw className="w-3 h-3" />
-                        Reverter Instantaneamente
-                      </button>
-                    </div>
-                  ))}
+                <div>
+                  <span className="text-slate-500 dark:text-zinc-400 block">Disponível</span>
+                  <span className="font-mono tabular-nums font-semibold text-slate-900 dark:text-zinc-100 mt-0.5 block">
+                    {storageStats.availableFormatted}
+                  </span>
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 text-center">
-                <p className="text-[11px] text-slate-400 italic">
-                  🛡️ Proteção inteligente ativada contra acidentes
-                </p>
-              </div>
-            </div>
-
-          </div>
-
-          {renderRecuperaBackupCard()}
-          {renderEstatisticaOpfsCard()}
-        </div>
-      )}
-
-      {/* TAB 2: CRIAR BACKUP */}
-      {currentTab === 'criacao' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Main Form Configuration */}
-          <div className="lg:col-span-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-6">
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <UploadCloud className="w-5 h-5 text-emerald-500" />
-                Configurar e Executar Backup
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-zinc-400">
-                Selecione o tipo de empacotamento, destino e parâmetros de criptografia
-              </p>
-            </div>
-
-            {/* Step 1: Tipo de Backup */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 block">
-                  1. Tipo de Backup
-                </label>
-                <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                  <Info className="w-3.5 h-3.5 text-emerald-500" />
-                  Passe o ponteiro do mouse sobre uma opção para ver a explicação detalhada
-                </span>
+              {/* Distribution Bar */}
+              <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-zinc-800">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-slate-700 dark:text-zinc-300">
+                    Composição estimada do pacote
+                  </span>
+                  <span className="font-mono tabular-nums text-slate-500 dark:text-zinc-400">
+                    {storageStats.usedFormatted}
+                  </span>
+                </div>
+                <div className="h-2 w-full bg-slate-100 dark:bg-zinc-800 rounded-full overflow-hidden flex">
+                  <div className="bg-emerald-600 h-full w-[45%]" title="Banco de Dados (45%)" />
+                  <div className="bg-sky-500 h-full w-[35%]" title="Mídias e Fotos (35%)" />
+                  <div className="bg-amber-500 h-full w-[15%]" title="PDFs e Laudos (15%)" />
+                  <div className="bg-slate-400 dark:bg-zinc-600 h-full w-[5%]" title="Outros (5%)" />
+                </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500 dark:text-zinc-400">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-xs bg-emerald-600" /> Banco 45%
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-xs bg-sky-500" /> Fotos 35%
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-xs bg-amber-500" /> Laudos PDF 15%
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-xs bg-slate-400 dark:bg-zinc-600" /> Outros 5%
+                  </span>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Compact Quick Links */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-slate-100 dark:border-zinc-800">
                 {[
-                  {
-                    id: 'completo',
-                    title: 'Backup Completo',
-                    desc: 'Salva todas as tabelas, cadastros e mídias do sistema',
-                    explanation: 'Cria uma cópia de segurança idêntica e 100% autônoma de toda a base de dados, imagens, fotos de campo, áudios e laudos. É a opção mais segura para criar pontos de restauração antes de grandes alterações.',
-                    badge: 'Recomendado Periodicamente',
-                    timeEst: '~ 1 a 3 minutos'
-                  },
-                  {
-                    id: 'incremental',
-                    title: 'Backup Incremental',
-                    desc: 'Salva apenas registros e fotos novos inseridos recentemente',
-                    explanation: 'Salva estritamente os novos dados, fotos e laudos adicionados desde o último backup feito. Executa de forma ultra-rápida e gera arquivos muito menores, ideais para o dia a dia no campo.',
-                    badge: 'Rápido & Leve',
-                    timeEst: '~ 5 a 15 segundos'
-                  },
-                  {
-                    id: 'diferencial',
-                    title: 'Backup Diferencial',
-                    desc: 'Salva alterações ocorridas desde o último backup completo',
-                    explanation: 'Exporta todas as modificações ocorridas a partir do ÚLTIMO backup COMPLETO registrado. Simplifica a restauração pós-falhas, pois exige apenas o arquivo do backup completo original + este arquivo diferencial.',
-                    badge: 'Equilibrado',
-                    timeEst: '~ 20 a 45 segundos'
-                  }
-                ].map((type) => (
-                  <div
-                    key={type.id}
-                    onClick={() => setBackupType(type.id as any)}
-                    title={`${type.title}: ${type.explanation}`}
-                    className={`relative group p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                      backupType === type.id
-                        ? 'border-emerald-600 bg-emerald-50/60 dark:bg-emerald-950/40 shadow-xs'
-                        : 'border-slate-200 dark:border-zinc-800 hover:border-emerald-400 hover:bg-slate-50 dark:hover:bg-zinc-800/60'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-sm text-slate-900 dark:text-white">{type.title}</span>
-                        <Info className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 transition-colors" />
-                      </div>
-                      {backupType === type.id && <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />}
-                    </div>
-                    
-                    <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed mb-2">{type.desc}</p>
-                    
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-100 dark:border-zinc-800 pt-2 mt-2">
-                      <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-zinc-800 font-semibold text-slate-600 dark:text-zinc-300">
-                        {type.badge}
-                      </span>
-                      <span className="font-mono">{type.timeEst}</span>
-                    </div>
-
-                    {/* Popover explicativo dinâmico no hover */}
-                    <div className="absolute left-0 right-0 bottom-full mb-2 hidden group-hover:block z-30 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-xl border border-slate-700 pointer-events-none animate-fadeIn">
-                      <div className="font-bold text-emerald-400 mb-1 flex items-center gap-1">
-                        <Info className="w-3.5 h-3.5" /> {type.title}
-                      </div>
-                      <p className="text-slate-200 leading-relaxed text-[11px] mb-1">
-                        {type.explanation}
-                      </p>
-                      <div className="text-[10px] text-emerald-300/80 font-mono italic">
-                        ⏱️ Tempo estimado: {type.timeEst}
-                      </div>
-                      <div className="absolute left-1/2 -bottom-1 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45 border-r border-b border-slate-700"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Step 2: Locais de Armazenamento */}
-            <div className="space-y-3">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 block">
-                2. Destino de Armazenamento
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  {
-                    id: 'pasta_custom',
-                    name: 'Pasta Escolhida',
-                    icon: FolderOpen,
-                    desc: customFolderPath,
-                    explanation: 'Permite selecionar manualmente a pasta de sua preferência no gerenciador de arquivos do dispositivo.'
-                  },
-                  {
-                    id: 'ftp',
-                    name: 'Servidor FTP / SFTP',
-                    icon: Globe,
-                    desc: `${ftpConfig.protocol.toUpperCase()}://${ftpConfig.host}`,
-                    explanation: 'Transfere o backup diretamente para um servidor FTP/SFTP em nuvem privada ou na rede local da fazenda.'
-                  }
-                ].map((loc) => {
-                  const Icon = loc.icon;
-                  const isSel = selectedStorage === loc.id;
+                  { tab: 'restauracao', label: 'Restaurar arquivo', icon: RefreshCw },
+                  { tab: 'modulos', label: 'Exportar por módulo', icon: Layers },
+                  { tab: 'migracao', label: 'Migrar de aparelho', icon: Smartphone },
+                ].map((action) => {
+                  const Icon = action.icon;
                   return (
-                    <div
-                      key={loc.id}
-                      onClick={() => setSelectedStorage(loc.id as any)}
-                      title={`${loc.name}: ${loc.explanation}`}
-                      className={`relative group p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
-                        isSel
-                          ? 'border-emerald-600 bg-emerald-50/60 dark:bg-emerald-950/40 shadow-xs'
-                          : 'border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/50 hover:border-emerald-400'
-                      }`}
+                    <button
+                      key={action.tab}
+                      type="button"
+                      onClick={() => handleTabChange(action.tab)}
+                      className="flex items-center justify-between px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/60 text-xs font-medium text-slate-700 dark:text-zinc-200 transition-colors cursor-pointer"
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <Icon className={`w-4 h-4 ${isSel ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
-                          <span className="text-xs font-bold text-slate-800 dark:text-zinc-200">{loc.name}</span>
-                        </div>
-                        <Info className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 transition-colors" />
-                      </div>
-                      <span className="text-[10px] text-slate-400 truncate font-mono">{loc.desc}</span>
-
-                      {/* Hover Tooltip Popover */}
-                      <div className="absolute left-0 right-0 bottom-full mb-2 hidden group-hover:block z-30 p-2.5 bg-slate-900 text-white text-[11px] rounded-xl shadow-xl border border-slate-700 pointer-events-none animate-fadeIn">
-                        <div className="font-bold text-emerald-400 mb-1 flex items-center gap-1">
-                          <Icon className="w-3 h-3" /> {loc.name}
-                        </div>
-                        <p className="text-slate-200 leading-normal text-[10px]">
-                          {loc.explanation}
-                        </p>
-                        <div className="absolute left-1/2 -bottom-1 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45 border-r border-b border-slate-700"></div>
-                      </div>
-                    </div>
+                      <span className="inline-flex items-center gap-2 truncate">
+                        <Icon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span className="truncate">{action.label}</span>
+                      </span>
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    </button>
                   );
                 })}
               </div>
+            </div>
 
-              {/* Dynamic Panel: Custom Folder Selector */}
-              {selectedStorage === 'pasta_custom' && (
-                <div className="p-4 bg-emerald-50/50 dark:bg-emerald-950/30 rounded-xl border border-emerald-300 dark:border-emerald-800/60 space-y-3 animate-fadeIn">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <FolderOpen className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-900 dark:text-white">Gerenciador de Pasta Escolhida</h4>
-                        <p className="text-[11px] text-slate-500 dark:text-zinc-400">Selecione ou digite o diretório local onde o backup será salvo</p>
+            {/* Recent Snapshots */}
+            <div className="lg:col-span-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 flex flex-col justify-between space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                    Snapshots Recentes
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange('snapshots')}
+                    className="text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                  >
+                    Ver todos ({snapshots.length})
+                  </button>
+                </div>
+
+                {snapshots.length === 0 ? (
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 py-4">
+                    Nenhum snapshot gravado ainda.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-slate-100 dark:divide-zinc-800">
+                    {snapshots.slice(0, 4).map((snap) => (
+                      <div key={snap.id} className="py-2.5 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-xs font-medium text-slate-900 dark:text-zinc-100 truncate">
+                            {snap.title}
+                          </div>
+                          <div className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums truncate">
+                            {new Date(snap.timestamp).toLocaleDateString('pt-BR')} · {snap.sizeFormatted}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRollbackSnapshot(snap)}
+                          className="px-2.5 py-1 rounded-md border border-slate-200 dark:border-zinc-700 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400 text-[11px] font-medium text-slate-700 dark:text-zinc-300 transition-colors cursor-pointer shrink-0"
+                        >
+                          Reverter
+                        </button>
                       </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleSelectDirectoryFolder}
-                      className="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
-                    >
-                      <FolderOpen className="w-4 h-4" />
-                      Escolher Pasta no Dispositivo
-                    </button>
+                    ))}
                   </div>
+                )}
+              </div>
 
-                  <div className="flex items-center gap-2">
+              <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 text-[11px] text-slate-500 dark:text-zinc-400">
+                Snapshots preventivos são gerados automaticamente antes de cada restauração.
+              </div>
+            </div>
+          </div>
+
+          {renderRecuperaSection()}
+          {renderEstatisticaOpfsSection()}
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* TAB 2: CRIAR BACKUP                                                   */}
+      {/* ===================================================================== */}
+      {currentTab === 'criacao' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          {/* Configuration Form */}
+          <div className="lg:col-span-8 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 divide-y divide-slate-100 dark:divide-zinc-800">
+            {/* Step 1: Tipo */}
+            <div className="pb-5 space-y-3">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                  1. Tipo de empacotamento
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                  Escolha o escopo da cópia de segurança.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {[
+                  {
+                    id: 'completo',
+                    title: 'Completo',
+                    desc: 'Base integral, cadastros e anexos',
+                    time: '1–3 min',
+                  },
+                  {
+                    id: 'incremental',
+                    title: 'Incremental',
+                    desc: 'Apenas novidades desde o último',
+                    time: '5–15 s',
+                  },
+                  {
+                    id: 'diferencial',
+                    title: 'Diferencial',
+                    desc: 'Mudanças desde o último completo',
+                    time: '20–45 s',
+                  },
+                ].map((opt) => {
+                  const selected = backupType === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setBackupType(opt.id as any)}
+                      className={`text-left p-3 rounded-lg border transition-colors cursor-pointer ${
+                        selected
+                          ? 'border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/30'
+                          : 'border-slate-200 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                          {opt.title}
+                        </span>
+                        <span className="text-[11px] font-mono tabular-nums text-slate-500 dark:text-zinc-400">
+                          {opt.time}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-1 leading-snug">
+                        {opt.desc}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Step 2: Destino */}
+            <div className="py-5 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                    2. Destino do arquivo
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                    Salve localmente no dispositivo ou envie via FTP/SFTP na rede da fazenda.
+                  </p>
+                </div>
+
+                {/* Segmented switch */}
+                <div className="inline-flex p-0.5 bg-slate-100 dark:bg-zinc-800 rounded-lg self-start">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStorage('pasta_custom')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                      selectedStorage === 'pasta_custom'
+                        ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-zinc-100 shadow-2xs'
+                        : 'text-slate-600 dark:text-zinc-400'
+                    }`}
+                  >
+                    <FolderOpen className="w-3.5 h-3.5" />
+                    Pasta Local
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStorage('ftp')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                      selectedStorage === 'ftp'
+                        ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-zinc-100 shadow-2xs'
+                        : 'text-slate-600 dark:text-zinc-400'
+                    }`}
+                  >
+                    <Globe className="w-3.5 h-3.5" />
+                    FTP / SFTP
+                  </button>
+                </div>
+              </div>
+
+              {selectedStorage === 'pasta_custom' && (
+                <div className="space-y-3 pt-1">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <div className="flex-1 relative">
+                      <Folder className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                       <input
                         type="text"
                         value={customFolderPath}
                         onChange={(e) => setCustomFolderPath(e.target.value)}
                         placeholder="/Documentos/GeaAgro_Backups/"
-                        className="w-full pl-8 pr-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-800 bg-white dark:bg-zinc-900 text-xs font-mono text-slate-800 dark:text-zinc-200"
+                        className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs font-mono text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
                       />
-                      <Folder className="w-4 h-4 text-emerald-600 dark:text-emerald-400 absolute left-2.5 top-2.5" />
                     </div>
-                    <span className="px-2.5 py-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 text-[11px] font-semibold whitespace-nowrap border border-emerald-300 dark:border-emerald-800">
-                      ✓ Pasta Valida
-                    </span>
+                    <button
+                      type="button"
+                      onClick={handleSelectDirectoryFolder}
+                      className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
+                    >
+                      <FolderOpen className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      Selecionar Pasta
+                    </button>
                   </div>
 
-                  {/* Atalhos Rápidos para Pastas do Computador */}
-                  <div className="pt-2 border-t border-emerald-200/60 dark:border-emerald-900/40 space-y-2">
-                    <span className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 block">
-                      Atalhos Rápidos de Pastas no Computador:
-                    </span>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {PRESET_BACKUP_FOLDERS.map((preset) => {
-                        const isPresetActive = customFolderPath === preset.path;
-                        return (
-                          <button
-                            key={preset.id}
-                            type="button"
-                            onClick={() => {
-                              setCustomFolderPath(preset.path);
-                              showToast(`Destino definido para: ${preset.name}`, 'success');
-                            }}
-                            className={`p-2 rounded-lg border text-left transition flex flex-col justify-between cursor-pointer ${
-                              isPresetActive
-                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                                : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:border-emerald-500'
-                            }`}
-                          >
-                            <span className="text-xs font-bold truncate">{preset.name}</span>
-                            <span className={`text-[10px] truncate ${isPresetActive ? 'text-emerald-100' : 'text-slate-400'}`}>
-                              {preset.description}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 rounded-lg bg-emerald-100/60 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 text-[11px] text-emerald-900 dark:text-emerald-200 flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                    <span>
-                      <strong>Armazenamento 100% Local:</strong> Os arquivos são gerados e salvos diretamente no seu aparelho, sem envio para servidores externos.
-                    </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[11px] text-slate-500 dark:text-zinc-400 mr-1">Atalhos:</span>
+                    {PRESET_BACKUP_FOLDERS.map((preset) => {
+                      const active = customFolderPath === preset.path;
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => {
+                            setCustomFolderPath(preset.path);
+                            showToast(`Destino definido para ${preset.name}.`, 'info');
+                          }}
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors cursor-pointer ${
+                            active
+                              ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
+                              : 'border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:border-slate-300 dark:hover:border-zinc-700'
+                          }`}
+                        >
+                          {preset.name}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
-              {/* Dynamic Panel: FTP / SFTP Server Setup */}
               {selectedStorage === 'ftp' && (
-                <div className="p-4 bg-slate-900 text-white rounded-xl border border-slate-700 space-y-4 animate-fadeIn">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <div className="flex items-center gap-2">
-                      <Globe className="w-5 h-5 text-emerald-400" />
-                      <div>
-                        <h4 className="text-xs font-bold text-white">Configuração do Servidor FTP / SFTP Remoto</h4>
-                        <p className="text-[11px] text-slate-400">Sincronize backups com servidores NAS, nuvem privada ou computadores da fazenda</p>
-                      </div>
-                    </div>
-                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider">
-                      Rede & Nuvem
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-3 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     <div>
-                      <label className="text-[11px] font-semibold text-slate-300 block mb-1">Host / Endereço IP do Servidor</label>
+                      <label className="text-[11px] font-medium text-slate-600 dark:text-zinc-400 block mb-1">
+                        Host / IP
+                      </label>
                       <input
                         type="text"
                         value={ftpConfig.host}
                         onChange={(e) => setFtpConfig({ ...ftpConfig, host: e.target.value })}
-                        placeholder="ftp.fazenda.com.br ou 192.168.1.100"
-                        className="w-full px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white font-mono"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs font-mono"
                       />
                     </div>
-
                     <div>
-                      <label className="text-[11px] font-semibold text-slate-300 block mb-1">Protocolo</label>
+                      <label className="text-[11px] font-medium text-slate-600 dark:text-zinc-400 block mb-1">
+                        Protocolo
+                      </label>
                       <select
                         value={ftpConfig.protocol}
                         onChange={(e) => setFtpConfig({ ...ftpConfig, protocol: e.target.value as any })}
-                        className="w-full px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white font-bold"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs"
                       >
-                        <option value="ftp">FTP (Porta 21)</option>
-                        <option value="ftps">FTPS - FTP Seguro SSL (Porta 990)</option>
-                        <option value="sftp">SFTP - SSH File Transfer (Porta 22)</option>
+                        <option value="ftp">FTP (21)</option>
+                        <option value="ftps">FTPS SSL (990)</option>
+                        <option value="sftp">SFTP SSH (22)</option>
                       </select>
                     </div>
-
                     <div>
-                      <label className="text-[11px] font-semibold text-slate-300 block mb-1">Porta de Comunicação</label>
+                      <label className="text-[11px] font-medium text-slate-600 dark:text-zinc-400 block mb-1">
+                        Porta
+                      </label>
                       <input
                         type="number"
                         value={ftpConfig.port}
-                        onChange={(e) => setFtpConfig({ ...ftpConfig, port: parseInt(e.target.value, 10) || 21 })}
-                        className="w-full px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white font-mono"
+                        onChange={(e) =>
+                          setFtpConfig({ ...ftpConfig, port: parseInt(e.target.value, 10) || 21 })
+                        }
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs font-mono"
                       />
                     </div>
-
                     <div>
-                      <label className="text-[11px] font-semibold text-slate-300 block mb-1">Usuário / Login</label>
+                      <label className="text-[11px] font-medium text-slate-600 dark:text-zinc-400 block mb-1">
+                        Usuário
+                      </label>
                       <input
                         type="text"
                         value={ftpConfig.user}
                         onChange={(e) => setFtpConfig({ ...ftpConfig, user: e.target.value })}
-                        className="w-full px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white font-mono"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs font-mono"
                       />
                     </div>
-
                     <div>
-                      <label className="text-[11px] font-semibold text-slate-300 block mb-1">Senha de Acesso</label>
+                      <label className="text-[11px] font-medium text-slate-600 dark:text-zinc-400 block mb-1">
+                        Senha
+                      </label>
                       <input
                         type="password"
                         value={ftpConfig.password}
                         onChange={(e) => setFtpConfig({ ...ftpConfig, password: e.target.value })}
-                        className="w-full px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white font-mono"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs font-mono"
                       />
                     </div>
-
                     <div>
-                      <label className="text-[11px] font-semibold text-slate-300 block mb-1">Caminho do Diretório Remoto</label>
+                      <label className="text-[11px] font-medium text-slate-600 dark:text-zinc-400 block mb-1">
+                        Diretório remoto
+                      </label>
                       <input
                         type="text"
                         value={ftpConfig.remotePath}
                         onChange={(e) => setFtpConfig({ ...ftpConfig, remotePath: e.target.value })}
-                        className="w-full px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white font-mono"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs font-mono"
                       />
                     </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-800">
-                    <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <label className="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-zinc-400 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={ftpConfig.passiveMode}
                         onChange={(e) => setFtpConfig({ ...ftpConfig, passiveMode: e.target.checked })}
-                        className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 accent-emerald-500"
+                        className="w-3.5 h-3.5 accent-emerald-600 rounded"
                       />
-                      <span>Usar Modo Passivo (PASV) para contornar firewall da fazenda</span>
+                      Modo Passivo (PASV)
                     </label>
-
                     <button
                       type="button"
                       onClick={handleTestFtpConnection}
                       disabled={isTestingFtp}
-                      className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
                       {isTestingFtp ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
-                          <span>Testando Handshake FTP...</span>
-                        </>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                       ) : (
-                        <>
-                          <Network className="w-4 h-4 text-slate-950" />
-                          <span>Testar Conexão FTP</span>
-                        </>
+                        <Network className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       )}
+                      {isTestingFtp ? 'Testando...' : 'Testar Conexão'}
                     </button>
                   </div>
 
                   {ftpTestStatus && (
-                    <div className="p-2.5 rounded-lg bg-slate-800/80 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    <div className="text-xs text-emerald-700 dark:text-emerald-400 font-mono flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                       <span>{ftpTestStatus}</span>
                     </div>
                   )}
 
-                  {/* Local FTP Server Node Hosting Card */}
-                  <div className="p-3 bg-slate-800/90 rounded-xl border border-slate-700 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Server className="w-4 h-4 text-emerald-400" />
-                        <span className="text-xs font-bold text-white">Criar e Hospedar Servidor FTP Local na Fazenda</span>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
+                  {/* Local FTP Server compact row */}
+                  <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <Server className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span className="font-medium text-slate-700 dark:text-zinc-300">
+                        Servidor FTP local na rede Wi-Fi
+                      </span>
+                      {isLocalFtpRunning && (
+                        <code className="font-mono text-[11px] text-emerald-700 dark:text-emerald-400">
+                          {localFtpUrl}
+                        </code>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isLocalFtpRunning && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(localFtpUrl);
+                            showToast('URL FTP local copiada.', 'info');
+                          }}
+                          className="text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Copy className="w-3 h-3" /> Copiar
+                        </button>
+                      )}
+                      <label className="inline-flex items-center gap-1.5 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={isLocalFtpRunning}
                           onChange={(e) => {
                             setIsLocalFtpRunning(e.target.checked);
-                            showToast(e.target.checked ? 'Servidor FTP Local ativado na rede da fazenda!' : 'Servidor FTP Local pausado.', 'info');
+                            showToast(
+                              e.target.checked ? 'Servidor FTP local ativado.' : 'Servidor FTP local pausado.',
+                              'info'
+                            );
                           }}
-                          className="sr-only peer"
+                          className="w-3.5 h-3.5 accent-emerald-600 rounded"
                         />
-                        <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                        <span className="text-[11px] text-slate-500">Ativo</span>
                       </label>
                     </div>
-
-                    <p className="text-[11px] text-slate-300 leading-relaxed">
-                      Transforma este dispositivo em um <strong className="text-emerald-400">Servidor FTP Embutido</strong>. Permite que outros celulares, tablets e notebooks da propriedade transfiram backups diretamente pela rede Wi-Fi local sem usar a internet.
-                    </p>
-
-                    {isLocalFtpRunning && (
-                      <div className="flex items-center justify-between p-2 rounded bg-slate-950 text-xs font-mono text-emerald-300 border border-slate-800">
-                        <span className="flex items-center gap-2">
-                          <Wifi className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                          <span>Endereço de Acesso Local: <strong>{localFtpUrl}</strong></span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(localFtpUrl);
-                            showToast('URL do Servidor FTP Local copiada!', 'info');
-                          }}
-                          className="text-[10px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold flex items-center gap-1 cursor-pointer"
-                        >
-                          <Copy className="w-3 h-3" /> Copiar URL
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Step 3: Conteúdo e Criptografia */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              
-              <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 block">
-                  Inclusão de Mídias
-                </span>
-                <label className="flex items-center gap-3 cursor-pointer">
+            {/* Step 3: Opções e Criptografia */}
+            <div className="py-5 space-y-4">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                3. Conteúdo e criptografia
+              </h2>
+
+              <div className="space-y-3">
+                <label className="flex items-start gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={includeMediaFiles}
                     onChange={(e) => setIncludeMediaFiles(e.target.checked)}
-                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600"
+                    className="mt-0.5 w-4 h-4 accent-emerald-600 rounded"
                   />
-                  <span className="text-xs font-medium text-slate-800 dark:text-zinc-200">
-                    Incluir Fotos, Vídeos, Áudios e PDFs de Laudos
-                  </span>
+                  <div>
+                    <span className="text-xs font-medium text-slate-800 dark:text-zinc-200 block">
+                      Incluir fotografias, anexos e laudos PDF
+                    </span>
+                    <span className="text-[11px] text-slate-500 dark:text-zinc-400">
+                      Preserva anexos de campo e assinaturas técnicas no pacote.
+                    </span>
+                  </div>
                 </label>
-                <p className="text-[11px] text-slate-500 dark:text-zinc-400">
-                  Preserva a estrutura de pastas organizada (`/fotos/talhoes/`, `/laudos/pdf/`, `/assinaturas/`).
-                </p>
-              </div>
 
-              <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
-                    Criptografia de Segurança
-                  </span>
-                  <Lock className="w-4 h-4 text-emerald-500" />
-                </div>
-                <label className="flex items-center gap-3 cursor-pointer">
+                <label className="flex items-start gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={useEncryption}
                     onChange={(e) => setUseEncryption(e.target.checked)}
-                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600"
+                    className="mt-0.5 w-4 h-4 accent-emerald-600 rounded"
                   />
-                  <span className="text-xs font-medium text-slate-800 dark:text-zinc-200">
-                    Proteger com AES-256 e Senha
-                  </span>
+                  <div>
+                    <span className="text-xs font-medium text-slate-800 dark:text-zinc-200 block">
+                      Proteger com criptografia AES-256-GCM e senha
+                    </span>
+                    <span className="text-[11px] text-slate-500 dark:text-zinc-400">
+                      Exige senha ou chave de recuperação de 256 bits para restaurar.
+                    </span>
+                  </div>
                 </label>
+
                 {useEncryption && (
-                  <div className="space-y-3 pt-2">
-                    <div>
-                      <label className="text-[11px] font-semibold text-slate-600 dark:text-zinc-400 block mb-1">
-                        Senha de Criptografia do Arquivo *
+                  <div className="pl-6 space-y-3 pt-1">
+                    <div className="max-w-sm">
+                      <label className="text-[11px] font-medium text-slate-600 dark:text-zinc-400 block mb-1">
+                        Senha do arquivo *
                       </label>
                       <input
                         ref={passwordInputRef}
@@ -1882,708 +1885,712 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
                           setEncryptionPassword(e.target.value);
                           if (backupFormError) setBackupFormError(null);
                         }}
-                        placeholder="Defina uma senha para este backup"
-                        className={`w-full px-3 py-2 rounded-lg border bg-white dark:bg-zinc-900 text-xs font-mono transition-all ${
+                        placeholder="Defina uma senha segura"
+                        className={`w-full px-3 py-1.5 rounded-lg border bg-white dark:bg-zinc-950 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/40 ${
                           backupFormError && !encryptionPassword.trim()
-                            ? 'border-rose-500 ring-2 ring-rose-200 dark:ring-rose-900/50'
-                            : 'border-slate-300 dark:border-zinc-700'
+                            ? 'border-rose-500'
+                            : 'border-slate-200 dark:border-zinc-700'
                         }`}
                       />
-                      {backupFormError && !encryptionPassword.trim() && (
-                        <span className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold mt-1 block">
-                          ⚠️ Digite uma senha ou desmarque a opção de criptografia acima.
-                        </span>
-                      )}
                     </div>
 
-                    <div className="pt-2 border-t border-slate-200 dark:border-zinc-800 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-                          Chave de Recuperação de Emergência (256 bits)
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-medium text-slate-700 dark:text-zinc-300">
+                          Chave de recuperação (opcional · Envelope Duplo)
                         </span>
-                        {!recoveryKey ? (
-                          <button
-                            type="button"
-                            onClick={handleGenerateRecoveryKey}
-                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
-                          >
-                            <Key className="w-3 h-3" /> Gerar Chave Segura
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={handleGenerateRecoveryKey}
-                            className="text-[10px] text-slate-400 hover:text-emerald-500 underline cursor-pointer"
-                          >
-                            Regerar nova chave
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={handleGenerateRecoveryKey}
+                          className="text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Key className="w-3 h-3" />
+                          {recoveryKey ? 'Gerar nova' : 'Gerar chave 256 bits'}
+                        </button>
                       </div>
 
-                      {recoveryKey ? (
-                        <div className="p-3 bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-xl space-y-2.5">
-                          <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
-                            Esta chave de 256 bits permite restaurar este backup mesmo se você esquecer a senha. Guarde-a em local físico seguro.
-                          </p>
-                          <div className="p-2 bg-white dark:bg-zinc-900 rounded-lg border border-amber-300 dark:border-amber-700 flex items-center justify-between gap-2">
-                            <code className="text-[11px] font-mono text-slate-900 dark:text-emerald-400 font-bold break-all select-all">
+                      {recoveryKey && (
+                        <div className="p-3 rounded-lg bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <code className="text-[11px] font-mono text-slate-900 dark:text-amber-200 font-semibold break-all select-all">
                               {recoveryKey}
                             </code>
                             <button
                               type="button"
                               onClick={() => {
                                 navigator.clipboard.writeText(recoveryKey);
-                                showToast('Chave de recuperação de 256 bits copiada!', 'info');
+                                showToast('Chave de recuperação copiada.', 'info');
                               }}
-                              className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 cursor-pointer flex-shrink-0"
-                              title="Copiar Chave"
+                              className="p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-800 dark:text-amber-300 cursor-pointer shrink-0"
+                              title="Copiar chave"
                             >
                               <Copy className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                          <label className="flex items-start gap-2 pt-1 cursor-pointer">
+                          <label className="flex items-center gap-2 text-[11px] text-amber-900 dark:text-amber-200 cursor-pointer">
                             <input
                               type="checkbox"
                               checked={isRecoveryKeyConfirmed}
                               onChange={(e) => setIsRecoveryKeyConfirmed(e.target.checked)}
-                              className="mt-0.5 w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600"
+                              className="w-3.5 h-3.5 accent-emerald-600 rounded"
                             />
-                            <span className="text-[11px] font-medium text-amber-900 dark:text-amber-200">
-                              Confirmo que copiei ou anotei esta chave em local físico e seguro.
-                            </span>
+                            Confirmo que salvei esta chave em local seguro.
                           </label>
                         </div>
-                      ) : (
-                        <p className="text-[11px] text-slate-400 italic">
-                          Opcional: clique em "Gerar Chave Segura" para habilitar a dupla proteção por Envelope Encryption (Senha + Chave de 256 bits).
-                        </p>
                       )}
                     </div>
                   </div>
                 )}
               </div>
-
             </div>
 
-            {/* User Notes & Responsável */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Step 4: Identificação */}
+            <div className="pt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
-                  Usuário Responsável
+                <label className="text-xs font-medium text-slate-700 dark:text-zinc-300 block mb-1">
+                  Responsável
                 </label>
                 <input
                   type="text"
                   value={backupUser}
                   onChange={(e) => setBackupUser(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-slate-800 dark:text-zinc-200"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
-                  Observações / Notas do Backup
+                <label className="text-xs font-medium text-slate-700 dark:text-zinc-300 block mb-1">
+                  Observações (opcional)
                 </label>
                 <input
                   type="text"
                   value={backupNotes}
                   onChange={(e) => setBackupNotes(e.target.value)}
-                  placeholder="Ex.: Backup pré-adubação de cobertura Safra 25/26"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-slate-800 dark:text-zinc-200"
+                  placeholder="Ex.: Pré-fechamento de safra"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
                 />
               </div>
             </div>
+          </div>
 
-            {/* Trigger Button & Validation Alert */}
-            <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 space-y-3">
-              {backupFormError && (
-                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800/60 flex items-center gap-2 text-rose-700 dark:text-rose-300 text-xs font-semibold animate-fadeIn">
-                  <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-600 dark:text-rose-400" />
-                  <span>{backupFormError}</span>
-                </div>
-              )}
+          {/* Sticky Compact Summary Sidebar */}
+          <aside className="lg:col-span-4 lg:sticky lg:top-20 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 space-y-4">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 pb-3 border-b border-slate-100 dark:border-zinc-800">
+              Resumo do backup
+            </h3>
 
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                <span className="text-[11px] text-slate-500 dark:text-zinc-400">
-                  {useEncryption ? '🔒 Backup protegido com criptografia AES-256' : '⚡ Backup padrão imediato (sem senha)'}
+            <div className="divide-y divide-slate-100 dark:divide-zinc-800 text-xs">
+              <div className="py-2 flex justify-between">
+                <span className="text-slate-500 dark:text-zinc-400">Tipo</span>
+                <span className="font-medium text-slate-900 dark:text-zinc-100 capitalize">{backupType}</span>
+              </div>
+              <div className="py-2 flex justify-between">
+                <span className="text-slate-500 dark:text-zinc-400">Destino</span>
+                <span className="font-medium text-slate-900 dark:text-zinc-100">
+                  {selectedStorage === 'pasta_custom' ? 'Pasta local' : 'FTP / SFTP'}
                 </span>
-
-                <button
-                  type="button"
-                  onClick={handleStartBackupCreation}
-                  disabled={isExecutingBackup}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-lg shadow-emerald-900/20 transition-all cursor-pointer disabled:opacity-50"
-                >
-                  <Zap className="w-4 h-4 fill-white" />
-                  {isExecutingBackup ? 'Gerando Backup...' : 'Iniciar Empacotamento e Backup'}
-                </button>
+              </div>
+              <div className="py-2 flex justify-between">
+                <span className="text-slate-500 dark:text-zinc-400">Mídias</span>
+                <span className="font-medium text-slate-900 dark:text-zinc-100">
+                  {includeMediaFiles ? 'Incluídas' : 'Apenas dados'}
+                </span>
+              </div>
+              <div className="py-2 flex justify-between">
+                <span className="text-slate-500 dark:text-zinc-400">Criptografia</span>
+                <span className="font-medium text-slate-900 dark:text-zinc-100">
+                  {useEncryption ? (recoveryKey ? 'AES-256 Envelope' : 'AES-256 Senha') : 'Sem senha'}
+                </span>
+              </div>
+              <div className="py-2 flex justify-between">
+                <span className="text-slate-500 dark:text-zinc-400">Estimativa</span>
+                <span className="font-mono tabular-nums font-semibold text-slate-900 dark:text-zinc-100">
+                  {includeMediaFiles ? '~46.5 MB' : '~12.2 MB'}
+                </span>
               </div>
             </div>
 
-          </div>
-
-          {/* Backup Live Status & Summary Card */}
-          <div className="space-y-6">
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-4">
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                Resumo da Operação
-              </h4>
-
-              <div className="space-y-2 text-xs divide-y divide-slate-100 dark:divide-zinc-800">
-                <div className="flex justify-between py-1.5">
-                  <span className="text-slate-500">Tipo Escolhido:</span>
-                  <span className="font-bold text-slate-800 dark:text-zinc-200 uppercase">{backupType}</span>
-                </div>
-                <div className="flex justify-between py-1.5">
-                  <span className="text-slate-500">Destino:</span>
-                  <span className="font-bold text-slate-800 dark:text-zinc-200">{selectedStorage.toUpperCase()}</span>
-                </div>
-                <div className="flex justify-between py-1.5">
-                  <span className="text-slate-500">Mídias Incluídas:</span>
-                  <span className="font-bold text-emerald-600">{includeMediaFiles ? 'Sim (Fotos/PDFs)' : 'Não (Apenas BD)'}</span>
-                </div>
-                <div className="flex justify-between py-1.5">
-                  <span className="text-slate-500">Criptografia:</span>
-                  <span className="font-bold text-slate-800 dark:text-zinc-200">{useEncryption ? 'AES-256' : 'Nenhuma'}</span>
-                </div>
-                <div className="flex justify-between py-1.5">
-                  <span className="text-slate-500">Tamanho Estimado:</span>
-                  <span className="font-bold text-purple-600">{includeMediaFiles ? '~46.5 MB' : '~12.2 MB'}</span>
-                </div>
+            {backupFormError && (
+              <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>{backupFormError}</span>
               </div>
+            )}
 
-              {/* Progress Indicator if running */}
-              {isExecutingBackup && (
-                <div className="p-4 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/60 rounded-xl space-y-2 animate-fadeIn">
-                  <div className="flex justify-between text-xs font-bold text-emerald-900 dark:text-emerald-300">
-                    <span>{executionStep}</span>
-                    <span>{executionProgress}%</span>
-                  </div>
-                  <div className="w-full bg-emerald-200 dark:bg-emerald-900 h-2.5 rounded-full overflow-hidden">
-                    <div
-                      className="bg-emerald-600 h-full transition-all duration-300"
-                      style={{ width: `${executionProgress}%` }}
-                    ></div>
-                  </div>
+            {isExecutingBackup && (
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-[11px] text-slate-600 dark:text-zinc-300">
+                  <span className="truncate">{executionStep}</span>
+                  <span className="font-mono tabular-nums shrink-0">{executionProgress}%</span>
                 </div>
-              )}
-
-              {lastCreatedBackup && !isExecutingBackup && (
-                <div className="p-4 bg-slate-50 dark:bg-zinc-800/80 rounded-xl border border-slate-200 dark:border-zinc-700 space-y-3">
-                  <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs">
-                    <CheckCircle2 className="w-4 h-4" /> Backup Criado com Sucesso!
-                  </div>
-                  <p className="text-[11px] font-mono text-slate-600 dark:text-zinc-400 break-all">
-                    {lastCreatedBackup.filename}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {lastCreatedBackupPayload && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          triggerFileDownload(lastCreatedBackup.filename, lastCreatedBackupPayload, 'application/json');
-                          showToast('Download do arquivo de backup iniciado.', 'success');
-                        }}
-                        className="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        Baixar Arquivo
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleVerifyIntegrity(lastCreatedBackup)}
-                      className="py-1.5 px-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-bold text-xs rounded-lg transition-all cursor-pointer"
-                    >
-                      Validar SHA-256
-                    </button>
-                    <button
-                      onClick={() => setSelectedQrBackup(lastCreatedBackup)}
-                      className="py-1.5 px-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-bold text-xs rounded-lg transition-all cursor-pointer"
-                    >
-                      QR Code
-                    </button>
-                  </div>
-                </div>
-              )}
-
-            </div>
-          </div>
-
-        </div>
-      )}
-
-      {/* TAB 3: SNAPSHOTS INTELIGENTES & VERSIONAMENTO (DIFERENCIAL EXCLUSIVO) */}
-      {currentTab === 'snapshots' && (
-        <div className="space-y-6">
-          <div className="bg-gradient-to-r from-emerald-900 to-slate-900 text-white rounded-2xl p-6 shadow-md border border-emerald-800/40 space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-emerald-500/20 rounded-xl border border-emerald-500/30">
-                <Sparkles className="w-6 h-6 text-emerald-400" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold">🧬 Snapshot Inteligente & Versionamento Histórico</h3>
-                <p className="text-xs text-slate-300">
-                  Criação automática de cópia de emergência antes de ações críticas. Permite reverter o banco instantaneamente ao estado exato anterior a uma adubação, atualização ou importação.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* Create Snapshot Form */}
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-4">
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Zap className="w-4 h-4 text-emerald-500" />
-                Criar Snapshot Manual
-              </h4>
-
-              <form onSubmit={handleCreateSnapshotSubmit} className="space-y-4">
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
-                    Título do Snapshot
-                  </label>
-                  <input
-                    type="text"
-                    value={snapshotTitle}
-                    onChange={(e) => setSnapshotTitle(e.target.value)}
-                    placeholder="Ex.: Antes da Adubação de Cobertura - Safra 26"
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-slate-800 dark:text-zinc-200"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
-                    Evento Desencadeador
-                  </label>
-                  <select
-                    value={snapshotEvent}
-                    onChange={(e) => setSnapshotEvent(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-slate-800 dark:text-zinc-200"
-                  >
-                    <option value="Alteração Manual em Massa">Alteração Manual em Massa</option>
-                    <option value="Importação de PDF/CSV">Importação de PDF/CSV</option>
-                    <option value="Atualização do Banco de Fertilizantes">Atualização do Banco de Fertilizantes</option>
-                    <option value="Sincronização em Lote">Sincronização em Lote</option>
-                    <option value="Auditoria de Campo">Auditoria de Campo</option>
-                  </select>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isCreatingSnapshot}
-                  className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  {isCreatingSnapshot ? 'Gerando Snapshot...' : 'Gravar Snapshot Instantâneo'}
-                </button>
-              </form>
-            </div>
-
-            {/* Snapshots Timeline & List */}
-            <div className="lg:col-span-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-4">
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <History className="w-4 h-4 text-emerald-500" />
-                Linha do Tempo de Snapshots Gravados ({snapshots.length})
-              </h4>
-
-              <div className="space-y-3">
-                {snapshots.map((snap) => (
+                <div className="w-full bg-slate-100 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden">
                   <div
-                    key={snap.id}
-                    className="p-4 bg-slate-50 dark:bg-zinc-800/60 rounded-xl border border-slate-200 dark:border-zinc-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:border-emerald-300 dark:hover:border-emerald-800"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-slate-900 dark:text-white">{snap.title}</span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
-                          {snap.sizeFormatted}
-                        </span>
-                      </div>
-                      <div className="text-xs text-slate-500 dark:text-zinc-400 flex items-center gap-4">
-                        <span>Gatilho: <strong className="text-slate-700 dark:text-zinc-300">{snap.triggerEvent}</strong></span>
-                        <span>{new Date(snap.timestamp).toLocaleString('pt-BR')}</span>
-                      </div>
-                      <div className="text-[10px] font-mono text-slate-400">
-                        Hash SHA-256: {snap.hash.substring(0, 32)}...
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => handleRollbackSnapshot(snap)}
-                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all flex items-center gap-1.5 self-start sm:self-center cursor-pointer shadow-xs"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      Reverter para este Ponto
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: BACKUP POR MÓDULO (SELETIVO) */}
-      {currentTab === 'modulos' && (
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-zinc-800">
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Layers className="w-5 h-5 text-emerald-500" />
-                Backup Inteligente por Módulo
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-zinc-400">
-                Selecione os módulos específicos que deseja exportar. Reduz drasticamente o tamanho do arquivo para compartilhamento rápido com consultores.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={selectAllModules}
-                className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 text-xs font-semibold text-slate-700 dark:text-zinc-300 cursor-pointer"
-              >
-                Marcar Todos
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {suiteModules.map((mod) => {
-              const Icon = mod.icon;
-              const isSelected = selectedModules.includes(mod.id);
-              return (
-                <div
-                  key={mod.id}
-                  onClick={() => toggleModuleSelection(mod.id)}
-                  className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-start justify-between gap-3 ${
-                    isSelected
-                      ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30 shadow-xs'
-                      : 'border-slate-200 dark:border-zinc-800 opacity-60 hover:opacity-100'
-                  }`}
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Icon className={`w-4 h-4 ${isSelected ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
-                      <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">{mod.name}</span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-tight">{mod.desc}</p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => {}} // handled by div click
-                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600 mt-1 cursor-pointer"
+                    className="bg-emerald-600 h-full transition-all duration-300"
+                    style={{ width: `${executionProgress}%` }}
                   />
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">
-              Módulos Selecionados: <strong className="text-emerald-600 font-bold">{selectedModules.length} de {suiteModules.length}</strong>
-            </span>
-            <button
-              onClick={() => {
-                setBackupType('modulo');
-                handleStartBackupCreation();
-              }}
-              disabled={selectedModules.length === 0}
-              className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              <Download className="w-4 h-4" />
-              Exportar Módulos Selecionados ({selectedModules.length})
-            </button>
-          </div>
-
-          <div className="pt-4 border-t border-slate-100 dark:border-zinc-800">
-            {renderRecuperaBackupCard()}
-          </div>
-
-          <div className="pt-4 border-t border-slate-100 dark:border-zinc-800">
-            {renderEstatisticaOpfsCard()}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4B: BACKUP & INTEGRIDADE OPFS — GEAAGRO ESTATÍSTICA */}
-      {currentTab === 'estatistica_opfs' && (
-        <div className="space-y-6">
-          {renderEstatisticaOpfsCard()}
-        </div>
-      )}
-
-      {/* TAB 5: RESTAURAÇÃO GRANULAR & TOTAL */}
-      {currentTab === 'restauracao' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          <div className="lg:col-span-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-6">
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <RefreshCw className="w-5 h-5 text-emerald-500" />
-                Restauração de Dados GeaAgro
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-zinc-400">
-                Selecione o arquivo `.geabackup` ou ZIP de backup e defina o escopo da restauração.
-              </p>
-            </div>
-
-            {/* File Upload Drop Area */}
-            <div className="border-2 border-dashed border-slate-300 dark:border-zinc-700 hover:border-emerald-500 dark:hover:border-emerald-500 rounded-2xl p-8 text-center transition-all bg-slate-50 dark:bg-zinc-800/40 space-y-3">
-              <div className="mx-auto w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                <Upload className="w-6 h-6" />
-              </div>
-              <div>
-                <span className="text-sm font-bold text-slate-800 dark:text-zinc-200 block">
-                  {restoreFile ? restoreFile.name : 'Arraste ou selecione o arquivo de backup (.geabackup ou .json)'}
-                </span>
-                <span className="text-xs text-slate-500 dark:text-zinc-400">
-                  {restoreFile ? `${formatBytes(restoreFile.size)} - Pronto para leitura` : 'Suporta arquivos criptografados AES-256'}
-                </span>
-              </div>
-              <input
-                type="file"
-                accept=".geabackup,.json,.zip,.sqlite"
-                onChange={handleFileSelectForRestore}
-                className="hidden"
-                id="restore-file-input"
-              />
-              <label
-                htmlFor="restore-file-input"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-200 dark:bg-zinc-700 hover:bg-slate-300 text-slate-800 dark:text-zinc-200 text-xs font-bold cursor-pointer transition-all"
-              >
-                Buscar Arquivo no Dispositivo
-              </label>
-            </div>
-
-            {/* Restore Preview Info */}
-            {restorePreview && (
-              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl space-y-2 animate-fadeIn">
-                <div className="flex items-center justify-between text-xs font-bold text-emerald-900 dark:text-emerald-300">
-                  <span className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    Arquivo de Backup Reconhecido
-                  </span>
-                  <span>SHA-256: {restorePreview.sha256.substring(0, 16)}...</span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-slate-600 dark:text-zinc-400 pt-1">
-                  <div>Versão: <strong>{restorePreview.version}</strong></div>
-                  <div>Tipo: <strong>{restorePreview.type}</strong></div>
-                  <div>Módulos: <strong>{restorePreview.modulesCount}</strong></div>
-                  <div>Cifragem: <strong className="uppercase">{restorePreview.encryptionMode}</strong></div>
                 </div>
               </div>
             )}
 
-            {/* Authentication Credentials for Encrypted Backups */}
-            {restoreFile && (isRestoreEncrypted || (restorePreview && restorePreview.encryptionMode !== 'none')) && (
-              <div className="p-4 bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 rounded-2xl space-y-3 animate-fadeIn">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-amber-500" />
-                    <span className="text-xs font-bold text-slate-800 dark:text-zinc-200">
-                      Autenticação de Segurança (AES-256-GCM)
-                    </span>
-                  </div>
-                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
-                    {restoreEncryptionMode === 'envelope' ? 'Envelope Duplo' : 'Senha'}
-                  </span>
+            <button
+              type="button"
+              onClick={handleStartBackupCreation}
+              disabled={isExecutingBackup}
+              className="w-full px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <UploadCloud className="w-3.5 h-3.5" />
+              {isExecutingBackup ? 'Gerando backup...' : 'Gerar Backup Agora'}
+            </button>
+
+            {lastCreatedBackup && !isExecutingBackup && (
+              <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 space-y-2.5">
+                <div className="text-xs font-medium text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Pacote criado
                 </div>
-                <p className="text-[11px] text-slate-500 dark:text-zinc-400">
-                  Este backup está protegido por criptografia de alta segurança. Os dados persistidos no aplicativo só serão alterados após a validação criptográfica bem-sucedida.
+                <p className="text-[11px] font-mono text-slate-500 dark:text-zinc-400 break-all">
+                  {lastCreatedBackup.filename}
                 </p>
-
-                <div className="space-y-2">
-                  <div>
-                    <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
-                      Senha do Backup
-                    </label>
-                    <input
-                      type="password"
-                      placeholder="Digite a senha de proteção do backup"
-                      value={restorePassword}
-                      onChange={(e) => {
-                        setRestorePassword(e.target.value);
-                        setRestoreValidationStatus({ tested: false, valid: false });
-                      }}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-hidden"
-                    />
-                  </div>
-
-                  {restoreEncryptionMode === 'envelope' && (
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                          Chave de Recuperação de 256 bits (Opcional se usar a senha)
-                        </label>
-                        <span className="text-[10px] text-slate-400">Modo Envelope</span>
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="GEA1-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
-                        value={restoreRecoveryKey}
-                        onChange={(e) => {
-                          setRestoreRecoveryKey(e.target.value);
-                          setRestoreValidationStatus({ tested: false, valid: false });
-                        }}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-mono uppercase focus:ring-2 focus:ring-emerald-500 outline-hidden"
-                      />
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between pt-1">
+                <div className="flex flex-wrap gap-1.5">
+                  {lastCreatedBackupPayload && (
                     <button
                       type="button"
-                      onClick={handleValidateCredentials}
-                      className="px-3 py-1.5 rounded-lg bg-slate-200 dark:bg-zinc-700 hover:bg-slate-300 text-slate-800 dark:text-zinc-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                      onClick={() => {
+                        triggerFileDownload(
+                          lastCreatedBackup.filename,
+                          lastCreatedBackupPayload,
+                          'application/json'
+                        );
+                        showToast('Download iniciado.', 'success');
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[11px] font-medium inline-flex items-center gap-1 cursor-pointer"
                     >
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                      Testar Credenciais & Integridade
+                      <Download className="w-3 h-3" /> Baixar
                     </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleVerifyIntegrity(lastCreatedBackup)}
+                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-[11px] font-medium text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer"
+                  >
+                    Validar SHA-256
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenQrForBackup(lastCreatedBackup)}
+                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-[11px] font-medium text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer"
+                  >
+                    QR Code
+                  </button>
+                </div>
+              </div>
+            )}
+          </aside>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* TAB 3: RESTAURAÇÃO                                                    */}
+      {/* ===================================================================== */}
+      {currentTab === 'restauracao' && (
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            <div className="lg:col-span-8 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 space-y-5">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                  Restaurar Arquivo de Backup
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                  Validação SHA-256 e snapshot preventivo automáticos antes de gravar qualquer dado.
+                </p>
+              </div>
+
+              {/* Compact Dropzone */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDropRestoreFile}
+                className={`border border-dashed rounded-xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 transition-colors ${
+                  isDragging
+                    ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20'
+                    : 'border-slate-300 dark:border-zinc-700 bg-slate-50/60 dark:bg-zinc-950/60'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                    <Upload className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium text-slate-900 dark:text-zinc-100 truncate">
+                      {restoreFile
+                        ? restoreFile.name
+                        : 'Arraste um arquivo .geabackup, .geaagro ou .json'}
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+                      {restoreFile
+                        ? `${formatBytes(restoreFile.size)} · Pronto para validação`
+                        : 'Compatível com arquivos cifrados AES-256-GCM'}
+                    </div>
+                  </div>
+                </div>
+
+                <input
+                  ref={restoreFileInputRef}
+                  type="file"
+                  accept=".geabackup,.geaagro,.json,.zip,.sqlite"
+                  onChange={handleFileSelectForRestore}
+                  className="hidden"
+                  id="restore-file-input"
+                />
+                <label
+                  htmlFor="restore-file-input"
+                  className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-xs font-medium text-slate-700 dark:text-zinc-200 cursor-pointer transition-colors whitespace-nowrap shrink-0"
+                >
+                  {restoreFile ? 'Trocar arquivo' : 'Selecionar arquivo'}
+                </label>
+              </div>
+
+              {/* File Preview */}
+              {restorePreview && (
+                <div className="p-3.5 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-900/50 space-y-2 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-medium text-emerald-800 dark:text-emerald-300 inline-flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Pacote reconhecido
+                    </span>
+                    <span className="font-mono text-[11px] text-slate-500 dark:text-zinc-400">
+                      SHA-256: {restorePreview.sha256.substring(0, 16)}...
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-600 dark:text-zinc-300 tabular-nums">
+                    <span>Versão: <strong>{restorePreview.version}</strong></span>
+                    <span>Tipo: <strong className="capitalize">{restorePreview.type}</strong></span>
+                    <span>Módulos: <strong>{restorePreview.modulesCount}</strong></span>
+                    <span>Cifragem: <strong className="uppercase">{restorePreview.encryptionMode}</strong></span>
+                  </div>
+                </div>
+              )}
+
+              {/* Credentials for Encrypted Backups */}
+              {restoreFile && (isRestoreEncrypted || (restorePreview && restorePreview.encryptionMode !== 'none')) && (
+                <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-800 dark:text-zinc-200 inline-flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                      Autenticação AES-256-GCM ({restoreEncryptionMode === 'envelope' ? 'Envelope Duplo' : 'Senha'})
+                    </span>
                     {restoreValidationStatus.tested && (
-                      <span className={`text-xs font-bold flex items-center gap-1 ${
-                        restoreValidationStatus.valid ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'
-                      }`}>
-                        {restoreValidationStatus.valid ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
-                        {restoreValidationStatus.valid ? 'Credencial Válida' : 'Credencial Inválida'}
+                      <span
+                        className={`text-xs font-medium inline-flex items-center gap-1 ${
+                          restoreValidationStatus.valid
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-rose-600 dark:text-rose-400'
+                        }`}
+                      >
+                        {restoreValidationStatus.valid ? (
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        ) : (
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                        )}
+                        {restoreValidationStatus.valid ? 'Validado' : 'Inválido'}
                       </span>
                     )}
                   </div>
 
-                  {restoreValidationStatus.tested && restoreValidationStatus.message && (
-                    <div className={`p-2.5 rounded-lg text-[11px] ${
-                      restoreValidationStatus.valid
-                        ? 'bg-emerald-100/60 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300'
-                        : 'bg-red-100/60 dark:bg-red-950/40 text-red-800 dark:text-red-300 border border-red-300'
-                    }`}>
-                      {restoreValidationStatus.message}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-medium text-slate-600 dark:text-zinc-400 block mb-1">
+                        Senha do backup
+                      </label>
+                      <input
+                        type="password"
+                        placeholder="Digite a senha"
+                        value={restorePassword}
+                        onChange={(e) => {
+                          setRestorePassword(e.target.value);
+                          setRestoreValidationStatus({ tested: false, valid: false });
+                        }}
+                        className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                      />
                     </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Scope of Restoration */}
-            <div className="space-y-3">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 block">
-                Escolha o Escopo de Restauração
-              </label>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  { id: 'total', label: 'Restaurar Todo o Aplicativo', desc: 'Substitui todas as tabelas e dados com o contéudo do backup' },
-                  { id: 'modulo', label: 'Apenas Um Módulo', desc: 'Restaura exclusivamente o módulo escolhido' },
-                  { id: 'fazenda', label: 'Apenas Uma Fazenda', desc: 'Mescla apenas os dados pertencentes à fazenda selecionada' },
-                  { id: 'midia', label: 'Apenas Mídias e Fotografias', desc: 'Restaura a galeria sem alterar os registros numéricos' },
-                  { id: 'relatorios', label: 'Apenas Relatórios e Laudos', desc: 'Restaura o histórico de laudos técnicos PDFs' },
-                ].map((m) => (
-                  <div
-                    key={m.id}
-                    onClick={() => setRestoreMode(m.id as any)}
-                    className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                      restoreMode === m.id
-                        ? 'border-emerald-600 bg-emerald-50/60 dark:bg-emerald-950/40'
-                        : 'border-slate-200 dark:border-zinc-800 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-xs text-slate-900 dark:text-white">{m.label}</span>
-                      {restoreMode === m.id && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
-                    </div>
-                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-tight">{m.desc}</p>
+                    {restoreEncryptionMode === 'envelope' && (
+                      <div>
+                        <label className="text-[11px] font-medium text-slate-600 dark:text-zinc-400 block mb-1">
+                          Chave de recuperação (opcional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="GEA1-XXXX-XXXX-..."
+                          value={restoreRecoveryKey}
+                          onChange={(e) => {
+                            setRestoreRecoveryKey(e.target.value);
+                            setRestoreValidationStatus({ tested: false, valid: false });
+                          }}
+                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs font-mono uppercase focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                        />
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
 
-              {restoreMode === 'modulo' && (
-                <div className="pt-2">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
-                    Selecione o Módulo a Restaurar:
-                  </label>
-                  <select
-                    value={selectedModuleToRestore}
-                    onChange={(e) => setSelectedModuleToRestore(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs"
-                  >
-                    {suiteModules.map(m => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
-                    ))}
-                  </select>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleValidateCredentials}
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 text-xs font-medium text-slate-700 dark:text-zinc-200 inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      Testar Credenciais
+                    </button>
+                    {restoreValidationStatus.tested && restoreValidationStatus.message && (
+                      <span
+                        className={`text-xs ${
+                          restoreValidationStatus.valid
+                            ? 'text-emerald-700 dark:text-emerald-400'
+                            : 'text-rose-600 dark:text-rose-400'
+                        }`}
+                      >
+                        {restoreValidationStatus.message}
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
+
+              {/* Escopo */}
+              <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 space-y-2.5">
+                <label className="text-xs font-semibold text-slate-800 dark:text-zinc-200 block">
+                  Escopo da restauração
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {[
+                    { id: 'total', label: 'Aplicativo completo', desc: 'Substitui todas as tabelas locais' },
+                    { id: 'modulo', label: 'Módulo específico', desc: 'Aplica apenas o módulo escolhido' },
+                    { id: 'fazenda', label: 'Apenas uma fazenda', desc: 'Mescla registros da propriedade' },
+                    { id: 'midia', label: 'Mídias e fotos', desc: 'Restaura apenas galeria de campo' },
+                    { id: 'relatorios', label: 'Relatórios e laudos', desc: 'Histórico de laudos técnicos PDF' },
+                  ].map((scope) => {
+                    const active = restoreMode === scope.id;
+                    return (
+                      <button
+                        key={scope.id}
+                        type="button"
+                        onClick={() => setRestoreMode(scope.id as any)}
+                        className={`text-left px-3 py-2 rounded-lg border transition-colors cursor-pointer ${
+                          active
+                            ? 'border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/30'
+                            : 'border-slate-200 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700'
+                        }`}
+                      >
+                        <div className="text-xs font-medium text-slate-900 dark:text-zinc-100">
+                          {scope.label}
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-zinc-400">{scope.desc}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {restoreMode === 'modulo' && (
+                  <div className="pt-1 max-w-xs">
+                    <select
+                      value={selectedModuleToRestore}
+                      onChange={(e) => setSelectedModuleToRestore(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs"
+                    >
+                      {SUITE_MODULES.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {restoreInlineError && (
+                <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{restoreInlineError}</span>
+                </div>
+              )}
+
+              {isExecutingRestore && (
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs text-slate-600 dark:text-zinc-300">
+                    <span>{restoreStepText}</span>
+                    <span className="font-mono tabular-nums">{restoreProgress}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-emerald-600 h-full transition-all duration-300"
+                      style={{ width: `${restoreProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleExecuteRestore}
+                  disabled={isExecutingRestore}
+                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isExecutingRestore ? 'animate-spin' : ''}`} />
+                  {isExecutingRestore ? `Restaurando (${restoreProgress}%)` : 'Executar Restauração'}
+                </button>
+              </div>
             </div>
 
-            {/* Execute Button */}
-            <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 flex justify-end">
-              <button
-                type="button"
-                onClick={handleExecuteRestore}
-                disabled={isExecutingRestore}
-                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${isExecutingRestore ? 'animate-spin' : ''}`} />
-                {isExecutingRestore ? `Restaurando... ${restoreProgress}%` : 'Executar Restauração'}
-              </button>
-            </div>
-
+            {/* Compact Safety Panel */}
+            <aside className="lg:col-span-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 space-y-3 text-xs">
+              <div className="flex items-center gap-2 font-semibold text-slate-900 dark:text-zinc-100">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                Protocolo de segurança
+              </div>
+              <ul className="space-y-2 text-slate-600 dark:text-zinc-400 leading-relaxed">
+                <li>1. O arquivo é validado por checksum SHA-256 antes de alterar a base local.</li>
+                <li>2. Um snapshot de emergência é salvo automaticamente para reversão imediata.</li>
+                <li>3. Em caso de interrupção ou erro de escrita, o rollback compensatório restaura o estado anterior.</li>
+              </ul>
+            </aside>
           </div>
 
-          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-2xl p-6 space-y-4 text-amber-900 dark:text-amber-200">
-            <div className="flex items-center gap-2 font-bold text-sm">
-              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-              Recomendações de Segurança
-            </div>
-            <p className="text-xs leading-relaxed">
-              Antes de executar uma restauração total, o sistema gerará automaticamente um <strong>Snapshot de Segurança</strong>. Se necessário, você poderá reverter a restauração com um único clique na guia de Snapshots.
-            </p>
-            <div className="pt-2 border-t border-amber-200 dark:border-amber-900/40 text-[11px] font-mono">
-              Status da Verificação: SHA-256 Checksum OK
-            </div>
-          </div>
-
-          <div className="lg:col-span-3">
-            {renderRecuperaBackupCard()}
-          </div>
-
+          {renderRecuperaSection()}
         </div>
       )}
 
-      {/* TAB 6: HISTÓRICO DE BACKUPS */}
-      {currentTab === 'historico' && (
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-4">
-          
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* ===================================================================== */}
+      {/* TAB 4: SNAPSHOTS                                                      */}
+      {/* ===================================================================== */}
+      {currentTab === 'snapshots' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          <div className="lg:col-span-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 space-y-4">
             <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <History className="w-5 h-5 text-emerald-500" />
-                Histórico de Backups Realizados
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-zinc-400">
-                Registro detalhado de todos os arquivos de backup com hash SHA-256 e logs de integridade
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Criar Snapshot
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                Ponto de restauração rápido antes de alterações em massa.
               </p>
             </div>
 
-            {/* Filters */}
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            <form onSubmit={handleCreateSnapshotSubmit} className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-slate-700 dark:text-zinc-300 block mb-1">
+                  Identificação
+                </label>
                 <input
                   type="text"
-                  placeholder="Buscar no histórico..."
+                  value={snapshotTitle}
+                  onChange={(e) => setSnapshotTitle(e.target.value)}
+                  placeholder="Ex.: Pré-importação de solos"
+                  required
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-700 dark:text-zinc-300 block mb-1">
+                  Motivo / Evento
+                </label>
+                <select
+                  value={snapshotEvent}
+                  onChange={(e) => setSnapshotEvent(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs"
+                >
+                  <option value="Alteração Manual em Massa">Alteração Manual em Massa</option>
+                  <option value="Importação de PDF/CSV">Importação de PDF/CSV</option>
+                  <option value="Atualização do Banco de Fertilizantes">Atualização de Fertilizantes</option>
+                  <option value="Sincronização em Lote">Sincronização em Lote</option>
+                  <option value="Auditoria de Campo">Auditoria de Campo</option>
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isCreatingSnapshot}
+                className="w-full px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <History className="w-3.5 h-3.5" />
+                {isCreatingSnapshot ? 'Gravando...' : 'Gravar Snapshot'}
+              </button>
+            </form>
+          </div>
+
+          <div className="lg:col-span-8 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 space-y-3">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Linha do tempo ({snapshots.length})
+              </h2>
+              <span className="text-xs text-slate-500 dark:text-zinc-400">
+                Reversão imediata por ponto
+              </span>
+            </div>
+
+            {snapshots.length === 0 ? (
+              <p className="text-xs text-slate-500 dark:text-zinc-400 py-8 text-center">
+                Nenhum snapshot gravado. Utilize o formulário ao lado para criar um ponto de segurança.
+              </p>
+            ) : (
+              <div className="divide-y divide-slate-100 dark:divide-zinc-800">
+                {snapshots.map((snap) => (
+                  <div
+                    key={snap.id}
+                    className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                        {snap.title}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+                        <span>{snap.triggerEvent}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{new Date(snap.timestamp).toLocaleString('pt-BR')}</span>
+                        <span aria-hidden="true">·</span>
+                        <span className="font-mono">{snap.sizeFormatted}</span>
+                      </div>
+                      <div className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 truncate">
+                        SHA-256: {snap.hash.substring(0, 32)}...
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRollbackSnapshot(snap)}
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 hover:border-emerald-600 hover:text-emerald-700 dark:hover:text-emerald-400 text-xs font-medium text-slate-700 dark:text-zinc-200 inline-flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 self-start sm:self-center whitespace-nowrap"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      Reverter
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* TAB 5: BACKUP POR MÓDULO                                              */}
+      {/* ===================================================================== */}
+      {currentTab === 'modulos' && (
+        <div className="space-y-5">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-zinc-800">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                  Backup Seletivo por Módulo
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5 tabular-nums">
+                  {selectedModules.length} de {SUITE_MODULES.length} módulos selecionados para exportação.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={selectAllModules}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 text-xs font-medium text-slate-700 dark:text-zinc-200 cursor-pointer whitespace-nowrap"
+                >
+                  Selecionar todos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBackupType('modulo');
+                    handleStartBackupCreation();
+                  }}
+                  disabled={selectedModules.length === 0 || isExecutingBackup}
+                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Exportar ({selectedModules.length})
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {SUITE_MODULES.map((mod) => {
+                const Icon = mod.icon;
+                const isSelected = selectedModules.includes(mod.id);
+                return (
+                  <label
+                    key={mod.id}
+                    className={`px-3 py-2.5 rounded-lg border cursor-pointer transition-colors flex items-start justify-between gap-2.5 ${
+                      isSelected
+                        ? 'border-emerald-600/70 bg-emerald-50/40 dark:bg-emerald-950/20'
+                        : 'border-slate-200 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700'
+                    }`}
+                  >
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <Icon
+                        className={`w-4 h-4 mt-0.5 shrink-0 ${
+                          isSelected
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-slate-400 dark:text-zinc-500'
+                        }`}
+                      />
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-slate-900 dark:text-zinc-100 truncate">
+                          {mod.name}
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-zinc-400 truncate">
+                          {mod.desc}
+                        </div>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleModuleSelection(mod.id)}
+                      className="mt-0.5 w-4 h-4 accent-emerald-600 rounded shrink-0"
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {renderRecuperaSection()}
+          {renderEstatisticaOpfsSection()}
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* TAB 6: HISTÓRICO                                                      */}
+      {/* ===================================================================== */}
+      {currentTab === 'historico' && (
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+          <div className="p-4 border-b border-slate-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Histórico de Backups ({filteredHistory.length})
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                Registros com integridade SHA-256, QR Code e download direto.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
+                <input
+                  type="text"
+                  placeholder="Buscar arquivo ou responsável..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-xs w-48"
+                  className="pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-950 text-xs w-52 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
                 />
               </div>
 
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-xs font-semibold"
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-950 text-xs"
               >
-                <option value="all">Todos os Tipos</option>
+                <option value="all">Todos os tipos</option>
                 <option value="completo">Completo</option>
                 <option value="incremental">Incremental</option>
                 <option value="diferencial">Diferencial</option>
@@ -2592,118 +2599,134 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
             </div>
           </div>
 
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-700 dark:text-zinc-300">
-              <thead className="bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 font-bold uppercase tracking-wider">
-                <tr>
-                  <th className="p-3 rounded-l-xl">Arquivo & Data</th>
-                  <th className="p-3">Tipo</th>
-                  <th className="p-3">Tamanho</th>
-                  <th className="p-3">Usuário / Local</th>
-                  <th className="p-3">SHA-256 Hash</th>
-                  <th className="p-3 rounded-r-xl text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
-                {filteredHistory.map((bak) => (
-                  <tr key={bak.id} className="hover:bg-slate-50 dark:hover:bg-zinc-800/50 transition-all">
-                    <td className="p-3 font-medium">
-                      <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <FileCode className="w-4 h-4 text-emerald-500" />
-                        {bak.filename}
-                      </div>
-                      <div className="text-[11px] text-slate-400">
-                        {new Date(bak.timestamp).toLocaleString('pt-BR')}
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700">
-                        {bak.type}
-                      </span>
-                    </td>
-                    <td className="p-3 font-mono font-bold text-slate-800 dark:text-zinc-200">
-                      {bak.formattedSize}
-                    </td>
-                    <td className="p-3">
-                      <div className="text-slate-800 dark:text-zinc-200">{bak.userResponsible}</div>
-                      <div className="text-[11px] text-slate-400 truncate max-w-[180px]">{bak.storageLocation}</div>
-                    </td>
-                    <td className="p-3 font-mono text-[10px] text-emerald-600 dark:text-emerald-400">
-                      {bak.integrityHash.substring(0, 16)}...
-                    </td>
-                    <td className="p-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => handleVerifyIntegrity(bak)}
-                          title="Validar Hash SHA-256"
-                          className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 cursor-pointer"
-                        >
-                          <ShieldCheck className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setSelectedQrBackup(bak)}
-                          title="Gerar QR Code"
-                          className="p-1.5 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-200 cursor-pointer"
-                        >
-                          <QrCode className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            triggerFileDownload(bak.filename, JSON.stringify(bak, null, 2));
-                            showToast(`Download de ${bak.filename} iniciado!`, 'success');
-                          }}
-                          title="Baixar Arquivo"
-                          className="p-1.5 rounded-lg bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-400 hover:bg-sky-100 cursor-pointer"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteBackup(bak.id)}
-                          title="Remover Registro"
-                          className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 hover:bg-rose-100 cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+          {filteredHistory.length === 0 ? (
+            <div className="py-10 px-4 text-center space-y-2">
+              <p className="text-xs text-slate-500 dark:text-zinc-400">
+                Nenhum backup encontrado para os filtros atuais.
+              </p>
+              <button
+                type="button"
+                onClick={() => handleTabChange('criacao')}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium cursor-pointer"
+              >
+                Criar novo backup
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-zinc-950/60 text-slate-500 dark:text-zinc-400 border-b border-slate-100 dark:border-zinc-800">
+                  <tr>
+                    <th className="py-2.5 px-4 font-medium">Arquivo e Data</th>
+                    <th className="py-2.5 px-3 font-medium">Tipo</th>
+                    <th className="py-2.5 px-3 font-medium text-right">Tamanho</th>
+                    <th className="py-2.5 px-3 font-medium">Responsável / Destino</th>
+                    <th className="py-2.5 px-3 font-medium">SHA-256</th>
+                    <th className="py-2.5 px-4 font-medium text-right">Ações</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
+                  {filteredHistory.map((bak) => (
+                    <tr
+                      key={bak.id}
+                      className="hover:bg-slate-50/70 dark:hover:bg-zinc-800/40 transition-colors"
+                    >
+                      <td className="py-2.5 px-4">
+                        <div className="font-medium text-slate-900 dark:text-zinc-100 truncate max-w-[240px]" title={bak.filename}>
+                          {bak.filename}
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+                          {new Date(bak.timestamp).toLocaleString('pt-BR')}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 capitalize text-slate-700 dark:text-zinc-300">
+                        {bak.type}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-800 dark:text-zinc-200 whitespace-nowrap">
+                        {bak.formattedSize}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <div className="text-slate-800 dark:text-zinc-200 truncate max-w-[180px]">
+                          {bak.userResponsible}
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-zinc-400 truncate max-w-[180px]">
+                          {bak.storageLocation}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-[11px] text-emerald-700 dark:text-emerald-400">
+                        {bak.integrityHash.substring(0, 12)}...
+                      </td>
+                      <td className="py-2.5 px-4 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleVerifyIntegrity(bak)}
+                            title="Validar SHA-256"
+                            className="p-1.5 rounded-md text-slate-500 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenQrForBackup(bak)}
+                            title="Abrir QR Code"
+                            className="p-1.5 rounded-md text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer"
+                          >
+                            <QrCode className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              triggerFileDownload(bak.filename, JSON.stringify(bak, null, 2));
+                              showToast(`Download de ${bak.filename} iniciado.`, 'success');
+                            }}
+                            title="Baixar metadados"
+                            className="p-1.5 rounded-md text-slate-500 hover:text-sky-600 hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteBackup(bak)}
+                            title="Remover do histórico"
+                            className="p-1.5 rounded-md text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
-      {/* TAB 7: AGENDAMENTO & AUTOMAÇÃO */}
+      {/* ===================================================================== */}
+      {/* TAB 7: AUTOMAÇÃO & AGENDAMENTO                                        */}
+      {/* ===================================================================== */}
       {currentTab === 'agendamento' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          <div className="lg:col-span-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-6">
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-emerald-500" />
-                Agendamento & Gatilhos Automáticos de Backup
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-zinc-400">
-                Configure a periodicidade automática e ative gatilhos por eventos agronômicos e zootécnicos.
-              </p>
-            </div>
-
-            {/* Schedule Periodic Option */}
-            <div className="p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200 dark:border-zinc-700 space-y-4">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 block">
-                Frequência Programada
-              </span>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          <div className="lg:col-span-8 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 space-y-5">
+            <div className="space-y-2.5 pb-4 border-b border-slate-100 dark:border-zinc-800">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                  Frequência Programada
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                  Intervalo automático para cópias de segurança locais.
+                </p>
+              </div>
+              <div className="inline-flex flex-wrap gap-1 p-1 bg-slate-100 dark:bg-zinc-800 rounded-lg">
                 {[
                   { id: 'off', label: 'Desativado' },
                   { id: 'daily', label: 'Diário' },
                   { id: 'weekly', label: 'Semanal' },
                   { id: 'fortnightly', label: 'Quinzenal' },
                   { id: 'monthly', label: 'Mensal' },
-                ].map(f => (
+                ].map((f) => (
                   <button
                     key={f.id}
                     type="button"
@@ -2711,12 +2734,12 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
                       const updated = { ...autoConfig, scheduleFrequency: f.id as any };
                       setAutoConfig(updated);
                       saveAutoTriggerConfig(updated);
-                      showToast(`Frequência ajustada para ${f.label}`, 'success');
+                      showToast(`Frequência definida para ${f.label}.`, 'success');
                     }}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
                       autoConfig.scheduleFrequency === f.id
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300'
+                        ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-zinc-100 shadow-2xs'
+                        : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
                     }`}
                   >
                     {f.label}
@@ -2725,202 +2748,163 @@ export const BackupModule: React.FC<BackupModuleProps> = ({
               </div>
             </div>
 
-            {/* Event Triggers List */}
-            <div className="space-y-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 block">
-                Gatilhos Automáticos por Eventos do Usuário
-              </span>
-              <p className="text-xs text-slate-500 dark:text-zinc-400">
-                O aplicativo criará automaticamente um backup incremental sempre que você realizar qualquer uma das ações abaixo:
-              </p>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                  Gatilhos por eventos ({activeTriggersCount}/{AUTO_TRIGGERS.length})
+                </h3>
+                <span className="text-xs text-slate-500 dark:text-zinc-400">
+                  Backup incremental automático
+                </span>
+              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  { key: 'onAppClose', label: 'Ao encerrar ou fechar o aplicativo', icon: Smartphone },
-                  { key: 'onSoilAnalysisComplete', label: 'Ao concluir uma análise de solo', icon: FlaskConical },
-                  { key: 'onReportFinished', label: 'Ao finalizar um laudo técnico PDF', icon: FileText },
-                  { key: 'onNewFieldAdded', label: 'Ao adicionar um novo talhão / lavoura', icon: Tractor },
-                  { key: 'onBirthRegistered', label: 'Ao registrar um parto no rebanho', icon: Beef },
-                  { key: 'onApplicationRegistered', label: 'Ao registrar aplicação de defensivo', icon: ShieldCheck },
-                  { key: 'onFertilizerDbUpdated', label: 'Ao atualizar o banco de fertilizantes', icon: Layers },
-                ].map(trig => {
-                  const Icon = trig.icon;
-                  const isChecked = autoConfig[trig.key as keyof BackupAutoTriggerConfig] as boolean;
+              <div className="divide-y divide-slate-100 dark:divide-zinc-800">
+                {AUTO_TRIGGERS.map((trig) => {
+                  const checked = Boolean(autoConfig[trig.key]);
                   return (
-                    <div
+                    <label
                       key={trig.key}
-                      onClick={() => handleToggleAutoConfig(trig.key as any)}
-                      className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between gap-3 ${
-                        isChecked
-                          ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/40'
-                          : 'border-slate-200 dark:border-zinc-800 opacity-60'
-                      }`}
+                      className="py-2.5 flex items-center justify-between gap-4 cursor-pointer"
                     >
-                      <div className="flex items-center gap-2">
-                        <Icon className={`w-4 h-4 ${isChecked ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
-                        <span className="text-xs font-bold text-slate-800 dark:text-zinc-200">{trig.label}</span>
+                      <div>
+                        <div className="text-xs font-medium text-slate-900 dark:text-zinc-100">
+                          {trig.label}
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-zinc-400">{trig.desc}</div>
                       </div>
                       <input
                         type="checkbox"
-                        checked={isChecked}
-                        onChange={() => {}}
-                        className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
+                        checked={checked}
+                        onChange={() => handleToggleAutoConfig(trig.key)}
+                        className="w-4 h-4 accent-emerald-600 rounded shrink-0"
                       />
-                    </div>
+                    </label>
                   );
                 })}
               </div>
             </div>
-
           </div>
 
-          {/* Retention & Emergency Rules */}
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-5">
-            <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-emerald-500" />
-              Retenção e Alertas de Perda
-            </h4>
+          <aside className="lg:col-span-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 space-y-5">
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-900 dark:text-zinc-100 block">
+                Política de retenção
+              </label>
+              <select
+                value={autoConfig.retentionCount}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  const updated = { ...autoConfig, retentionCount: val };
+                  setAutoConfig(updated);
+                  saveAutoTriggerConfig(updated);
+                  showToast(`Retenção atualizada para ${val} backups.`, 'info');
+                }}
+                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs"
+              >
+                <option value={5}>Manter os últimos 5 backups</option>
+                <option value={10}>Manter os últimos 10 backups</option>
+                <option value={20}>Manter os últimos 20 backups</option>
+                <option value={50}>Manter os últimos 50 backups</option>
+              </select>
+            </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
-                  Retenção Automática (Máximo de Backups a manter):
-                </label>
-                <select
-                  value={autoConfig.retentionCount}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value, 10);
-                    const updated = { ...autoConfig, retentionCount: val };
-                    setAutoConfig(updated);
-                    saveAutoTriggerConfig(updated);
-                  }}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-bold"
-                >
-                  <option value={5}>Manter os últimos 5 backups</option>
-                  <option value={10}>Manter os últimos 10 backups</option>
-                  <option value={20}>Manter os últimos 20 backups</option>
-                  <option value={50}>Manter os últimos 50 backups</option>
-                </select>
+            <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-slate-800 dark:text-zinc-200">Cota de armazenamento</span>
+                <span className="font-mono tabular-nums text-slate-500">{storageStats.percentageUsed}%</span>
               </div>
-
-              {/* Graphical StorageManager API Progress Bar Widget in Settings */}
-              <div className="p-4 bg-slate-50 dark:bg-zinc-800/60 rounded-xl border border-slate-200 dark:border-zinc-700 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <HardDrive className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                    <span className="text-xs font-bold text-slate-800 dark:text-zinc-200">Cota StorageManager API</span>
-                  </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-bold">
-                    {storageStats.percentageUsed}% Usado
-                  </span>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-600 dark:text-zinc-400 font-medium">Uso Atual: <strong>{storageStats.usedFormatted}</strong></span>
-                    <span className="text-slate-600 dark:text-zinc-400 font-medium">Cota Estimada: <strong>{storageStats.quotaFormatted}</strong></span>
-                  </div>
-
-                  {/* Graphical Progress Bar */}
-                  <div className="w-full bg-slate-200 dark:bg-zinc-700 h-3 rounded-full overflow-hidden p-0.5 border border-slate-300 dark:border-zinc-600">
-                    <div
-                      className="bg-gradient-to-r from-purple-500 via-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-500"
-                      style={{ width: `${Math.max(2, Math.min(100, storageStats.percentageUsed))}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-zinc-400 pt-1">
-                  <span>Disponível: <strong className="text-emerald-600 dark:text-emerald-400">{storageStats.availableFormatted}</strong></span>
-                  {storageStats.isPersisted !== null && (
-                    <span className="text-[10px] font-semibold text-slate-400">
-                      {storageStats.isPersisted ? '✓ Armazenamento Persistente' : '• Armazenamento Temporário'}
-                    </span>
-                  )}
-                </div>
+              <div className="w-full bg-slate-100 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+                <div
+                  className="bg-emerald-600 h-full transition-all"
+                  style={{ width: `${Math.max(2, Math.min(100, storageStats.percentageUsed))}%` }}
+                />
               </div>
-
-              <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 rounded-xl space-y-2">
-                <span className="text-xs font-bold text-amber-900 dark:text-amber-300 block">
-                  🔔 Alerta de Inatividade
-                </span>
-                <p className="text-[11px] text-amber-800 dark:text-amber-400">
-                  O sistema enviará uma notificação visual se você ficar mais de 7 dias sem realizar um backup completo.
-                </p>
+              <div className="flex justify-between text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+                <span>Uso: {storageStats.usedFormatted}</span>
+                <span>Livre: {storageStats.availableFormatted}</span>
               </div>
             </div>
-          </div>
 
+            <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
+              <strong className="text-slate-900 dark:text-zinc-200 block mb-0.5">Alerta de inatividade</strong>
+              O sistema exibe um lembrete visual caso passem mais de 7 dias sem um backup completo.
+            </div>
+          </aside>
         </div>
       )}
 
-      {/* TAB 8: MIGRAÇÃO ENTRE DISPOSITIVOS (SEM INTERNET) */}
+      {/* ===================================================================== */}
+      {/* TAB 8: MIGRAÇÃO                                                       */}
+      {/* ===================================================================== */}
       {currentTab === 'migracao' && (
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-6">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Smartphone className="w-5 h-5 text-emerald-500" />
-              Migração Direta entre Celulares / Dispositivos (100% Offline)
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-zinc-400">
-              Transfira todos os seus dados da fazenda para um smartphone novo sem precisar de conexão à internet.
-            </p>
-          </div>
-
-          {/* Interactive Flow Diagram */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 relative">
-            {[
-              { step: '1', title: 'Telefone Antigo', desc: 'Gerar Backup Completo criptografado no celular antigo', icon: Smartphone },
-              { step: '2', title: 'Escolher Meio', desc: 'Transferir via Cabo OTG, Bluetooth, Wi-Fi Direct ou QR Code', icon: Radio },
-              { step: '3', title: 'Telefone Novo', desc: 'Abrir o GeaAgro no celular novo e selecionar o arquivo', icon: Smartphone },
-              { step: '4', title: 'Restaurar', desc: 'O sistema valida o hash SHA-256 e recria a base de dados', icon: RefreshCw },
-              { step: '5', title: 'Concluído', desc: 'Todos os talhões, relatórios e animais recuperados!', icon: CheckCircle2 }
-            ].map((s, idx) => {
-              const Icon = s.icon;
-              return (
-                <div key={s.step} className="p-4 bg-slate-50 dark:bg-zinc-800/60 rounded-xl border border-slate-200 dark:border-zinc-700 flex flex-col justify-between space-y-2 relative">
-                  <div className="flex items-center justify-between">
-                    <span className="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center">
-                      {s.step}
-                    </span>
-                    <Icon className="w-5 h-5 text-emerald-500" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-xs text-slate-900 dark:text-white">{s.title}</h4>
-                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-snug mt-1">{s.desc}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="p-6 bg-slate-900 text-white rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="space-y-1">
-              <h4 className="font-bold text-base text-emerald-400">Pronto para migrar seus dados agora?</h4>
-              <p className="text-xs text-slate-300">Gere o arquivo `.geabackup` criptografado e baixe diretamente no seu dispositivo.</p>
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-zinc-800">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Migração Offline entre Dispositivos
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                Transfira toda a base agronômica para um novo celular ou computador sem internet.
+              </p>
             </div>
-            <button
-              onClick={() => handleTabChange('criacao')}
-              className="px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs shadow-lg transition-all cursor-pointer whitespace-nowrap"
-            >
-              Iniciar Passo 1: Criar Backup de Migração
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleTabChange('restauracao')}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 text-xs font-medium text-slate-700 dark:text-zinc-200 cursor-pointer whitespace-nowrap"
+              >
+                Já tenho o arquivo
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTabChange('criacao')}
+                className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+              >
+                Iniciar Passo 1
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-zinc-800">
+            {[
+              { step: '01', title: 'Gerar pacote', desc: 'Crie um backup completo cifrado no dispositivo atual.' },
+              { step: '02', title: 'Transferir mídia', desc: 'Envie via cabo OTG, Bluetooth, Wi-Fi Direct ou FTP local.' },
+              { step: '03', title: 'Abrir no destino', desc: 'Acesse Backup e Restauração no novo dispositivo.' },
+              { step: '04', title: 'Validar e restaurar', desc: 'Confirme o hash SHA-256 e informe a senha.' },
+              { step: '05', title: 'Pronto para campo', desc: 'Talhões, análises, rebanho e laudos disponíveis offline.' },
+            ].map((item) => (
+              <div key={item.step} className="py-3 sm:py-1 sm:px-4 first:sm:pl-0 last:sm:pr-0 space-y-1">
+                <span className="font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                  {item.step}
+                </span>
+                <h3 className="text-xs font-semibold text-slate-900 dark:text-zinc-100">{item.title}</h3>
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* TAB 9: BACKUP POR QR CODE */}
+      {/* ===================================================================== */}
+      {/* TAB 9: QR CODE                                                        */}
+      {/* ===================================================================== */}
       {currentTab === 'qrcode' && (
         <BackupQRCodeGenerator
           backupList={history}
+          initialBackupId={selectedQrBackupId}
           onSelectBackupForRestore={(b) => {
-            showToast(`Backup ${b.filename} selecionado para restauração`, 'info');
+            showToast(`Backup ${b.filename} pronto para restauração.`, 'info');
             handleTabChange('restauracao');
           }}
           showToast={showToast}
         />
       )}
 
+      {/* ===================================================================== */}
+      {/* TAB 10: OPFS ESTATÍSTICA                                              */}
+      {/* ===================================================================== */}
+      {currentTab === 'estatistica_opfs' && renderEstatisticaOpfsSection()}
     </div>
   );
 };

@@ -1,402 +1,341 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { X, Check, Sliders } from 'lucide-react';
 import {
-  X,
-  Check,
-  Sparkles,
-  Wheat,
-  Scale,
-} from 'lucide-react';
-import { ConfigCulturaIntegrada, UnidadeComercializacao } from '../../types/gestaoRural';
+  ConfigCulturaIntegrada,
+  UnidadeComercializacao,
+} from '../../types/gestaoRural';
 import {
   CROP_COMMERCIALIZATION_PRESETS,
   UNIDADE_DESCRICOES,
   CropPresetDefinition,
-  DEFAULT_CONFIG_CULTURA
 } from '../../data/cropCommercializationPresets';
 
 interface GestaoCulturaSelectorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentConfig?: ConfigCulturaIntegrada;
+  currentConfig: ConfigCulturaIntegrada;
   onSaveConfig: (newConfig: ConfigCulturaIntegrada) => void;
 }
+
+const ALL_UNITS: UnidadeComercializacao[] = ['cx', 'sc', 'kg', 'ton', '@', 'un', 'bandeja', 'cacho', 'litros'];
+
+const INPUT_CLASS =
+  'w-full h-9 px-3 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950/60 text-slate-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500';
+
+const LABEL_CLASS = 'block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1';
 
 export const GestaoCulturaSelectorModal: React.FC<GestaoCulturaSelectorModalProps> = ({
   isOpen,
   onClose,
-  currentConfig = DEFAULT_CONFIG_CULTURA,
+  currentConfig,
   onSaveConfig,
 }) => {
-  const [selectedCropPreset, setSelectedCropPreset] = useState<string>(() => {
-    const match = CROP_COMMERCIALIZATION_PRESETS.find(
-      p => p.cultura.toLowerCase() === (currentConfig.cultura || '').toLowerCase()
-    );
-    return match ? match.id : 'banana';
-  });
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('');
+  const [culturaNome, setCulturaNome] = useState(currentConfig.cultura);
+  const [variedade, setVariedade] = useState(currentConfig.variedade || '');
+  const [unidadePrincipal, setUnidadePrincipal] = useState<UnidadeComercializacao>(
+    currentConfig.unidadeComercializacaoPrincipal
+  );
+  const [unidadesHabilitadas, setUnidadesHabilitadas] = useState<UnidadeComercializacao[]>(
+    currentConfig.unidadesHabilitadas || ['cx', 'sc', 'kg', 'ton']
+  );
+  const [pesoPorUnidadeKg, setPesoPorUnidadeKg] = useState<number>(currentConfig.pesoPorUnidadeKg || 20);
+  const [precoReferencia, setPrecoReferencia] = useState<number>(currentConfig.precoReferenciaUnitarioR$ || 68);
+  const [metaProdutividade, setMetaProdutividade] = useState<number>(currentConfig.metaProdutividadePadraoHa || 1500);
 
-  const [formConfig, setFormConfig] = useState<ConfigCulturaIntegrada>({
-    cultura: currentConfig.cultura || 'Banana',
-    variedade: currentConfig.variedade || 'Prata Anã',
-    unidadeComercializacaoPrincipal: currentConfig.unidadeComercializacaoPrincipal || 'cx',
-    unidadesHabilitadas: currentConfig.unidadesHabilitadas || ['cx', 'sc', 'kg', 'ton'],
-    pesoPorUnidadeKg: currentConfig.pesoPorUnidadeKg || 20,
-    apelidoUnidade: currentConfig.apelidoUnidade || 'Caixa (20 kg)',
-    precoReferenciaUnitarioR$: currentConfig.precoReferenciaUnitarioR$ || 68.0,
-    metaProdutividadePadraoHa: currentConfig.metaProdutividadePadraoHa || 1500,
-    descricaoComercializacao: currentConfig.descricaoComercializacao || '',
-  });
+  useEffect(() => {
+    if (!isOpen) return;
+    setCulturaNome(currentConfig.cultura);
+    setVariedade(currentConfig.variedade || '');
+    setUnidadePrincipal(currentConfig.unidadeComercializacaoPrincipal);
+    setUnidadesHabilitadas(currentConfig.unidadesHabilitadas || ['cx', 'sc', 'kg', 'ton']);
+    setPesoPorUnidadeKg(currentConfig.pesoPorUnidadeKg || 20);
+    setPrecoReferencia(currentConfig.precoReferenciaUnitarioR$ || 68);
+    setMetaProdutividade(currentConfig.metaProdutividadePadraoHa || 1500);
 
-  const [isCustomMode, setIsCustomMode] = useState<boolean>(() => {
-    const match = CROP_COMMERCIALIZATION_PRESETS.some(
-      p => p.cultura.toLowerCase() === (currentConfig.cultura || '').toLowerCase()
+    const matched = CROP_COMMERCIALIZATION_PRESETS.find(
+      p => p.cultura.toLowerCase() === currentConfig.cultura.toLowerCase()
     );
-    return !match;
-  });
+    setSelectedPresetId(matched?.id || 'custom');
+  }, [isOpen, currentConfig]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   const handleSelectPreset = (preset: CropPresetDefinition) => {
-    setSelectedCropPreset(preset.id);
-    setIsCustomMode(false);
-    setFormConfig({
-      cultura: preset.cultura,
-      variedade: preset.variedade || '',
-      unidadeComercializacaoPrincipal: preset.unidadeComercializacaoPrincipal,
-      unidadesHabilitadas: [...preset.unidadesHabilitadas],
-      pesoPorUnidadeKg: preset.pesoPorUnidadeKg,
-      apelidoUnidade: preset.apelidoUnidade || `${preset.unidadeComercializacaoPrincipal} (${preset.pesoPorUnidadeKg} kg)`,
-      precoReferenciaUnitarioR$: preset.precoReferenciaUnitarioR$,
-      metaProdutividadePadraoHa: preset.metaProdutividadePadraoHa,
-      descricaoComercializacao: preset.descricaoComercializacao || '',
-    });
+    setSelectedPresetId(preset.id);
+    setCulturaNome(preset.cultura);
+    setVariedade(preset.variedade || '');
+    setUnidadePrincipal(preset.unidadeComercializacaoPrincipal);
+    setUnidadesHabilitadas([...preset.unidadesHabilitadas]);
+    setPesoPorUnidadeKg(preset.pesoPorUnidadeKg);
+    setPrecoReferencia(preset.precoReferenciaUnitarioR$);
+    setMetaProdutividade(preset.metaProdutividadePadraoHa);
   };
 
-  const handleToggleUnidade = (unit: UnidadeComercializacao) => {
-    const currentList = formConfig.unidadesHabilitadas || [];
-    let updated: UnidadeComercializacao[];
-    
-    if (currentList.includes(unit)) {
-      // Impede desmarcar a unidade principal
-      if (unit === formConfig.unidadeComercializacaoPrincipal) {
-        return;
+  const handleToggleUnit = (unit: UnidadeComercializacao) => {
+    setUnidadesHabilitadas(prev => {
+      if (prev.includes(unit)) {
+        if (prev.length === 1) return prev;
+        const filtered = prev.filter(u => u !== unit);
+        if (unit === unidadePrincipal) {
+          setUnidadePrincipal(filtered[0]);
+        }
+        return filtered;
       }
-      updated = currentList.filter(u => u !== unit);
-    } else {
-      updated = [...currentList, unit];
-    }
-
-    setFormConfig({
-      ...formConfig,
-      unidadesHabilitadas: updated
+      return [...prev, unit];
     });
   };
 
   const handleChangePrincipalUnit = (unit: UnidadeComercializacao) => {
-    const currentList = formConfig.unidadesHabilitadas || [];
-    const updatedHabilitadas = currentList.includes(unit) ? currentList : [...currentList, unit];
-    const defaultWeight = UNIDADE_DESCRICOES[unit]?.pesoPadraoKg || formConfig.pesoPorUnidadeKg;
-
-    setFormConfig({
-      ...formConfig,
-      unidadeComercializacaoPrincipal: unit,
-      unidadesHabilitadas: updatedHabilitadas,
-      pesoPorUnidadeKg: defaultWeight,
-      apelidoUnidade: `${UNIDADE_DESCRICOES[unit]?.nome || unit} (${defaultWeight} kg)`,
-    });
+    setUnidadePrincipal(unit);
+    if (!unidadesHabilitadas.includes(unit)) {
+      setUnidadesHabilitadas(prev => [unit, ...prev]);
+    }
+    const info = UNIDADE_DESCRICOES[unit];
+    if (info) {
+      setPesoPorUnidadeKg(info.pesoPadraoKg);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveConfig(formConfig);
+    const nomeUnidade = UNIDADE_DESCRICOES[unidadePrincipal]?.nome || unidadePrincipal;
+    onSaveConfig({
+      cultura: culturaNome.trim() || 'Banana',
+      variedade: variedade.trim() || undefined,
+      unidadeComercializacaoPrincipal: unidadePrincipal,
+      unidadesHabilitadas: unidadesHabilitadas.length > 0 ? unidadesHabilitadas : [unidadePrincipal],
+      pesoPorUnidadeKg: Number(pesoPorUnidadeKg) || 20,
+      apelidoUnidade: `${nomeUnidade} (${pesoPorUnidadeKg} kg)`,
+      precoReferenciaUnitarioR$: Number(precoReferencia) || 0,
+      metaProdutividadePadraoHa: Number(metaProdutividade) || 0,
+      descricaoComercializacao: `Cultura ${culturaNome} comercializada principalmente em ${unidadePrincipal} (${pesoPorUnidadeKg} kg). Unidades habilitadas: ${unidadesHabilitadas.join(', ')}.`,
+    });
     onClose();
   };
 
-  const allAvailableUnits: UnidadeComercializacao[] = ['cx', 'sc', 'kg', 'ton', '@', 'un', 'cacho', 'bandeja'];
+  const activePreset = CROP_COMMERCIALIZATION_PRESETS.find(p => p.id === selectedPresetId);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fade-in">
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-5 sm:p-7 max-w-3xl w-full shadow-2xl my-6 space-y-6 max-h-[92vh] overflow-y-auto text-xs">
-        {/* Header */}
-        <div className="flex items-start justify-between border-b border-slate-100 dark:border-zinc-800 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-amber-500 text-white flex items-center justify-center text-2xl shadow-sm shrink-0">
-              🌱
-            </div>
+    <div
+      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+      onClick={e => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-xl overflow-hidden">
+        {/* HEADER */}
+        <div className="px-5 py-3.5 border-b border-slate-200/80 dark:border-zinc-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sliders className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             <div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 font-extrabold text-[10px] uppercase tracking-wider mb-1">
-                <Sparkles className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                <span>Integração de Cultura &amp; Comercialização</span>
-              </div>
-              <h2 className="text-lg font-black text-slate-900 dark:text-white">
-                Escolher Cultura &amp; Ajustar Unidades de Comercialização
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Cultura Integrada &amp; Unidades Comerciais
               </h2>
-              <p className="text-slate-500 text-[11px] mt-0.5">
-                Personalize a cultura ativa (ex: <strong>Banana, Soja, Milho, Café</strong>) e como a colheita é comercializada (<strong>cx, sc, kg, tonelada</strong>).
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                Defina a cultura padrão, unidade principal e parâmetros de referência
               </p>
             </div>
           </div>
-
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+            className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* 1. SELEÇÃO DA CULTURA */}
-          <div className="space-y-3">
+        {/* BODY */}
+        <form onSubmit={handleSave} className="overflow-y-auto flex-1 p-5 space-y-5">
+          {/* PRESET GRID */}
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-black uppercase text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-                <Wheat className="w-4 h-4 text-emerald-600" />
-                <span>1. Selecione a Cultura Agrícola</span>
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsCustomMode(!isCustomMode);
-                  if (!isCustomMode) {
-                    setSelectedCropPreset('custom');
-                  }
-                }}
-                className="text-[11px] font-bold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer"
-              >
-                {isCustomMode ? '← Ver culturas predefinidas' : '+ Adicionar outra cultura'}
-              </button>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+                Cultura Predefinida
+              </span>
+              <span className="text-[11px] text-slate-400 dark:text-zinc-500">
+                {CROP_COMMERCIALIZATION_PRESETS.length} culturas disponíveis
+              </span>
             </div>
 
-            {!isCustomMode ? (
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
-                {CROP_COMMERCIALIZATION_PRESETS.map((preset) => {
-                  const isSelected = !isCustomMode && selectedCropPreset === preset.id;
-                  return (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => handleSelectPreset(preset)}
-                      className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center justify-between gap-1 ${
-                        isSelected
-                          ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 shadow-xs ring-2 ring-emerald-500/30'
-                          : 'border-slate-200 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300'
-                      }`}
-                    >
-                      <span className="text-2xl">{preset.icon}</span>
-                      <span className="font-extrabold text-[11px] leading-tight block truncate w-full">{preset.cultura}</span>
-                      <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400">
-                        {preset.unidadeComercializacaoPrincipal}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="p-4 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200 dark:border-zinc-700 space-y-3">
-                <span className="text-xs font-bold text-slate-700 dark:text-zinc-300 block">
-                  Defina o Nome da sua Cultura Personalizada:
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] font-bold uppercase text-slate-500 block mb-1">Nome da Cultura:</label>
-                    <input
-                      type="text"
-                      value={formConfig.cultura}
-                      onChange={(e) => setFormConfig({ ...formConfig, cultura: e.target.value })}
-                      placeholder="Ex: Banana Nanica, Pimenta-do-reino, Manga..."
-                      className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold uppercase text-slate-500 block mb-1">Variedade / Cultivar:</label>
-                    <input
-                      type="text"
-                      value={formConfig.variedade || ''}
-                      onChange={(e) => setFormConfig({ ...formConfig, variedade: e.target.value })}
-                      placeholder="Ex: Prata, Nanica, Híbrido..."
-                      className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2">
+              {CROP_COMMERCIALIZATION_PRESETS.map(preset => {
+                const isSelected = selectedPresetId === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => handleSelectPreset(preset)}
+                    className={`px-2.5 py-2 rounded-lg border text-left transition-colors cursor-pointer ${
+                      isSelected
+                        ? 'border-emerald-600 bg-emerald-50/70 dark:bg-emerald-950/30 dark:border-emerald-500 text-emerald-900 dark:text-emerald-200'
+                        : 'border-slate-200 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700 text-slate-700 dark:text-zinc-300'
+                    }`}
+                  >
+                    <div className="text-xs font-semibold truncate">{preset.cultura}</div>
+                    <div className="text-[10px] text-slate-500 dark:text-zinc-400 tabular-nums">
+                      {preset.unidadeComercializacaoPrincipal} · {preset.pesoPorUnidadeKg} kg
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* 2. AJUSTAR UNIDADES DE COMERCIALIZAÇÃO (EXEMPLO: BANANA -> cx, sc, kg, ton) */}
-          <div className="p-4 sm:p-5 bg-gradient-to-br from-amber-500/5 via-slate-50 to-emerald-500/5 dark:from-zinc-850 dark:via-zinc-900 dark:to-zinc-850 rounded-2xl border border-slate-200 dark:border-zinc-700 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-xs font-black uppercase text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
-                  <Scale className="w-4 h-4 text-amber-500" />
-                  <span>2. Como a {formConfig.cultura} é Comercializada na Fazenda?</span>
-                </label>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Selecione todas as unidades de venda aceitas (ex: <strong>caixa (cx), saco (sc), kg, tonelada (ton)</strong>) e defina a principal.
-                </p>
-              </div>
-            </div>
-
-            {/* Unidade Principal */}
+          {/* CROP NAME & VARIETY */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-3 border-t border-slate-100 dark:border-zinc-800">
             <div>
-              <span className="text-[11px] font-bold text-slate-700 dark:text-zinc-300 block mb-1.5">
-                Unidade Principal de Faturamento &amp; Produtividade:
-              </span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {allAvailableUnits.slice(0, 6).map((unit) => {
-                  const isMain = formConfig.unidadeComercializacaoPrincipal === unit;
-                  const desc = UNIDADE_DESCRICOES[unit];
+              <label className={LABEL_CLASS}>Nome da Cultura</label>
+              <input
+                type="text"
+                value={culturaNome}
+                onChange={e => {
+                  setCulturaNome(e.target.value);
+                  setSelectedPresetId('custom');
+                }}
+                placeholder="Ex: Banana, Soja, Café..."
+                className={INPUT_CLASS}
+                required
+              />
+            </div>
+
+            <div>
+              <label className={LABEL_CLASS}>Variedade / Cultivar</label>
+              <input
+                type="text"
+                value={variedade}
+                onChange={e => setVariedade(e.target.value)}
+                placeholder="Ex: Prata Anã, Nanica, BMX Potência..."
+                className={INPUT_CLASS}
+              />
+              {activePreset && activePreset.exemplosVariedades.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {activePreset.exemplosVariedades.slice(0, 5).map(v => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setVariedade(v)}
+                      className="text-[10px] px-2 py-0.5 rounded-md border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400 cursor-pointer transition-colors"
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* UNITS CONFIGURATION */}
+          <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-zinc-800">
+            <div>
+              <label className={LABEL_CLASS}>Unidade Principal de Comercialização</label>
+              <div className="flex flex-wrap gap-1.5">
+                {ALL_UNITS.map(u => {
+                  const isMain = unidadePrincipal === u;
                   return (
                     <button
-                      key={unit}
+                      key={u}
                       type="button"
-                      onClick={() => handleChangePrincipalUnit(unit)}
-                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                      onClick={() => handleChangePrincipalUnit(u)}
+                      className={`h-7 px-2.5 rounded-md border text-xs font-medium transition-colors cursor-pointer ${
                         isMain
-                          ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 shadow-xs ring-2 ring-emerald-500/30'
-                          : 'border-slate-200 dark:border-zinc-700 hover:border-slate-300 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300'
+                          ? 'bg-emerald-600 border-emerald-600 text-white'
+                          : 'border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800'
                       }`}
                     >
-                      <div>
-                        <span className="font-black text-xs block">{desc?.nome || unit}</span>
-                        <span className="text-[10px] text-slate-500">Sigla: <strong>{unit}</strong></span>
-                      </div>
-                      {isMain && (
-                        <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">
-                          ✓
-                        </span>
-                      )}
+                      {u}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Unidades Habilitadas na Comercialização */}
-            <div className="pt-3 border-t border-slate-200/60 dark:border-zinc-800 space-y-2">
-              <span className="text-[11px] font-bold text-slate-700 dark:text-zinc-300 block">
-                Habilitar Opções de Unidade para Venda &amp; Contratos:
-              </span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {allAvailableUnits.map((unit) => {
-                  const isChecked = formConfig.unidadesHabilitadas?.includes(unit);
-                  const isMain = formConfig.unidadeComercializacaoPrincipal === unit;
-                  const desc = UNIDADE_DESCRICOES[unit];
+            <div>
+              <label className={LABEL_CLASS}>Unidades Habilitadas nas Vendas</label>
+              <div className="flex flex-wrap gap-1.5">
+                {ALL_UNITS.map(u => {
+                  const active = unidadesHabilitadas.includes(u);
                   return (
-                    <label
-                      key={unit}
-                      className={`p-2.5 rounded-xl border flex items-center gap-2.5 transition-all select-none cursor-pointer ${
-                        isChecked
-                          ? 'border-teal-500/60 bg-teal-50/50 dark:bg-teal-950/30 text-teal-900 dark:text-teal-200'
-                          : 'border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/40 text-slate-500'
+                    <button
+                      key={u}
+                      type="button"
+                      onClick={() => handleToggleUnit(u)}
+                      className={`h-7 px-2.5 rounded-md border text-xs font-medium inline-flex items-center gap-1 transition-colors cursor-pointer ${
+                        active
+                          ? 'border-emerald-500/60 bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300'
+                          : 'border-slate-200 dark:border-zinc-800 text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300'
                       }`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => handleToggleUnidade(unit)}
-                        disabled={isMain}
-                        className="rounded accent-emerald-600 w-4 h-4 cursor-pointer"
-                      />
-                      <div className="leading-tight">
-                        <span className="font-bold text-xs block">{unit}</span>
-                        <span className="text-[10px] text-slate-500 block truncate">{desc?.nome}</span>
-                      </div>
-                      {isMain && (
-                        <span className="ml-auto text-[9px] font-black uppercase text-emerald-600">Principal</span>
-                      )}
-                    </label>
+                      {active && <Check className="w-3 h-3" />}
+                      <span>{u}</span>
+                    </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Peso e Conversões */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-200/60 dark:border-zinc-800">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
               <div>
-                <label className="text-[10px] font-bold uppercase text-slate-500 block mb-1">
-                  Peso em Kg por 1 {formConfig.unidadeComercializacaoPrincipal}:
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0.1"
-                    value={formConfig.pesoPorUnidadeKg}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setFormConfig({
-                        ...formConfig,
-                        pesoPorUnidadeKg: val,
-                        apelidoUnidade: `${UNIDADE_DESCRICOES[formConfig.unidadeComercializacaoPrincipal]?.nome || formConfig.unidadeComercializacaoPrincipal} (${val} kg)`
-                      });
-                    }}
-                    className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white pr-8"
-                    required
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">kg</span>
-                </div>
-                <span className="text-[10px] text-slate-400 mt-0.5 block">
-                  Ex: Banana ~ 20kg/cx, Soja = 60kg/sc
-                </span>
+                <label className={LABEL_CLASS}>Peso por {unidadePrincipal} (kg)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={pesoPorUnidadeKg}
+                  onChange={e => setPesoPorUnidadeKg(Number(e.target.value))}
+                  className={`${INPUT_CLASS} tabular-nums`}
+                  required
+                />
               </div>
-
               <div>
-                <label className="text-[10px] font-bold uppercase text-slate-500 block mb-1">
-                  Preço de Referência (R$ / {formConfig.unidadeComercializacaoPrincipal}):
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    value={formConfig.precoReferenciaUnitarioR$}
-                    onChange={(e) => setFormConfig({ ...formConfig, precoReferenciaUnitarioR$: Number(e.target.value) })}
-                    className="w-full pl-8 pr-3 py-2 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white"
-                  />
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">R$</span>
-                </div>
-                <span className="text-[10px] text-slate-400 mt-0.5 block">
-                  Cotação base para projeção de receita
-                </span>
+                <label className={LABEL_CLASS}>Preço Referência (R$/{unidadePrincipal})</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={precoReferencia}
+                  onChange={e => setPrecoReferencia(Number(e.target.value))}
+                  className={`${INPUT_CLASS} tabular-nums`}
+                  required
+                />
               </div>
-
               <div>
-                <label className="text-[10px] font-bold uppercase text-slate-500 block mb-1">
-                  Meta de Produtividade ({formConfig.unidadeComercializacaoPrincipal} / ha):
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    step="1"
-                    min="1"
-                    value={formConfig.metaProdutividadePadraoHa}
-                    onChange={(e) => setFormConfig({ ...formConfig, metaProdutividadePadraoHa: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white pr-12"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">/ha</span>
-                </div>
-                <span className="text-[10px] text-slate-400 mt-0.5 block">
-                  Estimativa de safra média por hectare
-                </span>
+                <label className={LABEL_CLASS}>Meta Produtividade ({unidadePrincipal}/ha)</label>
+                <input
+                  type="number"
+                  step="1"
+                  value={metaProdutividade}
+                  onChange={e => setMetaProdutividade(Number(e.target.value))}
+                  className={`${INPUT_CLASS} tabular-nums`}
+                  required
+                />
               </div>
             </div>
           </div>
 
-          {/* Botões de Ação */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-zinc-800">
+          {/* FOOTER */}
+          <div className="pt-3 border-t border-slate-200/80 dark:border-zinc-800 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 font-bold text-xs hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+              className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs shadow-md cursor-pointer transition-all flex items-center gap-2"
+              className="h-8 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
             >
-              <Check className="w-4 h-4" />
-              <span>Aplicar Cultura &amp; Ajustar Unidades</span>
+              <Check className="w-3.5 h-3.5" />
+              <span>Aplicar Cultura</span>
             </button>
           </div>
         </form>

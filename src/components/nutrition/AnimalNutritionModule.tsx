@@ -1,7 +1,7 @@
-// @ts-nocheck
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   AnimalProfile,
+  AnimalSpecies,
   FeedIngredient,
   DietFormulation,
   ForageProductionPlan,
@@ -23,15 +23,22 @@ import { ForagePlanningView } from './ForagePlanningView';
 import { DigitalTwinView } from './DigitalTwinView';
 import { DietReportModal } from './DietReportModal';
 import {
+  Activity,
+  Calculator,
+  DollarSign,
+  GitCompare,
+  LayoutGrid,
+  Package,
   Printer,
-  HelpCircle,
+  Users,
+  Wheat,
 } from 'lucide-react';
 
 export type NutritionSubTab =
   | 'dashboard'
+  | 'formulador'
   | 'animais'
   | 'alimentos'
-  | 'formulador'
   | 'custos'
   | 'cenarios'
   | 'forragens'
@@ -42,18 +49,56 @@ interface AnimalNutritionModuleProps {
   setActiveSubTab?: (tab: string) => void;
 }
 
+const SUBTAB_ALIAS_MAP: Record<string, NutritionSubTab> = {
+  dashboard: 'dashboard',
+  formulador: 'formulador',
+  formulacao: 'formulador',
+  formulation: 'formulador',
+  laudo: 'formulador',
+  animais: 'animais',
+  alimentos: 'alimentos',
+  ingredientes: 'alimentos',
+  ingredients: 'alimentos',
+  premistura: 'alimentos',
+  custos: 'custos',
+  cenarios: 'cenarios',
+  dietas: 'cenarios',
+  forragens: 'forragens',
+  forage: 'forragens',
+  gemeo_digital: 'gemeo_digital',
+};
+
+const NAV_TABS: Array<{ id: NutritionSubTab; label: string; icon: React.ComponentType<{ className?: string }> }> = [
+  { id: 'dashboard', label: 'Visão Geral', icon: LayoutGrid },
+  { id: 'formulador', label: 'Formulador', icon: Calculator },
+  { id: 'animais', label: 'Lotes & Perfis', icon: Users },
+  { id: 'alimentos', label: 'Ingredientes', icon: Package },
+  { id: 'custos', label: 'Custos & IOFC', icon: DollarSign },
+  { id: 'cenarios', label: 'Cenários', icon: GitCompare },
+  { id: 'forragens', label: 'Forragens', icon: Wheat },
+  { id: 'gemeo_digital', label: 'Gêmeo Digital', icon: Activity },
+];
+
 export const AnimalNutritionModule: React.FC<AnimalNutritionModuleProps> = ({
   activeSubTab: externalActiveSubTab,
   setActiveSubTab: externalSetActiveSubTab,
 }) => {
   const [internalActiveSubTab, setInternalActiveSubTab] = useState<NutritionSubTab>('dashboard');
+  const [selectedSpecies, setSelectedSpecies] = useState<AnimalSpecies | 'todas'>('todas');
+  const [pendingProfileForDiet, setPendingProfileForDiet] = useState<AnimalProfile | null>(null);
 
-  const activeSubTab = (externalActiveSubTab as NutritionSubTab) || internalActiveSubTab;
-  const setActiveSubTab = (tab: string | NutritionSubTab) => {
+  const activeSubTab: NutritionSubTab = useMemo(() => {
+    if (externalActiveSubTab && SUBTAB_ALIAS_MAP[externalActiveSubTab]) {
+      return SUBTAB_ALIAS_MAP[externalActiveSubTab];
+    }
+    return internalActiveSubTab;
+  }, [externalActiveSubTab, internalActiveSubTab]);
+
+  const setActiveSubTab = (tab: string) => {
+    const normalized = SUBTAB_ALIAS_MAP[tab] || 'dashboard';
+    setInternalActiveSubTab(normalized);
     if (externalSetActiveSubTab) {
-      externalSetActiveSubTab(tab);
-    } else {
-      setInternalActiveSubTab(tab as NutritionSubTab);
+      externalSetActiveSubTab(normalized);
     }
   };
 
@@ -62,7 +107,9 @@ export const AnimalNutritionModule: React.FC<AnimalNutritionModuleProps> = ({
     try {
       const saved = localStorage.getItem('gea_nutrition_animal_profiles');
       const parsed = saved ? JSON.parse(saved) : DEFAULT_ANIMAL_PROFILES;
-      return Array.isArray(parsed) ? parsed.filter(p => p && typeof p === 'object' && p.id) : DEFAULT_ANIMAL_PROFILES;
+      return Array.isArray(parsed)
+        ? parsed.filter((p): p is AnimalProfile => Boolean(p && typeof p === 'object' && p.id))
+        : DEFAULT_ANIMAL_PROFILES;
     } catch {
       return DEFAULT_ANIMAL_PROFILES;
     }
@@ -72,7 +119,9 @@ export const AnimalNutritionModule: React.FC<AnimalNutritionModuleProps> = ({
     try {
       const saved = localStorage.getItem('gea_nutrition_ingredients');
       const parsed = saved ? JSON.parse(saved) : NATIONAL_FEED_DATABASE;
-      return Array.isArray(parsed) ? parsed.filter(i => i && typeof i === 'object' && i.id) : NATIONAL_FEED_DATABASE;
+      return Array.isArray(parsed) && parsed.length > 0
+        ? parsed.filter((i): i is FeedIngredient => Boolean(i && typeof i === 'object' && i.id))
+        : NATIONAL_FEED_DATABASE;
     } catch {
       return NATIONAL_FEED_DATABASE;
     }
@@ -82,7 +131,9 @@ export const AnimalNutritionModule: React.FC<AnimalNutritionModuleProps> = ({
     try {
       const saved = localStorage.getItem('gea_nutrition_formulations');
       const parsed = saved ? JSON.parse(saved) : DEFAULT_DIET_FORMULATIONS;
-      return Array.isArray(parsed) ? parsed.filter(d => d && typeof d === 'object' && d.id) : DEFAULT_DIET_FORMULATIONS;
+      return Array.isArray(parsed)
+        ? parsed.filter((d): d is DietFormulation => Boolean(d && typeof d === 'object' && d.id))
+        : DEFAULT_DIET_FORMULATIONS;
     } catch {
       return DEFAULT_DIET_FORMULATIONS;
     }
@@ -92,14 +143,16 @@ export const AnimalNutritionModule: React.FC<AnimalNutritionModuleProps> = ({
     try {
       const saved = localStorage.getItem('gea_nutrition_forage_plans');
       const parsed = saved ? JSON.parse(saved) : DEFAULT_FORAGE_PLANS;
-      return Array.isArray(parsed) ? parsed.filter(p => p && typeof p === 'object' && p.id) : DEFAULT_FORAGE_PLANS;
+      return Array.isArray(parsed)
+        ? parsed.filter((p): p is ForageProductionPlan => Boolean(p && typeof p === 'object' && p.id))
+        : DEFAULT_FORAGE_PLANS;
     } catch {
       return DEFAULT_FORAGE_PLANS;
     }
   });
 
   const [activeFormulationId, setActiveFormulationId] = useState<string>(
-    DEFAULT_DIET_FORMULATIONS[0]?.id || ''
+    () => formulations[0]?.id || ''
   );
 
   const [reportModalDiet, setReportModalDiet] = useState<DietFormulation | null>(null);
@@ -121,15 +174,13 @@ export const AnimalNutritionModule: React.FC<AnimalNutritionModuleProps> = ({
     localStorage.setItem('gea_nutrition_forage_plans', JSON.stringify(foragePlans));
   }, [foragePlans]);
 
-  // Current active diet for studio / digital twin
   const currentFormulation =
-    (formulations || []).find((f) => f?.id === activeFormulationId) || formulations?.[0] || null;
+    formulations.find((f) => f.id === activeFormulationId) || formulations[0] || null;
 
-  // Handlers for Animal Profiles
   const handleSaveProfile = (profile: AnimalProfile) => {
-    if (!profile || !profile.id) return;
+    if (!profile?.id) return;
     setAnimalProfiles((prev) => {
-      const idx = prev.findIndex((p) => p?.id === profile.id);
+      const idx = prev.findIndex((p) => p.id === profile.id);
       if (idx >= 0) {
         const next = [...prev];
         next[idx] = profile;
@@ -140,14 +191,13 @@ export const AnimalNutritionModule: React.FC<AnimalNutritionModuleProps> = ({
   };
 
   const handleDeleteProfile = (id: string) => {
-    setAnimalProfiles((prev) => prev.filter((p) => p?.id !== id));
+    setAnimalProfiles((prev) => prev.filter((p) => p.id !== id));
   };
 
-  // Handlers for Ingredients
   const handleSaveIngredient = (ing: FeedIngredient) => {
-    if (!ing || !ing.id) return;
+    if (!ing?.id) return;
     setIngredients((prev) => {
-      const idx = prev.findIndex((i) => i?.id === ing.id);
+      const idx = prev.findIndex((i) => i.id === ing.id);
       if (idx >= 0) {
         const next = [...prev];
         next[idx] = ing;
@@ -158,14 +208,13 @@ export const AnimalNutritionModule: React.FC<AnimalNutritionModuleProps> = ({
   };
 
   const handleDeleteIngredient = (id: string) => {
-    setIngredients((prev) => prev.filter((i) => i?.id !== id));
+    setIngredients((prev) => prev.filter((i) => i.id !== id));
   };
 
-  // Handlers for Formulations
   const handleSaveFormulation = (diet: DietFormulation) => {
-    if (!diet || !diet.id) return;
+    if (!diet?.id) return;
     setFormulations((prev) => {
-      const idx = prev.findIndex((d) => d?.id === diet.id);
+      const idx = prev.findIndex((d) => d.id === diet.id);
       if (idx >= 0) {
         const next = [...prev];
         next[idx] = diet;
@@ -174,13 +223,13 @@ export const AnimalNutritionModule: React.FC<AnimalNutritionModuleProps> = ({
       return [diet, ...prev];
     });
     setActiveFormulationId(diet.id);
+    setPendingProfileForDiet(null);
   };
 
-  // Handlers for Forage Plans
   const handleSaveForagePlan = (plan: ForageProductionPlan) => {
-    if (!plan || !plan.id) return;
+    if (!plan?.id) return;
     setForagePlans((prev) => {
-      const idx = prev.findIndex((p) => p?.id === plan.id);
+      const idx = prev.findIndex((p) => p.id === plan.id);
       if (idx >= 0) {
         const next = [...prev];
         next[idx] = plan;
@@ -191,78 +240,99 @@ export const AnimalNutritionModule: React.FC<AnimalNutritionModuleProps> = ({
   };
 
   const handleDeleteForagePlan = (id: string) => {
-    setForagePlans((prev) => prev.filter((p) => p?.id !== id));
+    setForagePlans((prev) => prev.filter((p) => p.id !== id));
   };
 
-  // Handlers for Digital Twin
   const handleAddValidation = (dietId: string, validation: DigitalTwinValidation) => {
     setFormulations((prev) =>
-      prev.map((d) => {
-        if (d.id === dietId) {
-          return {
-            ...d,
-            digitalTwin: [validation, ...(d.digitalTwin || [])],
-          };
-        }
-        return d;
-      })
+      prev.map((d) =>
+        d.id === dietId
+          ? { ...d, digitalTwin: [validation, ...(d.digitalTwin || [])] }
+          : d
+      )
     );
   };
 
   return (
-    <div id="animal-nutrition-master-module" className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-      {/* Module Title & Quick Summary Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl">
+    <div id="animal-nutrition-master-module" className="p-3 sm:p-5 max-w-7xl mx-auto space-y-4">
+      {/* Compact Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <div className="flex items-center gap-2.5">
-            <span className="px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-              Módulo Técnico Zootécnico &bull; 100% Offline
-            </span>
-            <span className="text-xs text-slate-400">NRC 2001 & BR-CORTE 2016</span>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-1 flex items-center gap-2">
+          <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight">
             Nutrição Animal & Formulação de Dietas
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-            Otimização linear de menor custo, balanço de aminoácidos/minerais, previsão de desempenho e índice IGEN
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Otimização linear de menor custo, balanço bromatológico NRC 2001 / BR-CORTE, margem IOFC e índice IGEN
           </p>
         </div>
 
-        {/* Quick Top Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {currentFormulation && (
             <button
+              type="button"
               onClick={() => setReportModalDiet(currentFormulation)}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all"
+              className="h-8 px-3 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-md inline-flex items-center gap-1.5 whitespace-nowrap transition-colors"
             >
-              <Printer className="w-4 h-4 text-emerald-400" />
+              <Printer className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               Imprimir Batelada
             </button>
           )}
         </div>
       </div>
 
+      {/* Horizontal Sub-Navigation Strip */}
+      <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-800 pb-2">
+        {NAV_TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeSubTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveSubTab(tab.id)}
+              className={`h-8 px-3 rounded-md text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-colors ${
+                isActive
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Sub-Views Content */}
-      <div className="mt-4">
+      <div>
         {activeSubTab === 'dashboard' && (
           <NutritionDashboard
             formulations={formulations}
             animalProfiles={animalProfiles}
             ingredients={ingredients}
             foragePlans={foragePlans}
+            selectedSpecies={selectedSpecies}
+            onSelectSpecies={setSelectedSpecies}
             onSelectDiet={(dietId) => {
               setActiveFormulationId(dietId);
+              setPendingProfileForDiet(null);
               setActiveSubTab('formulador');
             }}
-            onNavigateTab={(tab) => setActiveSubTab(tab as NutritionSubTab)}
+            onNavigateTab={(tab) => setActiveSubTab(tab)}
           />
         )}
 
         {activeSubTab === 'formulador' && (
           <FormulationStudio
             formulation={currentFormulation}
+            formulations={formulations}
+            initialProfile={pendingProfileForDiet}
             animalProfiles={animalProfiles}
             ingredients={ingredients}
+            onSelectFormulation={(dietId) => {
+              setActiveFormulationId(dietId);
+              setPendingProfileForDiet(null);
+            }}
             onSaveFormulation={handleSaveFormulation}
             onOpenReport={(diet) => setReportModalDiet(diet)}
           />
@@ -273,7 +343,8 @@ export const AnimalNutritionModule: React.FC<AnimalNutritionModuleProps> = ({
             profiles={animalProfiles}
             onSaveProfile={handleSaveProfile}
             onDeleteProfile={handleDeleteProfile}
-            onStartFormulation={(profile) => {
+            onFormulateForProfile={(profile) => {
+              setPendingProfileForDiet(profile);
               setActiveSubTab('formulador');
             }}
           />
@@ -288,17 +359,21 @@ export const AnimalNutritionModule: React.FC<AnimalNutritionModuleProps> = ({
         )}
 
         {activeSubTab === 'custos' && (
-          <CostAnalysisView formulations={formulations} ingredients={ingredients} />
+          <CostAnalysisView
+            formulations={formulations}
+            ingredients={ingredients}
+            onNavigateFormulator={() => setActiveSubTab('formulador')}
+          />
         )}
 
         {activeSubTab === 'cenarios' && (
           <ScenarioSimulatorView
             formulations={formulations}
-            ingredients={ingredients}
             onApplyScenario={(diet) => {
               handleSaveFormulation(diet);
               setActiveSubTab('formulador');
             }}
+            onNavigateFormulator={() => setActiveSubTab('formulador')}
           />
         )}
 
@@ -310,10 +385,13 @@ export const AnimalNutritionModule: React.FC<AnimalNutritionModuleProps> = ({
           />
         )}
 
-        {activeSubTab === 'gemeo_digital' && currentFormulation && (
+        {activeSubTab === 'gemeo_digital' && (
           <DigitalTwinView
             formulation={currentFormulation}
+            formulations={formulations}
+            onSelectFormulation={(dietId) => setActiveFormulationId(dietId)}
             onAddValidation={handleAddValidation}
+            onNavigateFormulator={() => setActiveSubTab('formulador')}
           />
         )}
       </div>

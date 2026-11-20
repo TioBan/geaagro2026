@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { CheckCircle2, X } from 'lucide-react';
 import { Farm, RuralProducer, Agronomist, Company, SoilSample, LeafSample } from '../types/agronomy';
 import { CROPS_CATALOG } from '../data/agronomicStandards';
 import {
@@ -35,53 +36,65 @@ export const DashboardModule: React.FC<DashboardModuleProps> = ({
   setSelectedFarmId,
   setActiveSubTab,
 }) => {
-  // Toast notification state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (toastMessage) {
-      const timer = setTimeout(() => setToastMessage(null), 3500);
-      return () => clearTimeout(timer);
-    }
+    if (!toastMessage) return;
+    const timer = window.setTimeout(() => setToastMessage(null), 3500);
+    return () => window.clearTimeout(timer);
   }, [toastMessage]);
 
-  // Farm area and count calculations
-  const totalFarmsCount = useMemo(() => farms.filter(f => f && f.id).length, [farms]);
-
-  const totalAreaHa = useMemo(() => {
-    return farms.reduce((acc, f) => acc + (Number(f?.totalAreaHa) || 0), 0);
+  const { totalFarmsCount, totalAreaHa, totalCultivatedAreaHa } = useMemo(() => {
+    let count = 0;
+    let total = 0;
+    let cultivated = 0;
+    for (const f of farms) {
+      if (!f?.id) continue;
+      count += 1;
+      total += Number(f.totalAreaHa) || 0;
+      cultivated += Number(f.cultivatedAreaHa) || 0;
+    }
+    return { totalFarmsCount: count, totalAreaHa: total, totalCultivatedAreaHa: cultivated };
   }, [farms]);
 
-  const totalCultivatedAreaHa = useMemo(() => {
-    return farms.reduce((acc, f) => acc + (Number(f?.cultivatedAreaHa) || 0), 0);
-  }, [farms]);
-
-  // Active crop resolution
-  const activeCrop = useMemo(() => {
-    const firstPlotCrop = farm?.plots?.[0]?.currentCrop;
-    return (
-      CROPS_CATALOG.find(c => c.name.toLowerCase().includes((firstPlotCrop || 'soja').toLowerCase())) ||
-      CROPS_CATALOG[0]
+  const { activeCrop, registeredCropName } = useMemo(() => {
+    const plotWithCrop = farm?.plots?.find((p) => p?.currentCrop && p.currentCrop.trim().length > 0);
+    const rawCropName = plotWithCrop?.currentCrop?.trim();
+    if (!rawCropName) {
+      return { activeCrop: undefined, registeredCropName: undefined };
+    }
+    const normalized = rawCropName.toLowerCase();
+    const matched = CROPS_CATALOG.find(
+      (c) =>
+        c.name.toLowerCase().includes(normalized) ||
+        normalized.includes(c.id.replace(/_/g, ' ')) ||
+        c.id.toLowerCase() === normalized
     );
+    return {
+      activeCrop: matched,
+      registeredCropName: matched ? matched.name : rawCropName,
+    };
   }, [farm]);
 
   return (
-    <div className="space-y-8 animate-fade-in pb-12">
-      {/* Toast Feedback */}
+    <div className="max-w-7xl mx-auto space-y-6 pb-10">
+      {/* Feedback Toast */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-emerald-800 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 border border-emerald-600 animate-slide-up">
-          <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
-          <span className="text-xs font-bold">{toastMessage}</span>
+        <div className="fixed bottom-5 right-5 z-50 bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-900/60 text-slate-800 dark:text-zinc-100 px-3.5 py-2.5 rounded-xl shadow-md flex items-center gap-2.5 max-w-sm">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span className="text-xs font-medium leading-snug">{toastMessage}</span>
           <button
+            type="button"
             onClick={() => setToastMessage(null)}
-            className="text-emerald-300 hover:text-white text-xs ml-2 font-bold cursor-pointer"
+            aria-label="Fechar aviso"
+            className="text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 ml-1 shrink-0 cursor-pointer"
           >
-            ✕
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
-      {/* 1. Producer Header & Overview Metrics */}
+      {/* 1. Cabeçalho Consolidado */}
       <DashboardHeaderBanner
         producer={producer}
         totalFarmsCount={totalFarmsCount}
@@ -89,18 +102,21 @@ export const DashboardModule: React.FC<DashboardModuleProps> = ({
         totalCultivatedAreaHa={totalCultivatedAreaHa}
       />
 
-      {/* 2. KPI Cards & Interactive Calculation Methodology */}
+      {/* 2. Indicadores Consolidados & Base de Cálculo */}
       <DashboardKpiSection
         farmId={farm?.id}
         totalCultivatedAreaHa={totalCultivatedAreaHa}
         totalAreaHa={totalAreaHa}
-        activeCropName={activeCrop?.name}
+        activeCropName={registeredCropName}
         activeCropTargetVPercent={activeCrop?.targetVPercent}
+        activeCropYieldTarget={activeCrop?.defaultYieldTarget}
+        activeCropYieldUnit={activeCrop?.expectedYieldUnit}
         onNavigateToCosts={() => {
           setActiveTab('custos');
-          if (setActiveSubTab) {
-            setActiveSubTab('painel_geral');
-          }
+          setActiveSubTab?.('painel_geral');
+        }}
+        onNavigateToCadastros={() => {
+          setActiveTab('cadastros');
         }}
       />
 
@@ -114,7 +130,7 @@ export const DashboardModule: React.FC<DashboardModuleProps> = ({
         }}
       />
 
-      {/* 4. Farm Summaries & Latest Soil Samples */}
+      {/* 4. Resumo das Fazendas & Última Análise */}
       <DashboardFarmsSummary
         farms={farms}
         activeFarm={farm}
@@ -124,7 +140,7 @@ export const DashboardModule: React.FC<DashboardModuleProps> = ({
         setActiveTab={setActiveTab}
       />
 
-      {/* 5. Actionable Pending Recommendations */}
+      {/* 5. Recomendações Pendentes de Campo */}
       <DashboardRecommendationsSection
         farms={farms}
         setSelectedFarmId={setSelectedFarmId}
@@ -132,7 +148,7 @@ export const DashboardModule: React.FC<DashboardModuleProps> = ({
         onShowToast={setToastMessage}
       />
 
-      {/* 6. Diagnostic Tools & Climatology */}
+      {/* 6. Diagnósticos & Climatologia */}
       <DashboardDiagnosticsSection
         farm={farm}
         soilSamples={soilSamples}

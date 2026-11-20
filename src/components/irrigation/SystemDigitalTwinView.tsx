@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
-import { IrrigationSystemRecord, ClimateDayRecord, IrrigationKPIs } from '../../types/irrigation';
-import { Activity, Droplets, Gauge, Layers, Radio, ShieldCheck, Sun, Zap, Sparkles } from 'lucide-react';
+import {
+  IrrigationSystemRecord,
+  ClimateDayRecord,
+  IrrigationKPIs,
+} from '../../types/irrigation';
+import { Droplets, ShieldCheck, Activity, Layers } from 'lucide-react';
+import { formatBrDate } from './irrigationUi';
 
 interface Props {
   systems: IrrigationSystemRecord[];
@@ -16,217 +21,287 @@ export const SystemDigitalTwinView: React.FC<Props> = ({
   const [twinMode, setTwinMode] = useState<'system' | 'plot'>('system');
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
 
-  const activeSystem = (selectedSystemId ? systems.find(s => s.id === selectedSystemId) : null) || systems[0] || null;
+  const activeSystem =
+    (selectedSystemId ? systems.find((s) => s.id === selectedSystemId) : null) ||
+    systems[0] ||
+    null;
+
+  const latestClimate = climate[climate.length - 1] || null;
 
   if (systems.length === 0 || !activeSystem) {
     return (
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-12 text-center space-y-4">
-        <div className="w-16 h-16 bg-slate-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto text-slate-400">
-          <Droplets className="w-8 h-8" />
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-8 text-center space-y-2">
+        <div className="w-10 h-10 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-sky-600 dark:text-sky-400 flex items-center justify-center mx-auto">
+          <Droplets className="w-5 h-5" />
         </div>
-        <div className="space-y-1">
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white">Nenhum Sistema de Irrigação</h3>
-          <p className="text-sm text-slate-500 max-w-sm mx-auto">Cadastre primeiro seus pivôs ou sistemas fixos para visualizar o gêmeo digital.</p>
-        </div>
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+          Nenhum Sistema de Irrigação Cadastrado
+        </h3>
+        <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-sm mx-auto">
+          Cadastre seus pivôs ou sistemas fixos na aba Sistemas para acompanhar a modelagem operacional e o perfil hídrico do talhão.
+        </p>
       </div>
     );
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Banner Digital Twin Header */}
-      <div className="bg-gradient-to-r from-cyan-950 via-teal-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-cyan-800/40 space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 text-xs font-black uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5" /> Gêmeo Digital Agrícola 360°
-            </div>
-            <h2 className="text-2xl font-black">Modelagem Virtual em Tempo Real</h2>
-            <p className="text-xs text-cyan-100/80">
-              Acompanhe a dinâmica hídrica do solo e a telemetria operacional dos pivôs e emissores
-            </p>
-          </div>
+  // Derive realistic soil profile percentages from latest climate balance when available
+  const baseMoisture =
+    kpis.currentSoilMoisturePct > 0
+      ? kpis.currentSoilMoisturePct
+      : latestClimate
+      ? Math.max(
+          45,
+          Math.min(
+            95,
+            Math.round(78 + (latestClimate.effectiveRainfallMm - latestClimate.et0MmDay) * 2)
+          )
+        )
+      : 75;
 
-          <div className="flex items-center gap-2 bg-cyan-900/40 p-1.5 rounded-2xl border border-cyan-700/40">
-            <button
-              onClick={() => setTwinMode('system')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                twinMode === 'system'
-                  ? 'bg-cyan-500 text-white shadow-xs'
-                  : 'text-cyan-200 hover:text-white'
-              }`}
-            >
-              Gêmeo do Sistema
-            </button>
-            <button
-              onClick={() => setTwinMode('plot')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                twinMode === 'plot'
-                  ? 'bg-cyan-500 text-white shadow-xs'
-                  : 'text-cyan-200 hover:text-white'
-              }`}
-            >
-              Gêmeo do Talhão
-            </button>
-          </div>
+  const soilLayers = [
+    {
+      label: 'Camada 0 – 20 cm (Zona Superficial)',
+      pct: Math.max(30, Math.min(100, baseMoisture - 3)),
+    },
+    {
+      label: 'Camada 20 – 40 cm (Zona Radicular Efetiva)',
+      pct: Math.max(30, Math.min(100, baseMoisture)),
+    },
+    {
+      label: 'Camada 40 – 60 cm (Subsolo / Reserva)',
+      pct: Math.max(30, Math.min(100, baseMoisture + 4)),
+    },
+  ];
+
+  const estimatedCv = Math.round(activeSystem.powerKw * 1.3596);
+
+  return (
+    <div className="space-y-4">
+      {/* Header + Mode Segmented Switch */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+            <Activity className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+            Painel Operacional &amp; Balanço Hídrico do Talhão
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Visão integrada de desempenho hidráulico do sistema selecionado e reserva de umidade por camada.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1 p-1 rounded-lg bg-slate-100 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setTwinMode('system')}
+            className={`h-7 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+              twinMode === 'system'
+                ? 'bg-emerald-600 text-white'
+                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100'
+            }`}
+          >
+            Sistema
+          </button>
+          <button
+            type="button"
+            onClick={() => setTwinMode('plot')}
+            className={`h-7 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+              twinMode === 'plot'
+                ? 'bg-emerald-600 text-white'
+                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100'
+            }`}
+          >
+            Perfil do Solo
+          </button>
         </div>
       </div>
 
       {twinMode === 'system' && (
-        !activeSystem ? (
-          <div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl border border-slate-200 dark:border-zinc-800 text-center space-y-3">
-            <div className="w-12 h-12 rounded-full bg-cyan-100 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 mx-auto flex items-center justify-center">
-              <Droplets className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
-              Nenhum Sistema de Irrigação Cadastrado
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto">
-              Cadastre um pivô central, carretel ou sistema de gotejamento para ativar a telemetria e modelagem em tempo real do Gêmeo Digital.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Seleção do Pivô */}
-            <div className="space-y-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block px-1">
-                Selecione o Sistema em Operação
-              </span>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* System Selector */}
+          <div className="lg:col-span-4 space-y-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-400 block px-0.5">
+              Sistemas Disponíveis ({systems.length})
+            </span>
 
-              {systems.map(sys => (
-                <div
+            {systems.map((sys) => {
+              const selected = activeSystem.id === sys.id;
+              return (
+                <button
                   key={sys.id}
+                  type="button"
                   onClick={() => setSelectedSystemId(sys.id)}
-                  className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-                    activeSystem.id === sys.id
-                      ? 'bg-cyan-950/40 border-cyan-500 text-white'
-                      : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800'
+                  className={`w-full text-left p-3.5 rounded-xl border transition-colors cursor-pointer ${
+                    selected
+                      ? 'bg-white dark:bg-zinc-900 border-emerald-500 dark:border-emerald-600'
+                      : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700'
                   }`}
                 >
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-bold text-sm">{sys.systemName}</h4>
-                    <Radio className="w-4 h-4 text-cyan-400 animate-pulse" />
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-xs text-slate-900 dark:text-zinc-100 truncate">
+                      {sys.systemName}
+                    </span>
+                    <span
+                      className={`text-[11px] font-medium shrink-0 ${
+                        sys.status === 'Ativo'
+                          ? 'text-emerald-700 dark:text-emerald-400'
+                          : 'text-amber-700 dark:text-amber-400'
+                      }`}
+                    >
+                      {sys.status}
+                    </span>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
-                    {sys.plotName} • {sys.irrigatedAreaHa} ha
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 tabular-nums">
+                    {sys.plotName} · {sys.irrigatedAreaHa} ha · {sys.type}
                   </p>
-                </div>
-              ))}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Active System Overview */}
+          <div className="lg:col-span-8 bg-white dark:bg-zinc-900 p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-zinc-800">
+              <div>
+                <span className="text-[11px] font-medium text-sky-700 dark:text-sky-400">
+                  {activeSystem.type} · {activeSystem.plotName}
+                </span>
+                <h3 className="text-base font-semibold text-slate-900 dark:text-zinc-100">
+                  {activeSystem.systemName}
+                </h3>
+              </div>
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                <ShieldCheck className="w-4 h-4" />
+                Status: {activeSystem.status}
+              </span>
             </div>
 
-            {/* Painel Virtual do Pivô (Gêmeo do Sistema) */}
-            <div className="lg:col-span-2 bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs space-y-6">
-              <div className="flex justify-between items-center border-b border-slate-100 dark:border-zinc-800 pb-4">
-                <div>
-                  <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400 uppercase">
-                    Gêmeo Virtual Ativo
-                  </span>
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">
-                    {activeSystem.systemName}
-                  </h3>
-                </div>
+            {/* Clean Hairline SVG Hydraulic Schematic */}
+            <div className="rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 p-5 flex flex-col sm:flex-row items-center gap-5">
+              <svg
+                viewBox="0 0 120 120"
+                className="w-28 h-28 shrink-0"
+                aria-hidden="true"
+              >
+                <circle
+                  cx="60"
+                  cy="60"
+                  r="50"
+                  fill="none"
+                  strokeWidth="1.5"
+                  strokeDasharray="4 4"
+                  className="stroke-slate-300 dark:stroke-zinc-700"
+                />
+                <circle
+                  cx="60"
+                  cy="60"
+                  r="34"
+                  fill="none"
+                  strokeWidth="1.5"
+                  className="stroke-sky-500/50"
+                />
+                <circle
+                  cx="60"
+                  cy="60"
+                  r="18"
+                  fill="none"
+                  strokeWidth="1.5"
+                  className="stroke-emerald-500/60"
+                />
+                <line
+                  x1="60"
+                  y1="60"
+                  x2="104"
+                  y2="38"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  className="stroke-emerald-600 dark:stroke-emerald-400"
+                />
+                <circle cx="60" cy="60" r="4" className="fill-slate-900 dark:fill-zinc-100" />
+              </svg>
 
-                <div className="flex items-center gap-2 bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-3 py-1 rounded-xl text-xs font-bold">
-                  <ShieldCheck className="w-4 h-4" /> Telemetria Estável
+              <div className="space-y-1.5 text-center sm:text-left">
+                <div className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 tabular-nums">
+                  Conjunto Motobomba · {activeSystem.powerKw} kW (~{estimatedCv} CV) · Tarifa {activeSystem.energyTariffType}
                 </div>
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 tabular-nums">
+                  Vazão Nominal: {activeSystem.nominalFlowM3h} m³/h · Pressão: {activeSystem.operatingPressureMca} mca
+                </h4>
+                <p className="text-xs text-slate-600 dark:text-zinc-400 tabular-nums">
+                  Área coberta de {activeSystem.irrigatedAreaHa} ha ({(activeSystem.nominalFlowM3h / Math.max(1, activeSystem.irrigatedAreaHa)).toFixed(2)} m³/h/ha).
+                </p>
               </div>
+            </div>
 
-              {/* Representação Gráfica / Diagrama do Pivô */}
-              <div className="relative bg-slate-900 rounded-2xl p-6 text-white overflow-hidden flex flex-col items-center justify-center min-h-[220px] border border-cyan-800/40">
-                {activeSystem.photoUrl && (
-                  <img
-                    src={activeSystem.photoUrl}
-                    alt="Pivô Central"
-                    className="absolute inset-0 w-full h-full object-cover opacity-20"
-                  />
-                )}
-
-                <div className="relative z-10 text-center space-y-2">
-                  <div className="w-20 h-20 rounded-full border-4 border-cyan-400/80 border-t-transparent animate-spin mx-auto flex items-center justify-center">
-                    <Droplets className="w-8 h-8 text-cyan-300" />
-                  </div>
-
-                  <div className="space-y-0.5">
-                    <span className="text-xs text-cyan-300 font-mono font-bold">POSIÇÃO ANGULAR: 142° / 360°</span>
-                    <h4 className="text-lg font-black text-white">BOMBA PRINCIPAL: OPERACIONAL (100 CV)</h4>
-                    <p className="text-xs text-slate-300">
-                      Vazão Atual: {activeSystem.nominalFlowM3h} m³/h • Pressão no Centro: {activeSystem.operatingPressureMca} mca
-                    </p>
-                  </div>
-                </div>
+            <div className="grid grid-cols-3 gap-2.5 text-xs tabular-nums">
+              <div className="bg-slate-50 dark:bg-zinc-950 p-3 rounded-lg border border-slate-200 dark:border-zinc-800">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Uniformidade CUC</span>
+                <strong className="text-base text-emerald-700 dark:text-emerald-400">
+                  {activeSystem.cucPercent ?? 0}%
+                </strong>
               </div>
-
-              <div className="grid grid-cols-3 gap-3 text-center text-xs">
-                <div className="bg-slate-50 dark:bg-zinc-800/60 p-3 rounded-xl border border-slate-100 dark:border-zinc-800">
-                  <span className="text-[10px] text-slate-400 font-bold block">Uniformidade CUC</span>
-                  <strong className="text-lg text-emerald-600 dark:text-emerald-400">{activeSystem.cucPercent ?? 0}%</strong>
-                </div>
-
-                <div className="bg-slate-50 dark:bg-zinc-800/60 p-3 rounded-xl border border-slate-100 dark:border-zinc-800">
-                  <span className="text-[10px] text-slate-400 font-bold block">Distribuição CUD</span>
-                  <strong className="text-lg text-emerald-600 dark:text-emerald-400">{activeSystem.cudPercent ?? 0}%</strong>
-                </div>
-
-                <div className="bg-slate-50 dark:bg-zinc-800/60 p-3 rounded-xl border border-slate-100 dark:border-zinc-800">
-                  <span className="text-[10px] text-slate-400 font-bold block">Eficiência Ea</span>
-                  <strong className="text-lg text-cyan-600 dark:text-cyan-400">{activeSystem.applicationEfficiencyPct ?? 85}%</strong>
-                </div>
+              <div className="bg-slate-50 dark:bg-zinc-950 p-3 rounded-lg border border-slate-200 dark:border-zinc-800">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Distribuição CUD</span>
+                <strong className="text-base text-emerald-700 dark:text-emerald-400">
+                  {activeSystem.cudPercent ?? 0}%
+                </strong>
+              </div>
+              <div className="bg-slate-50 dark:bg-zinc-950 p-3 rounded-lg border border-slate-200 dark:border-zinc-800">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Eficiência Ea</span>
+                <strong className="text-base text-sky-700 dark:text-sky-400">
+                  {activeSystem.applicationEfficiencyPct ?? 85}%
+                </strong>
               </div>
             </div>
           </div>
-        )
+        </div>
       )}
 
       {twinMode === 'plot' && (
-        <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs space-y-6">
-          <div className="flex justify-between items-center border-b border-slate-100 dark:border-zinc-800 pb-4">
+        <div className="bg-white dark:bg-zinc-900 p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-zinc-800">
             <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                Gêmeo Digital do Talhão: Balanço Hídrico do Solo
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                Perfil Vertical de Umidade — {activeSystem.plotName}
               </h3>
-              <p className="text-xs text-slate-500">
-                Distribuição vertical da umidade do solo por perfil de profundidade
+              <p className="text-xs text-slate-500 dark:text-zinc-400">
+                {latestClimate
+                  ? `Baseado na leitura climática de ${formatBrDate(latestClimate.date)} (ET₀ ${latestClimate.et0MmDay} mm/dia · Chuva ${latestClimate.rainfallMm} mm).`
+                  : 'Estimativa de reserva hídrica por camada (lance leituras em Meteorologia para refinar).'}
               </p>
             </div>
-            <span className="px-3 py-1 bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300 rounded-xl text-xs font-bold">
-              Umidade Média: {kpis.currentSoilMoisturePct}% CAD
+            <span className="text-xs font-semibold tabular-nums text-sky-700 dark:text-sky-400">
+              Reserva Média: {baseMoisture}% CAD
             </span>
           </div>
 
-          {/* Perfis de Camadas de Solo */}
-          <div className="space-y-4">
-            <div className="p-4 bg-cyan-950/20 rounded-xl border border-cyan-800/40 space-y-2">
-              <div className="flex justify-between text-xs font-bold text-cyan-200">
-                <span>Camada 0 - 20 cm (Zona Superior)</span>
-                <span>82% da Capacidade de Campo</span>
+          <div className="space-y-3">
+            {soilLayers.map((layer) => (
+              <div
+                key={layer.label}
+                className="p-3.5 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 space-y-2"
+              >
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-medium text-slate-800 dark:text-zinc-200">
+                    {layer.label}
+                  </span>
+                  <strong className="tabular-nums text-sky-700 dark:text-sky-400">
+                    {layer.pct}% da Capacidade de Campo
+                  </strong>
+                </div>
+                <div className="w-full bg-slate-200 dark:bg-zinc-800 h-2 rounded-sm overflow-hidden">
+                  <div
+                    className="bg-sky-600 dark:bg-sky-500 h-full transition-all"
+                    style={{ width: `${layer.pct}%` }}
+                  />
+                </div>
               </div>
-              <div className="w-full bg-slate-200 dark:bg-zinc-800 h-3 rounded-full overflow-hidden">
-                <div className="bg-cyan-500 h-full rounded-full" style={{ width: '82%' }}></div>
-              </div>
-            </div>
-
-            <div className="p-4 bg-cyan-950/20 rounded-xl border border-cyan-800/40 space-y-2">
-              <div className="flex justify-between text-xs font-bold text-cyan-200">
-                <span>Camada 20 - 40 cm (Zona Radicular Efetiva)</span>
-                <span>78% da Capacidade de Campo</span>
-              </div>
-              <div className="w-full bg-slate-200 dark:bg-zinc-800 h-3 rounded-full overflow-hidden">
-                <div className="bg-cyan-500 h-full rounded-full" style={{ width: '78%' }}></div>
-              </div>
-            </div>
-
-            <div className="p-4 bg-cyan-950/20 rounded-xl border border-cyan-800/40 space-y-2">
-              <div className="flex justify-between text-xs font-bold text-cyan-200">
-                <span>Camada 40 - 60 cm (Subsolo/Reserva)</span>
-                <span>75% da Capacidade de Campo</span>
-              </div>
-              <div className="w-full bg-slate-200 dark:bg-zinc-800 h-3 rounded-full overflow-hidden">
-                <div className="bg-cyan-500 h-full rounded-full" style={{ width: '75%' }}></div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       )}
     </div>
   );
 };
+
+export default SystemDigitalTwinView;

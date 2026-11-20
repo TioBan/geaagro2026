@@ -1,18 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Building2,
   Plus,
   Trash2,
   Edit2,
   Check,
+  X,
   Layers,
-  ShieldCheck,
   ArrowUpRight,
   Sliders,
-  Wheat,
 } from 'lucide-react';
 import { PropriedadeRural, TalhaoRural, ConfigCulturaIntegrada } from '../../types/gestaoRural';
-import { getCropEmoji } from '../../utils/gestaoRuralStorage';
 
 interface GestaoAdministracaoPropriedadeProps {
   propriedade: PropriedadeRural;
@@ -25,6 +23,11 @@ interface GestaoAdministracaoPropriedadeProps {
   onNavigateToRegister?: () => void;
   onNavigate?: (tab: string, subTab?: string) => void;
 }
+
+const INPUT_CLASS =
+  'w-full h-9 px-3 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-950/60 text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500';
+
+const LABEL_CLASS = 'block text-[11px] font-medium text-slate-600 dark:text-zinc-400 mb-1';
 
 export const GestaoAdministracaoPropriedade: React.FC<GestaoAdministracaoPropriedadeProps> = ({
   propriedade,
@@ -39,6 +42,15 @@ export const GestaoAdministracaoPropriedade: React.FC<GestaoAdministracaoProprie
   const [isEditingPropriedade, setIsEditingPropriedade] = useState(false);
   const [propForm, setPropForm] = useState<PropriedadeRural>(propriedade);
   const [showAddTalhaoModal, setShowAddTalhaoModal] = useState(false);
+
+  useEffect(() => {
+    if (!showAddTalhaoModal) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowAddTalhaoModal(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showAddTalhaoModal]);
 
   const syncCentralFarmsStorage = (transformFarm: (farm: Record<string, any>) => Record<string, any>) => {
     try {
@@ -67,7 +79,7 @@ export const GestaoAdministracaoPropriedade: React.FC<GestaoAdministracaoProprie
     texturaSolo: 'argiloso',
     teorArgilaPct: 48,
     historicoUso: 'Rotação Soja / Milho Safrinha',
-    culturaAtual: 'Soja',
+    culturaAtual: configCultura?.cultura || 'Soja',
     culturaAnterior: 'Milho Safrinha',
     sistemaCultivo: 'Plantio Direto',
     irrigado: false,
@@ -115,7 +127,7 @@ export const GestaoAdministracaoPropriedade: React.FC<GestaoAdministracaoProprie
       texturaSolo: newTalhao.texturaSolo || 'argiloso',
       teorArgilaPct: Number(newTalhao.teorArgilaPct) || 45,
       historicoUso: newTalhao.historicoUso || '',
-      culturaAtual: newTalhao.culturaAtual || 'Soja',
+      culturaAtual: newTalhao.culturaAtual || configCultura?.cultura || 'Soja',
       culturaAnterior: newTalhao.culturaAnterior || 'Milho',
       sistemaCultivo: newTalhao.sistemaCultivo || 'Plantio Direto',
       irrigado: Boolean(newTalhao.irrigado),
@@ -133,7 +145,12 @@ export const GestaoAdministracaoPropriedade: React.FC<GestaoAdministracaoProprie
       name: created.nome,
       areaHa: created.areaHa,
       crop: created.culturaAtual,
-      soilTexture: created.texturaSolo === 'argiloso' ? 'ARGILOSO' : created.texturaSolo === 'arenoso' ? 'ARENOSO' : 'MEDIO',
+      soilTexture:
+        created.texturaSolo === 'argiloso' || created.texturaSolo === 'muito_argiloso'
+          ? 'ARGILOSO'
+          : created.texturaSolo === 'arenoso'
+          ? 'ARENOSO'
+          : 'MEDIO',
       clayPercentage: created.teorArgilaPct,
       irrigation: created.irrigado,
     };
@@ -151,7 +168,7 @@ export const GestaoAdministracaoPropriedade: React.FC<GestaoAdministracaoProprie
       texturaSolo: 'argiloso',
       teorArgilaPct: 48,
       historicoUso: 'Rotação Soja / Milho Safrinha',
-      culturaAtual: 'Soja',
+      culturaAtual: configCultura?.cultura || 'Soja',
       culturaAnterior: 'Milho Safrinha',
       sistemaCultivo: 'Plantio Direto',
       irrigado: false,
@@ -170,501 +187,475 @@ export const GestaoAdministracaoPropriedade: React.FC<GestaoAdministracaoProprie
   };
 
   return (
-    <div className="space-y-6 animate-fade-in text-xs">
-      {/* SECTION HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 shadow-2xs">
-        <div>
-          <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-extrabold uppercase text-[10px] tracking-wider">
-            <Building2 className="w-4 h-4" />
-            Módulo 1 • Cadastro Técnico Integrado ao Cadastro Central
-          </div>
-          <h2 className="text-xl font-black text-slate-900 dark:text-white">
-            Administração da Fazenda e Mapeamento de Talhões
-          </h2>
-          <p className="text-slate-500">
-            Ficha cadastral unificada, divisão agronômica de áreas, polígonos GPS e aptidão do solo
-          </p>
-        </div>
-
-        <button
-          onClick={() => {
-            if (!isEditingPropriedade) {
-              setPropForm(propriedade);
-            }
-            setIsEditingPropriedade(!isEditingPropriedade);
-          }}
-          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 shrink-0"
-        >
-          <Edit2 className="w-4 h-4" />
-          <span>{isEditingPropriedade ? 'Cancelar Edição' : 'Editar Propriedade'}</span>
-        </button>
-      </div>
-
-      {/* INTEGRATION BANNER WITH CENTRAL CADASTRO TÉCNICO */}
-      <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white rounded-3xl p-5 border border-emerald-600/40 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <div className="p-3 bg-emerald-500/20 rounded-2xl border border-emerald-400/30 text-emerald-300 shrink-0">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-400 text-emerald-950 font-black text-[10px] uppercase tracking-wider">
-                Integrado ao Cadastro Técnico Central
-              </span>
-              <span className="text-emerald-200 text-xs font-bold flex items-center gap-1">
-                <Check className="w-3.5 h-3.5 text-emerald-400" /> Sincronização em Tempo Real
-              </span>
-            </div>
-            <h3 className="text-base font-black text-white">
-              Centralização dos Dados da Propriedade, Produtor e RT
-            </h3>
-            <p className="text-xs text-emerald-100/80 max-w-2xl leading-relaxed">
-              Todos os registros cadastrais desta fazenda, proprietário, responsável técnico e talhões estão unificados com o módulo central de <strong>Cadastro Técnico (Gestão de Cadastros)</strong>.
+    <div className="space-y-5 animate-fade-in">
+      {/* PROPRIEDADE & CULTURA SUMMARY */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-200/80 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Cadastro da Propriedade Rural</span>
+            </h2>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+              Dados sincronizados com o Cadastro Técnico Central
+              {propriedade.codigoIbge ? ` · IBGE ${propriedade.codigoIbge}` : ''}
             </p>
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2 shrink-0 w-full md:w-auto justify-end">
-          {onNavigateToRegister && (
+          <div className="flex flex-wrap items-center gap-2">
+            {onNavigateToRegister && (
+              <button
+                type="button"
+                onClick={onNavigateToRegister}
+                className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white hover:bg-slate-50 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>Cadastro Central</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </button>
+            )}
             <button
-              onClick={onNavigateToRegister}
-              className="px-4 py-2.5 bg-emerald-400 hover:bg-emerald-300 text-emerald-950 font-extrabold rounded-xl text-xs transition-all shadow-md flex items-center gap-2 cursor-pointer w-full md:w-auto justify-center"
-              title="Abrir Módulo Central de Cadastro Técnico"
+              type="button"
+              onClick={() => {
+                if (!isEditingPropriedade) {
+                  setPropForm(propriedade);
+                }
+                setIsEditingPropriedade(!isEditingPropriedade);
+              }}
+              className={`h-8 px-3 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                isEditingPropriedade
+                  ? 'border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              }`}
             >
-              <Building2 className="w-4 h-4" />
-              <span>Abrir Cadastro Técnico Central</span>
-              <ArrowUpRight className="w-4 h-4" />
+              {isEditingPropriedade ? <X className="w-3.5 h-3.5" /> : <Edit2 className="w-3.5 h-3.5" />}
+              <span>{isEditingPropriedade ? 'Cancelar' : 'Editar Propriedade'}</span>
             </button>
-          )}
-        </div>
-      </div>
-
-      {/* CULTURA INTEGRADA & UNIDADES COMERCIAIS CARD */}
-      <div className="bg-gradient-to-br from-amber-500/10 via-white to-emerald-500/10 dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-850 border border-amber-500/30 rounded-3xl p-6 shadow-2xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-zinc-800 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-emerald-600 text-white flex items-center justify-center text-2xl shadow-sm shrink-0">
-              {getCropEmoji(configCultura?.cultura)}
-            </div>
-            <div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-300 font-extrabold text-[10px] uppercase tracking-wider mb-1">
-                <Wheat className="w-3 h-3 text-amber-600" />
-                <span>Cultura Agrícola Integrada</span>
-              </div>
-              <h3 className="text-base font-black text-slate-900 dark:text-white">
-                Cultura Ativa: {configCultura?.cultura || 'Banana'} {configCultura?.variedade ? `• ${configCultura.variedade}` : ''}
-              </h3>
-              <p className="text-xs text-slate-500">
-                Ajuste como a cultura é comercializada no app (ex: <strong>caixa (cx), saca (sc), kg, tonelada (ton)</strong>).
-              </p>
-            </div>
-          </div>
-
-          {onOpenConfigCultura && (
-            <button
-              onClick={onOpenConfigCultura}
-              className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold rounded-xl transition-all shadow-md cursor-pointer flex items-center gap-2 shrink-0"
-            >
-              <Sliders className="w-4 h-4 text-white" />
-              <span>Ajustar Cultura &amp; Unidades</span>
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl border border-slate-100 dark:border-zinc-700 space-y-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase block">Unidade Principal</span>
-            <span className="text-base font-black text-emerald-600 dark:text-emerald-400 block">
-              {configCultura?.unidadeComercializacaoPrincipal || 'cx'}
-            </span>
-            <span className="text-[10px] text-slate-500">
-              {configCultura?.pesoPorUnidadeKg || 20} kg por {configCultura?.unidadeComercializacaoPrincipal || 'cx'}
-            </span>
-          </div>
-
-          <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl border border-slate-100 dark:border-zinc-700 space-y-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase block">Unidades Habilitadas</span>
-            <span className="text-sm font-black text-slate-900 dark:text-white block truncate">
-              {configCultura?.unidadesHabilitadas?.join(', ') || 'cx, sc, kg, ton'}
-            </span>
-            <span className="text-[10px] text-slate-500">Opções nas vendas</span>
-          </div>
-
-          <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl border border-slate-100 dark:border-zinc-700 space-y-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase block">Preço de Referência</span>
-            <span className="text-base font-black text-amber-600 dark:text-amber-400 block">
-              R$ {configCultura?.precoReferenciaUnitarioR$?.toFixed(2) || '68.00'}
-            </span>
-            <span className="text-[10px] text-slate-500">por {configCultura?.unidadeComercializacaoPrincipal || 'cx'}</span>
-          </div>
-
-          <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl border border-slate-100 dark:border-zinc-700 space-y-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase block">Meta Produtividade</span>
-            <span className="text-base font-black text-purple-600 dark:text-purple-400 block">
-              {configCultura?.metaProdutividadePadraoHa || 1500} {configCultura?.unidadeComercializacaoPrincipal || 'cx'}/ha
-            </span>
-            <span className="text-[10px] text-slate-500">Planejamento de safra</span>
           </div>
         </div>
-      </div>
-
-      {/* PROPRIEDADE FORM / DETAILS CARD */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-2xs space-y-6">
-        <h3 className="font-black text-sm text-slate-900 dark:text-white border-b pb-3 flex items-center justify-between">
-          <span>Informações Gerais da Propriedade Rural</span>
-          <span className="text-xs text-emerald-600 font-bold">
-            Código IBGE: {propriedade.codigoIbge}
-          </span>
-        </h3>
 
         {isEditingPropriedade ? (
-          <form onSubmit={handleSavePropriedade} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <form onSubmit={handleSavePropriedade} className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             <div>
-              <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">
-                Nome da Fazenda
-              </label>
+              <label className={LABEL_CLASS}>Nome da Fazenda</label>
               <input
                 type="text"
                 value={propForm.nome}
                 onChange={e => setPropForm({ ...propForm, nome: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                className={INPUT_CLASS}
                 required
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">
-                Proprietário
-              </label>
+              <label className={LABEL_CLASS}>Proprietário</label>
               <input
                 type="text"
                 value={propForm.proprietario}
                 onChange={e => setPropForm({ ...propForm, proprietario: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                className={INPUT_CLASS}
                 required
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">
-                CPF / CNPJ
-              </label>
+              <label className={LABEL_CLASS}>CPF / CNPJ</label>
               <input
                 type="text"
                 value={propForm.documento}
                 onChange={e => setPropForm({ ...propForm, documento: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                className={INPUT_CLASS}
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">
-                Inscrição Estadual
-              </label>
+              <label className={LABEL_CLASS}>Inscrição Estadual</label>
               <input
                 type="text"
                 value={propForm.inscricaoEstadual}
                 onChange={e => setPropForm({ ...propForm, inscricaoEstadual: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                className={INPUT_CLASS}
               />
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">
-                Município
-              </label>
+              <label className={LABEL_CLASS}>Município</label>
               <input
                 type="text"
                 value={propForm.municipio}
                 onChange={e => setPropForm({ ...propForm, municipio: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                className={INPUT_CLASS}
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">
-                Estado (UF)
-              </label>
+              <label className={LABEL_CLASS}>Estado (UF)</label>
               <input
                 type="text"
                 value={propForm.estado}
                 onChange={e => setPropForm({ ...propForm, estado: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                className={INPUT_CLASS}
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">
-                Área Total (ha)
-              </label>
+              <label className={LABEL_CLASS}>Responsável Técnico</label>
               <input
-                type="number"
-                value={propForm.areaTotalHa}
-                onChange={e =>
-                  setPropForm({ ...propForm, areaTotalHa: Number(e.target.value) || 0 })
-                }
-                className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                type="text"
+                value={propForm.responsavelTecnico}
+                onChange={e => setPropForm({ ...propForm, responsavelTecnico: e.target.value })}
+                className={INPUT_CLASS}
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 dark:text-zinc-300 mb-1">
-                Área Agrícola (ha)
-              </label>
+              <label className={LABEL_CLASS}>Código IBGE</label>
               <input
-                type="number"
-                value={propForm.areaAgricolaHa}
-                onChange={e =>
-                  setPropForm({ ...propForm, areaAgricolaHa: Number(e.target.value) || 0 })
-                }
-                className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                type="text"
+                value={propForm.codigoIbge}
+                onChange={e => setPropForm({ ...propForm, codigoIbge: e.target.value })}
+                className={INPUT_CLASS}
               />
             </div>
 
-            <div className="md:col-span-4 flex justify-end gap-2 mt-2">
+            <div>
+              <label className={LABEL_CLASS}>Área Total (ha)</label>
+              <input
+                type="number"
+                step="0.1"
+                value={propForm.areaTotalHa}
+                onChange={e => setPropForm({ ...propForm, areaTotalHa: Number(e.target.value) || 0 })}
+                className={`${INPUT_CLASS} tabular-nums`}
+              />
+            </div>
+            <div>
+              <label className={LABEL_CLASS}>Área Agrícola (ha)</label>
+              <input
+                type="number"
+                step="0.1"
+                value={propForm.areaAgricolaHa}
+                onChange={e => setPropForm({ ...propForm, areaAgricolaHa: Number(e.target.value) || 0 })}
+                className={`${INPUT_CLASS} tabular-nums`}
+              />
+            </div>
+            <div>
+              <label className={LABEL_CLASS}>Área Irrigada (ha)</label>
+              <input
+                type="number"
+                step="0.1"
+                value={propForm.areaIrrigadaHa}
+                onChange={e => setPropForm({ ...propForm, areaIrrigadaHa: Number(e.target.value) || 0 })}
+                className={`${INPUT_CLASS} tabular-nums`}
+              />
+            </div>
+            <div>
+              <label className={LABEL_CLASS}>Reserva Legal (ha)</label>
+              <input
+                type="number"
+                step="0.1"
+                value={propForm.reservaLegalHa}
+                onChange={e => setPropForm({ ...propForm, reservaLegalHa: Number(e.target.value) || 0 })}
+                className={`${INPUT_CLASS} tabular-nums`}
+              />
+            </div>
+
+            <div className="sm:col-span-2 lg:col-span-4 flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-zinc-800">
+              <button
+                type="button"
+                onClick={() => setIsEditingPropriedade(false)}
+                className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer"
+              >
+                Cancelar
+              </button>
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 cursor-pointer flex items-center gap-2"
+                className="h-8 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
               >
-                <Check className="w-4 h-4" />
+                <Check className="w-3.5 h-3.5" />
                 <span>Salvar Alterações</span>
               </button>
             </div>
           </form>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-slate-700 dark:text-zinc-300">
-            <div>
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                Nome da Fazenda
-              </span>
-              <span className="font-black text-slate-900 dark:text-white text-sm">
-                {propriedade.nome}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                Proprietário
-              </span>
-              <span className="font-bold">{propriedade.proprietario}</span>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                {propriedade.tipoDocumento}
-              </span>
-              <span className="font-bold">{propriedade.documento}</span>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                Localização
-              </span>
-              <span className="font-bold">
-                {propriedade.municipio} - {propriedade.estado}
-              </span>
+          <div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80 dark:divide-zinc-800 border-b border-slate-200/80 dark:border-zinc-800">
+              <div className="p-4">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Fazenda</span>
+                <span className="text-xs font-semibold text-slate-900 dark:text-zinc-100 mt-0.5 block">
+                  {propriedade.nome || '—'}
+                </span>
+              </div>
+              <div className="p-4">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Proprietário</span>
+                <span className="text-xs font-medium text-slate-800 dark:text-zinc-200 mt-0.5 block">
+                  {propriedade.proprietario || '—'}
+                </span>
+              </div>
+              <div className="p-4">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">
+                  {propriedade.tipoDocumento} / IE
+                </span>
+                <span className="text-xs font-medium text-slate-800 dark:text-zinc-200 mt-0.5 block tabular-nums">
+                  {propriedade.documento || '—'}
+                  {propriedade.inscricaoEstadual ? ` · IE ${propriedade.inscricaoEstadual}` : ''}
+                </span>
+              </div>
+              <div className="p-4">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Localização</span>
+                <span className="text-xs font-medium text-slate-800 dark:text-zinc-200 mt-0.5 block">
+                  {propriedade.municipio || propriedade.estado
+                    ? `${propriedade.municipio || '—'}${propriedade.estado ? ` - ${propriedade.estado}` : ''}`
+                    : '—'}
+                </span>
+              </div>
             </div>
 
-            <div className="p-3 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-slate-200 dark:border-zinc-800">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                Área Total
-              </span>
-              <span className="text-base font-black text-slate-900 dark:text-white">
-                {propriedade.areaTotalHa} ha
-              </span>
-            </div>
-            <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200/60 dark:border-emerald-800/40">
-              <span className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-300 block">
-                Área Agrícola
-              </span>
-              <span className="text-base font-black text-emerald-800 dark:text-emerald-200">
-                {propriedade.areaAgricolaHa} ha
-              </span>
-            </div>
-            <div className="p-3 bg-blue-50/50 dark:bg-blue-950/30 rounded-xl border border-blue-200/60 dark:border-blue-800/40">
-              <span className="text-[10px] uppercase font-bold text-blue-700 dark:text-blue-300 block">
-                Área Irrigada
-              </span>
-              <span className="text-base font-black text-blue-800 dark:text-blue-200">
-                {propriedade.areaIrrigadaHa} ha
-              </span>
-            </div>
-            <div className="p-3 bg-amber-50/50 dark:bg-amber-950/30 rounded-xl border border-amber-200/60 dark:border-amber-800/40">
-              <span className="text-[10px] uppercase font-bold text-amber-700 dark:text-amber-300 block">
-                Reserva Legal + APP
-              </span>
-              <span className="text-base font-black text-amber-800 dark:text-amber-200">
-                {propriedade.reservaLegalHa + propriedade.appHa} ha
-              </span>
+            <div className="grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80 dark:divide-zinc-800">
+              <div className="p-4">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Área Total</span>
+                <span className="text-base font-semibold text-slate-900 dark:text-zinc-100 tabular-nums">
+                  {propriedade.areaTotalHa || 0} ha
+                </span>
+              </div>
+              <div className="p-4">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Área Agrícola</span>
+                <span className="text-base font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">
+                  {propriedade.areaAgricolaHa || 0} ha
+                </span>
+              </div>
+              <div className="p-4">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Área Irrigada</span>
+                <span className="text-base font-semibold text-sky-700 dark:text-sky-400 tabular-nums">
+                  {propriedade.areaIrrigadaHa || 0} ha
+                </span>
+              </div>
+              <div className="p-4">
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Reserva Legal + APP</span>
+                <span className="text-base font-semibold text-slate-900 dark:text-zinc-100 tabular-nums">
+                  {(propriedade.reservaLegalHa || 0) + (propriedade.appHa || 0)} ha
+                </span>
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* TALHÕES LIST & MANAGEMENT */}
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-2xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
+      {/* CULTURA INTEGRADA STRIP */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-slate-200/80 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 font-extrabold text-[10px] uppercase tracking-wider border border-emerald-300 dark:border-emerald-800/80">
-                Sincronizado com Cadastro Técnico Central
-              </span>
-            </div>
-            <h3 className="font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
-              <Layers className="w-4 h-4 text-emerald-600" />
-              Mapeamento de Talhões ({talhoes.length} Cadastrados & Centralizados)
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+              Cultura Ativa: {configCultura?.cultura || 'Banana'}
+              {configCultura?.variedade ? (
+                <span className="font-normal text-slate-500 dark:text-zinc-400"> · {configCultura.variedade}</span>
+              ) : null}
             </h3>
-            <p className="text-[11px] text-slate-500">
-              Divisão geográfica com solo, textura, irrigação e aptidão agronômica sincronizados no repositório central
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+              Parâmetros comerciais e unidades usados em safras, produtividade e vendas
             </p>
           </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            {onNavigateToRegister && (
-              <button
-                onClick={onNavigateToRegister}
-                className="px-3.5 py-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800/60 font-bold rounded-xl cursor-pointer flex items-center gap-1.5 transition-colors text-xs"
-                title="Ir para Cadastro Técnico Central de Talhões"
-              >
-                <Building2 className="w-4 h-4" />
-                <span>Gerenciar no Cadastro Técnico</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </button>
-            )}
+          {onOpenConfigCultura && (
             <button
-              onClick={() => setShowAddTalhaoModal(true)}
-              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl cursor-pointer flex items-center gap-1.5 text-xs shadow-xs"
+              type="button"
+              onClick={onOpenConfigCultura}
+              className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white hover:bg-slate-50 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer shrink-0"
             >
-              <Plus className="w-4 h-4" />
-              <span>Adicionar Novo Talhão</span>
+              <Sliders className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Ajustar Cultura</span>
             </button>
-          </div>
-        </div>
-
-        {/* TALHÕES GRID */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {talhoes.map(t => (
-            <div
-              key={t.id}
-              className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-2xl border border-slate-200 dark:border-zinc-800 space-y-3 relative group"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 rounded-md">
-                    {t.codigo}
-                  </span>
-                  <h4 className="font-black text-sm text-slate-900 dark:text-white mt-1">
-                    {t.nome}
-                  </h4>
-                </div>
-                <button
-                  onClick={() => handleDeleteTalhaoWithSync(t.id)}
-                  className="text-slate-400 hover:text-red-600 p-1 cursor-pointer transition-colors"
-                  title="Excluir Talhão"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 dark:text-zinc-300">
-                <div>
-                  <span className="block text-slate-400 font-bold">Área Total:</span>
-                  <span className="font-bold text-slate-900 dark:text-white">{t.areaHa} ha</span>
-                </div>
-                <div>
-                  <span className="block text-slate-400 font-bold">Cultura Atual:</span>
-                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                    {t.culturaAtual}
-                  </span>
-                </div>
-                <div>
-                  <span className="block text-slate-400 font-bold">Tipo de Solo:</span>
-                  <span>{t.tipoSolo}</span>
-                </div>
-                <div>
-                  <span className="block text-slate-400 font-bold">Textura / Argila:</span>
-                  <span>
-                    {t.texturaSolo} ({t.teorArgilaPct}%)
-                  </span>
-                </div>
-                <div>
-                  <span className="block text-slate-400 font-bold">Irrigado:</span>
-                  <span>{t.irrigado ? `Sim (${t.tipoSistemaIrrigacao})` : 'Não (Sequeiro)'}</span>
-                </div>
-                <div>
-                  <span className="block text-slate-400 font-bold">Declividade / Alt:</span>
-                  <span>
-                    {t.declividadePct}% | {t.altitudeMeters}m
-                  </span>
-                </div>
-              </div>
-
-              {t.observacoes && (
-                <p className="text-[10px] text-slate-500 border-t pt-2 italic">
-                  &ldquo;{t.observacoes}&rdquo;
-                </p>
-              )}
-            </div>
-          ))}
-          {talhoes.length === 0 && (
-            <div className="col-span-full p-8 text-center bg-slate-50 dark:bg-zinc-800/20 rounded-2xl border border-dashed border-slate-300 dark:border-zinc-700 text-slate-500 dark:text-zinc-400">
-              Nenhum talhão cadastrado. Clique no botão &ldquo;Adicionar Novo Talhão&rdquo; acima para cadastrar os talhões da sua propriedade.
-            </div>
           )}
         </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80 dark:divide-zinc-800">
+          <div className="p-4">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Unidade Principal</span>
+            <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">
+              {configCultura?.unidadeComercializacaoPrincipal || 'cx'} ({configCultura?.pesoPorUnidadeKg || 20} kg)
+            </span>
+          </div>
+          <div className="p-4">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Unidades Habilitadas</span>
+            <span className="text-sm font-medium text-slate-900 dark:text-zinc-100">
+              {configCultura?.unidadesHabilitadas?.join(', ') || 'cx, sc, kg, ton'}
+            </span>
+          </div>
+          <div className="p-4">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Preço Referência</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-zinc-100 tabular-nums">
+              R$ {(configCultura?.precoReferenciaUnitarioR$ ?? 68).toFixed(2)} / {configCultura?.unidadeComercializacaoPrincipal || 'cx'}
+            </span>
+          </div>
+          <div className="p-4">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">Meta Produtividade</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-zinc-100 tabular-nums">
+              {(configCultura?.metaProdutividadePadraoHa || 1500).toLocaleString('pt-BR')} {configCultura?.unidadeComercializacaoPrincipal || 'cx'}/ha
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* TALHÕES TABLE / CARDS */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-200/80 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+              <Layers className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Talhões Cadastrados ({talhoes.length})</span>
+            </h3>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+              Divisão de áreas, solo, textura e sistema de irrigação sincronizados
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowAddTalhaoModal(true)}
+            className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Novo Talhão</span>
+          </button>
+        </div>
+
+        {talhoes.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-200/80 dark:border-zinc-800 text-[11px] font-medium text-slate-500 dark:text-zinc-400 bg-slate-50/70 dark:bg-zinc-950/40">
+                  <th className="py-2.5 px-4">Código / Talhão</th>
+                  <th className="py-2.5 px-4 text-right">Área</th>
+                  <th className="py-2.5 px-4">Cultura Atual</th>
+                  <th className="py-2.5 px-4">Solo &amp; Textura</th>
+                  <th className="py-2.5 px-4">Irrigação</th>
+                  <th className="py-2.5 px-4 text-right">Relevo</th>
+                  <th className="py-2.5 px-4 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/80">
+                {talhoes.map(t => (
+                  <tr key={t.id} className="hover:bg-slate-50/70 dark:hover:bg-zinc-800/30 transition-colors">
+                    <td className="py-3 px-4">
+                      <div className="font-semibold text-slate-900 dark:text-zinc-100">{t.nome}</div>
+                      <div className="text-[11px] text-slate-500 dark:text-zinc-400 font-mono">{t.codigo}</div>
+                    </td>
+                    <td className="py-3 px-4 text-right font-semibold text-slate-900 dark:text-zinc-100 tabular-nums">
+                      {t.areaHa} ha
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="font-medium text-emerald-700 dark:text-emerald-400">{t.culturaAtual}</span>
+                      <span className="block text-[11px] text-slate-400 dark:text-zinc-500">{t.sistemaCultivo}</span>
+                    </td>
+                    <td className="py-3 px-4 text-slate-600 dark:text-zinc-300">
+                      <div>{t.tipoSolo}</div>
+                      <div className="text-[11px] text-slate-400 dark:text-zinc-500 capitalize tabular-nums">
+                        {t.texturaSolo.replace('_', ' ')} · {t.teorArgilaPct}% argila
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-slate-600 dark:text-zinc-300">
+                      {t.irrigado ? (
+                        <span className="text-sky-700 dark:text-sky-400 font-medium">
+                          {t.tipoSistemaIrrigacao || 'Irrigado'}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 dark:text-zinc-500">Sequeiro</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-right text-slate-600 dark:text-zinc-300 tabular-nums">
+                      {t.declividadePct}% · {t.altitudeMeters}m
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTalhaoWithSync(t.id)}
+                        className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                        title="Excluir talhão"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center text-xs text-slate-500 dark:text-zinc-400">
+            Nenhum talhão cadastrado. Clique em <strong className="font-medium text-slate-700 dark:text-zinc-200">Novo Talhão</strong> para mapear as áreas da propriedade.
+          </div>
+        )}
       </div>
 
       {/* ADD TALHÃO MODAL */}
       {showAddTalhaoModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-xl">
-            <h3 className="font-black text-base text-slate-900 dark:text-white border-b pb-2">
-              Cadastrar Novo Talhão
-            </h3>
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={e => {
+            if (e.target === e.currentTarget) setShowAddTalhaoModal(false);
+          }}
+        >
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl">
+            <div className="px-5 py-3.5 border-b border-slate-200/80 dark:border-zinc-800 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">Cadastrar Novo Talhão</h3>
+              <button
+                type="button"
+                onClick={() => setShowAddTalhaoModal(false)}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-            <form onSubmit={handleSaveNewTalhao} className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleSaveNewTalhao} className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="block font-bold mb-1">Código</label>
+                <label className={LABEL_CLASS}>Código</label>
                 <input
                   type="text"
                   value={newTalhao.codigo}
                   onChange={e => setNewTalhao({ ...newTalhao, codigo: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                  className={INPUT_CLASS}
                   required
                 />
               </div>
               <div>
-                <label className="block font-bold mb-1">Nome do Talhão</label>
+                <label className={LABEL_CLASS}>Nome do Talhão</label>
                 <input
                   type="text"
                   placeholder="Ex: Talhão Pivô Leste"
                   value={newTalhao.nome}
                   onChange={e => setNewTalhao({ ...newTalhao, nome: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                  className={INPUT_CLASS}
                   required
                 />
               </div>
 
               <div>
-                <label className="block font-bold mb-1">Área (ha)</label>
+                <label className={LABEL_CLASS}>Área (ha)</label>
                 <input
                   type="number"
                   step="0.1"
                   value={newTalhao.areaHa}
                   onChange={e => setNewTalhao({ ...newTalhao, areaHa: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                  className={`${INPUT_CLASS} tabular-nums`}
                   required
                 />
               </div>
               <div>
-                <label className="block font-bold mb-1">Tipo de Solo</label>
+                <label className={LABEL_CLASS}>Cultura Atual</label>
                 <input
                   type="text"
-                  value={newTalhao.tipoSolo}
-                  onChange={e => setNewTalhao({ ...newTalhao, tipoSolo: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                  value={newTalhao.culturaAtual}
+                  onChange={e => setNewTalhao({ ...newTalhao, culturaAtual: e.target.value })}
+                  className={INPUT_CLASS}
                 />
               </div>
 
               <div>
-                <label className="block font-bold mb-1">Textura</label>
+                <label className={LABEL_CLASS}>Tipo de Solo</label>
+                <input
+                  type="text"
+                  value={newTalhao.tipoSolo}
+                  onChange={e => setNewTalhao({ ...newTalhao, tipoSolo: e.target.value })}
+                  className={INPUT_CLASS}
+                />
+              </div>
+              <div>
+                <label className={LABEL_CLASS}>Textura do Solo</label>
                 <select
                   value={newTalhao.texturaSolo}
-                  onChange={e =>
-                    setNewTalhao({ ...newTalhao, texturaSolo: e.target.value as any })
-                  }
-                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
+                  onChange={e => setNewTalhao({ ...newTalhao, texturaSolo: e.target.value as TalhaoRural['texturaSolo'] })}
+                  className={INPUT_CLASS}
                 >
                   <option value="arenoso">Arenoso (&lt;15%)</option>
                   <option value="medio">Médio (15-35%)</option>
@@ -673,40 +664,30 @@ export const GestaoAdministracaoPropriedade: React.FC<GestaoAdministracaoProprie
                 </select>
               </div>
 
-              <div>
-                <label className="block font-bold mb-1">Cultura Atual</label>
-                <input
-                  type="text"
-                  value={newTalhao.culturaAtual}
-                  onChange={e => setNewTalhao({ ...newTalhao, culturaAtual: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-black"
-                />
-              </div>
-
-              <div className="col-span-2 flex items-center gap-2">
+              <div className="sm:col-span-2 flex items-center gap-2 pt-1">
                 <input
                   type="checkbox"
-                  id="irrigado"
-                  checked={newTalhao.irrigado}
+                  id="talhao-irrigado"
+                  checked={Boolean(newTalhao.irrigado)}
                   onChange={e => setNewTalhao({ ...newTalhao, irrigado: e.target.checked })}
-                  className="w-4 h-4 rounded text-emerald-600 cursor-pointer"
+                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 cursor-pointer"
                 />
-                <label htmlFor="irrigado" className="font-bold cursor-pointer">
-                  Possui Sistema de Irrigação
+                <label htmlFor="talhao-irrigado" className="text-xs font-medium text-slate-700 dark:text-zinc-300 cursor-pointer">
+                  Possui sistema de irrigação instalado
                 </label>
               </div>
 
-              <div className="col-span-2 flex justify-end gap-2 pt-2 border-t">
+              <div className="sm:col-span-2 flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setShowAddTalhaoModal(false)}
-                  className="px-4 py-2 bg-slate-200 text-slate-800 rounded-xl font-bold cursor-pointer"
+                  className="h-8 px-3 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 cursor-pointer"
+                  className="h-8 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium cursor-pointer"
                 >
                   Cadastrar Talhão
                 </button>

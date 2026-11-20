@@ -1,51 +1,39 @@
-// @ts-nocheck
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
   Compass,
   MapPin,
   Layers,
-  Plus,
   Trash2,
   Download,
   Upload,
-  Sparkles,
   CheckCircle2,
-  Clock,
-  Send,
-  FileCheck2,
-  Maximize2,
-  Minimize2,
+  AlertTriangle,
+  Info,
   RefreshCw,
   Search,
-  Filter,
   Eye,
   EyeOff,
-  Sliders,
-  Printer,
-  FileSpreadsheet,
-  AlertCircle,
-  HelpCircle,
-  Info,
-  ChevronRight,
   Check,
   Edit2,
   Edit3,
-  Save,
   Grid,
   Shuffle,
-  FileText,
   X,
-  FileCode,
   Image,
-  Database,
   ArrowRight,
   Crosshair,
-  Map as MapIcon
+  Map as MapIcon,
+  SlidersHorizontal,
 } from 'lucide-react';
-import { Farm, FieldPlot, SoilSample } from '../../types/agronomy';
-import { SoilSamplingPoint, PlotBoundary, SoilSamplingStatus, GeoTIFFOverlay } from '../../types/soilSampling';
+import { Farm, SoilSample } from '../../types/agronomy';
+import {
+  SoilSamplingPoint,
+  PlotBoundary,
+  SoilSamplingStatus,
+  GeoTIFFOverlay,
+} from '../../types/soilSampling';
 import {
   calculatePolygonAreaHa,
   calculatePolygonPerimeter,
@@ -62,62 +50,172 @@ import {
   importFromCSV,
   importFromGPKG,
   importFromGeoTIFF,
-  calculateDistanceMeters
 } from '../../utils/soilSamplingGeo';
 import {
+  AgroCity,
   BRAZILIAN_AGRO_CITIES,
   searchLocalBrazilianCities,
   searchOnlineCityNominatim,
 } from '../../data/brazilianAgroCities';
-import { VraPrescriptionModal } from './VraPrescriptionModal';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
+import {
+  SoilPointModal,
+  SoilEditPlotModal,
+  SoilExportModal,
+  SoilImportModal,
+  SoilGridModal,
+  PointFormState,
+  PlotEditFormState,
+  ImportSummaryState,
+  ExportFormatType,
+} from './SoilSamplingModals';
 
-interface SoilSamplingMapViewProps {
+const VraPrescriptionModal = lazyWithRetry(() =>
+  import('./VraPrescriptionModal').then((m) => ({ default: m.VraPrescriptionModal }))
+);
+
+export interface SoilSamplingMapViewProps {
   selectedFarm: Farm;
   soilSamples?: SoilSample[];
   onNavigateToManualSample?: (prefilledData: Partial<SoilSample>) => void;
   hideHeader?: boolean;
 }
 
+interface ToastState {
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
+
+const QUICK_AGRO_HUBS = [
+  { label: 'Sorriso (MT)', query: 'Sorriso' },
+  { label: 'Rio Verde (GO)', query: 'Rio Verde' },
+  { label: 'Cascavel (PR)', query: 'Cascavel' },
+  { label: 'LEM (BA)', query: 'Luís Eduardo Magalhães' },
+  { label: 'Dourados (MS)', query: 'Dourados' },
+  { label: 'Uberlândia (MG)', query: 'Uberlândia' },
+  { label: 'Passo Fundo (RS)', query: 'Passo Fundo' },
+  { label: 'Cristalina (GO)', query: 'Cristalina' },
+  { label: 'Balsas (MA)', query: 'Balsas' },
+  { label: 'Ribeirão Preto (SP)', query: 'Ribeirão Preto' },
+  { label: 'Sinop (MT)', query: 'Sinop' },
+  { label: 'Primavera do Leste (MT)', query: 'Primavera do Leste' },
+];
+
+const getStatusMeta = (status: SoilSamplingStatus) => {
+  switch (status) {
+    case 'planejado':
+      return {
+        hex: '#d97706',
+        dotClass: 'bg-amber-500',
+        textClass: 'text-amber-700 dark:text-amber-400',
+        label: 'Planejado',
+      };
+    case 'coletado':
+      return {
+        hex: '#2563eb',
+        dotClass: 'bg-blue-600',
+        textClass: 'text-blue-700 dark:text-blue-400',
+        label: 'Coletado',
+      };
+    case 'enviado_laboratorio':
+    case 'em_laboratorio':
+      return {
+        hex: '#7c3aed',
+        dotClass: 'bg-violet-600',
+        textClass: 'text-violet-700 dark:text-violet-400',
+        label: 'Em Laboratório',
+      };
+    case 'analisado':
+      return {
+        hex: '#059669',
+        dotClass: 'bg-emerald-600',
+        textClass: 'text-emerald-700 dark:text-emerald-400',
+        label: 'Laudo Concluído',
+      };
+    default:
+      return {
+        hex: '#64748b',
+        dotClass: 'bg-slate-500',
+        textClass: 'text-slate-600 dark:text-zinc-400',
+        label: String(status),
+      };
+  }
+};
+
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
   selectedFarm,
-  soilSamples = [],
   onNavigateToManualSample,
   hideHeader = false,
 }) => {
-  // Plots da fazenda selecionada
-  const plots = selectedFarm?.plots || [];
+  const plots = useMemo(() => selectedFarm?.plots || [], [selectedFarm?.plots]);
   const [selectedPlotId, setSelectedPlotId] = useState<string>(() => plots[0]?.id || 'plot-1');
-  const currentPlot = plots.find(p => p.id === selectedPlotId) || plots[0] || {
-    id: 'plot-1',
-    name: 'Talhão Principal',
-    areaHa: 25,
-    clayPercentage: 35
-  };
 
-  // Estado: Limites do talhão e Pontos de Amostragem (Inicia VAZIO sem dados pré-preenchidos)
+  useEffect(() => {
+    if (plots.length > 0 && !plots.some((p) => p.id === selectedPlotId)) {
+      setSelectedPlotId(plots[0].id);
+    }
+  }, [plots, selectedPlotId]);
+
+  const currentPlot = useMemo(
+    () =>
+      plots.find((p) => p.id === selectedPlotId) ||
+      plots[0] || {
+        id: 'plot-1',
+        name: 'Talhão Principal',
+        areaHa: 25,
+        clayPercentage: 35,
+      },
+    [plots, selectedPlotId]
+  );
+
+  // Estado principal (sem dados pré-preenchidos)
   const [boundaries, setBoundaries] = useState<Record<string, PlotBoundary>>({});
   const [points, setPoints] = useState<SoilSamplingPoint[]>([]);
-
-  // Camada GeoTIFF Raster carregada
   const [geotiffOverlay, setGeotiffOverlay] = useState<GeoTIFFOverlay | null>(null);
 
-  // Modos de Operação do Mapa
-  const [mapMode, setMapMode] = useState<'view' | 'draw_polygon' | 'add_point' | 'edit_vertices'>('view');
+  // Refs para evitar stale closures em handlers do Leaflet
+  const boundariesRef = useRef<Record<string, PlotBoundary>>(boundaries);
+  const pointsRef = useRef<SoilSamplingPoint[]>(points);
+  useEffect(() => {
+    boundariesRef.current = boundaries;
+  }, [boundaries]);
+  useEffect(() => {
+    pointsRef.current = points;
+  }, [points]);
+
+  // Modos do mapa
+  const [mapMode, setMapMode] = useState<'view' | 'draw_polygon' | 'add_point' | 'edit_vertices'>(
+    'view'
+  );
   const [mapLayerType, setMapLayerType] = useState<'satellite' | 'streets'>('satellite');
   const [drawingCoords, setDrawingCoords] = useState<[number, number][]>([]);
 
+  // Confirmações inline em dois passos
+  const [confirmClearAction, setConfirmClearAction] = useState<null | 'plot' | 'farm'>(null);
+  const [confirmDeletePointId, setConfirmDeletePointId] = useState<string | null>(null);
+
   // Modais
   const [isPointModalOpen, setIsPointModalOpen] = useState(false);
-  const [pendingPointCoords, setPendingPointCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [pendingPointCoords, setPendingPointCoords] = useState<{ lat: number; lng: number } | null>(
+    null
+  );
   const [editingPoint, setEditingPoint] = useState<SoilSamplingPoint | null>(null);
 
   const [isEditPlotModalOpen, setIsEditPlotModalOpen] = useState(false);
-  const [plotEditForm, setPlotEditForm] = useState({
+  const [plotEditForm, setPlotEditForm] = useState<PlotEditFormState>({
     name: '',
     crop: '',
     notes: '',
     areaHa: 0,
-    perimeterM: 0
+    perimeterM: 0,
   });
 
   const [isGridModalOpen, setIsGridModalOpen] = useState(false);
@@ -127,42 +225,36 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
   const [gridSubsamples, setGridSubsamples] = useState<number>(15);
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [exportFormat, setExportFormat] = useState<'kml' | 'kmz' | 'geojson' | 'gpkg' | 'csv' | 'geotiff'>('kml');
+  const [exportFormat, setExportFormat] = useState<ExportFormatType>('kml');
   const [isExporting, setIsExporting] = useState(false);
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importDragOver, setImportDragOver] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
-  const [importSummary, setImportSummary] = useState<{
-    file: File;
-    type: string;
-    pointsCount: number;
-    hasBoundary: boolean;
-    hasRaster: boolean;
-    parsedData: any;
-  } | null>(null);
+  const [importSummary, setImportSummary] = useState<ImportSummaryState | null>(null);
   const [importMergeMode, setImportMergeMode] = useState<'replace' | 'append'>('replace');
 
-  // Filtros & Pesquisa
+  // Filtros e toast
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [depthFilter, setDepthFilter] = useState<string>('all');
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Formulário de Cadastro e Edição de Ponto
-  const [pointForm, setPointForm] = useState({
+  // Formulário de ponto
+  const [pointForm, setPointForm] = useState<PointFormState>({
     code: '',
     lat: 0,
     lng: 0,
-    depth: '0-20' as '0-20' | '20-40' | '0-40',
+    depth: '0-20',
     date: new Date().toISOString().split('T')[0],
     subsamplesCount: 15,
-    status: 'planejado' as SoilSamplingStatus,
+    status: 'planejado',
     soilColor: 'Latossolo Vermelho Eutrófico',
     notes: '',
   });
 
-  // Referências do Mapa Leaflet
+  // Refs do Leaflet
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const polygonLayerRef = useRef<L.Polygon | null>(null);
@@ -173,53 +265,161 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Estados para Busca de Cidades
+  // Busca de cidades
   const [citySearchQuery, setCitySearchQuery] = useState('');
   const [citySearchResults, setCitySearchResults] = useState<AgroCity[]>([]);
   const [isSearchingCity, setIsSearchingCity] = useState(false);
   const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [selectedCityInfo, setSelectedCityInfo] = useState<AgroCity | null>(null);
   const cityLocationMarkerRef = useRef<L.Marker | null>(null);
-  const citySearchDebounceRef = useRef<any>(null);
+  const citySearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const citySearchContainerRef = useRef<HTMLDivElement>(null);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const showToast = useCallback(
+    (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      setToast({ message, type });
+      toastTimerRef.current = setTimeout(() => {
+        setToast(null);
+        toastTimerRef.current = null;
+      }, 3800);
+    },
+    []
+  );
+
+  // Cleanup de timers ao desmontar
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (citySearchDebounceRef.current) clearTimeout(citySearchDebounceRef.current);
+    };
+  }, []);
 
   // Fechar dropdown de cidades ao clicar fora
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (citySearchContainerRef.current && !citySearchContainerRef.current.contains(e.target as Node)) {
+      if (
+        citySearchContainerRef.current &&
+        !citySearchContainerRef.current.contains(e.target as Node)
+      ) {
         setShowCityDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Manipulador de Digitação no Campo de Busca de Cidade
+  // Persistência: Salvar limites no localStorage
+  const saveBoundariesToStorage = useCallback(
+    (updated: Record<string, PlotBoundary>) => {
+      boundariesRef.current = updated;
+      setBoundaries(updated);
+      try {
+        if (selectedFarm?.id) {
+          localStorage.setItem(
+            `geaagro_plot_boundaries_${selectedFarm.id}`,
+            JSON.stringify(updated)
+          );
+          window.dispatchEvent(
+            new CustomEvent('geaagro_plot_boundaries_updated', {
+              detail: { farmId: selectedFarm.id, boundaries: updated },
+            })
+          );
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    [selectedFarm?.id]
+  );
+
+  // Persistência: Salvar pontos no localStorage
+  const savePointsToStorage = useCallback(
+    (updated: SoilSamplingPoint[]) => {
+      pointsRef.current = updated;
+      setPoints(updated);
+      try {
+        if (selectedFarm?.id) {
+          localStorage.setItem(
+            `geaagro_soil_sampling_points_${selectedFarm.id}`,
+            JSON.stringify(updated)
+          );
+          window.dispatchEvent(
+            new CustomEvent('geaagro_soil_points_updated', {
+              detail: { farmId: selectedFarm.id, points: updated },
+            })
+          );
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    [selectedFarm?.id]
+  );
+
+  // Carregamento inicial por fazenda
+  useEffect(() => {
+    if (!selectedFarm?.id) return;
+    try {
+      const savedBoundariesStr = localStorage.getItem(
+        `geaagro_plot_boundaries_${selectedFarm.id}`
+      );
+      setBoundaries(savedBoundariesStr ? JSON.parse(savedBoundariesStr) : {});
+
+      const savedPointsStr = localStorage.getItem(
+        `geaagro_soil_sampling_points_${selectedFarm.id}`
+      );
+      setPoints(savedPointsStr ? JSON.parse(savedPointsStr) : []);
+    } catch (e) {
+      console.warn('Erro ao carregar dados de mapeamento de solo:', e);
+      setBoundaries({});
+      setPoints([]);
+    }
+  }, [selectedFarm?.id]);
+
+  // Sincronização em tempo real entre abas e módulos
+  useEffect(() => {
+    if (!selectedFarm?.id) return;
+
+    const handleExternalPoints = (e: Event) => {
+      const custom = e as CustomEvent<{ farmId?: string; points?: SoilSamplingPoint[] }>;
+      if (custom.detail?.farmId === selectedFarm.id && custom.detail?.points) {
+        setPoints(custom.detail.points);
+      }
+    };
+
+    const handleExternalBoundaries = (e: Event) => {
+      const custom = e as CustomEvent<{
+        farmId?: string;
+        boundaries?: Record<string, PlotBoundary>;
+      }>;
+      if (custom.detail?.farmId === selectedFarm.id && custom.detail?.boundaries) {
+        setBoundaries(custom.detail.boundaries);
+      }
+    };
+
+    window.addEventListener('geaagro_soil_points_updated', handleExternalPoints);
+    window.addEventListener('geaagro_plot_boundaries_updated', handleExternalBoundaries);
+    return () => {
+      window.removeEventListener('geaagro_soil_points_updated', handleExternalPoints);
+      window.removeEventListener('geaagro_plot_boundaries_updated', handleExternalBoundaries);
+    };
+  }, [selectedFarm?.id]);
+
+  // Busca de cidades
   const handleCityInputChange = (query: string) => {
     setCitySearchQuery(query);
-
     if (!query.trim() || query.trim().length < 2) {
       setCitySearchResults([]);
       setShowCityDropdown(false);
       return;
     }
 
-    // 1. Busca local instantânea (catálogo em memória de municípios agrícolas)
     const localMatches = searchLocalBrazilianCities(query, 8);
     setCitySearchResults(localMatches);
     setShowCityDropdown(true);
 
-    // 2. Busca online complementar via Nominatim OpenStreetMap com debounce
-    if (citySearchDebounceRef.current) {
-      clearTimeout(citySearchDebounceRef.current);
-    }
+    if (citySearchDebounceRef.current) clearTimeout(citySearchDebounceRef.current);
 
     citySearchDebounceRef.current = setTimeout(async () => {
       if (query.trim().length < 3) return;
@@ -228,7 +428,7 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
         const onlineMatches = await searchOnlineCityNominatim(query, 6);
         if (onlineMatches.length > 0) {
           setCitySearchResults((prev) => {
-            const seen = new Set(prev.map(c => `${c.name.toLowerCase()}-${c.state.toLowerCase()}`));
+            const seen = new Set(prev.map((c) => `${c.name.toLowerCase()}-${c.state.toLowerCase()}`));
             const merged = [...prev];
             for (const item of onlineMatches) {
               const key = `${item.name.toLowerCase()}-${item.state.toLowerCase()}`;
@@ -248,7 +448,6 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
     }, 350);
   };
 
-  // Voar até a Cidade e Centralizar Mapa
   const handleFlyToCity = (city: AgroCity) => {
     setCitySearchQuery(`${city.name} - ${city.state}`);
     setSelectedCityInfo(city);
@@ -257,54 +456,39 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
     if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
 
-    // Voo suave do Leaflet com zoom de aproximação
-    map.flyTo([city.lat, city.lng], 14, {
-      duration: 1.5,
-      easeLinearity: 0.25,
-    });
+    map.flyTo([city.lat, city.lng], 14, { duration: 1.4, easeLinearity: 0.25 });
 
-    // Remover marcador anterior de busca se houver
     if (cityLocationMarkerRef.current) {
       map.removeLayer(cityLocationMarkerRef.current);
       cityLocationMarkerRef.current = null;
     }
 
-    // Pino animado de localização
     const cityIcon = L.divIcon({
       className: 'bg-transparent border-none',
-      html: `
-        <div class="relative flex items-center justify-center">
-          <div class="absolute -top-1.5 -left-1.5 w-10 h-10 rounded-full bg-emerald-400/40 animate-ping"></div>
-          <div class="w-8 h-8 rounded-full bg-emerald-600 border-2 border-white text-white flex items-center justify-center shadow-2xl text-xs font-black">
-            📍
-          </div>
-        </div>
-      `,
-      iconSize: [32, 32],
-      iconAnchor: [16, 16],
+      html: `<div style="width:26px;height:26px;border-radius:50%;background:#059669;border:2px solid #ffffff;color:#ffffff;display:flex;align-items:center;justify-content:center;font-family:sans-serif;font-size:10px;font-weight:700;">${escapeHtml(city.state)}</div>`,
+      iconSize: [26, 26],
+      iconAnchor: [13, 13],
     });
 
     const marker = L.marker([city.lat, city.lng], { icon: cityIcon })
       .bindTooltip(
-        `<div style="font-family:sans-serif;padding:3px 6px;">
-           <strong style="font-size:12px;color:#065f46;">${city.name} - ${city.state}</strong><br/>
-           <span style="font-size:10px;color:#475569;">${city.notes || 'Região Agrícola Centralizada'}</span><br/>
-           <span style="font-size:9px;color:#059669;font-weight:bold;">Use o botão "Desenhar Contorno" para delimitar seu talhão</span>
-         </div>`,
+        `<div style="font-family:sans-serif;padding:2px 4px;">
+          <strong style="font-size:12px;color:#065f46;">${escapeHtml(city.name)} - ${escapeHtml(city.state)}</strong><br/>
+          <span style="font-size:10px;color:#475569;">${escapeHtml(city.notes || 'Região Agrícola Centralizada')}</span>
+        </div>`,
         { permanent: false, direction: 'top', offset: [0, -10] }
       )
       .addTo(map);
 
     cityLocationMarkerRef.current = marker;
-    showToast(`Mapa centralizado em ${city.name} - ${city.state}!`);
+    showToast(`Mapa centralizado em ${city.name} - ${city.state}.`, 'info');
   };
 
-  // Submissão ao Teclar Enter ou Clicar no Botão "Ir"
   const handleSearchCitySubmit = async (overrideQuery?: string) => {
     const q = overrideQuery || citySearchQuery;
     if (!q.trim()) return;
 
-    if (citySearchResults.length > 0) {
+    if (citySearchResults.length > 0 && !overrideQuery) {
       handleFlyToCity(citySearchResults[0]);
       return;
     }
@@ -316,28 +500,29 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
         handleFlyToCity(local[0]);
         return;
       }
-
       const online = await searchOnlineCityNominatim(q, 5);
       if (online.length > 0) {
         handleFlyToCity(online[0]);
       } else {
-        showToast(`Cidade "${q}" não localizada. Tente informar o estado (ex: Sorriso MT).`);
+        showToast(
+          `Cidade "${q}" não localizada. Informe o estado (ex: Sorriso MT).`,
+          'error'
+        );
       }
-    } catch (err) {
-      showToast('Erro ao consultar a localização da cidade.');
+    } catch {
+      showToast('Erro ao consultar a localização da cidade.', 'error');
     } finally {
       setIsSearchingCity(false);
     }
   };
 
-  // Centralizar na Posição GPS do Usuário
   const handleCenterGPS = () => {
     if (!navigator.geolocation) {
-      alert('Geolocalização não suportada no seu dispositivo.');
+      showToast('Geolocalização não suportada neste dispositivo.', 'error');
       return;
     }
 
-    showToast('Buscando sinal GPS do seu dispositivo...');
+    showToast('Buscando sinal GPS do dispositivo...', 'info');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
@@ -350,180 +535,111 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
 
           const gpsIcon = L.divIcon({
             className: 'bg-transparent border-none',
-            html: `
-              <div class="relative flex items-center justify-center">
-                <div class="absolute -top-2 -left-2 w-12 h-12 rounded-full bg-blue-400/40 animate-ping"></div>
-                <div class="w-8 h-8 rounded-full bg-blue-600 border-2 border-white text-white flex items-center justify-center shadow-xl text-xs font-black">
-                  📡
-                </div>
-              </div>
-            `,
-            iconSize: [32, 32],
-            iconAnchor: [16, 16],
+            html: `<div style="width:26px;height:26px;border-radius:50%;background:#2563eb;border:2px solid #ffffff;color:#ffffff;display:flex;align-items:center;justify-content:center;font-family:sans-serif;font-size:9px;font-weight:700;">GPS</div>`,
+            iconSize: [26, 26],
+            iconAnchor: [13, 13],
           });
 
           const marker = L.marker([latitude, longitude], { icon: gpsIcon })
-            .bindTooltip(`<strong>Minha Posição GPS Atual</strong><br/><span style="font-size:10px;">${latitude.toFixed(5)}, ${longitude.toFixed(5)}</span>`, { permanent: false, direction: 'top' })
+            .bindTooltip(
+              `<strong>Posição GPS Atual</strong><br/><span style="font-size:10px;">${latitude.toFixed(5)}, ${longitude.toFixed(5)}</span>`,
+              { permanent: false, direction: 'top' }
+            )
             .addTo(mapInstanceRef.current);
 
           cityLocationMarkerRef.current = marker;
-          showToast('Centralizado na sua localização GPS atual!');
+          showToast('Mapa centralizado na localização GPS atual.');
         }
       },
       (err) => {
-        alert(`Não foi possível obter GPS: ${err.message}. Verifique as permissões de localização no navegador.`);
+        showToast(
+          `Não foi possível obter GPS: ${err.message}. Verifique as permissões do navegador.`,
+          'error'
+        );
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
-  // 1. CARREGAMENTO SEM DADOS PRÉ-PREENCHIDOS (Somente dados salvos pelo usuário)
-  useEffect(() => {
-    if (!selectedFarm?.id) return;
-    try {
-      const savedBoundariesStr = localStorage.getItem(`geaagro_plot_boundaries_${selectedFarm.id}`);
-      if (savedBoundariesStr) {
-        setBoundaries(JSON.parse(savedBoundariesStr));
-      } else {
-        setBoundaries({});
-      }
+  // Limpar talhão ativo (confirmado inline)
+  const executeClearPlot = () => {
+    const updatedBoundaries = { ...boundariesRef.current };
+    delete updatedBoundaries[selectedPlotId];
+    saveBoundariesToStorage(updatedBoundaries);
 
-      const savedPointsStr = localStorage.getItem(`geaagro_soil_sampling_points_${selectedFarm.id}`);
-      if (savedPointsStr) {
-        setPoints(JSON.parse(savedPointsStr));
-      } else {
-        setPoints([]);
-      }
-    } catch (e) {
-      console.warn('Erro ao carregar dados de mapeamento de solo:', e);
-      setBoundaries({});
-      setPoints([]);
+    const otherPoints = pointsRef.current.filter((p) => p.plotId !== selectedPlotId);
+    savePointsToStorage(otherPoints);
+
+    if (geotiffLayerRef.current && mapInstanceRef.current) {
+      mapInstanceRef.current.removeLayer(geotiffLayerRef.current);
+      geotiffLayerRef.current = null;
     }
-  }, [selectedFarm?.id]);
+    setGeotiffOverlay(null);
+    setDrawingCoords([]);
+    setMapMode('view');
+    setConfirmClearAction(null);
+    showToast('Contorno e pontos do talhão removidos.');
+  };
 
-  // Listener para sincronização em tempo real entre abas e módulos
-  useEffect(() => {
-    if (!selectedFarm?.id) return;
-
-    const handleExternalPoints = (e: CustomEvent) => {
-      if (e.detail?.farmId === selectedFarm.id && e.detail?.points) {
-        setPoints(e.detail.points);
-      }
-    };
-
-    const handleExternalBoundaries = (e: CustomEvent) => {
-      if (e.detail?.farmId === selectedFarm.id && e.detail?.boundaries) {
-        setBoundaries(e.detail.boundaries);
-      }
-    };
-
-    window.addEventListener('geaagro_soil_points_updated', handleExternalPoints as EventListener);
-    window.addEventListener('geaagro_plot_boundaries_updated', handleExternalBoundaries as EventListener);
-
-    return () => {
-      window.removeEventListener('geaagro_soil_points_updated', handleExternalPoints as EventListener);
-      window.removeEventListener('geaagro_plot_boundaries_updated', handleExternalBoundaries as EventListener);
-    };
-  }, [selectedFarm?.id]);
-
-  // Salvar limites no localStorage
-  const saveBoundariesToStorage = (updated: Record<string, PlotBoundary>) => {
-    setBoundaries(updated);
+  // Zerar toda a fazenda (confirmado inline)
+  const executeClearEntireFarm = () => {
+    boundariesRef.current = {};
+    pointsRef.current = [];
+    setBoundaries({});
+    setPoints([]);
     try {
-      if (selectedFarm?.id) {
-        localStorage.setItem(`geaagro_plot_boundaries_${selectedFarm.id}`, JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent('geaagro_plot_boundaries_updated', {
-          detail: { farmId: selectedFarm.id, boundaries: updated }
-        }));
-      }
+      localStorage.removeItem(`geaagro_plot_boundaries_${selectedFarm.id}`);
+      localStorage.removeItem(`geaagro_soil_sampling_points_${selectedFarm.id}`);
+      window.dispatchEvent(
+        new CustomEvent('geaagro_plot_boundaries_updated', {
+          detail: { farmId: selectedFarm.id, boundaries: {} },
+        })
+      );
+      window.dispatchEvent(
+        new CustomEvent('geaagro_soil_points_updated', {
+          detail: { farmId: selectedFarm.id, points: [] },
+        })
+      );
     } catch (e) {
       console.error(e);
     }
-  };
-
-  // Salvar pontos no localStorage
-  const savePointsToStorage = (updated: SoilSamplingPoint[]) => {
-    setPoints(updated);
-    try {
-      if (selectedFarm?.id) {
-        localStorage.setItem(`geaagro_soil_sampling_points_${selectedFarm.id}`, JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent('geaagro_soil_points_updated', {
-          detail: { farmId: selectedFarm.id, points: updated }
-        }));
-      }
-    } catch (e) {
-      console.error(e);
+    if (geotiffLayerRef.current && mapInstanceRef.current) {
+      mapInstanceRef.current.removeLayer(geotiffLayerRef.current);
+      geotiffLayerRef.current = null;
     }
+    setGeotiffOverlay(null);
+    setDrawingCoords([]);
+    setMapMode('view');
+    setConfirmClearAction(null);
+    showToast('Mapeamento da fazenda zerado com sucesso.');
   };
 
-  // Limpar todos os dados do mapeamento (Zerar Talhão Ativo)
-  const handleClearAllData = () => {
-    if (window.confirm('Deseja limpar todos os pontos de amostragem e contorno deste talhão? Esta ação não pode ser desfeita.')) {
-      const updatedBoundaries = { ...boundaries };
-      delete updatedBoundaries[selectedPlotId];
-      saveBoundariesToStorage(updatedBoundaries);
-
-      const otherPoints = points.filter(p => p.plotId !== selectedPlotId);
-      savePointsToStorage(otherPoints);
-
-      if (geotiffLayerRef.current && mapInstanceRef.current) {
-        mapInstanceRef.current.removeLayer(geotiffLayerRef.current);
-        geotiffLayerRef.current = null;
-      }
-      setGeotiffOverlay(null);
-      setDrawingCoords([]);
-      setMapMode('view');
-      showToast('Dados do talhão limpos com sucesso.');
-    }
-  };
-
-  // Zerar completamente todos os dados de mapeamento da fazenda
-  const handleClearEntireFarmData = () => {
-    if (window.confirm(`Deseja zerar e remover TODOS os contornos e pontos de amostragem de TODOS os talhões da fazenda ${selectedFarm?.name || ''}? O mapa ficará 100% limpo.`)) {
-      setBoundaries({});
-      setPoints([]);
-      try {
-        localStorage.removeItem(`geaagro_plot_boundaries_${selectedFarm.id}`);
-        localStorage.removeItem(`geaagro_soil_sampling_points_${selectedFarm.id}`);
-      } catch (e) {
-        console.error(e);
-      }
-      if (geotiffLayerRef.current && mapInstanceRef.current) {
-        mapInstanceRef.current.removeLayer(geotiffLayerRef.current);
-        geotiffLayerRef.current = null;
-      }
-      setGeotiffOverlay(null);
-      setDrawingCoords([]);
-      setMapMode('view');
-      showToast('Mapeamento zerado: Todos os pontos e contornos da fazenda foram removidos!');
-    }
-  };
-
-  // Limite atual do talhão selecionado
+  // Limite e pontos do talhão ativo
   const currentBoundary = boundaries[selectedPlotId];
 
-  // Pontos pertencentes ao talhão selecionado
-  const plotPoints = useMemo(() => {
-    return points.filter(p => p.plotId === selectedPlotId);
-  }, [points, selectedPlotId]);
+  const plotPoints = useMemo(
+    () => points.filter((p) => p.plotId === selectedPlotId),
+    [points, selectedPlotId]
+  );
 
-  // Pontos filtrados
   const filteredPoints = useMemo(() => {
-    return plotPoints.filter(p => {
+    const q = searchQuery.trim().toLowerCase();
+    return plotPoints.filter((p) => {
       const matchQuery =
-        !searchQuery ||
-        p.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (p.notes || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (p.soilColor || '').toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchStatus = statusFilter === 'all' || p.status === statusFilter;
+        !q ||
+        p.code.toLowerCase().includes(q) ||
+        (p.notes || '').toLowerCase().includes(q) ||
+        (p.soilColor || '').toLowerCase().includes(q);
+      const matchStatus =
+        statusFilter === 'all' ||
+        p.status === statusFilter ||
+        (statusFilter === 'enviado_laboratorio' && p.status === 'em_laboratorio');
       const matchDepth = depthFilter === 'all' || p.depth === depthFilter;
-
       return matchQuery && matchStatus && matchDepth;
     });
   }, [plotPoints, searchQuery, statusFilter, depthFilter]);
 
-  // Inicializar o Mapa Leaflet
+  // Inicializar Leaflet
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
@@ -538,19 +654,15 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
         attributionControl: false,
       });
 
-      // Satélite ESRI World Imagery
       const satLayer = L.tileLayer(
         'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         { maxZoom: 19 }
       );
-
       satLayer.addTo(map);
       tileLayerRef.current = satLayer;
 
-      // Escala métrica
       L.control.scale({ imperial: false, metric: true, position: 'bottomleft' }).addTo(map);
 
-      // Layer groups
       markersLayerRef.current = L.layerGroup().addTo(map);
       tempDrawLayerRef.current = L.layerGroup().addTo(map);
       vertexEditLayerRef.current = L.layerGroup().addTo(map);
@@ -566,42 +678,40 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
     };
   }, []);
 
-  // Alternar Camada de Fundo (Satélite vs Mapa de Ruas)
+  // Alternar camada base
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
 
-    if (tileLayerRef.current) {
-      map.removeLayer(tileLayerRef.current);
-    }
+    if (tileLayerRef.current) map.removeLayer(tileLayerRef.current);
 
     if (mapLayerType === 'satellite') {
-      const sat = L.tileLayer(
+      tileLayerRef.current = L.tileLayer(
         'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         { maxZoom: 19 }
       ).addTo(map);
-      tileLayerRef.current = sat;
     } else {
-      const streets = L.tileLayer(
+      tileLayerRef.current = L.tileLayer(
         'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
         { maxZoom: 19 }
       ).addTo(map);
-      tileLayerRef.current = streets;
     }
   }, [mapLayerType]);
 
-  // Manipulador de Clique no Mapa baseado no Modo Ativo
+  // Clique no mapa para desenho ou novo ponto
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
 
     const handleMapClick = (e: L.LeafletMouseEvent) => {
       const { lat, lng } = e.latlng;
-
       if (mapMode === 'draw_polygon') {
-        setDrawingCoords(prev => [...prev, [Number(lat.toFixed(6)), Number(lng.toFixed(6))]]);
+        setDrawingCoords((prev) => [
+          ...prev,
+          [Number(lat.toFixed(6)), Number(lng.toFixed(6))],
+        ]);
       } else if (mapMode === 'add_point') {
-        const nextNum = (plotPoints.length || 0) + 1;
+        const nextNum = plotPoints.length + 1;
         setPendingPointCoords({ lat, lng });
         setEditingPoint(null);
         setPointForm({
@@ -621,13 +731,12 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
     };
 
     map.on('click', handleMapClick);
-
     return () => {
       map.off('click', handleMapClick);
     };
   }, [mapMode, plotPoints.length]);
 
-  // Renderizar desenho temporário de novo polígono
+  // Desenho temporário de polígono
   useEffect(() => {
     if (!tempDrawLayerRef.current) return;
     tempDrawLayerRef.current.clearLayers();
@@ -653,7 +762,7 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
     }
   }, [drawingCoords]);
 
-  // Renderizar e Atualizar Polígono do Talhão
+  // Renderizar polígono do talhão
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
@@ -666,13 +775,15 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
     if (currentBoundary && currentBoundary.coordinates && currentBoundary.coordinates.length >= 3) {
       const poly = L.polygon(currentBoundary.coordinates, {
         color: '#10b981',
-        weight: 3,
+        weight: 2.5,
         fillColor: '#10b981',
-        fillOpacity: 0.18,
+        fillOpacity: 0.16,
       }).addTo(map);
 
       poly.bindTooltip(
-        `<div class="text-xs font-bold font-sans">${currentBoundary.name || currentPlot.name}<br/><span class="text-[10px] font-normal text-emerald-800">${currentBoundary.areaHa} ha | ${currentBoundary.perimeterM}m</span></div>`,
+        `<div style="font-family:sans-serif;font-size:11px;font-weight:700;">${escapeHtml(
+          currentBoundary.name || currentPlot.name
+        )}<br/><span style="font-size:10px;font-weight:500;color:#065f46;">${currentBoundary.areaHa} ha | ${currentBoundary.perimeterM} m</span></div>`,
         { permanent: true, direction: 'center', className: 'soil-plot-tooltip' }
       );
 
@@ -684,7 +795,7 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
     }
   }, [currentBoundary, selectedPlotId, mapMode, currentPlot.name]);
 
-  // MODO EDIÇÃO DE VÉRTICES DO TALHÃO NO MAPA
+  // Edição de vértices (corrigido stale closure via boundariesRef)
   useEffect(() => {
     if (!vertexEditLayerRef.current || !mapInstanceRef.current) return;
     const layer = vertexEditLayerRef.current;
@@ -696,60 +807,46 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
           draggable: true,
           icon: L.divIcon({
             className: 'vertex-drag-handle',
-            html: `
-              <div style="
-                background-color: #ffffff;
-                color: #065f46;
-                border: 2px solid #10b981;
-                border-radius: 9999px;
-                width: 22px;
-                height: 22px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 10px;
-                font-weight: 900;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-                cursor: grab;
-              ">
-                ${index + 1}
-              </div>
-            `,
+            html: `<div style="background:#ffffff;color:#065f46;border:2px solid #059669;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;cursor:grab;font-family:sans-serif;">${
+              index + 1
+            }</div>`,
             iconSize: [22, 22],
-            iconAnchor: [11, 11]
-          })
+            iconAnchor: [11, 11],
+          }),
         });
 
         marker.on('drag', (e) => {
-          const newPos = (e as any).latlng;
-          const updatedCoords = [...currentBoundary.coordinates];
+          const newPos = (e as L.LeafletEvent & { latlng: L.LatLng }).latlng;
+          const latest = boundariesRef.current[selectedPlotId];
+          if (!latest) return;
+
+          const updatedCoords: [number, number][] = [...latest.coordinates];
           updatedCoords[index] = [Number(newPos.lat.toFixed(6)), Number(newPos.lng.toFixed(6))];
 
-          const newArea = calculatePolygonAreaHa(updatedCoords);
-          const newPerimeter = calculatePolygonPerimeter(updatedCoords);
-
           const updatedBoundary: PlotBoundary = {
-            ...currentBoundary,
+            ...latest,
             coordinates: updatedCoords,
-            areaHa: newArea,
-            perimeterM: newPerimeter,
-            lastUpdated: new Date().toISOString()
+            areaHa: calculatePolygonAreaHa(updatedCoords),
+            perimeterM: calculatePolygonPerimeter(updatedCoords),
+            lastUpdated: new Date().toISOString(),
           };
 
-          setBoundaries(prev => ({ ...prev, [selectedPlotId]: updatedBoundary }));
+          const nextMap = { ...boundariesRef.current, [selectedPlotId]: updatedBoundary };
+          boundariesRef.current = nextMap;
+          setBoundaries(nextMap);
         });
 
         marker.on('dragend', () => {
-          saveBoundariesToStorage({ ...boundaries, [selectedPlotId]: boundaries[selectedPlotId] });
+          saveBoundariesToStorage({ ...boundariesRef.current });
           showToast(`Vértice ${index + 1} ajustado.`);
         });
 
         marker.addTo(layer);
       });
     }
-  }, [mapMode, currentBoundary?.coordinates]);
+  }, [mapMode, currentBoundary?.coordinates.length, selectedPlotId, saveBoundariesToStorage, showToast]);
 
-  // Renderizar Camada GeoTIFF Raster Overlay
+  // Camada GeoTIFF overlay
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
@@ -762,7 +859,7 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
     if (geotiffOverlay && geotiffOverlay.visible) {
       const overlay = L.imageOverlay(geotiffOverlay.imageUrl, geotiffOverlay.bounds, {
         opacity: geotiffOverlay.opacity,
-        interactive: false
+        interactive: false,
       }).addTo(map);
 
       geotiffLayerRef.current = overlay;
@@ -770,116 +867,106 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
     }
   }, [geotiffOverlay]);
 
-  // Auxiliar para Cores de Status
-  const getStatusColor = (status: SoilSamplingStatus) => {
-    switch (status) {
-      case 'planejado':
-        return { bg: '#f59e0b', text: '#ffffff', border: '#fcd34d', label: 'Planejado' };
-      case 'coletado':
-        return { bg: '#2563eb', text: '#ffffff', border: '#93c5fd', label: 'Coletado' };
-      case 'enviado_laboratorio':
-      case 'em_laboratorio':
-        return { bg: '#8b5cf6', text: '#ffffff', border: '#c4b5fd', label: 'Em Laboratório' };
-      case 'analisado':
-        return { bg: '#10b981', text: '#ffffff', border: '#6ee7b7', label: 'Laudo Concluído' };
-      default:
-        return { bg: '#64748b', text: '#ffffff', border: '#cbd5e1', label: status };
-    }
-  };
+  const handleOpenEditPoint = useCallback((point: SoilSamplingPoint) => {
+    setEditingPoint(point);
+    setPointForm({
+      code: point.code,
+      lat: point.lat,
+      lng: point.lng,
+      depth: point.depth === '20-40' || point.depth === '0-40' ? point.depth : '0-20',
+      date: point.date,
+      subsamplesCount: point.subsamplesCount,
+      status: point.status,
+      soilColor: point.soilColor || 'Latossolo Vermelho Eutrófico',
+      notes: point.notes || '',
+    });
+    setIsPointModalOpen(true);
+  }, []);
 
-  // Renderizar Marcadores dos Pontos de Amostragem (com suporte a Arrastar para Editar Posição)
+  const handleDeletePoint = useCallback(
+    (pointId: string) => {
+      const updated = pointsRef.current.filter((p) => p.id !== pointId);
+      savePointsToStorage(updated);
+      setConfirmDeletePointId(null);
+      showToast('Ponto de coleta excluído.');
+    },
+    [savePointsToStorage, showToast]
+  );
+
+  // Renderizar marcadores dos pontos de amostragem
   useEffect(() => {
     if (!markersLayerRef.current || !mapInstanceRef.current) return;
     const layer = markersLayerRef.current;
     layer.clearLayers();
 
     plotPoints.forEach((point) => {
-      const statusStyle = getStatusColor(point.status);
+      const statusMeta = getStatusMeta(point.status);
+      const pinLabel = escapeHtml(
+        String(point.pointNumber || point.code.replace(/\D/g, '') || 'P')
+      );
 
       const icon = L.divIcon({
         className: 'custom-soil-pin',
-        html: `
-          <div style="
-            background-color: ${statusStyle.bg};
-            color: ${statusStyle.text};
-            border: 2px solid #ffffff;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.35);
-            border-radius: 9999px;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-            font-weight: 800;
-            font-family: sans-serif;
-            cursor: pointer;
-            transition: transform 0.15s ease;
-          ">
-            ${point.pointNumber || point.code.replace(/\D/g, '') || '•'}
-          </div>
-        `,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-        popupAnchor: [0, -18],
+        html: `<div style="background:${statusMeta.hex};color:#ffffff;border:2px solid #ffffff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:sans-serif;cursor:pointer;">${pinLabel}</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+        popupAnchor: [0, -16],
       });
 
-      const marker = L.marker([point.lat, point.lng], {
-        icon,
-        draggable: true
-      });
+      const marker = L.marker([point.lat, point.lng], { icon, draggable: true });
 
-      // Evento de Arrastar Ponto para Editar Coordenadas no Mapa
       marker.on('dragend', (e) => {
-        const newPos = (e as any).target.getLatLng();
-        const updated = points.map(p => {
-          if (p.id === point.id) {
-            return {
-              ...p,
-              lat: Number(newPos.lat.toFixed(6)),
-              lng: Number(newPos.lng.toFixed(6))
-            };
-          }
-          return p;
-        });
+        const newPos = (e.target as L.Marker).getLatLng();
+        const updated = pointsRef.current.map((p) =>
+          p.id === point.id
+            ? { ...p, lat: Number(newPos.lat.toFixed(6)), lng: Number(newPos.lng.toFixed(6)) }
+            : p
+        );
         savePointsToStorage(updated);
-        showToast(`Coordenadas do ponto ${point.code} atualizadas para ${newPos.lat.toFixed(5)}, ${newPos.lng.toFixed(5)}.`);
+        showToast(
+          `Coordenadas de ${point.code} atualizadas (${newPos.lat.toFixed(5)}, ${newPos.lng.toFixed(5)}).`
+        );
       });
 
-      // Popup com Ações Rápidas
       const popupHtml = document.createElement('div');
-      popupHtml.className = 'p-1 font-sans text-xs text-slate-800 space-y-2';
+      popupHtml.style.fontFamily = 'sans-serif';
+      popupHtml.style.fontSize = '12px';
+      popupHtml.style.minWidth = '210px';
       popupHtml.innerHTML = `
-        <div class="border-b pb-1">
-          <div class="flex items-center justify-between gap-2">
-            <strong class="text-sm font-black text-slate-900">${point.code}</strong>
-            <span style="background-color: ${statusStyle.bg}; color: #ffffff;" class="px-2 py-0.5 rounded-full text-[10px] font-bold">
-              ${statusStyle.label}
+        <div style="border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin-bottom:6px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <strong style="font-size:13px;color:#0f172a;">${escapeHtml(point.code)}</strong>
+            <span style="background:${statusMeta.hex};color:#ffffff;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;">
+              ${escapeHtml(statusMeta.label)}
             </span>
           </div>
-          <div class="text-[10px] text-slate-500">${currentPlot.name} &bull; ${point.depth} cm</div>
+          <div style="font-size:10px;color:#64748b;margin-top:2px;">${escapeHtml(
+            currentPlot.name
+          )} · ${escapeHtml(point.depth)} cm</div>
         </div>
-
-        <div class="space-y-1 text-[11px]">
-          <div><strong>Data:</strong> ${point.date}</div>
-          <div><strong>Subamostras:</strong> ${point.subsamplesCount} subamostras</div>
-          <div><strong>Coordenadas:</strong> ${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}</div>
-          ${point.soilColor ? `<div><strong>Solo:</strong> ${point.soilColor}</div>` : ''}
-          ${point.notes ? `<div class="text-slate-600 italic mt-1">"${point.notes}"</div>` : ''}
-          <div class="text-[10px] text-emerald-700 bg-emerald-50 p-1 rounded font-semibold mt-1">
-            Dica: você pode arrastar este pino no mapa para ajustar a posição!
-          </div>
+        <div style="font-size:11px;color:#334155;line-height:1.5;margin-bottom:8px;">
+          <div><strong>Data:</strong> ${escapeHtml(point.date)}</div>
+          <div><strong>Subamostras:</strong> ${point.subsamplesCount}</div>
+          <div><strong>Coord:</strong> ${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}</div>
+          ${point.soilColor ? `<div><strong>Solo:</strong> ${escapeHtml(point.soilColor)}</div>` : ''}
+          ${
+            point.notes
+              ? `<div style="color:#64748b;font-style:italic;margin-top:3px;">"${escapeHtml(
+                  point.notes
+                )}"</div>`
+              : ''
+          }
+          <div style="font-size:10px;color:#047857;margin-top:4px;">Arraste o pino para ajustar a posição.</div>
         </div>
-
-        <div class="pt-2 border-t flex flex-col gap-1.5">
-          <button id="btn-create-sample-${point.id}" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-1.5 px-2 rounded-lg cursor-pointer flex items-center justify-center gap-1">
-            <span>Lançar Laudo no Módulo</span> &rarr;
+        <div style="border-top:1px solid #e2e8f0;padding-top:6px;display:flex;flex-direction:column;gap:5px;">
+          <button id="btn-create-sample-${point.id}" style="width:100%;background:#059669;color:#ffffff;border:none;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:600;cursor:pointer;">
+            Lançar Laudo no Módulo &rarr;
           </button>
-          <div class="flex items-center gap-1 justify-between">
-            <button id="btn-edit-${point.id}" class="text-slate-700 hover:text-slate-900 text-[11px] font-bold py-1 px-2.5 border rounded hover:bg-slate-100 cursor-pointer flex items-center gap-1">
-              ✏️ Editar Detalhes
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+            <button id="btn-edit-${point.id}" style="flex:1;background:#ffffff;color:#334155;border:1px solid #cbd5e1;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;">
+              Editar
             </button>
-            <button id="btn-delete-${point.id}" class="text-red-600 hover:text-red-700 text-[11px] font-bold py-1 px-2.5 border border-red-200 rounded hover:bg-red-50 cursor-pointer">
+            <button id="btn-delete-${point.id}" data-armed="false" style="flex:1;background:#ffffff;color:#dc2626;border:1px solid #fecaca;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;">
               Excluir
             </button>
           </div>
@@ -896,9 +983,11 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
               onNavigateToManualSample({
                 sampleCode: point.code,
                 plotId: point.plotId,
-                depth: (point.depth === '20-40' ? '20-40' : '0-20') as any,
+                depth: point.depth === '20-40' ? '20-40' : '0-20',
                 collectionDate: point.date,
-                notes: `Ponto georreferenciado: Lat ${point.lat}, Lng ${point.lng}. ${point.notes || ''}`
+                notes: `Ponto georreferenciado: Lat ${point.lat}, Lng ${point.lng}. ${
+                  point.notes || ''
+                }`,
               });
             }
           };
@@ -915,8 +1004,15 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
         const btnDelete = document.getElementById(`btn-delete-${point.id}`);
         if (btnDelete) {
           btnDelete.onclick = () => {
-            if (window.confirm(`Deseja realmente excluir o ponto ${point.code}?`)) {
+            if (btnDelete.getAttribute('data-armed') === 'true') {
               handleDeletePoint(point.id);
+              marker.closePopup();
+            } else {
+              btnDelete.setAttribute('data-armed', 'true');
+              btnDelete.textContent = 'Confirmar?';
+              btnDelete.style.background = '#dc2626';
+              btnDelete.style.color = '#ffffff';
+              btnDelete.style.borderColor = '#dc2626';
             }
           };
         }
@@ -924,58 +1020,47 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
 
       marker.addTo(layer);
     });
-  }, [plotPoints, currentPlot.name, onNavigateToManualSample]);
+  }, [
+    plotPoints,
+    currentPlot.name,
+    onNavigateToManualSample,
+    handleOpenEditPoint,
+    handleDeletePoint,
+    savePointsToStorage,
+    showToast,
+  ]);
 
-  // ABRIR MODAL DE EDIÇÃO DE PONTO
-  const handleOpenEditPoint = (point: SoilSamplingPoint) => {
-    setEditingPoint(point);
-    setPointForm({
-      code: point.code,
-      lat: point.lat,
-      lng: point.lng,
-      depth: point.depth as any,
-      date: point.date,
-      subsamplesCount: point.subsamplesCount,
-      status: point.status,
-      soilColor: point.soilColor || 'Latossolo Vermelho Eutrófico',
-      notes: point.notes || '',
-    });
-    setIsPointModalOpen(true);
-  };
-
-  // SALVAR / ATUALIZAR PONTO DE AMOSTRA
+  // Salvar ponto (novo ou edição)
   const handleSavePoint = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (editingPoint) {
-      // Atualizar ponto existente
-      const updated = points.map(p => {
-        if (p.id === editingPoint.id) {
-          return {
-            ...p,
-            code: pointForm.code.trim() || p.code,
-            lat: Number(pointForm.lat) || p.lat,
-            lng: Number(pointForm.lng) || p.lng,
-            depth: pointForm.depth,
-            date: pointForm.date,
-            subsamplesCount: Number(pointForm.subsamplesCount) || 15,
-            status: pointForm.status,
-            soilColor: pointForm.soilColor,
-            notes: pointForm.notes,
-          };
-        }
-        return p;
-      });
+      const updated = pointsRef.current.map((p) =>
+        p.id === editingPoint.id
+          ? {
+              ...p,
+              code: pointForm.code.trim() || p.code,
+              lat: Number(pointForm.lat) || p.lat,
+              lng: Number(pointForm.lng) || p.lng,
+              depth: pointForm.depth,
+              date: pointForm.date,
+              subsamplesCount: Number(pointForm.subsamplesCount) || 15,
+              status: pointForm.status,
+              soilColor: pointForm.soilColor,
+              notes: pointForm.notes,
+            }
+          : p
+      );
       savePointsToStorage(updated);
-      showToast(`Ponto ${pointForm.code} atualizado com sucesso!`);
+      showToast(`Ponto ${pointForm.code} atualizado.`);
     } else if (pendingPointCoords) {
-      // Criar novo ponto
+      const nextNum = plotPoints.length + 1;
       const newPoint: SoilSamplingPoint = {
         id: `point-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         farmId: selectedFarm.id,
         plotId: currentPlot.id,
-        pointNumber: (plotPoints.length || 0) + 1,
-        code: pointForm.code.trim() || `P-${((plotPoints.length || 0) + 1).toString().padStart(2, '0')}`,
+        pointNumber: nextNum,
+        code: pointForm.code.trim() || `P-${nextNum.toString().padStart(2, '0')}`,
         lat: Number(pointForm.lat || pendingPointCoords.lat),
         lng: Number(pointForm.lng || pendingPointCoords.lng),
         depth: pointForm.depth,
@@ -986,8 +1071,8 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
         notes: pointForm.notes,
         createdAt: new Date().toISOString(),
       };
-      savePointsToStorage([...points, newPoint]);
-      showToast(`Ponto ${newPoint.code} cadastrado no talhão!`);
+      savePointsToStorage([...pointsRef.current, newPoint]);
+      showToast(`Ponto ${newPoint.code} cadastrado no talhão.`);
     }
 
     setIsPointModalOpen(false);
@@ -995,49 +1080,40 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
     setPendingPointCoords(null);
   };
 
-  // EXCLUIR PONTO
-  const handleDeletePoint = (pointId: string) => {
-    const updated = points.filter(p => p.id !== pointId);
-    savePointsToStorage(updated);
-    showToast('Ponto de coleta excluído.');
-  };
-
-  // ABRIR MODAL DE EDIÇÃO DO TALHÃO
+  // Editar dados do talhão
   const handleOpenEditPlot = () => {
     setPlotEditForm({
       name: currentBoundary?.name || currentPlot.name,
-      crop: currentBoundary?.crop || (currentPlot as any).crop || '',
+      crop: currentBoundary?.crop || (currentPlot as { crop?: string }).crop || '',
       notes: currentBoundary?.notes || '',
       areaHa: currentBoundary?.areaHa || currentPlot.areaHa || 0,
-      perimeterM: currentBoundary?.perimeterM || 0
+      perimeterM: currentBoundary?.perimeterM || 0,
     });
     setIsEditPlotModalOpen(true);
   };
 
-  // SALVAR ALTERAÇÕES DO TALHÃO
   const handleSavePlotEdit = (e: React.FormEvent) => {
     e.preventDefault();
-
     if (currentBoundary) {
       const updatedBoundary: PlotBoundary = {
         ...currentBoundary,
         name: plotEditForm.name.trim() || currentPlot.name,
         crop: plotEditForm.crop.trim(),
         notes: plotEditForm.notes.trim(),
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
       };
-      saveBoundariesToStorage({ ...boundaries, [selectedPlotId]: updatedBoundary });
-      showToast(`Talhão ${plotEditForm.name} atualizado com sucesso!`);
+      saveBoundariesToStorage({ ...boundariesRef.current, [selectedPlotId]: updatedBoundary });
+      showToast(`Talhão ${plotEditForm.name} atualizado.`);
     } else {
-      showToast('Nenhum contorno desenhado para salvar metadados.');
+      showToast('Desenhe o contorno antes de salvar metadados do talhão.', 'info');
     }
     setIsEditPlotModalOpen(false);
   };
 
-  // Concluir Desenho de Polígono
+  // Desenho de polígono
   const handleFinishDrawing = () => {
     if (drawingCoords.length < 3) {
-      alert('Desenhe pelo menos 3 pontos no mapa para formar o polígono do talhão.');
+      showToast('Marque pelo menos 3 pontos no mapa para fechar o polígono.', 'error');
       return;
     }
 
@@ -1051,36 +1127,32 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
       coordinates: drawingCoords,
       areaHa,
       perimeterM,
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
     };
 
-    saveBoundariesToStorage({ ...boundaries, [currentPlot.id]: newBoundary });
+    saveBoundariesToStorage({ ...boundariesRef.current, [currentPlot.id]: newBoundary });
     setDrawingCoords([]);
     setMapMode('view');
-    showToast(`Contorno do talhão salvo com sucesso! (${areaHa} ha)`);
+    showToast(`Contorno do talhão salvo (${areaHa} ha).`);
   };
 
-  // Cancelar Desenho
   const handleCancelDrawing = () => {
     setDrawingCoords([]);
     setMapMode('view');
   };
 
-  // Excluir Contorno do Talhão
   const handleClearPolygon = () => {
-    if (window.confirm(`Deseja remover o contorno do talhão ${currentPlot.name}?`)) {
-      const updated = { ...boundaries };
-      delete updated[currentPlot.id];
-      saveBoundariesToStorage(updated);
-      setMapMode('view');
-      showToast('Contorno do talhão removido.');
-    }
+    const updated = { ...boundariesRef.current };
+    delete updated[currentPlot.id];
+    saveBoundariesToStorage(updated);
+    setMapMode('view');
+    showToast('Contorno do talhão removido.');
   };
 
-  // Gerar Grade Amostral Regular
+  // Grade Amostral Regular
   const handleGenerateGrid = () => {
     if (!currentBoundary || currentBoundary.coordinates.length < 3) {
-      alert('Desenhe o contorno do talhão no mapa antes de gerar a grade amostral.');
+      showToast('Delimite o contorno do talhão antes de gerar a grade amostral.', 'error');
       return;
     }
 
@@ -1094,20 +1166,20 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
     );
 
     if (newPts.length === 0) {
-      alert('Nenhum ponto pôde ser gerado dentro dos limites com esta densidade.');
+      showToast('Nenhum ponto pôde ser gerado dentro dos limites com esta densidade.', 'error');
       return;
     }
 
-    const otherPoints = points.filter(p => p.plotId !== currentPlot.id);
+    const otherPoints = pointsRef.current.filter((p) => p.plotId !== currentPlot.id);
     savePointsToStorage([...otherPoints, ...newPts]);
     setIsGridModalOpen(false);
-    showToast(`Grade amostral gerada: ${newPts.length} pontos distribuídos no talhão!`);
+    showToast(`Grade amostral gerada: ${newPts.length} pontos no talhão.`);
   };
 
-  // Gerar Zigue-Zague Embrapa
+  // Zigue-Zague Embrapa
   const handleGenerateZigzag = () => {
     if (!currentBoundary || currentBoundary.coordinates.length < 3) {
-      alert('Desenhe o contorno do talhão no mapa antes de gerar o percurso em zigue-zague.');
+      showToast('Delimite o contorno do talhão antes de gerar o percurso zigue-zague.', 'error');
       return;
     }
 
@@ -1119,17 +1191,24 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
       '0-20'
     );
 
-    const otherPoints = points.filter(p => p.plotId !== currentPlot.id);
+    const otherPoints = pointsRef.current.filter((p) => p.plotId !== currentPlot.id);
     savePointsToStorage([...otherPoints, ...newPts]);
-    showToast(`Percurso zigue-zague Embrapa gerado com ${newPts.length} subamostras!`);
+    showToast(`Percurso zigue-zague Embrapa gerado com ${newPts.length} pontos.`);
   };
 
-  // =======================================================================
-  // MOTOR DE EXPORTAÇÃO COMPLETA
-  // =======================================================================
+  // Exportação geoespacial
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleExecuteExport = async () => {
     if (plotPoints.length === 0 && !currentBoundary) {
-      alert('Nenhum ponto ou contorno cadastrado para exportação.');
+      showToast('Nenhum ponto ou contorno cadastrado para exportação.', 'error');
       return;
     }
 
@@ -1141,78 +1220,73 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
     try {
       if (exportFormat === 'kml') {
         const kmlText = exportToKML(farmName, plotName, currentBoundary, plotPoints);
-        const blob = new Blob([kmlText], { type: 'application/vnd.google-earth.kml+xml;charset=utf-8' });
-        downloadBlob(blob, `${baseFilename}.kml`);
-        showToast('Arquivo KML gerado para Google Earth e GPS!');
+        downloadBlob(
+          new Blob([kmlText], { type: 'application/vnd.google-earth.kml+xml;charset=utf-8' }),
+          `${baseFilename}.kml`
+        );
+        showToast('Arquivo KML exportado.');
       } else if (exportFormat === 'kmz') {
         const kmzBlob = await exportToKMZ(farmName, plotName, currentBoundary, plotPoints);
         downloadBlob(kmzBlob, `${baseFilename}.kmz`);
-        showToast('Pacote KMZ compactado exportado com sucesso!');
+        showToast('Pacote KMZ exportado.');
       } else if (exportFormat === 'geojson') {
         const geojsonText = exportToGeoJSON(farmName, plotName, currentBoundary, plotPoints);
-        const blob = new Blob([geojsonText], { type: 'application/geo+json;charset=utf-8' });
-        downloadBlob(blob, `${baseFilename}.geojson`);
-        showToast('Arquivo GeoJSON exportado para SIG (QGIS/ArcGIS)!');
+        downloadBlob(
+          new Blob([geojsonText], { type: 'application/geo+json;charset=utf-8' }),
+          `${baseFilename}.geojson`
+        );
+        showToast('Arquivo GeoJSON exportado.');
       } else if (exportFormat === 'gpkg') {
         const gpkgBlob = await exportToGPKG(farmName, plotName, currentBoundary, plotPoints);
         downloadBlob(gpkgBlob, `${baseFilename}.gpkg`);
-        showToast('Pacote GeoPackage (.gpkg) exportado!');
+        showToast('Pacote GeoPackage (.gpkg) exportado.');
       } else if (exportFormat === 'csv') {
         const csvText = exportToCSV(farmName, plotName, plotPoints);
-        const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
-        downloadBlob(blob, `${baseFilename}_coordenadas.csv`);
-        showToast('Planilha CSV de pontos de coleta exportada!');
+        downloadBlob(
+          new Blob([csvText], { type: 'text/csv;charset=utf-8;' }),
+          `${baseFilename}_coordenadas.csv`
+        );
+        showToast('Planilha CSV de pontos exportada.');
       } else if (exportFormat === 'geotiff') {
-        // Exportar metadados e coordenadas de mapa raster
         if (geotiffOverlay) {
           const a = document.createElement('a');
           a.href = geotiffOverlay.imageUrl;
           a.download = `${baseFilename}_raster_overlay.png`;
           a.click();
-          showToast('Imagem raster do GeoTIFF baixada com sucesso!');
+          showToast('Imagem raster GeoTIFF baixada.');
         } else {
-          // Exportar KML + GeoJSON combinado
           const geojsonText = exportToGeoJSON(farmName, plotName, currentBoundary, plotPoints);
-          const blob = new Blob([geojsonText], { type: 'application/geo+json;charset=utf-8' });
-          downloadBlob(blob, `${baseFilename}_camadas.geojson`);
-          showToast('Camadas geoespaciais exportadas com sucesso!');
+          downloadBlob(
+            new Blob([geojsonText], { type: 'application/geo+json;charset=utf-8' }),
+            `${baseFilename}_camadas.geojson`
+          );
+          showToast('Camadas geoespaciais exportadas.');
         }
       }
       setIsExportModalOpen(false);
-    } catch (e: any) {
-      alert(`Erro na exportação: ${e?.message || e}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      showToast(`Erro na exportação: ${msg}`, 'error');
     } finally {
       setIsExporting(false);
     }
   };
 
-  const downloadBlob = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  // =======================================================================
-  // MOTOR DE IMPORTAÇÃO COMPLETA
-  // =======================================================================
+  // Importação geoespacial
   const handleFileSelectForImport = async (file: File) => {
     setImportLoading(true);
     const ext = file.name.split('.').pop()?.toLowerCase();
 
     try {
       if (ext === 'kml') {
-        const text = await file.text();
-        const parsed = importFromKML(text, currentPlot.id, selectedFarm.id);
+        const parsed = importFromKML(await file.text(), currentPlot.id, selectedFarm.id);
         setImportSummary({
           file,
           type: 'KML (Google Earth)',
           pointsCount: parsed.points.length,
           hasBoundary: parsed.boundaries.length > 0,
           hasRaster: false,
-          parsedData: parsed
+          parsedData: parsed,
         });
       } else if (ext === 'kmz') {
         const parsed = await importFromKMZ(file, currentPlot.id, selectedFarm.id);
@@ -1222,24 +1296,22 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
           pointsCount: parsed.points.length,
           hasBoundary: parsed.boundaries.length > 0,
           hasRaster: false,
-          parsedData: parsed
+          parsedData: parsed,
         });
       } else if (ext === 'geojson' || ext === 'json') {
-        const text = await file.text();
-        const parsed = importFromGeoJSON(text, currentPlot.id, selectedFarm.id);
+        const parsed = importFromGeoJSON(await file.text(), currentPlot.id, selectedFarm.id);
         setImportSummary({
           file,
           type: 'GeoJSON (RFC 7946)',
           pointsCount: parsed.points.length,
           hasBoundary: parsed.boundaries.length > 0,
           hasRaster: false,
-          parsedData: parsed
+          parsedData: parsed,
         });
       } else if (ext === 'csv' || ext === 'txt') {
-        const text = await file.text();
-        const parsed = importFromCSV(text, currentPlot.id, selectedFarm.id);
+        const parsed = importFromCSV(await file.text(), currentPlot.id, selectedFarm.id);
         if (parsed.errors.length > 0 && parsed.points.length === 0) {
-          throw new Error(`Erros no CSV:\n${parsed.errors.slice(0, 3).join('\n')}`);
+          throw new Error(parsed.errors.slice(0, 2).join('; '));
         }
         setImportSummary({
           file,
@@ -1247,7 +1319,7 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
           pointsCount: parsed.points.length,
           hasBoundary: false,
           hasRaster: false,
-          parsedData: { boundaries: [], points: parsed.points }
+          parsedData: { boundaries: [], points: parsed.points },
         });
       } else if (ext === 'gpkg') {
         const parsed = await importFromGPKG(file, currentPlot.id, selectedFarm.id);
@@ -1257,199 +1329,173 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
           pointsCount: parsed.points.length,
           hasBoundary: parsed.boundaries.length > 0,
           hasRaster: false,
-          parsedData: parsed
+          parsedData: parsed,
         });
       } else if (ext === 'tif' || ext === 'tiff') {
         const buffer = await file.arrayBuffer();
-        const farmCenter: [number, number] = [selectedFarm?.latitude || -15.7801, selectedFarm?.longitude || -47.9292];
+        const farmCenter: [number, number] = [
+          selectedFarm?.latitude || -15.7801,
+          selectedFarm?.longitude || -47.9292,
+        ];
         const overlay = await importFromGeoTIFF(buffer, file.name, farmCenter);
         setImportSummary({
           file,
-          type: 'Raster GeoTIFF / TIFF (Fertilidade / NDVI / Drone)',
+          type: 'Raster GeoTIFF / TIFF',
           pointsCount: 0,
           hasBoundary: false,
           hasRaster: true,
-          parsedData: { overlay }
+          parsedData: { overlay },
         });
       } else {
-        throw new Error('Formato de arquivo não suportado. Utilize KML, KMZ, GeoJSON, CSV, GPKG ou GeoTIFF (.tif).');
+        throw new Error(
+          'Formato não suportado. Utilize KML, KMZ, GeoJSON, CSV, GPKG ou GeoTIFF (.tif).'
+        );
       }
-    } catch (e: any) {
-      alert(`Falha ao ler o arquivo: ${e.message || e}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      showToast(`Falha ao ler arquivo: ${msg}`, 'error');
       setImportSummary(null);
     } finally {
       setImportLoading(false);
     }
   };
 
-  // Confirmar Importação dos Dados Lidos
   const handleApplyImport = () => {
-    if (!importSummary || !importSummary.parsedData) return;
+    if (!importSummary?.parsedData) return;
 
     const { parsedData, hasRaster } = importSummary;
 
     if (hasRaster && parsedData.overlay) {
       setGeotiffOverlay(parsedData.overlay);
-      showToast(`Camada GeoTIFF "${parsedData.overlay.name}" sobreposta no mapa!`);
     }
 
     if (parsedData.boundaries && parsedData.boundaries.length > 0) {
       const newBoundary = parsedData.boundaries[0];
-      const updated = {
-        ...boundaries,
+      saveBoundariesToStorage({
+        ...boundariesRef.current,
         [currentPlot.id]: {
           ...newBoundary,
           plotId: currentPlot.id,
           name: newBoundary.name || currentPlot.name,
-        }
-      };
-      saveBoundariesToStorage(updated);
+        },
+      });
     }
 
     if (parsedData.points && parsedData.points.length > 0) {
       if (importMergeMode === 'replace') {
-        const otherPoints = points.filter(p => p.plotId !== currentPlot.id);
+        const otherPoints = pointsRef.current.filter((p) => p.plotId !== currentPlot.id);
         savePointsToStorage([...otherPoints, ...parsedData.points]);
       } else {
-        savePointsToStorage([...points, ...parsedData.points]);
+        savePointsToStorage([...pointsRef.current, ...parsedData.points]);
       }
     }
 
     setIsImportModalOpen(false);
     setImportSummary(null);
-    showToast('Importação concluída com sucesso!');
+    showToast('Dados geoespaciais carregados no mapa.');
   };
 
+  const displayAreaHa = currentBoundary?.areaHa || currentPlot.areaHa || 0;
+
   return (
-    <div className="space-y-5 animate-fade-in">
-      {/* Notificação Toast */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-[2000] bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 animate-slide-up border border-emerald-500/50">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-          <span className="text-xs font-bold">{toastMessage}</span>
+    <div className="space-y-4">
+      {/* Toast Hairline Discreto */}
+      {toast && (
+        <div
+          role="status"
+          className={`fixed bottom-5 right-5 z-[2000] max-w-sm px-3.5 py-2.5 rounded-lg border text-xs font-medium flex items-center gap-2.5 ${
+            toast.type === 'error'
+              ? 'bg-rose-50 dark:bg-rose-950 text-rose-800 dark:text-rose-200 border-rose-200 dark:border-rose-800'
+              : toast.type === 'info'
+                ? 'bg-white dark:bg-zinc-900 text-slate-800 dark:text-zinc-100 border-slate-200 dark:border-zinc-700'
+                : 'bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800'
+          }`}
+        >
+          {toast.type === 'error' ? (
+            <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+          ) : toast.type === 'info' ? (
+            <Info className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          )}
+          <span className="flex-1">{toast.message}</span>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            aria-label="Fechar aviso"
+            className="opacity-60 hover:opacity-100 cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
-      {/* Header do Mapeamento de Solo ou Toolbar Compacta se hideHeader */}
-      {!hideHeader ? (
-        <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-950 text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-emerald-800/40">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-xs font-extrabold text-emerald-300 border border-emerald-400/30">
-                <Compass className="w-3.5 h-3.5" />
-                <span>Agricultura de Precisão &bull; Amostragem Georreferenciada</span>
+      {/* Cabeçalho / Toolbar do Talhão */}
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+        {!hideHeader && (
+          <div className="px-4 py-3.5 border-b border-slate-200 dark:border-zinc-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-slate-900 dark:text-zinc-100">
+                <Compass className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <h2 className="text-sm font-semibold">Mapeamento de Coletas no Talhão</h2>
               </div>
-              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                Mapeamento de Coletas no Talhão
-              </h2>
-              <p className="text-xs sm:text-sm text-emerald-100/90 max-w-2xl leading-relaxed">
-                Delimite o contorno do talhão sobre imagem de satélite, crie ou edite pontos de coleta de solo e importe/exporte arquivos KML, KMZ, GeoJSON, CSV, GeoPackage e GeoTIFF.
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                Delimite contornos sobre satélite, gerencie pontos georreferenciados, gere grades e prescrições VRA.
               </p>
             </div>
 
-            {/* Barra de Métricas em Tempo Real */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/10 text-xs">
-              <div className="p-2 bg-black/20 rounded-xl">
-                <span className="text-[10px] text-emerald-300 block font-bold">Área do Talhão</span>
-                <strong className="text-sm font-black text-white">
-                  {currentBoundary?.areaHa ? `${currentBoundary.areaHa} ha` : `${currentPlot.areaHa || '-'} ha`}
+            {/* 4 Métricas Hairline */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-slate-200 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-800 rounded-lg overflow-hidden tabular-nums shrink-0">
+              <div className="bg-slate-50 dark:bg-zinc-950 px-3 py-1.5">
+                <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Área</span>
+                <strong className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                  {displayAreaHa ? `${displayAreaHa} ha` : '—'}
                 </strong>
               </div>
-
-              <div className="p-2 bg-black/20 rounded-xl">
-                <span className="text-[10px] text-emerald-300 block font-bold">Pontos Marcados</span>
-                <strong className="text-sm font-black text-white">{plotPoints.length}</strong>
-              </div>
-
-              <div className="p-2 bg-black/20 rounded-xl">
-                <span className="text-[10px] text-emerald-300 block font-bold">Perímetro</span>
-                <strong className="text-sm font-black text-white">
-                  {currentBoundary?.perimeterM ? `${currentBoundary.perimeterM} m` : '-'}
+              <div className="bg-slate-50 dark:bg-zinc-950 px-3 py-1.5">
+                <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Pontos</span>
+                <strong className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                  {plotPoints.length}
                 </strong>
               </div>
-
-              <div className="p-2 bg-black/20 rounded-xl">
-                <span className="text-[10px] text-emerald-300 block font-bold">Status Talhão</span>
-                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                  currentBoundary ? 'bg-emerald-500/30 text-emerald-300' : 'bg-amber-500/30 text-amber-300'
-                }`}>
-                  {currentBoundary ? 'Delimitado' : 'Sem Contorno'}
-                </span>
+              <div className="bg-slate-50 dark:bg-zinc-950 px-3 py-1.5">
+                <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Perímetro</span>
+                <strong className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                  {currentBoundary?.perimeterM ? `${currentBoundary.perimeterM} m` : '—'}
+                </strong>
+              </div>
+              <div className="bg-slate-50 dark:bg-zinc-950 px-3 py-1.5">
+                <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">Contorno</span>
+                <strong
+                  className={`text-xs font-semibold ${
+                    currentBoundary
+                      ? 'text-emerald-700 dark:text-emerald-400'
+                      : 'text-amber-700 dark:text-amber-400'
+                  }`}
+                >
+                  {currentBoundary ? 'Delimitado' : 'Pendente'}
+                </strong>
               </div>
             </div>
           </div>
+        )}
 
-          {/* Toolbar de Ações: Seleção de Talhão, Importar, Exportar e Editar */}
-          <div className="mt-5 pt-4 border-t border-emerald-800/50 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
-                <Layers className="w-4 h-4" /> Talhão Ativo:
-              </span>
-              <select
-                value={selectedPlotId}
-                onChange={(e) => setSelectedPlotId(e.target.value)}
-                className="bg-black/40 border border-emerald-700/60 text-white rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-hidden focus:ring-2 focus:ring-emerald-400 cursor-pointer"
-              >
-                {(plots || []).map(p => (
-                  <option key={p.id} value={p.id} className="bg-slate-900 text-white">
-                    {p.name} ({p.areaHa} ha)
-                  </option>
-                ))}
-              </select>
-
-              {/* Botão Editar Talhão */}
-              <button
-                onClick={handleOpenEditPlot}
-                className="px-3 py-1.5 bg-teal-600/30 hover:bg-teal-600/50 text-teal-200 border border-teal-500/40 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-                title="Editar nome, cultura, notas e vértices do talhão"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                <span>Editar Talhão</span>
-              </button>
-            </div>
-
-            {/* Botões Importar, Exportar e Limpar */}
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => setIsImportModalOpen(true)}
-                className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-              >
-                <Upload className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Importar Arquivo</span>
-              </button>
-
-              <button
-                onClick={() => setIsExportModalOpen(true)}
-                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-md"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Exportar</span>
-              </button>
-
-              <button
-                onClick={handleClearAllData}
-                className="px-3 py-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-                title="Limpar todos os pontos e contornos deste talhão"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Limpar Talhão</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* Toolbar Compacta e Integrada */
-        <div className="bg-white dark:bg-zinc-950 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className="font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-emerald-600" /> Talhão Selecionado:
+        {/* Toolbar Integrada: Seleção de Talhão & Ações */}
+        <div className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-slate-600 dark:text-zinc-400 font-medium inline-flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              Talhão:
             </span>
             <select
               value={selectedPlotId}
-              onChange={(e) => setSelectedPlotId(e.target.value)}
-              className="bg-slate-50 dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-slate-900 dark:text-white rounded-xl px-3 py-1.5 text-xs font-bold cursor-pointer"
+              onChange={(e) => {
+                setSelectedPlotId(e.target.value);
+                setConfirmClearAction(null);
+              }}
+              className="h-8 px-2.5 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-700 text-slate-900 dark:text-zinc-100 rounded-md text-xs font-medium focus:outline-none focus:border-emerald-500 cursor-pointer"
             >
-              {(plots || []).map(p => (
+              {plots.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name} ({p.areaHa} ha)
                 </option>
@@ -1457,92 +1503,136 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
             </select>
 
             <button
+              type="button"
               onClick={handleOpenEditPlot}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border border-slate-200 dark:border-zinc-700"
+              className="h-8 px-2.5 bg-white dark:bg-zinc-950 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 rounded-md text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
               title="Editar nome, cultura, notas e vértices do talhão"
             >
-              <Edit3 className="w-3.5 h-3.5 text-emerald-600" />
+              <Edit3 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>Editar Talhão</span>
             </button>
 
-            <div className="h-4 w-px bg-slate-200 dark:border-zinc-800 hidden md:block" />
-
-            <div className="flex items-center gap-2 text-slate-500 dark:text-zinc-400 font-medium">
-              <span>Área: <strong className="text-slate-900 dark:text-zinc-100">{currentBoundary?.areaHa ? `${currentBoundary.areaHa} ha` : `${currentPlot.areaHa || '-'} ha`}</strong></span>
-              <span>&bull;</span>
-              <span>Pontos: <strong className="text-emerald-600 dark:text-emerald-400">{plotPoints.length}</strong></span>
-              {currentBoundary?.perimeterM && (
-                <>
-                  <span>&bull;</span>
-                  <span>Perímetro: <strong className="text-slate-800 dark:text-zinc-200">{currentBoundary.perimeterM} m</strong></span>
-                </>
-              )}
-            </div>
+            {hideHeader && (
+              <div className="hidden md:flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-zinc-800 text-slate-500 dark:text-zinc-400 tabular-nums">
+                <span>
+                  Área:{' '}
+                  <strong className="text-slate-900 dark:text-zinc-100">
+                    {displayAreaHa ? `${displayAreaHa} ha` : '—'}
+                  </strong>
+                </span>
+                <span>·</span>
+                <span>
+                  Pontos:{' '}
+                  <strong className="text-emerald-700 dark:text-emerald-400">
+                    {plotPoints.length}
+                  </strong>
+                </span>
+                {currentBoundary?.perimeterM ? (
+                  <>
+                    <span>·</span>
+                    <span>
+                      Perímetro:{' '}
+                      <strong className="text-slate-900 dark:text-zinc-100">
+                        {currentBoundary.perimeterM} m
+                      </strong>
+                    </span>
+                  </>
+                ) : null}
+              </div>
+            )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
+              type="button"
               onClick={() => setIsVraModalOpen(true)}
-              className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-600 hover:to-emerald-700 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition cursor-pointer shadow-md"
-              title="Gerar mapa de prescrição em taxa variável (IDW / Krigagem Ordinária) e exportar ISOXML / GeoJSON"
+              className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+              title="Gerar prescrição em taxa variável (IDW / Krigagem Ordinária) e exportar ISOXML / GeoJSON"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-200" />
-              <span>Taxa Variável VRA (IDW / Krigagem)</span>
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>Taxa Variável VRA</span>
             </button>
 
             <button
+              type="button"
               onClick={() => setIsImportModalOpen(true)}
-              className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              className="h-8 px-2.5 bg-white dark:bg-zinc-950 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 rounded-md text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
             >
-              <Upload className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Importar Arquivo</span>
+              <Upload className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Importar</span>
             </button>
 
             <button
+              type="button"
               onClick={() => setIsExportModalOpen(true)}
-              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+              className="h-8 px-2.5 bg-white dark:bg-zinc-950 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 rounded-md text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
             >
-              <Download className="w-3.5 h-3.5" />
+              <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>Exportar</span>
             </button>
 
-            <button
-              onClick={handleClearAllData}
-              className="px-3 py-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl text-xs font-bold flex items-center gap-1 transition cursor-pointer border border-rose-200 dark:border-rose-900/50"
-              title="Limpar todos os pontos e contornos deste talhão específico"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Limpar Talhão</span>
-            </button>
+            {confirmClearAction ? (
+              <div className="inline-flex items-center gap-1.5 pl-1">
+                <span className="text-[11px] font-medium text-rose-700 dark:text-rose-400">
+                  {confirmClearAction === 'plot' ? 'Limpar talhão?' : 'Zerar fazenda?'}
+                </span>
+                <button
+                  type="button"
+                  onClick={confirmClearAction === 'plot' ? executeClearPlot : executeClearEntireFarm}
+                  className="h-7 px-2 bg-rose-600 hover:bg-rose-700 text-white rounded text-[11px] font-semibold cursor-pointer"
+                >
+                  Confirmar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmClearAction(null)}
+                  className="h-7 px-2 border border-slate-200 dark:border-zinc-700 rounded text-[11px] text-slate-600 dark:text-zinc-300 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setConfirmClearAction('plot')}
+                  className="h-8 px-2.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-md text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Remover contorno e pontos deste talhão"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Limpar Talhão</span>
+                </button>
 
-            <button
-              onClick={handleClearEntireFarmData}
-              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition cursor-pointer shadow-xs"
-              title="Zerar e remover todos os contornos e pontos pré-preenchidos de toda a fazenda"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Zerar Mapeamento da Fazenda</span>
-            </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmClearAction('farm')}
+                  className="h-8 px-2.5 text-slate-600 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-slate-200 dark:border-zinc-700 rounded-md text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Zerar todos os contornos e pontos desta fazenda"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Zerar Fazenda</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Painel Principal do Mapa e Ferramentas */}
-      <div className="bg-white dark:bg-zinc-950 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-        {/* BARRA DE PESQUISA DE CIDADES & NAVEGAÇÃO REGIONAL */}
+      {/* Painel Principal do Mapa */}
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800 overflow-hidden">
+        {/* Barra de Pesquisa de Cidades & Polos Agrícolas */}
         <div
           ref={citySearchContainerRef}
-          className="p-3 sm:p-3.5 bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 text-white border-b border-emerald-800/40 relative"
+          className="px-3.5 py-2.5 bg-slate-50 dark:bg-zinc-950 border-b border-slate-200 dark:border-zinc-800 space-y-2 relative"
         >
-          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-            {/* Campo de Pesquisa com Autocomplete de Cidades */}
-            <div className="relative flex-1 max-w-2xl">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2">
+            <div className="relative flex-1 max-w-xl">
               <div className="relative flex items-center">
-                <div className="absolute left-3.5 text-emerald-400 pointer-events-none">
+                <div className="absolute left-2.5 text-slate-400 dark:text-zinc-500 pointer-events-none">
                   {isSearchingCity ? (
-                    <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-600" />
                   ) : (
-                    <Search className="w-4 h-4 text-emerald-400" />
+                    <Search className="w-3.5 h-3.5" />
                   )}
                 </div>
                 <input
@@ -1558,8 +1648,8 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
                       handleSearchCitySubmit();
                     }
                   }}
-                  placeholder="Pesquisar cidade do talhão (ex: Sorriso, Rio Verde, Cascavel, LEM, Dourados...)"
-                  className="w-full pl-10 pr-20 py-2.5 bg-black/50 hover:bg-black/60 focus:bg-black/75 text-white placeholder:text-emerald-200/50 rounded-xl text-xs sm:text-sm font-semibold border border-emerald-500/40 focus:outline-hidden focus:ring-2 focus:ring-emerald-400 shadow-inner transition"
+                  placeholder="Buscar município (ex: Sorriso, Rio Verde, Cascavel, LEM, Dourados...)"
+                  className="w-full h-8 pl-8 pr-20 bg-white dark:bg-zinc-900 text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 rounded-md text-xs border border-slate-200 dark:border-zinc-700 focus:outline-none focus:border-emerald-500"
                 />
                 {citySearchQuery && (
                   <button
@@ -1569,8 +1659,8 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
                       setCitySearchResults([]);
                       setShowCityDropdown(false);
                     }}
-                    className="absolute right-12 text-slate-400 hover:text-white p-1 rounded-lg"
-                    title="Limpar busca"
+                    aria-label="Limpar busca"
+                    className="absolute right-14 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 p-1 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -1579,49 +1669,44 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
                   type="button"
                   onClick={() => handleSearchCitySubmit()}
                   disabled={!citySearchQuery.trim()}
-                  className="absolute right-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition cursor-pointer shadow-xs"
+                  className="absolute right-1 h-6 px-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded text-[11px] font-semibold cursor-pointer"
                 >
-                  Buscar
+                  Ir
                 </button>
               </div>
 
-              {/* Dropdown de Sugestões / Resultados de Cidades */}
+              {/* Dropdown de sugestões */}
               {showCityDropdown && citySearchResults.length > 0 && (
-                <div className="absolute left-0 right-0 top-full mt-1.5 z-[1500] bg-slate-900/98 backdrop-blur-md rounded-2xl border border-emerald-500/50 shadow-2xl overflow-hidden max-h-72 overflow-y-auto">
-                  <div className="p-2.5 bg-emerald-950/80 border-b border-emerald-800/40 text-[10px] font-black uppercase tracking-wider text-emerald-300 flex items-center justify-between">
-                    <span>Municípios Encontrados ({citySearchResults.length})</span>
-                    <span className="text-slate-400 lowercase font-normal">clique para posicionar o mapa</span>
+                <div className="absolute left-0 right-0 top-full mt-1 z-[1500] bg-white dark:bg-zinc-900 rounded-lg border border-slate-200 dark:border-zinc-700 overflow-hidden max-h-64 overflow-y-auto">
+                  <div className="px-3 py-1.5 bg-slate-50 dark:bg-zinc-950 border-b border-slate-200 dark:border-zinc-800 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400 flex items-center justify-between">
+                    <span>Municípios ({citySearchResults.length})</span>
+                    <span className="normal-case font-normal">clique para centralizar</span>
                   </div>
-                  <div className="divide-y divide-slate-800">
+                  <div className="divide-y divide-slate-100 dark:divide-zinc-800">
                     {citySearchResults.map((city, idx) => (
                       <button
                         key={`${city.name}-${city.state}-${idx}`}
                         type="button"
                         onClick={() => handleFlyToCity(city)}
-                        className="w-full text-left p-2.5 hover:bg-emerald-800/40 text-white transition flex items-center justify-between gap-2 group cursor-pointer"
+                        className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-zinc-800/70 transition-colors flex items-center justify-between gap-2 cursor-pointer"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center shrink-0 border border-emerald-500/30 group-hover:bg-emerald-500 group-hover:text-black transition">
-                            <MapPin className="w-3.5 h-3.5" />
-                          </div>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                           <div className="min-w-0">
-                            <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                              <span>{city.name}</span>
-                              <span className="text-[10px] px-1.5 py-0.5 bg-emerald-900/90 text-emerald-300 rounded font-black border border-emerald-700/50">
+                            <div className="text-xs font-medium text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+                              <span className="truncate">{city.name}</span>
+                              <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
                                 {city.state}
                               </span>
                             </div>
                             {city.notes && (
-                              <p className="text-[11px] text-slate-300 truncate max-w-sm">
+                              <p className="text-[11px] text-slate-500 dark:text-zinc-400 truncate max-w-sm">
                                 {city.notes}
                               </p>
                             )}
                           </div>
                         </div>
-                        <span className="text-[11px] text-emerald-400 font-bold shrink-0 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                          <span>Centralizar</span>
-                          <ArrowRight className="w-3 h-3" />
-                        </span>
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                       </button>
                     ))}
                   </div>
@@ -1629,21 +1714,23 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
               )}
             </div>
 
-            {/* Botões de Apoio: GPS e Indicação da Cidade Ativa */}
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 type="button"
                 onClick={handleCenterGPS}
-                className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs shrink-0"
-                title="Centralizar mapa na minha coordenada GPS atual"
+                className="h-8 px-2.5 bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 rounded-md text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+                title="Centralizar mapa na coordenada GPS atual"
               >
-                <Crosshair className="w-3.5 h-3.5 text-emerald-400" />
+                <Crosshair className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 <span>Meu GPS</span>
               </button>
 
               {selectedCityInfo && (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 rounded-xl text-xs font-bold">
-                  <span>📍 {selectedCityInfo.name} - {selectedCityInfo.state}</span>
+                <div className="h-8 px-2.5 inline-flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-md text-xs font-medium">
+                  <MapPin className="w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    {selectedCityInfo.name} - {selectedCityInfo.state}
+                  </span>
                   <button
                     type="button"
                     onClick={() => {
@@ -1653,8 +1740,8 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
                       }
                       setSelectedCityInfo(null);
                     }}
-                    className="text-emerald-400 hover:text-white ml-1 cursor-pointer"
-                    title="Remover indicador de cidade"
+                    aria-label="Remover marcador de cidade"
+                    className="text-emerald-700 dark:text-emerald-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -1663,57 +1750,47 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
             </div>
           </div>
 
-          {/* Atalhos Rápidos para Principais Polos do Agronegócio Brasileiro */}
-          <div className="mt-2.5 pt-2 border-t border-emerald-900/40 flex items-center gap-1.5 overflow-x-auto text-[11px] no-scrollbar">
-            <span className="text-emerald-300/80 font-bold text-[10px] uppercase shrink-0 flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-amber-300" /> Polos Agro:
+          {/* Atalhos Rápidos de Polos Agrícolas */}
+          <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] no-scrollbar pt-1">
+            <span className="text-slate-500 dark:text-zinc-400 font-medium text-[10px] uppercase tracking-wide shrink-0">
+              Polos:
             </span>
-            {[
-              { label: 'Sorriso (MT)', query: 'Sorriso' },
-              { label: 'Rio Verde (GO)', query: 'Rio Verde' },
-              { label: 'Cascavel (PR)', query: 'Cascavel' },
-              { label: 'LEM (BA)', query: 'Luís Eduardo Magalhães' },
-              { label: 'Dourados (MS)', query: 'Dourados' },
-              { label: 'Uberlândia (MG)', query: 'Uberlândia' },
-              { label: 'Passo Fundo (RS)', query: 'Passo Fundo' },
-              { label: 'Cristalina (GO)', query: 'Cristalina' },
-              { label: 'Balsas (MA)', query: 'Balsas' },
-              { label: 'Ribeirão Preto (SP)', query: 'Ribeirão Preto' },
-              { label: 'Sinop (MT)', query: 'Sinop' },
-              { label: 'Primavera do Leste (MT)', query: 'Primavera do Leste' },
-            ].map((chip) => (
+            {QUICK_AGRO_HUBS.map((hub) => (
               <button
-                key={chip.label}
+                key={hub.label}
                 type="button"
                 onClick={() => {
                   const found = BRAZILIAN_AGRO_CITIES.find(
-                    (c) => c.name.toLowerCase() === chip.query.toLowerCase()
+                    (c) => c.name.toLowerCase() === hub.query.toLowerCase()
                   );
                   if (found) {
                     handleFlyToCity(found);
                   } else {
-                    handleCityInputChange(chip.query);
-                    handleSearchCitySubmit(chip.query);
+                    handleCityInputChange(hub.query);
+                    handleSearchCitySubmit(hub.query);
                   }
                 }}
-                className="px-2.5 py-0.5 rounded-lg bg-black/40 hover:bg-emerald-600/40 text-emerald-200 hover:text-white border border-emerald-500/30 text-[10px] font-semibold whitespace-nowrap transition cursor-pointer"
+                className="h-6 px-2 rounded bg-white dark:bg-zinc-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400 text-slate-600 dark:text-zinc-300 border border-slate-200 dark:border-zinc-800 text-[11px] font-medium whitespace-nowrap transition-colors cursor-pointer"
               >
-                {chip.label}
+                {hub.label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Barra Superior do Mapa: Ferramentas de Desenho e Visualização */}
-        <div className="p-3 bg-slate-50 dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-          {/* Modos do Mapa */}
+        {/* Ferramentas de Desenho & Camada Base */}
+        <div className="px-3.5 py-2 bg-white dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2 text-xs">
           <div className="flex flex-wrap items-center gap-1.5">
             <button
-              onClick={() => { setMapMode('view'); setDrawingCoords([]); }}
-              className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer ${
+              type="button"
+              onClick={() => {
+                setMapMode('view');
+                setDrawingCoords([]);
+              }}
+              className={`h-8 px-2.5 rounded-md font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                 mapMode === 'view'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 hover:bg-slate-100'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-slate-50 dark:bg-zinc-950 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800'
               }`}
             >
               <Crosshair className="w-3.5 h-3.5" />
@@ -1721,11 +1798,15 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
             </button>
 
             <button
-              onClick={() => { setMapMode('draw_polygon'); setDrawingCoords([]); }}
-              className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer ${
+              type="button"
+              onClick={() => {
+                setMapMode('draw_polygon');
+                setDrawingCoords([]);
+              }}
+              className={`h-8 px-2.5 rounded-md font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                 mapMode === 'draw_polygon'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 hover:bg-slate-100'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-slate-50 dark:bg-zinc-950 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800'
               }`}
             >
               <MapIcon className="w-3.5 h-3.5" />
@@ -1733,73 +1814,81 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
             </button>
 
             <button
-              onClick={() => { setMapMode('add_point'); setDrawingCoords([]); }}
-              className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer ${
+              type="button"
+              onClick={() => {
+                setMapMode('add_point');
+                setDrawingCoords([]);
+              }}
+              className={`h-8 px-2.5 rounded-md font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                 mapMode === 'add_point'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 hover:bg-slate-100'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-slate-50 dark:bg-zinc-950 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800'
               }`}
             >
               <MapPin className="w-3.5 h-3.5" />
-              <span>Marcar Ponto no Mapa</span>
+              <span>Marcar Ponto</span>
             </button>
 
             {currentBoundary && (
-              <button
-                onClick={() => setMapMode(mapMode === 'edit_vertices' ? 'view' : 'edit_vertices')}
-                className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer ${
-                  mapMode === 'edit_vertices'
-                    ? 'bg-amber-600 text-white shadow-xs'
-                    : 'bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 hover:bg-slate-100'
-                }`}
-                title="Ajustar vértices do contorno arrastando no mapa"
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-                <span>{mapMode === 'edit_vertices' ? 'Concluir Vértices' : 'Ajustar Vértices'}</span>
-              </button>
-            )}
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMapMode(mapMode === 'edit_vertices' ? 'view' : 'edit_vertices')
+                  }
+                  className={`h-8 px-2.5 rounded-md font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    mapMode === 'edit_vertices'
+                      ? 'bg-amber-600 text-white'
+                      : 'bg-slate-50 dark:bg-zinc-950 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800'
+                  }`}
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>{mapMode === 'edit_vertices' ? 'Concluir Vértices' : 'Ajustar Vértices'}</span>
+                </button>
 
-            {currentBoundary && (
-              <button
-                onClick={() => setIsGridModalOpen(true)}
-                className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-lg font-bold flex items-center gap-1.5 hover:bg-indigo-100 cursor-pointer"
-              >
-                <Grid className="w-3.5 h-3.5" />
-                <span>Grade Automática</span>
-              </button>
-            )}
+                <button
+                  type="button"
+                  onClick={() => setIsGridModalOpen(true)}
+                  className="h-8 px-2.5 bg-slate-50 dark:bg-zinc-950 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 hover:border-emerald-500 rounded-md font-medium inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Grid className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Grade Regular</span>
+                </button>
 
-            {currentBoundary && (
-              <button
-                onClick={handleGenerateZigzag}
-                className="px-3 py-1.5 bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 rounded-lg font-bold flex items-center gap-1.5 hover:bg-teal-100 cursor-pointer"
-                title="Gera rota de amostragem em zigue-zague recomendada pela Embrapa"
-              >
-                <Shuffle className="w-3.5 h-3.5" />
-                <span>Zigue-Zague Embrapa</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={handleGenerateZigzag}
+                  className="h-8 px-2.5 bg-slate-50 dark:bg-zinc-950 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 hover:border-emerald-500 rounded-md font-medium inline-flex items-center gap-1.5 cursor-pointer"
+                  title="Gera rota de amostragem em zigue-zague recomendada pela Embrapa"
+                >
+                  <Shuffle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Zigue-Zague Embrapa</span>
+                </button>
+              </>
             )}
           </div>
 
-          {/* Camada do Mapa (Satélite vs Ruas) */}
-          <div className="flex items-center gap-2">
-            <span className="text-slate-500 font-medium">Camada:</span>
-            <div className="flex items-center p-0.5 bg-slate-200 dark:bg-zinc-800 rounded-lg">
+          {/* Camada Base */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-slate-500 dark:text-zinc-400">Camada:</span>
+            <div className="inline-flex p-0.5 bg-slate-100 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-md">
               <button
+                type="button"
                 onClick={() => setMapLayerType('satellite')}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition ${
+                className={`h-6 px-2.5 rounded text-[11px] font-medium cursor-pointer transition-colors ${
                   mapLayerType === 'satellite'
-                    ? 'bg-white dark:bg-zinc-700 text-slate-900 dark:text-white shadow-xs'
+                    ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100'
                     : 'text-slate-600 dark:text-zinc-400'
                 }`}
               >
                 Satélite
               </button>
               <button
+                type="button"
                 onClick={() => setMapLayerType('streets')}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition ${
+                className={`h-6 px-2.5 rounded text-[11px] font-medium cursor-pointer transition-colors ${
                   mapLayerType === 'streets'
-                    ? 'bg-white dark:bg-zinc-700 text-slate-900 dark:text-white shadow-xs'
+                    ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100'
                     : 'text-slate-600 dark:text-zinc-400'
                 }`}
               >
@@ -1809,255 +1898,303 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
           </div>
         </div>
 
-        {/* Notificação / Instrução quando desenhando polígono */}
+        {/* Banner contextual: Desenho de polígono */}
         {mapMode === 'draw_polygon' && (
-          <div className="bg-emerald-50 dark:bg-emerald-950/60 p-3 border-b border-emerald-200 dark:border-emerald-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-medium">
-              <MapIcon className="w-4 h-4 text-emerald-600" />
+          <div className="px-3.5 py-2.5 bg-emerald-50 dark:bg-emerald-950/40 border-b border-emerald-200 dark:border-emerald-900 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300">
+              <MapIcon className="w-4 h-4 shrink-0" />
               <span>
-                <strong>Modo Desenho Ativo:</strong> Clique nos cantos do talhão na imagem de satélite para traçar os limites. ({drawingCoords.length} pontos marcados)
+                <strong>Modo Desenho:</strong> Clique nos vértices do talhão no mapa (
+                <span className="tabular-nums font-semibold">{drawingCoords.length}</span> pontos marcados).
               </span>
             </div>
             <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={handleCancelDrawing}
-                className="px-3 py-1 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border rounded-lg font-bold hover:bg-slate-100 cursor-pointer"
+                className="h-7 px-2.5 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 rounded-md font-medium cursor-pointer"
               >
                 Cancelar
               </button>
               <button
+                type="button"
                 onClick={handleFinishDrawing}
                 disabled={drawingCoords.length < 3}
-                className="px-4 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold disabled:opacity-50 cursor-pointer flex items-center gap-1 shadow-xs"
+                className="h-7 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-semibold disabled:opacity-50 cursor-pointer inline-flex items-center gap-1"
               >
                 <Check className="w-3.5 h-3.5" />
-                <span>Fechar e Salvar Talhão</span>
+                <span>Fechar e Salvar</span>
               </button>
             </div>
           </div>
         )}
 
-        {/* Notificação quando ajustando vértices */}
+        {/* Banner contextual: Ajuste de vértices */}
         {mapMode === 'edit_vertices' && (
-          <div className="bg-amber-50 dark:bg-amber-950/60 p-3 border-b border-amber-200 dark:border-amber-800 flex items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 font-medium">
-              <Edit2 className="w-4 h-4 text-amber-600" />
+          <div className="px-3.5 py-2.5 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
+              <Edit2 className="w-4 h-4 shrink-0" />
               <span>
-                <strong>Ajuste de Vértices Ativo:</strong> Arraste os pinos circulares numerados no mapa para remodelar as bordas do talhão. A área e perímetro recalculam em tempo real.
+                <strong>Ajuste de Vértices:</strong> Arraste os marcadores numerados para remodelar o contorno. Área e perímetro recalculam automaticamente.
               </span>
             </div>
             <button
+              type="button"
               onClick={() => setMapMode('view')}
-              className="px-3 py-1 bg-amber-600 text-white rounded-lg font-bold hover:bg-amber-700 cursor-pointer"
+              className="h-7 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-md font-semibold cursor-pointer"
             >
               Concluir Ajustes
             </button>
           </div>
         )}
 
-        {/* Controle Flutuante da Camada GeoTIFF Raster se carregada */}
+        {/* Controle da Camada GeoTIFF */}
         {geotiffOverlay && (
-          <div className="bg-indigo-950 text-white p-3 border-b border-indigo-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2">
-              <Image className="w-4 h-4 text-indigo-400" />
-              <div>
-                <strong className="text-indigo-200 font-bold">Camada Raster GeoTIFF:</strong> {geotiffOverlay.name} ({geotiffOverlay.fileSizeStr})
-              </div>
+          <div className="px-3.5 py-2 bg-slate-50 dark:bg-zinc-950 border-b border-slate-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-slate-800 dark:text-zinc-200">
+              <Image className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span>
+                <strong>Raster GeoTIFF:</strong> {geotiffOverlay.name}{' '}
+                {geotiffOverlay.fileSizeStr ? `(${geotiffOverlay.fileSizeStr})` : ''}
+              </span>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 tabular-nums">
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-indigo-300">Opacidade:</span>
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400">Opacidade:</span>
                 <input
                   type="range"
                   min="0.1"
                   max="1"
                   step="0.05"
                   value={geotiffOverlay.opacity}
-                  onChange={(e) => setGeotiffOverlay({ ...geotiffOverlay, opacity: parseFloat(e.target.value) })}
-                  className="w-24 cursor-pointer accent-indigo-400"
+                  onChange={(e) =>
+                    setGeotiffOverlay({ ...geotiffOverlay, opacity: parseFloat(e.target.value) })
+                  }
+                  className="w-24 cursor-pointer accent-emerald-600"
                 />
-                <span className="text-[11px] font-mono">{Math.round(geotiffOverlay.opacity * 100)}%</span>
+                <span className="text-[11px] font-mono text-slate-700 dark:text-zinc-300">
+                  {Math.round(geotiffOverlay.opacity * 100)}%
+                </span>
               </div>
               <button
-                onClick={() => setGeotiffOverlay({ ...geotiffOverlay, visible: !geotiffOverlay.visible })}
-                className="px-2 py-1 bg-indigo-900 hover:bg-indigo-800 rounded font-bold flex items-center gap-1"
+                type="button"
+                onClick={() =>
+                  setGeotiffOverlay({ ...geotiffOverlay, visible: !geotiffOverlay.visible })
+                }
+                className="h-7 px-2 border border-slate-200 dark:border-zinc-700 rounded bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-200 font-medium inline-flex items-center gap-1 cursor-pointer"
               >
-                {geotiffOverlay.visible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                {geotiffOverlay.visible ? (
+                  <EyeOff className="w-3.5 h-3.5" />
+                ) : (
+                  <Eye className="w-3.5 h-3.5" />
+                )}
                 <span>{geotiffOverlay.visible ? 'Ocultar' : 'Exibir'}</span>
               </button>
               <button
+                type="button"
                 onClick={() => setGeotiffOverlay(null)}
-                className="text-rose-300 hover:text-rose-100 font-bold ml-1"
-                title="Remover camada raster"
+                className="text-rose-600 dark:text-rose-400 hover:underline font-medium cursor-pointer"
               >
-                &times; Fechar
+                Remover
               </button>
             </div>
           </div>
         )}
 
-        {/* Conteúdo do Mapa Interativo */}
-        <div className="relative isolate z-0 w-full h-[520px] bg-slate-900">
+        {/* Mapa Leaflet */}
+        <div className="relative isolate z-0 w-full h-[500px] bg-zinc-950">
           <div ref={mapContainerRef} className="w-full h-full z-10" />
 
-          {/* Legenda Flutuante dos Status de Amostragem */}
-          <div className="absolute top-3 right-3 z-[400] bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md p-3 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-lg text-xs space-y-1.5 select-none">
-            <div className="font-bold text-slate-800 dark:text-zinc-200 text-[11px] pb-1 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between gap-2">
-              <span>Legenda de Coletas</span>
-              <span className="text-[10px] text-slate-400">{plotPoints.length} total</span>
+          {/* Legenda compacta */}
+          <div className="absolute top-3 right-3 z-[400] bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xs px-3 py-2.5 rounded-lg border border-slate-200 dark:border-zinc-800 text-[11px] space-y-1.5 select-none">
+            <div className="font-semibold text-slate-800 dark:text-zinc-200 pb-1 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between gap-3 tabular-nums">
+              <span>Legenda</span>
+              <span className="text-[10px] font-normal text-slate-500 dark:text-zinc-400">
+                {plotPoints.length} pts
+              </span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-amber-500 border border-white shrink-0"></span>
-              <span className="text-slate-600 dark:text-zinc-400 text-[11px]">Planejado / A Coletar</span>
+            <div className="flex items-center gap-2 text-slate-600 dark:text-zinc-300">
+              <span className="w-2.5 h-2.5 rounded-xs bg-amber-500 shrink-0" />
+              <span>Planejado</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-blue-600 border border-white shrink-0"></span>
-              <span className="text-slate-600 dark:text-zinc-400 text-[11px]">Coletado em Campo</span>
+            <div className="flex items-center gap-2 text-slate-600 dark:text-zinc-300">
+              <span className="w-2.5 h-2.5 rounded-xs bg-blue-600 shrink-0" />
+              <span>Coletado</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-purple-600 border border-white shrink-0"></span>
-              <span className="text-slate-600 dark:text-zinc-400 text-[11px]">Em Laboratório</span>
+            <div className="flex items-center gap-2 text-slate-600 dark:text-zinc-300">
+              <span className="w-2.5 h-2.5 rounded-xs bg-violet-600 shrink-0" />
+              <span>Em Laboratório</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-emerald-600 border border-white shrink-0"></span>
-              <span className="text-slate-600 dark:text-zinc-400 text-[11px]">Laudo Concluído</span>
+            <div className="flex items-center gap-2 text-slate-600 dark:text-zinc-300">
+              <span className="w-2.5 h-2.5 rounded-xs bg-emerald-600 shrink-0" />
+              <span>Laudo Concluído</span>
             </div>
           </div>
         </div>
 
-        {/* Tabela e Lista de Pontos com Edição Rápida */}
-        <div className="p-4 sm:p-5 border-t border-slate-200 dark:border-zinc-800 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Lista / Tabela de Pontos */}
+        <div className="p-4 border-t border-slate-200 dark:border-zinc-800 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-emerald-600" />
-                <span>Pontos de Amostragem do Talhão ({filteredPoints.length})</span>
+              <h3 className="text-xs font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>Pontos de Amostragem ({filteredPoints.length})</span>
               </h3>
-              <p className="text-xs text-slate-500 dark:text-zinc-400">
-                Clique em "Editar" para alterar código, coordenadas ou status, ou arraste o pino diretamente no mapa.
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+                Edite detalhes ou arraste os marcadores diretamente no mapa.
               </p>
             </div>
 
-            {/* Filtros da Tabela */}
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <div className="relative">
                 <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Pesquisar ponto..."
+                  placeholder="Filtrar ponto..."
                   value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 border border-slate-300 dark:border-zinc-700 rounded-lg bg-slate-50 dark:bg-zinc-900 text-slate-900 dark:text-zinc-100 w-44"
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-8 pl-8 pr-2.5 border border-slate-200 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 w-40 text-xs focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
               <select
                 value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value)}
-                className="px-2.5 py-1.5 border border-slate-300 dark:border-zinc-700 rounded-lg bg-slate-50 dark:bg-zinc-900 text-slate-900 dark:text-zinc-100 font-medium cursor-pointer"
+                onChange={(e) => setStatusFilter(e.target.value)}
+                aria-label="Filtrar por status"
+                className="h-8 px-2 border border-slate-200 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 text-xs cursor-pointer"
               >
-                <option value="all">Todos os Status</option>
+                <option value="all">Todos Status</option>
                 <option value="planejado">Planejados</option>
                 <option value="coletado">Coletados</option>
                 <option value="enviado_laboratorio">Em Laboratório</option>
                 <option value="analisado">Laudo Concluído</option>
               </select>
+
+              <select
+                value={depthFilter}
+                onChange={(e) => setDepthFilter(e.target.value)}
+                aria-label="Filtrar por profundidade"
+                className="h-8 px-2 border border-slate-200 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 text-xs cursor-pointer"
+              >
+                <option value="all">Todas Prof.</option>
+                <option value="0-20">0-20 cm</option>
+                <option value="20-40">20-40 cm</option>
+                <option value="0-40">0-40 cm</option>
+              </select>
             </div>
           </div>
 
-          {/* Tabela de Pontos */}
           {filteredPoints.length === 0 ? (
-            <div className="p-8 text-center bg-slate-50 dark:bg-zinc-900/50 rounded-xl border border-dashed border-slate-200 dark:border-zinc-800 space-y-2">
-              <MapPin className="w-8 h-8 text-slate-300 dark:text-zinc-600 mx-auto" />
-              <p className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-                Nenhum ponto de amostragem cadastrado neste talhão
+            <div className="py-7 px-4 text-center bg-slate-50 dark:bg-zinc-950 rounded-lg border border-dashed border-slate-200 dark:border-zinc-800 space-y-1.5">
+              <MapPin className="w-5 h-5 text-slate-400 dark:text-zinc-600 mx-auto" />
+              <p className="text-xs font-medium text-slate-700 dark:text-zinc-300">
+                Nenhum ponto de amostragem encontrado neste talhão
               </p>
               <p className="text-[11px] text-slate-500 dark:text-zinc-400 max-w-md mx-auto">
-                Clique no botão "Marcar Ponto no Mapa", use a "Grade Automática" ou importe arquivos KML, GeoJSON ou CSV.
+                Use &quot;Marcar Ponto&quot;, gere uma &quot;Grade Regular&quot; ou importe arquivos KML, GeoJSON ou CSV.
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-zinc-800">
-              <table className="w-full text-left text-xs text-slate-700 dark:text-zinc-300">
-                <thead className="bg-slate-100 dark:bg-zinc-900 font-bold text-slate-800 dark:text-zinc-200 border-b border-slate-200 dark:border-zinc-800 text-[11px] uppercase tracking-wider">
+            <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-zinc-800">
+              <table className="w-full text-left text-xs text-slate-700 dark:text-zinc-300 tabular-nums">
+                <thead className="bg-slate-50 dark:bg-zinc-950 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400 border-b border-slate-200 dark:border-zinc-800">
                   <tr>
-                    <th className="py-2.5 px-3">Código</th>
-                    <th className="py-2.5 px-3">Coordenadas (Lat, Lng)</th>
-                    <th className="py-2.5 px-3">Profundidade</th>
-                    <th className="py-2.5 px-3">Subamostras</th>
-                    <th className="py-2.5 px-3">Status</th>
-                    <th className="py-2.5 px-3">Data</th>
-                    <th className="py-2.5 px-3 text-right">Ações</th>
+                    <th className="py-2 px-3">Código</th>
+                    <th className="py-2 px-3">Coordenadas</th>
+                    <th className="py-2 px-3">Profundidade</th>
+                    <th className="py-2 px-3">Subamostras</th>
+                    <th className="py-2 px-3">Status</th>
+                    <th className="py-2 px-3">Data</th>
+                    <th className="py-2 px-3 text-right">Ações</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-zinc-800 bg-white dark:bg-zinc-950">
+                <tbody className="divide-y divide-slate-100 dark:divide-zinc-800 bg-white dark:bg-zinc-900">
                   {filteredPoints.map((pt) => {
-                    const st = getStatusColor(pt.status);
+                    const st = getStatusMeta(pt.status);
+                    const isConfirmingDelete = confirmDeletePointId === pt.id;
                     return (
-                      <tr key={pt.id} className="hover:bg-slate-50 dark:hover:bg-zinc-900/60 transition">
-                        <td className="py-2.5 px-3 font-mono font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-                          <span
-                            className="w-2.5 h-2.5 rounded-full shrink-0"
-                            style={{ backgroundColor: st.bg }}
-                          />
-                          {pt.code}
+                      <tr
+                        key={pt.id}
+                        className="hover:bg-slate-50/70 dark:hover:bg-zinc-800/40 transition-colors"
+                      >
+                        <td className="py-2 px-3 font-mono font-semibold text-slate-900 dark:text-zinc-100 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-xs shrink-0 ${st.dotClass}`} />
+                            {pt.code}
+                          </span>
                         </td>
-                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600 dark:text-zinc-400">
+                        <td className="py-2 px-3 font-mono text-[11px] text-slate-600 dark:text-zinc-400 whitespace-nowrap">
                           {pt.lat.toFixed(5)}, {pt.lng.toFixed(5)}
                         </td>
-                        <td className="py-2.5 px-3 font-medium">
-                          {pt.depth} cm
-                        </td>
-                        <td className="py-2.5 px-3">
-                          {pt.subsamplesCount} subs
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <span
-                            className="px-2 py-0.5 rounded-full text-[10px] font-bold inline-block text-white"
-                            style={{ backgroundColor: st.bg }}
-                          >
+                        <td className="py-2 px-3 whitespace-nowrap">{pt.depth} cm</td>
+                        <td className="py-2 px-3 whitespace-nowrap">{pt.subsamplesCount}</td>
+                        <td className="py-2 px-3 whitespace-nowrap">
+                          <span className={`text-[11px] font-medium ${st.textClass}`}>
                             {st.label}
                           </span>
                         </td>
-                        <td className="py-2.5 px-3 text-slate-500 text-[11px]">
+                        <td className="py-2 px-3 text-slate-500 dark:text-zinc-400 text-[11px] whitespace-nowrap">
                           {pt.date}
                         </td>
-                        <td className="py-2.5 px-3 text-right space-x-1.5 whitespace-nowrap">
-                          <button
-                            onClick={() => handleOpenEditPoint(pt)}
-                            className="p-1 text-slate-600 hover:text-emerald-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded cursor-pointer"
-                            title="Editar detalhes do ponto"
-                          >
-                            <Edit2 className="w-3.5 h-3.5 inline" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (onNavigateToManualSample) {
-                                onNavigateToManualSample({
-                                  sampleCode: pt.code,
-                                  plotId: pt.plotId,
-                                  depth: (pt.depth === '20-40' ? '20-40' : '0-20') as any,
-                                  collectionDate: pt.date,
-                                  notes: `Ponto georreferenciado: Lat ${pt.lat}, Lng ${pt.lng}. ${pt.notes || ''}`
-                                });
-                              }
-                            }}
-                            className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 rounded font-bold text-[11px] cursor-pointer"
-                            title="Lançar análise química laboratorial deste ponto"
-                          >
-                            Lançar Laudo
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (window.confirm(`Excluir o ponto ${pt.code}?`)) {
-                                handleDeletePoint(pt.id);
-                              }
-                            }}
-                            className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer"
-                            title="Excluir ponto"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 inline" />
-                          </button>
+                        <td className="py-2 px-3 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditPoint(pt)}
+                              className="h-7 w-7 inline-flex items-center justify-center text-slate-500 hover:text-emerald-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded cursor-pointer"
+                              title="Editar ponto"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+
+                            {onNavigateToManualSample && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onNavigateToManualSample({
+                                    sampleCode: pt.code,
+                                    plotId: pt.plotId,
+                                    depth: pt.depth === '20-40' ? '20-40' : '0-20',
+                                    collectionDate: pt.date,
+                                    notes: `Ponto georreferenciado: Lat ${pt.lat}, Lng ${pt.lng}. ${
+                                      pt.notes || ''
+                                    }`,
+                                  })
+                                }
+                                className="h-7 px-2 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-200/80 dark:border-emerald-900 rounded text-[11px] font-medium cursor-pointer"
+                              >
+                                Lançar Laudo
+                              </button>
+                            )}
+
+                            {isConfirmingDelete ? (
+                              <div className="inline-flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePoint(pt.id)}
+                                  className="h-7 px-2 bg-rose-600 text-white rounded text-[11px] font-semibold cursor-pointer"
+                                >
+                                  Confirmar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeletePointId(null)}
+                                  className="h-7 px-1.5 border border-slate-200 dark:border-zinc-700 rounded text-[11px] text-slate-600 dark:text-zinc-300 cursor-pointer"
+                                >
+                                  Não
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeletePointId(pt.id)}
+                                className="h-7 w-7 inline-flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded cursor-pointer"
+                                title="Excluir ponto"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -2069,739 +2206,89 @@ export const SoilSamplingMapView: React.FC<SoilSamplingMapViewProps> = ({
         </div>
       </div>
 
-      {/* =======================================================================
-          MODAL 1: EDITAR / CADASTRAR PONTO DE AMOSTRA
-          ======================================================================= */}
-      {isPointModalOpen && (
-        <div className="fixed inset-0 z-[1500] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-scale-in">
-            <div className="p-4 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-emerald-600" />
-                <span>{editingPoint ? `Editar Ponto: ${editingPoint.code}` : 'Novo Ponto de Amostragem'}</span>
-              </h3>
-              <button
-                onClick={() => setIsPointModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSavePoint} className="p-5 space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-700 dark:text-zinc-300 font-semibold mb-1">
-                    Código da Amostra *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={pointForm.code}
-                    onChange={e => setPointForm({ ...pointForm, code: e.target.value })}
-                    placeholder="Ex: P-01, ZL-02"
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-black font-mono font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 dark:text-zinc-300 font-semibold mb-1">
-                    Profundidade da Coleta
-                  </label>
-                  <select
-                    value={pointForm.depth}
-                    onChange={e => setPointForm({ ...pointForm, depth: e.target.value as any })}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-black cursor-pointer font-medium"
-                  >
-                    <option value="0-20">0-20 cm (Camada Arável)</option>
-                    <option value="20-40">20-40 cm (Subsolo)</option>
-                    <option value="0-40">0-40 cm (Perfil Total)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Coordenadas Geográficas Editáveis */}
-              <div className="bg-slate-50 dark:bg-zinc-900 p-3 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-2">
-                <span className="text-[11px] font-bold text-slate-700 dark:text-zinc-300 block">
-                  Coordenadas Geográficas (Graus Decimais WGS84)
-                </span>
-                <div className="grid grid-cols-2 gap-3 font-mono">
-                  <div>
-                    <label className="block text-[10px] text-slate-500 mb-0.5">Latitude</label>
-                    <input
-                      type="number"
-                      step="0.000001"
-                      required
-                      value={pointForm.lat}
-                      onChange={e => setPointForm({ ...pointForm, lat: parseFloat(e.target.value) || 0 })}
-                      className="w-full px-2 py-1.5 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-xs font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-slate-500 mb-0.5">Longitude</label>
-                    <input
-                      type="number"
-                      step="0.000001"
-                      required
-                      value={pointForm.lng}
-                      onChange={e => setPointForm({ ...pointForm, lng: parseFloat(e.target.value) || 0 })}
-                      className="w-full px-2 py-1.5 border border-slate-300 dark:border-zinc-700 rounded bg-white dark:bg-black text-xs font-bold"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-slate-700 dark:text-zinc-300 font-semibold mb-1">
-                    Status da Coleta
-                  </label>
-                  <select
-                    value={pointForm.status}
-                    onChange={e => setPointForm({ ...pointForm, status: e.target.value as any })}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-black cursor-pointer font-bold"
-                  >
-                    <option value="planejado">🟡 Planejado</option>
-                    <option value="coletado">🔵 Coletado</option>
-                    <option value="enviado_laboratorio">🟣 Em Laboratório</option>
-                    <option value="analisado">🟢 Laudo Concluído</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 dark:text-zinc-300 font-semibold mb-1">
-                    Data da Coleta
-                  </label>
-                  <input
-                    type="date"
-                    value={pointForm.date}
-                    onChange={e => setPointForm({ ...pointForm, date: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-black"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 dark:text-zinc-300 font-semibold mb-1">
-                    Subamostras
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="50"
-                    value={pointForm.subsamplesCount}
-                    onChange={e => setPointForm({ ...pointForm, subsamplesCount: parseInt(e.target.value, 10) || 15 })}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-black"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-700 dark:text-zinc-300 font-semibold mb-1">
-                  Cor / Tipo de Solo no Local
-                </label>
-                <input
-                  type="text"
-                  value={pointForm.soilColor}
-                  onChange={e => setPointForm({ ...pointForm, soilColor: e.target.value })}
-                  placeholder="Ex: Latossolo Vermelho Eutrófico, Argiloso"
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-black"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-700 dark:text-zinc-300 font-semibold mb-1">
-                  Observações de Campo
-                </label>
-                <textarea
-                  rows={2}
-                  value={pointForm.notes}
-                  onChange={e => setPointForm({ ...pointForm, notes: e.target.value })}
-                  placeholder="Ex: Ponto próximo à curva de nível 3, presença de palhada densa..."
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-black"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsPointModalOpen(false)}
-                  className="px-4 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg font-bold text-slate-700 dark:text-zinc-300 hover:bg-slate-100 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{editingPoint ? 'Salvar Alterações' : 'Adicionar Ponto'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* =======================================================================
-          MODAL 2: EDITAR TALHÃO (NOME, CULTURA, NOTAS E OPÇÕES)
-          ======================================================================= */}
-      {isEditPlotModalOpen && (
-        <div className="fixed inset-0 z-[1500] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-scale-in">
-            <div className="p-4 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-                <Edit3 className="w-5 h-5 text-teal-600" />
-                <span>Editar Dados do Talhão</span>
-              </h3>
-              <button
-                onClick={() => setIsEditPlotModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSavePlotEdit} className="p-5 space-y-4 text-xs">
-              <div>
-                <label className="block text-slate-700 dark:text-zinc-300 font-semibold mb-1">
-                  Nome / Identificação do Talhão *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={plotEditForm.name}
-                  onChange={e => setPlotEditForm({ ...plotEditForm, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-black font-bold text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-700 dark:text-zinc-300 font-semibold mb-1">
-                  Cultura / Variedade Atual
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ex: Soja Intacta 2, Milho Safrinha, Café Conilon"
-                  value={plotEditForm.crop}
-                  onChange={e => setPlotEditForm({ ...plotEditForm, crop: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-black"
-                />
-              </div>
-
-              {/* Informações Geográficas do Contorno */}
-              <div className="bg-slate-50 dark:bg-zinc-900 p-3 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-2">
-                <span className="font-bold text-slate-800 dark:text-zinc-200 text-xs block">
-                  Geometria do Contorno Atual
-                </span>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <span className="text-slate-500 block text-[10px]">Área Calculada</span>
-                    <strong className="text-emerald-700 dark:text-emerald-400 font-bold text-sm">
-                      {currentBoundary?.areaHa ? `${currentBoundary.areaHa} hectares` : 'Não delimitado'}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[10px]">Perímetro</span>
-                    <strong className="text-slate-800 dark:text-zinc-200 font-bold text-sm">
-                      {currentBoundary?.perimeterM ? `${currentBoundary.perimeterM} metros` : '-'}
-                    </strong>
-                  </div>
-                </div>
-
-                {currentBoundary && (
-                  <div className="pt-2 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-between">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsEditPlotModalOpen(false);
-                        setMapMode('edit_vertices');
-                      }}
-                      className="text-xs text-amber-700 dark:text-amber-400 font-bold hover:underline flex items-center gap-1 cursor-pointer"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                      Ajustar vértices arrastando no mapa
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleClearPolygon}
-                      className="text-xs text-rose-600 hover:text-rose-700 font-bold cursor-pointer"
-                    >
-                      Excluir Contorno
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-slate-700 dark:text-zinc-300 font-semibold mb-1">
-                  Notas / Observações do Talhão
-                </label>
-                <textarea
-                  rows={2}
-                  value={plotEditForm.notes}
-                  onChange={e => setPlotEditForm({ ...plotEditForm, notes: e.target.value })}
-                  placeholder="Ex: Histórico de calagem em 2024, talhão com declividade moderada..."
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-black"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsEditPlotModalOpen(false)}
-                  className="px-4 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg font-bold text-slate-700 dark:text-zinc-300 hover:bg-slate-100 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>Salvar Dados</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* =======================================================================
-          MODAL 3: EXPORTAÇÃO COMPLETA DE ARQUIVOS
-          ======================================================================= */}
-      {isExportModalOpen && (
-        <div className="fixed inset-0 z-[1500] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden animate-scale-in">
-            <div className="p-4 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-                <Download className="w-5 h-5 text-emerald-600" />
-                <span>Exportar Dados de Mapeamento Agrícola</span>
-              </h3>
-              <button
-                onClick={() => setIsExportModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4 text-xs">
-              <p className="text-slate-600 dark:text-zinc-400">
-                Selecione o formato desejado para exportar o contorno do talhão e os pontos de amostragem georreferenciados:
-              </p>
-
-              {/* Cards de Formatos Suportados */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {/* KML */}
-                <div
-                  onClick={() => setExportFormat('kml')}
-                  className={`p-3 rounded-xl border-2 cursor-pointer transition flex items-start gap-3 ${
-                    exportFormat === 'kml'
-                      ? 'border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/30'
-                      : 'border-slate-200 dark:border-zinc-800 hover:border-slate-300'
-                  }`}
-                >
-                  <FileCode className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="block text-slate-900 dark:text-zinc-100 font-bold">KML (Google Earth)</strong>
-                    <span className="text-[11px] text-slate-500 dark:text-zinc-400">
-                      Ideal para visualização 3D no Google Earth e computadores de bordo.
-                    </span>
-                  </div>
-                </div>
-
-                {/* KMZ */}
-                <div
-                  onClick={() => setExportFormat('kmz')}
-                  className={`p-3 rounded-xl border-2 cursor-pointer transition flex items-start gap-3 ${
-                    exportFormat === 'kmz'
-                      ? 'border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/30'
-                      : 'border-slate-200 dark:border-zinc-800 hover:border-slate-300'
-                  }`}
-                >
-                  <FileCode className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="block text-slate-900 dark:text-zinc-100 font-bold">KMZ Compactado</strong>
-                    <span className="text-[11px] text-slate-500 dark:text-zinc-400">
-                      Pacote KML compactado com ícones e metadados completos.
-                    </span>
-                  </div>
-                </div>
-
-                {/* GeoJSON */}
-                <div
-                  onClick={() => setExportFormat('geojson')}
-                  className={`p-3 rounded-xl border-2 cursor-pointer transition flex items-start gap-3 ${
-                    exportFormat === 'geojson'
-                      ? 'border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/30'
-                      : 'border-slate-200 dark:border-zinc-800 hover:border-slate-300'
-                  }`}
-                >
-                  <FileText className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="block text-slate-900 dark:text-zinc-100 font-bold">GeoJSON (QGIS / SIG)</strong>
-                    <span className="text-[11px] text-slate-500 dark:text-zinc-400">
-                      Padrão OGC RFC 7946 para QGIS, ArcGIS e scripts de análise em Python.
-                    </span>
-                  </div>
-                </div>
-
-                {/* GeoPackage */}
-                <div
-                  onClick={() => setExportFormat('gpkg')}
-                  className={`p-3 rounded-xl border-2 cursor-pointer transition flex items-start gap-3 ${
-                    exportFormat === 'gpkg'
-                      ? 'border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/30'
-                      : 'border-slate-200 dark:border-zinc-800 hover:border-slate-300'
-                  }`}
-                >
-                  <Database className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="block text-slate-900 dark:text-zinc-100 font-bold">GeoPackage (.gpkg)</strong>
-                    <span className="text-[11px] text-slate-500 dark:text-zinc-400">
-                      Banco de dados espacial padrão aberto universal para softwares SIG.
-                    </span>
-                  </div>
-                </div>
-
-                {/* CSV */}
-                <div
-                  onClick={() => setExportFormat('csv')}
-                  className={`p-3 rounded-xl border-2 cursor-pointer transition flex items-start gap-3 ${
-                    exportFormat === 'csv'
-                      ? 'border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/30'
-                      : 'border-slate-200 dark:border-zinc-800 hover:border-slate-300'
-                  }`}
-                >
-                  <FileSpreadsheet className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="block text-slate-900 dark:text-zinc-100 font-bold">Planilha CSV</strong>
-                    <span className="text-[11px] text-slate-500 dark:text-zinc-400">
-                      Tabela com coordenadas Lat/Lng, códigos, profundidade e status.
-                    </span>
-                  </div>
-                </div>
-
-                {/* GeoTIFF / Raster */}
-                <div
-                  onClick={() => setExportFormat('geotiff')}
-                  className={`p-3 rounded-xl border-2 cursor-pointer transition flex items-start gap-3 ${
-                    exportFormat === 'geotiff'
-                      ? 'border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/30'
-                      : 'border-slate-200 dark:border-zinc-800 hover:border-slate-300'
-                  }`}
-                >
-                  <Image className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="block text-slate-900 dark:text-zinc-100 font-bold">GeoTIFF / Imagem Raster</strong>
-                    <span className="text-[11px] text-slate-500 dark:text-zinc-400">
-                      Exporta o mapa raster e imagem de satélite com metadados espaciais.
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Resumo do Conteúdo */}
-              <div className="p-3 bg-slate-50 dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800 text-xs flex items-center justify-between">
-                <div>
-                  <span className="text-slate-500 block">Talhão selecionado:</span>
-                  <strong className="text-slate-900 dark:text-zinc-100">{currentPlot.name} ({currentBoundary?.areaHa || currentPlot.areaHa || '-'} ha)</strong>
-                </div>
-                <div className="text-right">
-                  <span className="text-slate-500 block">Total de pontos:</span>
-                  <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{plotPoints.length} pontos</strong>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsExportModalOpen(false)}
-                  className="px-4 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg font-bold text-slate-700 dark:text-zinc-300 hover:bg-slate-100 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  disabled={isExporting}
-                  onClick={handleExecuteExport}
-                  className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
-                >
-                  {isExporting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                  <span>{isExporting ? 'Exportando...' : `Baixar Arquivo (${exportFormat.toUpperCase()})`}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* =======================================================================
-          MODAL 4: IMPORTAÇÃO COMPLETA DE ARQUIVOS (KML, KMZ, GeoJSON, CSV, GPKG, GeoTIFF)
-          ======================================================================= */}
-      {isImportModalOpen && (
-        <div className="fixed inset-0 z-[1500] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden animate-scale-in">
-            <div className="p-4 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-                <Upload className="w-5 h-5 text-emerald-600" />
-                <span>Importar Arquivo Geoespacial</span>
-              </h3>
-              <button
-                onClick={() => { setIsImportModalOpen(false); setImportSummary(null); }}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4 text-xs">
-              <div
-                onDragOver={(e) => { e.preventDefault(); setImportDragOver(true); }}
-                onDragLeave={() => setImportDragOver(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setImportDragOver(false);
-                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                    handleFileSelectForImport(e.dataTransfer.files[0]);
-                  }
-                }}
-                onClick={() => fileInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-2xl p-6 sm:p-8 text-center cursor-pointer transition ${
-                  importDragOver
-                    ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/30'
-                    : 'border-slate-300 dark:border-zinc-700 hover:border-emerald-500 bg-slate-50/50 dark:bg-zinc-900/50'
-                }`}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".kml,.kmz,.geojson,.json,.csv,.txt,.gpkg,.tif,.tiff"
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      handleFileSelectForImport(e.target.files[0]);
-                    }
-                  }}
-                />
-
-                <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Upload className="w-6 h-6" />
-                </div>
-                <h4 className="text-sm font-bold text-slate-800 dark:text-zinc-200">
-                  Arraste o arquivo ou clique para selecionar
-                </h4>
-                <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 max-w-sm mx-auto">
-                  Formatos aceitos: <strong>KML, KMZ, GeoJSON, CSV, GeoPackage (.gpkg) e GeoTIFF / TIFF (.tif)</strong>
-                </p>
-              </div>
-
-              {/* Status de Leitura / Resumo do Arquivo */}
-              {importLoading && (
-                <div className="p-4 bg-slate-50 dark:bg-zinc-900 rounded-xl text-center space-y-2">
-                  <RefreshCw className="w-6 h-6 text-emerald-600 animate-spin mx-auto" />
-                  <p className="text-xs font-bold text-slate-700 dark:text-zinc-300">Processando camadas georreferenciadas...</p>
-                </div>
-              )}
-
-              {importSummary && (
-                <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 space-y-3">
-                  <div className="flex items-center justify-between border-b border-emerald-200/80 dark:border-emerald-800/60 pb-2">
-                    <div>
-                      <strong className="block text-emerald-900 dark:text-emerald-200 text-sm font-bold">
-                        {importSummary.file.name}
-                      </strong>
-                      <span className="text-[11px] text-emerald-700 dark:text-emerald-400">
-                        Formato: {importSummary.type}
-                      </span>
-                    </div>
-                    <span className="px-2.5 py-1 bg-emerald-200 dark:bg-emerald-800 text-emerald-900 dark:text-emerald-100 rounded-full font-bold text-[10px]">
-                      {(importSummary.file.size / 1024).toFixed(1)} KB
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="p-2 bg-white/70 dark:bg-black/30 rounded-lg">
-                      <span className="text-slate-500 text-[10px] block">Contorno do Talhão</span>
-                      <strong className="text-slate-900 dark:text-zinc-100 font-bold">
-                        {importSummary.hasBoundary ? '✓ Detectado' : 'Não encontrado'}
-                      </strong>
-                    </div>
-
-                    <div className="p-2 bg-white/70 dark:bg-black/30 rounded-lg">
-                      <span className="text-slate-500 text-[10px] block">Pontos de Amostragem</span>
-                      <strong className="text-slate-900 dark:text-zinc-100 font-bold">
-                        {importSummary.pointsCount} pontos detectados
-                      </strong>
-                    </div>
-                  </div>
-
-                  {importSummary.hasRaster && (
-                    <div className="p-2 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 rounded-lg text-indigo-900 dark:text-indigo-200 text-xs">
-                      <strong>Mapa Raster GeoTIFF detectado:</strong> a imagem de satélite / fertilidade será projetada como camada sobreposta com controle de transparência.
-                    </div>
-                  )}
-
-                  {importSummary.pointsCount > 0 && (
-                    <div className="pt-2 border-t border-emerald-200/80 dark:border-emerald-800/60 flex items-center justify-between">
-                      <span className="text-slate-700 dark:text-zinc-300 font-medium">Modo de Gravação:</span>
-                      <div className="flex items-center gap-3">
-                        <label className="flex items-center gap-1 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="mergeMode"
-                            checked={importMergeMode === 'replace'}
-                            onChange={() => setImportMergeMode('replace')}
-                          />
-                          <span>Substituir</span>
-                        </label>
-                        <label className="flex items-center gap-1 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="mergeMode"
-                            checked={importMergeMode === 'append'}
-                            onChange={() => setImportMergeMode('append')}
-                          />
-                          <span>Mesclar</span>
-                        </label>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="pt-3 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => { setIsImportModalOpen(false); setImportSummary(null); }}
-                  className="px-4 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg font-bold text-slate-700 dark:text-zinc-300 hover:bg-slate-100 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  disabled={!importSummary}
-                  onClick={handleApplyImport}
-                  className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>Carregar no Mapa</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* =======================================================================
-          MODAL 5: GERAR GRADE AMOSTRAL AUTOMÁTICA
-          ======================================================================= */}
-      {isGridModalOpen && (
-        <div className="fixed inset-0 z-[1500] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-scale-in">
-            <div className="p-4 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-                <Grid className="w-5 h-5 text-indigo-600" />
-                <span>Gerar Grade Amostral Regular</span>
-              </h3>
-              <button
-                onClick={() => setIsGridModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4 text-xs">
-              <p className="text-slate-600 dark:text-zinc-400">
-                Gere pontos de amostragem georreferenciados distribuídos uniformemente dentro do contorno do talhão ({currentBoundary?.areaHa || currentPlot.areaHa} ha).
-              </p>
-
-              <div>
-                <label className="block text-slate-700 dark:text-zinc-300 font-semibold mb-1">
-                  Densidade Amostral (Hectares por Ponto)
-                </label>
-                <select
-                  value={gridDensityHa}
-                  onChange={e => setGridDensityHa(parseFloat(e.target.value) || 2)}
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-black font-bold cursor-pointer"
-                >
-                  <option value="1">1 ponto a cada 1,0 hectare (Alta Precisão)</option>
-                  <option value="2">1 ponto a cada 2,0 hectares (Padrão Recomendado)</option>
-                  <option value="2.5">1 ponto a cada 2,5 hectares</option>
-                  <option value="3">1 ponto a cada 3,0 hectares</option>
-                  <option value="5">1 ponto a cada 5,0 hectares (Extensivo)</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-700 dark:text-zinc-300 font-semibold mb-1">
-                    Profundidade Padrão
-                  </label>
-                  <select
-                    value={gridDepth}
-                    onChange={e => setGridDepth(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-black cursor-pointer font-medium"
-                  >
-                    <option value="0-20">0-20 cm</option>
-                    <option value="20-40">20-40 cm</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 dark:text-zinc-300 font-semibold mb-1">
-                    Subamostras por Ponto
-                  </label>
-                  <input
-                    type="number"
-                    min="5"
-                    max="30"
-                    value={gridSubsamples}
-                    onChange={e => setGridSubsamples(parseInt(e.target.value, 10) || 15)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-black"
-                  />
-                </div>
-              </div>
-
-              <div className="p-3 bg-indigo-50 dark:bg-indigo-950/40 rounded-xl border border-indigo-200 dark:border-indigo-800 text-indigo-900 dark:text-indigo-200 text-xs flex items-center justify-between">
-                <span>Estimativa de pontos gerados:</span>
-                <strong className="text-sm font-bold">
-                  ~{Math.max(1, Math.round((currentBoundary?.areaHa || currentPlot.areaHa || 10) / gridDensityHa))} pontos
-                </strong>
-              </div>
-
-              <div className="pt-3 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsGridModalOpen(false)}
-                  className="px-4 py-2 border border-slate-300 dark:border-zinc-700 rounded-lg font-bold text-slate-700 dark:text-zinc-300 hover:bg-slate-100 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleGenerateGrid}
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  <Grid className="w-4 h-4" />
-                  <span>Gerar Grade</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Prescrição VRA e Interpolação Espacial */}
-      <VraPrescriptionModal
-        isOpen={isVraModalOpen}
-        onClose={() => setIsVraModalOpen(false)}
-        plotName={currentPlot.name}
-        farmName={selectedFarm?.name || 'Fazenda'}
-        boundaryCoordinates={currentBoundary?.coordinates}
-        existingPoints={plotPoints}
+      {/* Modais Extraídos */}
+      <SoilPointModal
+        isOpen={isPointModalOpen}
+        editingPoint={editingPoint}
+        pointForm={pointForm}
+        setPointForm={setPointForm}
+        onSubmit={handleSavePoint}
+        onClose={() => {
+          setIsPointModalOpen(false);
+          setEditingPoint(null);
+          setPendingPointCoords(null);
+        }}
       />
+
+      <SoilEditPlotModal
+        isOpen={isEditPlotModalOpen}
+        plotEditForm={plotEditForm}
+        setPlotEditForm={setPlotEditForm}
+        currentBoundary={currentBoundary}
+        onSubmit={handleSavePlotEdit}
+        onEditVertices={() => {
+          setIsEditPlotModalOpen(false);
+          setMapMode('edit_vertices');
+        }}
+        onClearPolygon={handleClearPolygon}
+        onClose={() => setIsEditPlotModalOpen(false)}
+      />
+
+      <SoilExportModal
+        isOpen={isExportModalOpen}
+        exportFormat={exportFormat}
+        setExportFormat={setExportFormat}
+        isExporting={isExporting}
+        plotName={currentBoundary?.name || currentPlot.name}
+        areaHa={displayAreaHa || '—'}
+        pointsCount={plotPoints.length}
+        onExecute={handleExecuteExport}
+        onClose={() => setIsExportModalOpen(false)}
+      />
+
+      <SoilImportModal
+        isOpen={isImportModalOpen}
+        fileInputRef={fileInputRef}
+        importDragOver={importDragOver}
+        setImportDragOver={setImportDragOver}
+        importLoading={importLoading}
+        importSummary={importSummary}
+        importMergeMode={importMergeMode}
+        setImportMergeMode={setImportMergeMode}
+        onFileSelect={handleFileSelectForImport}
+        onApply={handleApplyImport}
+        onClose={() => {
+          setIsImportModalOpen(false);
+          setImportSummary(null);
+        }}
+      />
+
+      <SoilGridModal
+        isOpen={isGridModalOpen}
+        areaHa={displayAreaHa || 10}
+        gridDensityHa={gridDensityHa}
+        setGridDensityHa={setGridDensityHa}
+        gridDepth={gridDepth}
+        setGridDepth={setGridDepth}
+        gridSubsamples={gridSubsamples}
+        setGridSubsamples={setGridSubsamples}
+        onGenerate={handleGenerateGrid}
+        onClose={() => setIsGridModalOpen(false)}
+      />
+
+      {/* Modal VRA Lazy-loaded */}
+      {isVraModalOpen && (
+        <Suspense fallback={null}>
+          <VraPrescriptionModal
+            isOpen={isVraModalOpen}
+            onClose={() => setIsVraModalOpen(false)}
+            plotName={currentPlot.name}
+            farmName={selectedFarm?.name || 'Fazenda'}
+            boundaryCoordinates={currentBoundary?.coordinates}
+            existingPoints={plotPoints}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

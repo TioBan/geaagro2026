@@ -28,6 +28,7 @@ export const AvaliacaoRecursosNaturaisTab: React.FC<AvaliacaoRecursosNaturaisTab
   const items: PericiaAvaliacaoRecursoNatural[] = avaliacao.recursosNaturais || [];
 
   const [showForm, setShowForm] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<PericiaAvaliacaoRecursoNatural>>({
     tipoRecurso: 'Excedente de Reserva Legal (CRA / Servidão Ambiental)',
     descricaoLocalizacao: '',
@@ -65,7 +66,7 @@ export const AvaliacaoRecursosNaturaisTab: React.FC<AvaliacaoRecursosNaturaisTab
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.descricaoLocalizacao?.trim() || !formData.tipoRecurso) {
-      alert('Informe o tipo de recurso e a descrição/localização.');
+      onShowNotification('Informe o tipo de recurso e a descrição/localização.');
       return;
     }
 
@@ -100,14 +101,19 @@ export const AvaliacaoRecursosNaturaisTab: React.FC<AvaliacaoRecursosNaturaisTab
   };
 
   const handleDeleteItem = (id: string) => {
-    if (confirm('Deseja excluir este recurso natural da avaliação?')) {
-      const updated = items.filter(item => item.id !== id);
-      onUpdateAvaliacao({
-        ...avaliacao,
-        recursosNaturais: updated,
-      });
-      onShowNotification('Recurso natural removido.');
+    if (pendingDeleteId !== id) {
+      setPendingDeleteId(id);
+      onShowNotification('Clique novamente em excluir para confirmar a remoção do recurso natural.');
+      setTimeout(() => setPendingDeleteId((prev) => (prev === id ? null : prev)), 4000);
+      return;
     }
+    const updated = items.filter(item => item.id !== id);
+    onUpdateAvaliacao({
+      ...avaliacao,
+      recursosNaturais: updated,
+    });
+    setPendingDeleteId(null);
+    onShowNotification('Recurso natural removido.');
   };
 
   const handleExportCSV = () => {

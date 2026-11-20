@@ -1,9 +1,8 @@
 import React, { useMemo } from 'react';
 import {
-  Building2,
   MapPin,
-  Activity,
   AlertTriangle,
+  CheckCircle2,
   ArrowRight,
   ArrowUpRight,
 } from 'lucide-react';
@@ -26,20 +25,21 @@ export const DashboardFarmsSummary: React.FC<DashboardFarmsSummaryProps> = ({
   setSelectedFarmId,
   setActiveTab,
 }) => {
-  // Pre-index the latest soil sample for each farm in a single pass
   const latestSamplesByFarmId = useMemo(() => {
     const map = new Map<string, SoilSample>();
     for (const sample of soilSamples) {
       if (!sample?.farmId) continue;
       const current = map.get(sample.farmId);
-      if (!current || new Date(sample.collectionDate).getTime() > new Date(current.collectionDate).getTime()) {
+      if (
+        !current ||
+        new Date(sample.collectionDate).getTime() > new Date(current.collectionDate).getTime()
+      ) {
         map.set(sample.farmId, sample);
       }
     }
     return map;
   }, [soilSamples]);
 
-  // Pre-index producers by id for instant O(1) lookup
   const producersById = useMemo(() => {
     const map = new Map<string, RuralProducer>();
     for (const p of producers) {
@@ -51,198 +51,234 @@ export const DashboardFarmsSummary: React.FC<DashboardFarmsSummaryProps> = ({
   const validFarms = useMemo(() => farms.filter(f => f && f.id), [farms]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+    <section className="space-y-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
         <div>
-          <h2 className="text-base font-black tracking-tight text-slate-800 dark:text-zinc-100 flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            Resumo das Fazendas & Última Análise de Solo
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+            Propriedades e última análise de solo
           </h2>
-          <p className="text-[11px] text-slate-500 dark:text-zinc-400">
-            Visão rápida de cada propriedade com sua análise física e química mais recente.
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Resumo rápido por fazenda com os parâmetros químicos mais recentes.
           </p>
         </div>
-        <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500">
-          {validFarms.length} fazendas ativas
+        <span className="text-xs text-slate-500 dark:text-zinc-400 tabular-nums">
+          {validFarms.length} propriedade{validFarms.length === 1 ? '' : 's'}
         </span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {validFarms.map(f => {
-          const latestSample = latestSamplesByFarmId.get(f.id);
-          const isActive = f.id === activeFarm?.id;
-          const farmProducer = f.producerId ? producersById.get(f.producerId) : undefined;
+      {validFarms.length === 0 ? (
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-6 text-center text-xs text-slate-500 dark:text-zinc-400">
+          Nenhuma propriedade cadastrada no momento.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {validFarms.map(f => {
+            const latestSample = latestSamplesByFarmId.get(f.id);
+            const isActive = f.id === activeFarm?.id;
+            const farmProducer = f.producerId ? producersById.get(f.producerId) : undefined;
 
-          // Soil quality interpretation
-          let soilHealthStatus = 'Sem Análise';
-          let healthColor = 'text-slate-400 bg-slate-50 border-slate-100 dark:bg-zinc-900 dark:border-zinc-800';
+            let soilHealthStatus = 'Sem análise';
+            let statusColor = 'text-slate-500 dark:text-zinc-400';
+            let statusOk = true;
 
-          if (latestSample) {
-            const ph = latestSample.phCaCl2;
-            const v = latestSample.vPercent || 50;
-            if (ph >= 5.5 && v >= 60) {
-              soilHealthStatus = 'Fertilidade Excelente';
-              healthColor = 'text-emerald-700 bg-emerald-50 border-emerald-100 dark:text-emerald-400 dark:bg-emerald-950/20 dark:border-emerald-900/40';
-            } else if (ph >= 5.0 && v >= 45) {
-              soilHealthStatus = 'Fertilidade Regular';
-              healthColor = 'text-amber-700 bg-amber-50 border-amber-100 dark:text-amber-400 dark:bg-amber-950/20 dark:border-amber-900/40';
-            } else {
-              soilHealthStatus = 'Necessita Correção Urgente';
-              healthColor = 'text-rose-700 bg-rose-50 border-rose-100 dark:text-rose-400 dark:bg-rose-950/20 dark:border-rose-900/40';
+            if (latestSample) {
+              const ph = latestSample.phCaCl2;
+              const v = latestSample.vPercent || 50;
+              if (ph >= 5.5 && v >= 60) {
+                soilHealthStatus = 'Fertilidade excelente';
+                statusColor = 'text-emerald-700 dark:text-emerald-400';
+                statusOk = true;
+              } else if (ph >= 5.0 && v >= 45) {
+                soilHealthStatus = 'Fertilidade regular';
+                statusColor = 'text-amber-700 dark:text-amber-400';
+                statusOk = false;
+              } else {
+                soilHealthStatus = 'Correção recomendada';
+                statusColor = 'text-red-600 dark:text-red-400';
+                statusOk = false;
+              }
             }
-          }
 
-          return (
-            <div
-              key={f.id}
-              className={`flex flex-col bg-white dark:bg-zinc-950 rounded-2xl border transition-all duration-200 overflow-hidden ${
-                isActive
-                  ? 'border-emerald-500 shadow-md ring-1 ring-emerald-500/20'
-                  : 'border-slate-100 dark:border-zinc-800/80 hover:border-slate-300 dark:hover:border-zinc-700'
-              }`}
-            >
-              {/* Farm Top Cover Bar */}
-              <div className="p-5 flex-1 space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <h3 className="font-extrabold text-sm text-slate-800 dark:text-zinc-100 tracking-tight">
-                        {f.name}
-                      </h3>
-                      {isActive && (
-                        <span className="text-[8px] font-black uppercase tracking-wider bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-400 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-900/40">
-                          Selecionada
+            return (
+              <div
+                key={f.id}
+                className={`bg-white dark:bg-zinc-900 rounded-xl border transition-colors flex flex-col overflow-hidden ${
+                  isActive
+                    ? 'border-emerald-500/80 dark:border-emerald-600/80'
+                    : 'border-slate-200 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700'
+                }`}
+              >
+                <div className="p-4 sm:p-5 flex-1 space-y-4">
+                  {/* Cabeçalho da Fazenda */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 truncate">
+                          {f.name}
+                        </h3>
+                        {isActive && (
+                          <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                            · Ativa
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500 dark:text-zinc-400">
+                        <span className="inline-flex items-center gap-1">
+                          <MapPin className="w-3 h-3 shrink-0" />
+                          {f.city} - {f.state}
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span>{farmProducer?.name || 'Produtor não informado'}</span>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0 tabular-nums">
+                      <span className="text-[11px] text-slate-500 dark:text-zinc-400 block">
+                        Área cultivada
+                      </span>
+                      <strong className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                        {f.cultivatedAreaHa} ha{' '}
+                        <span className="font-normal text-slate-400 dark:text-zinc-500">
+                          / {f.totalAreaHa} ha
+                        </span>
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Última Análise de Solo */}
+                  <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 space-y-3">
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="font-medium text-slate-600 dark:text-zinc-300">
+                        Última análise de solo
+                      </span>
+                      {latestSample && (
+                        <span className={`inline-flex items-center gap-1 font-medium ${statusColor}`}>
+                          {statusOk ? (
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                          ) : (
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                          )}
+                          {soilHealthStatus}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1 text-[11px] text-slate-400 dark:text-zinc-400 font-medium">
-                      <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                      <span>{f.city} - {f.state}</span>
-                      <span className="text-slate-300 dark:text-zinc-700 mx-1">|</span>
-                      <span>Produtor: {farmProducer?.name || 'Não informado'}</span>
-                    </div>
-                  </div>
 
-                  <div className="text-right shrink-0">
-                    <span className="text-[10px] text-slate-400 dark:text-zinc-500 block font-bold">Cultivada</span>
-                    <strong className="text-xs font-black text-slate-700 dark:text-zinc-200">
-                      {f.cultivatedAreaHa} ha <span className="text-[9px] text-slate-400 font-normal">/ {f.totalAreaHa} ha</span>
-                    </strong>
-                  </div>
-                </div>
+                    {latestSample ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs tabular-nums">
+                        <dl className="space-y-1 text-slate-500 dark:text-zinc-400">
+                          <div className="flex justify-between gap-2">
+                            <dt>Protocolo</dt>
+                            <dd className="font-medium text-slate-800 dark:text-zinc-200 truncate">
+                              {latestSample.labProtocol}
+                            </dd>
+                          </div>
+                          <div className="flex justify-between gap-2">
+                            <dt>Coleta</dt>
+                            <dd className="font-medium text-slate-800 dark:text-zinc-200">
+                              {new Date(latestSample.collectionDate).toLocaleDateString('pt-BR')}
+                            </dd>
+                          </div>
+                          <div className="flex justify-between gap-2">
+                            <dt>Profundidade</dt>
+                            <dd className="font-medium text-emerald-700 dark:text-emerald-400">
+                              {latestSample.depth} cm
+                            </dd>
+                          </div>
+                        </dl>
 
-                <div className="h-px bg-slate-100 dark:bg-zinc-900" />
-
-                {/* Latest Analysis Panel */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
-                      <Activity className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      Última Análise de Solo
-                    </span>
-                    {latestSample && (
-                      <span className={`text-[9px] font-bold px-2.5 py-0.5 rounded-full border ${healthColor}`}>
-                        {soilHealthStatus}
-                      </span>
+                        <div className="grid grid-cols-3 border border-slate-200 dark:border-zinc-800 rounded-lg divide-x divide-slate-200 dark:divide-zinc-800 self-center">
+                          <div className="py-2 px-1.5 text-center">
+                            <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">
+                              pH CaCl₂
+                            </span>
+                            <strong className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                              {latestSample.phCaCl2.toFixed(1)}
+                            </strong>
+                          </div>
+                          <div className="py-2 px-1.5 text-center">
+                            <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">
+                              V%
+                            </span>
+                            <strong className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                              {latestSample.vPercent ? Math.round(latestSample.vPercent) : '--'}%
+                            </strong>
+                          </div>
+                          <div className="py-2 px-1.5 text-center">
+                            <span className="text-[10px] text-slate-500 dark:text-zinc-400 block">
+                              Argila
+                            </span>
+                            <strong className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                              {Math.round(latestSample.clayPercent)}%
+                            </strong>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="py-3 text-xs text-slate-400 dark:text-zinc-500 flex items-center justify-between gap-2">
+                        <span>Nenhuma análise de solo cadastrada para esta propriedade.</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedFarmId(f.id);
+                            setActiveTab('solos');
+                          }}
+                          className="text-emerald-700 dark:text-emerald-400 font-medium hover:underline whitespace-nowrap cursor-pointer"
+                        >
+                          Lançar análise
+                        </button>
+                      </div>
                     )}
                   </div>
-
-                  {latestSample ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50/60 dark:bg-zinc-900/40 p-3 rounded-xl border border-slate-100 dark:border-zinc-900/80">
-                      {/* Column 1: Info */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-slate-400">Protocolo:</span>
-                          <span className="font-bold text-slate-700 dark:text-zinc-300">{latestSample.labProtocol}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-slate-400">Coleta:</span>
-                          <span className="font-bold text-slate-700 dark:text-zinc-300">
-                            {new Date(latestSample.collectionDate).toLocaleDateString('pt-BR')}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-slate-400">Profundidade:</span>
-                          <span className="font-black text-emerald-600 dark:text-emerald-400">{latestSample.depth} cm</span>
-                        </div>
-                      </div>
-
-                      {/* Column 2: Parameters */}
-                      <div className="grid grid-cols-3 gap-1.5">
-                        <div className="bg-white dark:bg-zinc-900 p-1.5 rounded-lg border border-slate-100 dark:border-zinc-800 text-center">
-                          <span className="text-[8px] text-slate-400 block font-bold">pH CaCl₂</span>
-                          <strong className="text-xs text-slate-800 dark:text-zinc-200 font-black">
-                            {latestSample.phCaCl2.toFixed(1)}
-                          </strong>
-                        </div>
-                        <div className="bg-white dark:bg-zinc-900 p-1.5 rounded-lg border border-slate-100 dark:border-zinc-800 text-center">
-                          <span className="text-[8px] text-slate-400 block font-bold">Bases (V%)</span>
-                          <strong className="text-xs text-slate-800 dark:text-zinc-200 font-black">
-                            {latestSample.vPercent ? Math.round(latestSample.vPercent) : '--'}%
-                          </strong>
-                        </div>
-                        <div className="bg-white dark:bg-zinc-900 p-1.5 rounded-lg border border-slate-100 dark:border-zinc-800 text-center">
-                          <span className="text-[8px] text-slate-400 block font-bold">Argila</span>
-                          <strong className="text-xs text-slate-800 dark:text-zinc-200 font-black">
-                            {Math.round(latestSample.clayPercent)}%
-                          </strong>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-slate-50 dark:bg-zinc-900 p-4 rounded-xl border border-dashed border-slate-200 dark:border-zinc-800 text-center text-slate-400 dark:text-zinc-500">
-                      <AlertTriangle className="w-5 h-5 mx-auto mb-1 text-slate-400" />
-                      <span className="text-xs block font-bold">Nenhuma análise cadastrada</span>
-                    </div>
-                  )}
                 </div>
-              </div>
 
-              {/* Bottom Actions Row */}
-              <div className="bg-slate-50/60 dark:bg-zinc-900/60 px-5 py-3 border-t border-slate-100 dark:border-zinc-900/80 flex flex-wrap items-center justify-between gap-3">
-                {!isActive ? (
-                  <button
-                    onClick={() => setSelectedFarmId(f.id)}
-                    className="text-[10px] font-black text-slate-600 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1 cursor-pointer transition-colors"
-                  >
-                    Selecionar como Ativa <ArrowRight className="w-3 h-3" />
-                  </button>
-                ) : (
-                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                    Ativa no Sistema
-                  </span>
-                )}
+                {/* Rodapé de Ações */}
+                <div className="px-4 sm:px-5 py-2.5 border-t border-slate-100 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2 bg-slate-50/50 dark:bg-zinc-950/40">
+                  {!isActive ? (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedFarmId(f.id)}
+                      className="text-xs font-medium text-slate-600 dark:text-zinc-400 hover:text-emerald-700 dark:hover:text-emerald-400 inline-flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <span>Selecionar fazenda</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                      Fazenda selecionada
+                    </span>
+                  )}
 
-                <div className="flex items-center gap-2">
                   {latestSample && (
-                    <>
+                    <div className="flex items-center gap-2">
                       <button
+                        type="button"
                         onClick={() => {
                           setSelectedFarmId(f.id);
                           setActiveTab('relatorios');
                         }}
-                        className="px-2.5 py-1.5 border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg text-[10px] text-slate-700 dark:text-zinc-300 font-extrabold cursor-pointer transition-colors"
+                        className="h-7 px-2.5 border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-md text-xs font-medium text-slate-700 dark:text-zinc-300 cursor-pointer transition-colors"
                       >
-                        Laudo Completo
+                        Laudo
                       </button>
                       <button
+                        type="button"
                         onClick={() => {
                           setSelectedFarmId(f.id);
                           setActiveTab('recomendacoes');
                         }}
-                        className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white rounded-lg text-[10px] font-extrabold flex items-center gap-1 cursor-pointer transition-all"
+                        className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
                       >
-                        Recomendar <ArrowUpRight className="w-3 h-3 text-emerald-100" />
+                        <span>Recomendar</span>
+                        <ArrowUpRight className="w-3 h-3" />
                       </button>
-                    </>
+                    </div>
                   )}
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 };

@@ -13,7 +13,6 @@ import {
   EquineCompetitionRecord,
   EquineExpenseRecord,
   EquineExamRecord,
-  EquinePhotoRecord,
 } from '../types/equine';
 
 export const INITIAL_EQUINE_ANIMALS: EquineAnimal[] = [];
@@ -39,8 +38,6 @@ export const INITIAL_EQUINE_COMPETITIONS: EquineCompetitionRecord[] = [];
 export const INITIAL_EQUINE_EXPENSES: EquineExpenseRecord[] = [];
 
 export const INITIAL_EQUINE_EXAMS: EquineExamRecord[] = [];
-
-export const INITIAL_EQUINE_PHOTOS: EquinePhotoRecord[] = [];
 
 export const EQUINE_FEEDS_CATALOG: EquineNutritionFeed[] = [
   {

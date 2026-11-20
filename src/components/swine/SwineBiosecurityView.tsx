@@ -1,18 +1,19 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { ShieldAlert, Plus, CheckCircle2, AlertTriangle, X } from 'lucide-react';
+import { SwineBiosecurityLog } from '../../types/swine';
 import {
-  ShieldAlert,
-  ShieldCheck,
-  Plus,
-  CheckCircle2,
-  AlertTriangle,
-  Car,
-  UserCheck,
-  Sparkles,
-  Lock,
-} from 'lucide-react';
-import {
-  SwineBiosecurityLog,
-} from '../../types/swine';
+  SWINE_CARD_CLASS,
+  SWINE_INPUT_CLASS,
+  SWINE_LABEL_CLASS,
+  SWINE_PRIMARY_BTN_CLASS,
+  SWINE_SECONDARY_BTN_CLASS,
+  SWINE_SUBCARD_CLASS,
+  SWINE_TEXTAREA_CLASS,
+  formatBrDate,
+  getBiosecurityBadgeClass,
+  getTodayIsoDate,
+  useEscapeClose,
+} from './swineUi';
 
 interface SwineBiosecurityViewProps {
   checks: SwineBiosecurityLog[];
@@ -29,33 +30,44 @@ export const SwineBiosecurityView: React.FC<SwineBiosecurityViewProps> = ({
 
   // Form state
   const [type, setType] = useState<SwineBiosecurityLog['type']>('Acesso de Visitante');
-  const [description, setDescription] = useState('Desinfecção de Caminhão no Arco e troca de botas');
-  const [responsibleName, setResponsibleName] = useState('Danilo Duarte (Inspetor de Granja)');
+  const [description, setDescription] = useState('');
+  const [responsibleName, setResponsibleName] = useState('');
   const [status, setStatus] = useState<SwineBiosecurityLog['status']>('Conforme');
   const [downtimeHours, setDowntimeHours] = useState(72);
   const [showerTaken, setShowerTaken] = useState(true);
   const [vehicleDisinfected, setVehicleDisinfected] = useState(true);
-  const [notes, setNotes] = useState('Aspersão completa com glutaraldeído + amônia quaternária 1:500');
+  const [notes, setNotes] = useState('');
 
-  const conformingCount = checks.filter(c => c.status === 'Conforme').length;
-  const compliancePct = (checks || []).length > 0 ? ((conformingCount / (checks || []).length) * 100).toFixed(1) : '100';
+  useEscapeClose(isModalOpen, () => setIsModalOpen(false));
+
+  const stats = useMemo(() => {
+    const total = checks.length;
+    const conforming = checks.filter(c => c.status === 'Conforme').length;
+    const nonConforming = checks.filter(c => c.status === 'Não Conforme / Advertência').length;
+    const pending = checks.filter(c => c.status === 'Pendente').length;
+    const compliancePct = total > 0 ? `${((conforming / total) * 100).toFixed(1)}%` : '—';
+    return { total, conforming, nonConforming, pending, compliancePct };
+  }, [checks]);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!description.trim()) return;
     const newCheck: SwineBiosecurityLog = {
       id: `bio_${Date.now()}`,
-      date: new Date().toISOString().split('T')[0],
+      date: getTodayIsoDate(),
       type,
-      description,
-      responsibleName,
+      description: description.trim(),
+      responsibleName: responsibleName.trim() || 'Responsável Técnico',
       status,
-      downtimeHoursObserved: downtimeHours,
+      downtimeHoursObserved: Number(downtimeHours) || 0,
       showerTakenAndBootsChanged: showerTaken,
       vehicleDisinfected,
-      notes,
+      notes: notes.trim() || undefined,
     };
 
     onAddCheck(newCheck);
+    setDescription('');
+    setNotes('');
     setIsModalOpen(false);
   };
 
@@ -67,178 +79,278 @@ export const SwineBiosecurityView: React.FC<SwineBiosecurityViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className={`${SWINE_CARD_CLASS} p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
         <div>
-          <h2 className="text-xl font-black text-gray-900 flex items-center gap-2">
-            <ShieldAlert className="w-5 h-5 text-rose-600" />
+          <h2 className="text-base font-semibold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-rose-600 dark:text-rose-400" />
             <span>Biosseguridade & Barreiras Sanitárias</span>
           </h2>
-          <p className="text-xs text-gray-500">
-            Controle de acesso, rodolúvio, arco de desinfecção, vazio sanitário de visitantes (72h), cerca perimetral e quarentenário.
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Controle de acesso, rodolúvio, arco de desinfecção, vazio sanitário de visitantes e quarentena.
           </p>
         </div>
 
         <button
+          type="button"
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
+          className={`${SWINE_PRIMARY_BTN_CLASS} shrink-0`}
         >
-          <Plus className="w-4 h-4" />
-          <span>Registrar Auditoria de Biossegurança</span>
+          <Plus className="w-3.5 h-3.5" />
+          <span>Registrar Auditoria</span>
         </button>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-4 bg-white rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs text-gray-500 font-semibold block">Índice de Conformidade</span>
-          <div className="text-2xl font-black text-emerald-600 mt-1">{compliancePct}%</div>
-          <span className="text-[11px] text-emerald-600 font-medium">Nível Excelente (&gt; 95%)</span>
+        <div className={`${SWINE_CARD_CLASS} p-3.5`}>
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+            Conformidade
+          </span>
+          <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 tabular-nums">
+            {stats.compliancePct}
+          </div>
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+            {stats.conforming} de {stats.total} registros
+          </span>
         </div>
-        <div className="p-4 bg-white rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs text-gray-500 font-semibold block">Vazio Sanitário Visitantes</span>
-          <div className="text-2xl font-black text-gray-900 mt-1">72 Horas</div>
-          <span className="text-[11px] text-gray-500 font-medium">Livre de contato prévio</span>
+
+        <div className={`${SWINE_CARD_CLASS} p-3.5`}>
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+            Não Conformidades
+          </span>
+          <div
+            className={`text-xl font-bold mt-0.5 tabular-nums ${
+              stats.nonConforming > 0
+                ? 'text-rose-600 dark:text-rose-400'
+                : 'text-slate-900 dark:text-zinc-100'
+            }`}
+          >
+            {stats.nonConforming}
+          </div>
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400">advertências ativas</span>
         </div>
-        <div className="p-4 bg-white rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs text-gray-500 font-semibold block">Rodolúvio & Arco</span>
-          <div className="text-2xl font-black text-indigo-600 mt-1">Ativos</div>
-          <span className="text-[11px] text-emerald-600 font-medium">Concentração 1:500</span>
+
+        <div className={`${SWINE_CARD_CLASS} p-3.5`}>
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+            Pendentes
+          </span>
+          <div className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-0.5 tabular-nums">
+            {stats.pending}
+          </div>
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400">aguardando verificação</span>
         </div>
-        <div className="p-4 bg-white rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs text-gray-500 font-semibold block">Quarentena de Reposição</span>
-          <div className="text-2xl font-black text-pink-600 mt-1">30 Dias</div>
-          <span className="text-[11px] text-gray-500 font-medium">Sorologia negativa</span>
+
+        <div className={`${SWINE_CARD_CLASS} p-3.5`}>
+          <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400 block">
+            Protocolo Padrão
+          </span>
+          <div className="text-xl font-bold text-slate-900 dark:text-zinc-100 mt-0.5 tabular-nums">
+            72h / 30d
+          </div>
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400">vazio visitas / quarentena</span>
         </div>
       </div>
 
-      {/* Checklist Cards */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-4">
-        <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-          Auditoria de Barreiras e Procedimentos Operacionais Padrão (POP)
+      {/* Checklist List */}
+      <div className={`${SWINE_CARD_CLASS} p-4 space-y-3`}>
+        <h3 className="text-xs font-semibold text-slate-900 dark:text-zinc-100 uppercase tracking-wider">
+          Auditoria de Barreiras e POPs
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {checks.map(item => (
-            <div
-              key={item.id}
-              className={`p-4 rounded-2xl border transition-all flex items-start justify-between gap-3 ${
-                item.status === 'Conforme' ? 'bg-white border-gray-200' : 'bg-red-50/50 border-red-200'
-              }`}
-            >
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full">
-                    {item.type}
-                  </span>
-                  <span className="text-[11px] text-gray-500">{item.date}</span>
-                </div>
-                <h4 className="text-sm font-bold text-gray-900">{item.description}</h4>
-                {item.notes && <p className="text-xs text-gray-600">{item.notes}</p>}
-                <span className="text-[11px] text-gray-500 block">Auditor: {item.responsibleName}</span>
-              </div>
-
-              <button
-                onClick={() => handleToggle(item)}
-                className={`p-2 rounded-xl text-xs font-bold shrink-0 flex items-center gap-1.5 transition-colors ${
-                  item.status === 'Conforme'
-                    ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
-                    : 'bg-red-100 hover:bg-red-200 text-red-800'
-                }`}
+        {checks.length === 0 ? (
+          <div className={`${SWINE_SUBCARD_CLASS} p-8 text-center space-y-1.5`}>
+            <ShieldAlert className="w-7 h-7 text-slate-400 dark:text-zinc-500 mx-auto" />
+            <p className="text-xs font-medium text-slate-700 dark:text-zinc-300">
+              Nenhuma auditoria de biosseguridade registrada
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+              Registre inspeções de veículos, visitantes, vazio sanitário e controle de pragas.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {checks.map(item => (
+              <div
+                key={item.id}
+                className={`${SWINE_SUBCARD_CLASS} p-3.5 flex items-start justify-between gap-3`}
               >
-                {item.status === 'Conforme' ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
-                <span>{item.status}</span>
-              </button>
-            </div>
-          ))}
-        </div>
+                <div className="space-y-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300">
+                      {item.type}
+                    </span>
+                    <span className="text-[11px] text-slate-500 dark:text-zinc-400 tabular-nums">
+                      {formatBrDate(item.date)}
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                    {item.description}
+                  </h4>
+                  {item.notes && (
+                    <p className="text-[11px] text-slate-600 dark:text-zinc-400">{item.notes}</p>
+                  )}
+                  <div className="flex flex-wrap gap-2 text-[11px] text-slate-500 dark:text-zinc-400">
+                    <span>Auditor: {item.responsibleName}</span>
+                    {item.downtimeHoursObserved !== undefined && item.downtimeHoursObserved > 0 && (
+                      <span>· Vazio: {item.downtimeHoursObserved}h</span>
+                    )}
+                    <span>· Banho/Botas: {item.showerTakenAndBootsChanged ? 'Sim' : 'Não'}</span>
+                    <span>· Arco: {item.vehicleDisinfected ? 'Sim' : 'Não'}</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleToggle(item)}
+                  className={`h-7 px-2.5 rounded-lg text-[11px] font-medium shrink-0 inline-flex items-center gap-1 transition-colors cursor-pointer ${getBiosecurityBadgeClass(item.status)}`}
+                  title="Alternar conformidade"
+                >
+                  {item.status === 'Conforme' ? (
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  ) : (
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                  )}
+                  <span>{item.status === 'Não Conforme / Advertência' ? 'Não Conforme' : item.status}</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="text-base font-black text-gray-900">Nova Auditoria de Biosseguridade</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400">✕</button>
+        <div
+          className="fixed inset-0 bg-zinc-950/60 z-50 flex items-center justify-center p-4"
+          onClick={() => setIsModalOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl max-w-lg w-full p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-3">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                Nova Auditoria de Biosseguridade
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
             <form onSubmit={handleSave} className="space-y-3">
               <div>
-                <label className="text-xs font-bold text-gray-700 block mb-1">Tipo de Evento *</label>
+                <label className={SWINE_LABEL_CLASS}>Tipo de Evento *</label>
                 <select
                   value={type}
-                  onChange={e => setType(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs font-bold"
+                  onChange={e => setType(e.target.value as SwineBiosecurityLog['type'])}
+                  className={SWINE_INPUT_CLASS}
                 >
-                  <option value="Acesso de Visitante">Acesso de Visitante (Vazio 72h)</option>
-                  <option value="Caminhão de Ração">Caminhão de Ração (Arco Desinfecção)</option>
+                  <option value="Acesso de Visitante">Acesso de Visitante</option>
+                  <option value="Caminhão de Ração">Caminhão de Ração</option>
                   <option value="Caminhão de Carga / Animais">Caminhão de Carga / Animais</option>
-                  <option value="Vazio Sanitário">Vazio Sanitário de Galpão</option>
-                  <option value="Controle de Roedores / Moscas">Controle de Roedores e Pragas</option>
-                  <option value="Destino de Carcaças / Compostagem">Destino de Carcaças / Compostagem</option>
+                  <option value="Vazio Sanitário">Vazio Sanitário</option>
+                  <option value="Controle de Roedores / Moscas">Controle de Roedores / Moscas</option>
+                  <option value="Destino de Carcaças / Compostagem">
+                    Destino de Carcaças / Compostagem
+                  </option>
                   <option value="Quarentena de Reposição">Quarentena de Reposição</option>
                 </select>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-gray-700 block mb-1">Descrição do Evento *</label>
+                <label className={SWINE_LABEL_CLASS}>Descrição do Evento *</label>
                 <input
                   type="text"
                   required
+                  placeholder="Ex: Desinfecção de caminhão de ração no arco sanitário"
                   value={description}
                   onChange={e => setDescription(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs"
+                  className={SWINE_INPUT_CLASS}
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-gray-700 block mb-1">Observações Técnicas</label>
-                <textarea
-                  rows={2}
-                  value={notes}
-                  onChange={e => setNotes(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">Auditor / Responsável</label>
+                  <label className={SWINE_LABEL_CLASS}>Auditor / Responsável</label>
                   <input
                     type="text"
+                    placeholder="Nome"
                     value={responsibleName}
                     onChange={e => setResponsibleName(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs"
+                    className={SWINE_INPUT_CLASS}
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">Status</label>
+                  <label className={SWINE_LABEL_CLASS}>Vazio Prévio (horas)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={downtimeHours}
+                    onChange={e => setDowntimeHours(Number(e.target.value))}
+                    className={SWINE_INPUT_CLASS}
+                  />
+                </div>
+                <div>
+                  <label className={SWINE_LABEL_CLASS}>Status</label>
                   <select
                     value={status}
-                    onChange={e => setStatus(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-gray-50 border rounded-xl text-xs font-bold"
+                    onChange={e => setStatus(e.target.value as SwineBiosecurityLog['status'])}
+                    className={SWINE_INPUT_CLASS}
                   >
                     <option value="Conforme">Conforme</option>
-                    <option value="Não Conforme / Advertência">Não Conforme / Advertência</option>
+                    <option value="Não Conforme / Advertência">Não Conforme</option>
                     <option value="Pendente">Pendente</option>
                   </select>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t">
+              <div className="flex flex-wrap gap-4 pt-1">
+                <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-zinc-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showerTaken}
+                    onChange={e => setShowerTaken(e.target.checked)}
+                    className="rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                  />
+                  <span>Banho e troca de botas</span>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-zinc-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={vehicleDisinfected}
+                    onChange={e => setVehicleDisinfected(e.target.checked)}
+                    className="rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                  />
+                  <span>Veículo desinfetado</span>
+                </label>
+              </div>
+
+              <div>
+                <label className={SWINE_LABEL_CLASS}>Observações Técnicas</label>
+                <textarea
+                  rows={2}
+                  placeholder="Produto utilizado, diluição ou ocorrência..."
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  className={SWINE_TEXTAREA_CLASS}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-gray-100 text-xs font-bold rounded-xl"
+                  className={SWINE_SECONDARY_BTN_CLASS}
                 >
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-pink-600 text-white text-xs font-bold rounded-xl shadow-xs"
-                >
+                <button type="submit" className={SWINE_PRIMARY_BTN_CLASS}>
                   Salvar Registro
                 </button>
               </div>

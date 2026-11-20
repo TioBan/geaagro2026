@@ -186,68 +186,36 @@ export const PericiaSubmoduleAnalise: React.FC<PericiaSubmoduleAnaliseProps> = (
   const perdaFisicaPercent = prodEsperada > 0 ? ((perdaFisicaKgHa / prodEsperada) * 100).toFixed(1) : '0.0';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Submodule Navigation Bar */}
-      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100 dark:bg-zinc-800/80 rounded-2xl border border-slate-200 dark:border-zinc-700 text-xs">
-        <button
-          onClick={() => setActiveTab('cultura')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'cultura'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <Sprout className="w-3.5 h-3.5" />
-          3.1 Cultura & Produtividade
-        </button>
-
-        <button
-          onClick={() => setActiveTab('solo')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'solo'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <FlaskConical className="w-3.5 h-3.5" />
-          3.2 Solo & Nutrição
-        </button>
-
-        <button
-          onClick={() => setActiveTab('fitotoxicidade')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'fitotoxicidade'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <AlertTriangle className="w-3.5 h-3.5" />
-          3.5 Fitotoxicidade & Deriva
-        </button>
-
-        <button
-          onClick={() => setActiveTab('hipoteses')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'hipoteses'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <Brain className="w-3.5 h-3.5" />
-          3.3 Hipóteses Técnicas ({analise.hipotesesTecnicas.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab('diagnostico')}
-          className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'diagnostico'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <TrendingDown className="w-3.5 h-3.5" />
-          3.9 Diagnóstico Estruturado
-        </button>
+      <div className="border-b border-slate-200/80 dark:border-zinc-800 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-1 min-w-max">
+          {[
+            { id: 'cultura' as const, label: '3.1 Cultura & Produtividade', icon: Sprout },
+            { id: 'solo' as const, label: '3.2 Solo & Nutrição', icon: FlaskConical },
+            { id: 'fitotoxicidade' as const, label: '3.5 Fitotoxicidade & Deriva', icon: AlertTriangle },
+            { id: 'hipoteses' as const, label: `3.3 Hipóteses (${analise.hipotesesTecnicas.length})`, icon: Brain },
+            { id: 'diagnostico' as const, label: '3.9 Diagnóstico Estruturado', icon: TrendingDown },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3 py-2.5 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
+                  active
+                    ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400 dark:border-emerald-500'
+                    : 'border-transparent text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:border-slate-300 dark:hover:border-zinc-700'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* 3.1 CULTURA E PRODUTIVIDADE */}
@@ -313,11 +281,11 @@ export const PericiaSubmoduleAnalise: React.FC<PericiaSubmoduleAnaliseProps> = (
             </div>
 
             {/* Calculated Physical Loss Badge */}
-            <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl p-3 flex flex-col justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+            <div className="bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/50 rounded-lg p-3 flex flex-col justify-between">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-300">
                 Perda Física Calculada
               </span>
-              <p className="text-lg font-black text-amber-900 dark:text-amber-200">
+              <p className="text-base font-bold text-amber-900 dark:text-amber-200 tabular-nums">
                 {perdaFisicaKgHa.toLocaleString('pt-BR')} kg/ha ({perdaFisicaPercent}%)
               </p>
             </div>

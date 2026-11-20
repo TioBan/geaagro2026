@@ -1,290 +1,320 @@
 import React, { useState } from 'react';
 import { ForageItem } from '../../types/forage';
 import { getForagePhotoData } from '../../data/foragePhotosDatabase';
-import {
-  AlertTriangle,
-  ArrowUpRight,
-  Scale,
-  Sparkles,
-  CheckCircle2,
-  Camera,
-  MapPin,
-} from 'lucide-react';
+import { Eye, Scale, Check, AlertTriangle, Camera, Leaf } from 'lucide-react';
 
 interface ForagePhotoCardProps {
   forage: ForageItem;
-  onSelect: (forage: ForageItem) => void;
-  onCompareToggle?: (forageId: string) => void;
-  isCompared?: boolean;
+  onSelectForage: (forage: ForageItem) => void;
+  isSelectedForCompare?: boolean;
+  onToggleCompare?: (forage: ForageItem) => void;
 }
 
-export const ForagePhotoCard: React.FC<ForagePhotoCardProps> = React.memo(({
-  forage,
-  onSelect,
-  onCompareToggle,
-  isCompared = false,
-}) => {
-  const [viewMode, setViewMode] = useState<'photo' | 'botanical'>('photo');
-  const photoData = getForagePhotoData(forage.id);
-  const isLegume = forage.botanicalFamily.includes('Leguminosa');
+const CATEGORY_LABELS: Record<ForageItem['category'], string> = {
+  graminea_tropical: 'Gramínea Tropical',
+  corte_silagem: 'Corte & Silagem',
+  graminea_temperada: 'Inverno / Temperada',
+  leguminosa_tropical: 'Leguminosa',
+  leguminosa_temperada: 'Leguminosa Temperada',
+};
 
-  // SVG Botanical Habitus Fallback / Alternative View
-  const renderBotanicalHabitus = () => {
-    return (
-      <svg
-        viewBox="0 0 320 200"
-        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <defs>
-          <linearGradient id={`skyGrad-${forage.id}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#dbeafe" stopOpacity="0.8" />
-            <stop offset="60%" stopColor="#f0fdf4" stopOpacity="0.9" />
-            <stop offset="100%" stopColor="#dcfce7" stopOpacity="1" />
-          </linearGradient>
-          <linearGradient id={`groundGrad-${forage.id}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#15803d" />
-            <stop offset="30%" stopColor="#166534" />
-            <stop offset="100%" stopColor="#451a03" />
-          </linearGradient>
-          <linearGradient id={`leafGrad-${forage.id}`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor={forage.visuals.secondaryColorHex} />
-            <stop offset="70%" stopColor={forage.visuals.mainColorHex} />
-            <stop offset="100%" stopColor="#064e3b" />
-          </linearGradient>
-        </defs>
+const SUSCEPTIBILITY_LABELS: Record<string, string> = {
+  alta: 'Alta',
+  moderada: 'Moderada',
+  tolerante: 'Tolerante',
+  resistente: 'Resistente',
+};
 
-        <rect width="320" height="200" fill={`url(#skyGrad-${forage.id})`} />
-        <circle cx="280" cy="35" r="22" fill="#fef08a" opacity="0.6" />
-        <circle cx="280" cy="35" r="14" fill="#fde047" opacity="0.8" />
-        <path d="M0,130 Q80,110 160,125 T320,120 L320,200 L0,200 Z" fill="#bbf7d0" opacity="0.6" />
-        <path d="M0,145 Q120,135 240,150 T320,140 L320,200 L0,200 Z" fill="#86efac" opacity="0.7" />
-        <rect y="165" width="320" height="35" fill={`url(#groundGrad-${forage.id})`} />
-        
-        <g stroke="#92400e" strokeWidth="1.2" opacity="0.7" fill="none">
-          <path d="M160,170 Q150,185 140,198" />
-          <path d="M160,170 Q165,185 175,198" />
-          <path d="M155,170 Q145,180 130,192" />
-          <path d="M165,170 Q180,182 195,195" />
-          {isLegume && (
-            <>
-              <circle cx="150" cy="182" r="3" fill="#f43f5e" />
-              <circle cx="170" cy="186" r="3.5" fill="#f43f5e" />
-              <circle cx="142" cy="192" r="2.5" fill="#f43f5e" />
-            </>
-          )}
-        </g>
-
-        <g fill="none" stroke={`url(#leafGrad-${forage.id})`} strokeLinecap="round">
-          <path d="M160,170 Q155,90 140,35" strokeWidth="4.5" />
-          <path d="M160,170 Q168,85 185,45" strokeWidth="4" />
-          <path d="M158,170 Q140,105 110,65" strokeWidth="3.5" />
-          <path d="M162,170 Q180,110 215,75" strokeWidth="3.5" />
-          <path d="M155,145 Q120,120 70,135" strokeWidth="5" stroke={`url(#leafGrad-${forage.id})`} />
-          <path d="M165,140 Q200,115 250,130" strokeWidth="5" stroke={`url(#leafGrad-${forage.id})`} />
-          <path d="M150,120 Q95,95 50,115" strokeWidth="4.5" stroke={`url(#leafGrad-${forage.id})`} />
-          <path d="M170,115 Q225,90 270,110" strokeWidth="4.5" stroke={`url(#leafGrad-${forage.id})`} />
-          <path d="M148,90 Q90,65 55,80" strokeWidth="4" stroke={`url(#leafGrad-${forage.id})`} />
-          <path d="M172,85 Q230,60 265,75" strokeWidth="4" stroke={`url(#leafGrad-${forage.id})`} />
-        </g>
-      </svg>
-    );
-  };
+const ForageBotanicalIllustration: React.FC<{ forage: ForageItem }> = ({ forage }) => {
+  const { mainColorHex, secondaryColorHex } = forage.visuals;
+  const habit = forage.phenology.growthHabit;
 
   return (
-    <div className="group bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between hover:border-emerald-500/60 dark:hover:border-emerald-500/60">
-      <div>
-        {/* Real Photo / Botanical Viewport Container */}
-        <div className="relative h-52 w-full overflow-hidden bg-slate-950">
-          {viewMode === 'photo' ? (
-            <div className="relative w-full h-full cursor-pointer" onClick={() => onSelect(forage)}>
-              <img
-                src={photoData.primaryPhotoUrl}
-                alt={`Foto real de ${forage.commonName}`}
-                loading="lazy"
-                decoding="async"
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+    <svg
+      viewBox="0 0 400 220"
+      className="w-full h-full object-cover"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-label={`Ilustração botânica de ${forage.commonName}`}
+    >
+      <defs>
+        <linearGradient id={`bg-${forage.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor={mainColorHex} stopOpacity="0.92" />
+          <stop offset="58%" stopColor={secondaryColorHex} stopOpacity="0.88" />
+          <stop offset="100%" stopColor="#0f172a" stopOpacity="0.95" />
+        </linearGradient>
+        <linearGradient id={`soil-${forage.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#3b2615" stopOpacity="0.9" />
+          <stop offset="100%" stopColor="#1e130b" stopOpacity="0.98" />
+        </linearGradient>
+      </defs>
+
+      <rect width="400" height="220" fill={`url(#bg-${forage.id})`} />
+      <circle cx="330" cy="45" r="52" fill={secondaryColorHex} opacity="0.18" />
+      <rect x="0" y="176" width="400" height="44" fill={`url(#soil-${forage.id})`} />
+
+      {habit === 'ereta_porte_alto' ? (
+        <g strokeLinecap="round">
+          {[100, 155, 210, 265, 310].map(x => (
+            <g key={x}>
+              <line x1={x} y1="184" x2={x - 4} y2="28" stroke="#a3e635" strokeWidth="9" />
+              <line x1={x - 5} y1="142" x2={x + 5} y2="142" stroke="#365314" strokeWidth="2.5" />
+              <line x1={x - 5} y1="100" x2={x + 5} y2="100" stroke="#365314" strokeWidth="2.5" />
+              <line x1={x - 5} y1="60" x2={x + 5} y2="60" stroke="#365314" strokeWidth="2.5" />
+              <path d={`M${x} 110 Q${x - 42} 84 ${x - 72} 102`} stroke="#bef264" strokeWidth="5" fill="none" />
+              <path d={`M${x} 76 Q${x + 42} 50 ${x + 70} 70`} stroke="#bef264" strokeWidth="5" fill="none" />
+            </g>
+          ))}
+        </g>
+      ) : habit === 'estolonifera' || habit === 'prostrada_decumbente' ? (
+        <g stroke="#bef264" strokeLinecap="round" fill="none">
+          <path d="M24 176 Q110 156 205 174 T385 168" strokeWidth="5" stroke="#84cc16" />
+          {[55, 95, 140, 185, 235, 285, 330].map((x, idx) => (
+            <g key={x}>
+              <path
+                d={`M${x} 174 Q${x - 16} 118 ${x - 28} 82`}
+                strokeWidth="4.5"
+                stroke={idx % 2 === 0 ? '#a3e635' : '#bef264'}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
-            </div>
+              <path d={`M${x} 174 Q${x + 14} 122 ${x + 26} 88`} strokeWidth="4" />
+            </g>
+          ))}
+        </g>
+      ) : habit === 'arbustiva_ereta' || forage.botanicalFamily === 'Fabaceae (Leguminosa)' ? (
+        <g>
+          <path d="M55 178 Q180 120 335 162" stroke="#65a30d" strokeWidth="5" fill="none" />
+          {[90, 150, 210, 270, 325].map((x, idx) => (
+            <g key={x} transform={`translate(${x}, ${118 - (idx % 2) * 18})`}>
+              <ellipse cx="-11" cy="-9" rx="13" ry="8" fill="#84cc16" transform="rotate(-28)" />
+              <ellipse cx="11" cy="-9" rx="13" ry="8" fill="#84cc16" transform="rotate(28)" />
+              <ellipse cx="0" cy="-21" rx="9" ry="13" fill="#bef264" />
+              {idx % 2 === 1 && <circle cx="0" cy="-35" r="6" fill="#facc15" />}
+            </g>
+          ))}
+        </g>
+      ) : (
+        <g stroke="#bef264" strokeLinecap="round" fill="none">
+          <path d="M120 182 Q100 102 68 38" strokeWidth="5.5" />
+          <path d="M125 182 Q120 96 112 22" strokeWidth="6.5" />
+          <path d="M130 182 Q150 92 178 32" strokeWidth="5.5" />
+          <path d="M260 182 Q232 104 205 42" strokeWidth="5.5" />
+          <path d="M266 182 Q268 88 274 20" strokeWidth="7" />
+          <path d="M272 182 Q296 96 334 38" strokeWidth="5.5" />
+          <ellipse cx="112" cy="22" rx="7" ry="15" fill="#fde68a" stroke="none" opacity="0.85" />
+          <ellipse cx="274" cy="20" rx="8" ry="17" fill="#fef08a" stroke="none" opacity="0.85" />
+        </g>
+      )}
+    </svg>
+  );
+};
+
+export const ForagePhotoCard: React.FC<ForagePhotoCardProps> = React.memo(
+  ({ forage, onSelectForage, isSelectedForCompare = false, onToggleCompare }) => {
+    const [viewMode, setViewMode] = useState<'photo' | 'botanical'>('photo');
+    const [imgError, setImgError] = useState(false);
+
+    const photoData = getForagePhotoData(forage.id);
+    const showPhoto = viewMode === 'photo' && !imgError;
+
+    const firstStrength = forage.strengthsAndWeaknesses.strengths[0];
+    const primaryDisease = forage.diseasesAndPests[0];
+
+    return (
+      <article
+        className={`group bg-white dark:bg-zinc-900 rounded-xl border transition-colors flex flex-col overflow-hidden ${
+          isSelectedForCompare
+            ? 'border-emerald-500 dark:border-emerald-500/80 ring-1 ring-emerald-500/20'
+            : 'border-slate-200/80 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700'
+        }`}
+      >
+        {/* Compact Media Header */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => onSelectForage(forage)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onSelectForage(forage);
+            }
+          }}
+          className="relative h-40 w-full overflow-hidden bg-slate-900 cursor-pointer shrink-0 focus:outline-none"
+        >
+          {showPhoto ? (
+            <img
+              src={photoData.primaryPhotoUrl}
+              alt={`${forage.commonName} (${forage.scientificName})`}
+              loading="lazy"
+              onError={() => setImgError(true)}
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            />
           ) : (
-            <div className="w-full h-full cursor-pointer" onClick={() => onSelect(forage)}>
-              {renderBotanicalHabitus()}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-            </div>
+            <ForageBotanicalIllustration forage={forage} />
           )}
 
-          {/* Top Floating Badges */}
-          <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between pointer-events-none">
-            {/* Real Photo Offline Tag */}
-            <div className="flex items-center gap-1.5 pointer-events-auto">
-              <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-black/75 backdrop-blur-md text-emerald-400 border border-emerald-500/40 shadow-xs flex items-center gap-1">
-                <Camera className="w-3 h-3 text-emerald-400" />
-                FOTO REAL OFFLINE
-              </span>
-            </div>
+          {/* Measured Contrast Scrim */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/20 pointer-events-none" />
 
-            {/* View Mode Switcher Toggle */}
-            <div className="flex items-center gap-1 pointer-events-auto bg-black/70 backdrop-blur-md p-1 rounded-xl border border-white/20">
+          {/* Top Bar: Category Label + View Switch */}
+          <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between gap-2">
+            <span className="px-2 py-0.5 rounded-md bg-black/55 backdrop-blur-xs text-[10px] font-medium text-white/95 tracking-wide">
+              {CATEGORY_LABELS[forage.category]}
+            </span>
+
+            <div
+              onClick={e => e.stopPropagation()}
+              className="inline-flex items-center rounded-md bg-black/55 backdrop-blur-xs p-0.5 border border-white/10"
+            >
               <button
                 type="button"
-                onClick={e => {
-                  e.stopPropagation();
+                onClick={() => {
+                  setImgError(false);
                   setViewMode('photo');
                 }}
-                className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                aria-label="Ver foto real"
+                title="Foto real"
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
                   viewMode === 'photo'
-                    ? 'bg-emerald-600 text-white shadow-2xs'
-                    : 'text-slate-300 hover:text-white'
+                    ? 'bg-white text-slate-900'
+                    : 'text-white/80 hover:text-white'
                 }`}
-                title="Foto Real de Campo"
               >
-                Foto
+                <Camera className="w-2.5 h-2.5" />
+                <span>Foto</span>
               </button>
               <button
                 type="button"
-                onClick={e => {
-                  e.stopPropagation();
-                  setViewMode('botanical');
-                }}
-                className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                onClick={() => setViewMode('botanical')}
+                aria-label="Ver esquema botânico"
+                title="Esquema botânico"
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
                   viewMode === 'botanical'
-                    ? 'bg-emerald-600 text-white shadow-2xs'
-                    : 'text-slate-300 hover:text-white'
+                    ? 'bg-white text-slate-900'
+                    : 'text-white/80 hover:text-white'
                 }`}
-                title="Morfologia Botânica"
               >
-                Botânica
+                <Leaf className="w-2.5 h-2.5" />
+                <span>Botânica</span>
               </button>
             </div>
           </div>
 
-          {/* Overlay Info at bottom of image */}
-          <div className="absolute inset-x-0 bottom-0 p-3.5 flex items-end justify-between cursor-pointer" onClick={() => onSelect(forage)}>
-            <div className="space-y-0.5">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-300 flex items-center gap-1 drop-shadow-sm">
-                <MapPin className="w-3 h-3 text-emerald-400" />
-                <span>{photoData.tagLocation}</span>
-              </span>
-              <h4 className="text-white font-extrabold text-base leading-tight drop-shadow-sm group-hover:text-emerald-300 transition-colors">
-                {forage.commonName}
-              </h4>
-              <p className="text-[11px] text-slate-300 italic line-clamp-1 drop-shadow-xs">
-                {forage.scientificName} &bull; {forage.cultivar}
-              </p>
-            </div>
+          {/* Bottom Title Overlay */}
+          <div className="absolute bottom-2.5 inset-x-3">
+            <h3 className="text-sm font-semibold text-white leading-snug line-clamp-1">
+              {forage.commonName}
+            </h3>
+            <p className="text-[11px] text-white/80 italic line-clamp-1">
+              {forage.scientificName} · cv. {forage.cultivar}
+            </p>
+          </div>
+        </div>
 
-            <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-white/20 backdrop-blur-md text-white border border-white/30 shrink-0">
-              {forage.category === 'graminea_tropical'
-                ? 'Tropical'
-                : forage.category === 'graminea_temperada'
-                ? 'Inverno'
-                : forage.category === 'leguminosa_tropical'
-                ? 'Leguminosa'
-                : 'Corte'}
+        {/* Hairline 3-Column Metric Strip */}
+        <div className="grid grid-cols-3 divide-x divide-slate-100 dark:divide-zinc-800 border-b border-slate-100 dark:border-zinc-800 text-center">
+          <div className="py-2 px-1.5">
+            <span className="block text-[10px] uppercase tracking-wider text-slate-400 dark:text-zinc-500">
+              PB Média
+            </span>
+            <span className="block text-xs font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums mt-0.5">
+              {forage.bromatology.crudeProteinPercent.average}%
+            </span>
+          </div>
+          <div className="py-2 px-1.5">
+            <span className="block text-[10px] uppercase tracking-wider text-slate-400 dark:text-zinc-500">
+              DIVMS
+            </span>
+            <span className="block text-xs font-semibold text-slate-800 dark:text-zinc-200 tabular-nums mt-0.5">
+              {forage.bromatology.inVitroDryMatterDigestibilityPercent.average}%
+            </span>
+          </div>
+          <div className="py-2 px-1.5">
+            <span className="block text-[10px] uppercase tracking-wider text-slate-400 dark:text-zinc-500">
+              MS t/ha
+            </span>
+            <span className="block text-xs font-semibold text-slate-800 dark:text-zinc-200 tabular-nums mt-0.5">
+              {forage.dryMatterYieldTonHaYear.min}–{forage.dryMatterYieldTonHaYear.max}
             </span>
           </div>
         </div>
 
-        {/* Nutritional & Agronomic Key Indicators */}
-        <div className="p-4 space-y-3">
-          {/* Key Metrics Grid */}
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="bg-emerald-50 dark:bg-emerald-950/40 p-2 rounded-xl border border-emerald-100 dark:border-emerald-900/50">
-              <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 block uppercase">
-                Proteína (PB)
-              </span>
-              <span className="text-sm font-extrabold text-emerald-700 dark:text-emerald-400">
-                {forage.bromatology.crudeProteinPercent.average}%
-              </span>
-            </div>
-
-            <div className="bg-blue-50 dark:bg-blue-950/40 p-2 rounded-xl border border-blue-100 dark:border-blue-900/50">
-              <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 block uppercase">
-                Digestib.
-              </span>
-              <span className="text-sm font-extrabold text-blue-700 dark:text-blue-400">
-                {forage.bromatology.inVitroDryMatterDigestibilityPercent.average}%
+        {/* Compact Agronomic Summary */}
+        <div className="p-3 flex-1 flex flex-col justify-between gap-2.5">
+          <div className="space-y-2">
+            {/* Rotational Heights Line */}
+            <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-zinc-400 pb-2 border-b border-slate-100 dark:border-zinc-800/80">
+              <span>Manejo Rotacionado</span>
+              <span className="tabular-nums font-medium text-slate-800 dark:text-zinc-200">
+                Entrada{' '}
+                <strong className="text-emerald-700 dark:text-emerald-400">
+                  {forage.phenology.entryHeightRotationalCm} cm
+                </strong>
+                <span className="mx-1.5 text-slate-300 dark:text-zinc-700">·</span>
+                Saída <strong>{forage.phenology.exitHeightRotationalCm} cm</strong>
               </span>
             </div>
 
-            <div className="bg-amber-50 dark:bg-amber-950/40 p-2 rounded-xl border border-amber-100 dark:border-amber-900/50">
-              <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 block uppercase">
-                Prod. MS
-              </span>
-              <span className="text-xs font-black text-amber-700 dark:text-amber-400">
-                {forage.dryMatterYieldTonHaYear.average} <span className="text-[9px] font-normal">t/ha</span>
-              </span>
+            {/* Highlight & Sanitary Note */}
+            <div className="space-y-1 text-[11px] leading-relaxed">
+              {firstStrength && (
+                <p className="text-slate-600 dark:text-zinc-300 line-clamp-1 flex items-center gap-1.5">
+                  <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span className="truncate">{firstStrength}</span>
+                </p>
+              )}
+              {primaryDisease && (
+                <p className="text-slate-500 dark:text-zinc-400 line-clamp-1 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
+                  <span className="truncate">
+                    {primaryDisease.name} (
+                    {SUSCEPTIBILITY_LABELS[primaryDisease.susceptibilityLevel] ||
+                      primaryDisease.susceptibilityLevel}
+                    )
+                  </span>
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Management Heights */}
-          <div className="bg-slate-50 dark:bg-zinc-800/60 p-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1.5">
-              <Scale className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
-              <span className="text-slate-600 dark:text-zinc-300 font-medium">Manejo Rotacionado:</span>
-            </div>
-            <div className="flex items-center gap-2 font-bold text-[11px]">
-              <span className="text-emerald-600 dark:text-emerald-400" title="Altura de Entrada">
-                Entrada: {forage.phenology.entryHeightRotationalCm} cm
-              </span>
-              <span className="text-slate-400">&bull;</span>
-              <span className="text-rose-600 dark:text-rose-400" title="Altura de Saída">
-                Saída: {forage.phenology.exitHeightRotationalCm} cm
-              </span>
-            </div>
-          </div>
-
-          {/* Highlights & Strengths */}
-          <div className="space-y-1.5 pt-1">
-            <div className="flex items-start gap-1.5 text-xs text-slate-700 dark:text-zinc-300">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-              <span className="line-clamp-2 leading-relaxed text-[11.5px]">
-                {forage.strengthsAndWeaknesses.strengths[0]}
-              </span>
-            </div>
-
-            {/* Disease Alert Preview */}
-            {forage.diseasesAndPests.length > 0 && (
-              <div className="flex items-start gap-1.5 text-xs text-slate-600 dark:text-zinc-400">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                <span className="line-clamp-1 text-[11px]">
-                  Atenção: {forage.diseasesAndPests[0].name}
-                </span>
-              </div>
+          {/* Compact Footer Actions */}
+          <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-zinc-800">
+            {onToggleCompare && (
+              <button
+                type="button"
+                onClick={() => onToggleCompare(forage)}
+                className={`h-8 flex-1 px-2.5 rounded-lg text-xs font-medium inline-flex items-center justify-center gap-1.5 border transition-colors cursor-pointer ${
+                  isSelectedForCompare
+                    ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-500/60 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800'
+                }`}
+              >
+                {isSelectedForCompare ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 shrink-0" />
+                    <span>Na Comparação</span>
+                  </>
+                ) : (
+                  <>
+                    <Scale className="w-3.5 h-3.5 shrink-0" />
+                    <span>Comparar</span>
+                  </>
+                )}
+              </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => onSelectForage(forage)}
+              className="h-8 flex-1 px-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Eye className="w-3.5 h-3.5 shrink-0" />
+              <span>Ver Ficha</span>
+            </button>
           </div>
         </div>
-      </div>
+      </article>
+    );
+  }
+);
 
-      {/* Card Actions Footer */}
-      <div className="p-3 bg-slate-50/80 dark:bg-zinc-950/80 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-between gap-2">
-        {onCompareToggle && (
-          <button
-            type="button"
-            onClick={() => onCompareToggle(forage.id)}
-            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              isCompared
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-700'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            {isCompared ? 'Comparando' : 'Comparar'}
-          </button>
-        )}
-
-        <button
-          type="button"
-          onClick={() => onSelect(forage)}
-          className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs hover:shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-        >
-          <Camera className="w-3.5 h-3.5" />
-          <span>Ver Fotos & Ficha Completa</span>
-          <ArrowUpRight className="w-3 h-3 ml-0.5 opacity-70" />
-        </button>
-      </div>
-    </div>
-  );
-});
+ForagePhotoCard.displayName = 'ForagePhotoCard';

@@ -551,116 +551,44 @@ export const PericiaSubmoduleAbertura: React.FC<PericiaSubmoduleAberturaProps> =
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Submodule Navigation Bar */}
-      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100 dark:bg-zinc-800/80 rounded-2xl border border-slate-200 dark:border-zinc-700">
-        <button
-          onClick={() => setActiveTab('identificacao')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'identificacao'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <FileText className="w-3.5 h-3.5" />
-          1.1 Identificação
-        </button>
-
-        <button
-          onClick={() => setActiveTab('dados_regiao')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'dados_regiao'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <CloudSun className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
-          1.1.2 Dados da Região
-        </button>
-
-        <button
-          onClick={() => setActiveTab('partes')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'partes'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <Users className="w-3.5 h-3.5" />
-          1.2 Partes Envolvidas ({pericia.partesEnvolvidas.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab('objeto')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'objeto'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <Target className="w-3.5 h-3.5" />
-          1.3 Objeto
-        </button>
-
-        <button
-          onClick={() => setActiveTab('imovel_avaliado')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'imovel_avaliado'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <Landmark className="w-3.5 h-3.5 text-blue-500" />
-          1.3.2 Do Imóvel Avaliado
-        </button>
-
-        <button
-          onClick={() => setActiveTab('avaliacao_imovel')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'avaliacao_imovel'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <Landmark className="w-3.5 h-3.5 text-emerald-500" />
-          1.3.3 Avaliação do Imóvel ({pericia.avaliacaoImovel?.precificacaoTerraNua?.length || 0})
-        </button>
-
-        <button
-          onClick={() => setActiveTab('quesitos')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'quesitos'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <HelpCircle className="w-3.5 h-3.5" />
-          1.4 Quesitos ({pericia.quesitos.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab('documentos')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'documentos'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <FolderOpen className="w-3.5 h-3.5" />
-          1.5 Documentos ({pericia.documentosIniciais.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab('checklist')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'checklist'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-700 dark:text-emerald-400 shadow-xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
-          }`}
-        >
-          <CheckSquare className="w-3.5 h-3.5" />
-          1.6 Checklist Preliminar
-        </button>
+      <div className="border-b border-slate-200/80 dark:border-zinc-800 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-1 min-w-max">
+          {[
+            { id: 'identificacao' as const, label: '1.1 Identificação', icon: FileText },
+            { id: 'dados_regiao' as const, label: '1.1.2 Dados da Região', icon: CloudSun },
+            { id: 'partes' as const, label: `1.2 Partes (${pericia.partesEnvolvidas.length})`, icon: Users },
+            { id: 'objeto' as const, label: '1.3 Objeto', icon: Target },
+            { id: 'imovel_avaliado' as const, label: '1.3.2 Imóvel Avaliado', icon: Landmark },
+            {
+              id: 'avaliacao_imovel' as const,
+              label: `1.3.3 Avaliação (${pericia.avaliacaoImovel?.precificacaoTerraNua?.length || 0})`,
+              icon: Landmark,
+            },
+            { id: 'quesitos' as const, label: `1.4 Quesitos (${pericia.quesitos.length})`, icon: HelpCircle },
+            { id: 'documentos' as const, label: `1.5 Documentos (${pericia.documentosIniciais.length})`, icon: FolderOpen },
+            { id: 'checklist' as const, label: '1.6 Checklist', icon: CheckSquare },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3 py-2.5 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
+                  active
+                    ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400 dark:border-emerald-500'
+                    : 'border-transparent text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:border-slate-300 dark:hover:border-zinc-700'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* 1.1.2 DADOS DA REGIÃO */}
@@ -1163,8 +1091,8 @@ export const PericiaSubmoduleAbertura: React.FC<PericiaSubmoduleAberturaProps> =
         <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-2xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-3 gap-2">
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Landmark className="w-4 h-4 text-blue-600 animate-pulse" />
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <Landmark className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 1.3.2 Do Imóvel Avaliado
               </h3>
               <span className="text-[11px] text-slate-400">Dados cadastrais e técnicos do imóvel rural</span>

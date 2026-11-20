@@ -2,12 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import {
   Activity,
   CheckCircle2,
-  GitMerge,
-  Grid3X3,
-  Layers,
   Play,
-  Square,
-  TrendingUp,
   XCircle,
 } from 'lucide-react';
 import {
@@ -140,17 +135,22 @@ export const AnalisesAvancadasView: React.FC<AnalisesAvancadasViewProps> = ({
 
   if (!dataset || rows.length === 0) {
     return (
-      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-10 text-center space-y-3">
-        <Activity className="w-8 h-8 text-slate-400 mx-auto" />
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-          Importe dados experimentais antes de executar análises avançadas
-        </h3>
+      <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl px-6 py-8 text-center space-y-3">
+        <Activity className="w-6 h-6 text-slate-400 dark:text-zinc-500 mx-auto" />
+        <div className="space-y-1">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-zinc-100">
+            Importe dados experimentais antes de executar análises avançadas
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Carregue ou crie sua matriz de dados na aba Dados &amp; Planilhas.
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => onNavigateSubTab('dados')}
-          className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer"
+          className="px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg whitespace-nowrap transition-colors cursor-pointer"
         >
-          Ir para Banco de Dados
+          Ir para Dados &amp; Planilhas
         </button>
       </div>
     );
@@ -506,15 +506,15 @@ export const AnalisesAvancadasView: React.FC<AnalisesAvancadasViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {errMsg && (
-        <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 text-xs text-rose-800 dark:text-rose-300">
+        <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 text-xs text-rose-800 dark:text-rose-300">
           <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{errMsg}</span>
         </div>
       )}
       {okMsg && (
-        <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-xs text-emerald-800 dark:text-emerald-300">
+        <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-xs text-emerald-800 dark:text-emerald-300">
           <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{okMsg}</span>
         </div>
@@ -524,8 +524,8 @@ export const AnalisesAvancadasView: React.FC<AnalisesAvancadasViewProps> = ({
       {/* A. TESTES NÃO PARAMÉTRICOS                                             */}
       {/* ====================================================================== */}
       {section === 'nao_parametrica' && (
-        <div className="space-y-5">
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+        <div className="space-y-4">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-3.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
             <div>
               <label className="block text-[11px] font-semibold text-slate-600 dark:text-zinc-400 mb-1">
                 Teste Não Paramétrico
@@ -617,7 +617,7 @@ export const AnalisesAvancadasView: React.FC<AnalisesAvancadasViewProps> = ({
             <button
               type="button"
               onClick={handleRunNonParametric}
-              className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer"
+              className="h-8 px-3.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
             >
               <Play className="w-3.5 h-3.5" />
               <span>Executar Teste</span>
@@ -829,7 +829,7 @@ export const AnalisesAvancadasView: React.FC<AnalisesAvancadasViewProps> = ({
                   <button
                     type="button"
                     onClick={() => abortRef.current?.abort()}
-                    className="w-full px-4 py-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg cursor-pointer"
+                    className="h-8 px-3.5 text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-lg whitespace-nowrap cursor-pointer"
                   >
                     Cancelar
                   </button>
@@ -837,10 +837,10 @@ export const AnalisesAvancadasView: React.FC<AnalisesAvancadasViewProps> = ({
                   <button
                     type="button"
                     onClick={handleRunMultivariate}
-                    className="w-full px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="h-8 px-3.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
                   >
                     <Play className="w-3.5 h-3.5" />
-                    <span>Executar Multivariada</span>
+                    <span>Executar</span>
                   </button>
                 )}
               </div>
@@ -848,7 +848,7 @@ export const AnalisesAvancadasView: React.FC<AnalisesAvancadasViewProps> = ({
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[11px] font-semibold text-slate-600 dark:text-zinc-400">
+                <label className="text-[11px] font-medium text-slate-600 dark:text-zinc-400">
                   Variáveis Quantitativas Selecionadas ({mvVars.length})
                 </label>
                 {mvTest !== 'pca' && (
@@ -862,7 +862,7 @@ export const AnalisesAvancadasView: React.FC<AnalisesAvancadasViewProps> = ({
                   </label>
                 )}
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {numericCols.map((c) => {
                   const sel = mvVars.includes(c);
                   return (
@@ -872,10 +872,10 @@ export const AnalisesAvancadasView: React.FC<AnalisesAvancadasViewProps> = ({
                       onClick={() =>
                         setMvVars((prev) => (sel ? prev.filter((x) => x !== c) : [...prev, c]))
                       }
-                      className={`px-3 py-1.5 text-xs rounded-lg border cursor-pointer ${
+                      className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
                         sel
-                          ? 'bg-emerald-600 text-white border-emerald-600'
-                          : 'bg-slate-50 dark:bg-zinc-950 border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                          : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800'
                       }`}
                     >
                       {c}
@@ -1057,23 +1057,23 @@ export const AnalisesAvancadasView: React.FC<AnalisesAvancadasViewProps> = ({
       {/* C. ANÁLISES ESPECIAIS                                                  */}
       {/* ====================================================================== */}
       {section === 'especiais' && (
-        <div className="space-y-5">
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 space-y-4">
-            <div className="flex flex-wrap gap-2">
+        <div className="space-y-4">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-3.5 space-y-3.5">
+            <div className="inline-flex flex-wrap items-center p-0.5 bg-slate-100 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg gap-0.5">
               {[
-                { id: 'mann_kendall', label: 'Séries Temporais (Mann-Kendall & Sen)' },
-                { id: 'logistica', label: 'Regressão Logística Binária (IRLS)' },
-                { id: 'contingencia', label: 'Contingência (χ² / Yates / Fisher / G)' },
-                { id: 'sobrevivencia', label: 'Sobrevivência (Kaplan-Meier & Log-Rank)' },
+                { id: 'mann_kendall', label: 'Mann-Kendall & Sen' },
+                { id: 'logistica', label: 'Logística Binária' },
+                { id: 'contingencia', label: 'Contingência (χ² / Fisher)' },
+                { id: 'sobrevivencia', label: 'Sobrevivência (KM)' },
               ].map((t) => (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => setSpTest(t.id as any)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg border cursor-pointer ${
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md whitespace-nowrap transition-colors cursor-pointer ${
                     spTest === t.id
-                      ? 'bg-emerald-600 text-white border-emerald-600'
-                      : 'bg-slate-50 dark:bg-zinc-950 border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300'
+                      ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-white'
+                      : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   {t.label}
@@ -1212,10 +1212,10 @@ export const AnalisesAvancadasView: React.FC<AnalisesAvancadasViewProps> = ({
               <button
                 type="button"
                 onClick={handleRunSpecial}
-                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer"
+                className="h-8 px-3.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
               >
                 <Play className="w-3.5 h-3.5" />
-                <span>Executar Análise Especial</span>
+                <span>Executar Análise</span>
               </button>
             </div>
           </div>

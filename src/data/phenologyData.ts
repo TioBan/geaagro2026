@@ -189,7 +189,7 @@ export const SOJA_PHENOLOGICAL_STAGES: PhenologicalStage[] = [
     },
     management: {
       recommendedOperations: [
-        '⭐ Coleta de amostras foliares para Diagnose Foliar de Laboratório (Módulo GeaAgro CRM)',
+        'Coleta de amostras foliares para Diagnose Foliar de Laboratório (Módulo GeaAgro CRM)',
         'Primeira aplicação estratégica de fungicida sítio-específico + multissítio',
         'Reforço nutricional foliar com Boro e Cálcio para pegamento floral',
       ],
